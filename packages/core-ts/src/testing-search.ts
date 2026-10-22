@@ -96,6 +96,20 @@ export function searchSuite(
       expect((await find("")).total).toBe(0);
     });
 
+    it("RFC-0038: a publish with a moved collection template rewrites every entry's href", async () => {
+      await article("cay", "Çay, the glass that never empties", "Tea gardens.");
+      await publish();
+      expect(await hrefs("cay")).toEqual(["/posts/cay"]);
+      // Only the site node changes: the entry rows are rewritten all the same.
+      await store.updateSite({
+        ...(await fresh()),
+        collections: { posts: { permalink: "/blog/{slug}" } },
+      });
+      await publish();
+      expect(await hrefs("cay")).toEqual(["/blog/cay"]);
+      expect(await hrefs("tea")).toEqual(["/blog/cay"]);
+    });
+
     it("follows edits, deletions and rollbacks, and says when it lags behind", async () => {
       const a = await article("first", "Hagia Sophia", "Fifteen centuries under one dome.");
       const b = await article("second", "Ephesus", "Walking a Roman street.");

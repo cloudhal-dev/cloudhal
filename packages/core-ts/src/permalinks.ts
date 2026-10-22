@@ -57,3 +57,41 @@ export function entryAt(
   if (site?.collections?.[collection]?.permalink) return undefined;
   return { collection, slug };
 }
+
+/** One collection whose effective template differs between two versions of a site. */
+export interface PermalinkChange {
+  readonly collection: string;
+  /** The old fixed prefix (`/posts`). */
+  readonly from: string;
+  /** The new fixed prefix (`/blog`). */
+  readonly to: string;
+  /** The new template is the collection's own (`permalink` set), not the default. */
+  readonly configured: boolean;
+}
+
+/**
+ * The collections whose effective template differs between `before` and `after`, for every key
+ * in either site's `collections` (RFC-0038 §3). Empty when nothing moved.
+ */
+export function changedPermalinks(
+  before: PermalinkSite | undefined,
+  after: PermalinkSite | undefined,
+): PermalinkChange[] {
+  const keys = new Set([
+    ...Object.keys(before?.collections ?? {}),
+    ...Object.keys(after?.collections ?? {}),
+  ]);
+  const out: PermalinkChange[] = [];
+  for (const collection of [...keys].sort()) {
+    const from = collectionPermalink(before, collection);
+    const to = collectionPermalink(after, collection);
+    if (from === to) continue;
+    out.push({
+      collection,
+      from: permalinkPrefix(from),
+      to: permalinkPrefix(to),
+      configured: Boolean(after?.collections?.[collection]?.permalink),
+    });
+  }
+  return out;
+}

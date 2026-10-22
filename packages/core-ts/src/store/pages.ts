@@ -9,6 +9,7 @@ import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { type Creatable, uniquenessKey } from "../nodes.ts";
 import type { StoreContext } from "./context.ts";
+import { checkPagePath, pageGuard } from "./site-permalinks.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkComponentSections, checkReservedPath } from "./validation.ts";
@@ -52,7 +53,7 @@ export class PageEngine {
       updatedAt: ts,
     };
     assertValid("site", nextSite);
-    await this.#ctx.tax.checkPagePath(page);
+    await checkPagePath(this.#ctx, page, site);
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
       locale: page.locale,
       wasPublished: false,
@@ -63,14 +64,14 @@ export class PageEngine {
     });
     const batch = new OpBatch(this.#ctx.newId(ID_PREFIX.operation), site.id, ts);
     await batch.update("site", site, nextSite);
-    await batch.insert("page", page, and(this.#ctx.tax.pageGuard(page), refs.guard));
+    await batch.insert("page", page, and(pageGuard(this.#ctx, page), refs.guard));
     batch.append(...refs.statements(await nodeHash(page)));
     await plan?.emit(batch);
     await runOpBatch(this.#ctx.sql, batch, {
       uniqueKind: "page",
       uniqueKey: uniquenessKey("page", page),
       diagnose: async () => {
-        await this.#ctx.tax.checkPagePath(page);
+        await checkPagePath(this.#ctx, page, site);
         await refs.diagnose();
       },
     });
@@ -92,7 +93,7 @@ export class PageEngine {
     await this.#ctx.checkGates(draft.siteId, stored.availability, draft.availability);
     const refs = await this.#ctx.assets.planRefs("page", draft.siteId, draft, stored);
     const next = refs.node;
-    await this.#ctx.tax.checkPagePath(next);
+    await checkPagePath(this.#ctx, next);
     const site = await this.#ctx.graph.getSite(next.siteId);
     if (!site) throw new NotFoundError("site", next.siteId);
     checkLocalizedNode("page", site, next);
@@ -114,7 +115,7 @@ export class PageEngine {
           "page",
           next,
           page.rev,
-          and(this.#ctx.tax.pageGuard(next), refs.guard),
+          and(pageGuard(this.#ctx, next), refs.guard),
         ),
         "page",
         key,
@@ -123,7 +124,7 @@ export class PageEngine {
       if (r.changes !== 1) {
         const rev = await this.#ctx.revOf(page.id);
         if (rev === page.rev) {
-          await this.#ctx.tax.checkPagePath(next);
+          await checkPagePath(this.#ctx, next);
           await refs.diagnose();
         }
         throw new ConflictError("page", page.id, page.rev, rev);
@@ -131,14 +132,14 @@ export class PageEngine {
       return next;
     }
     const batch = new OpBatch(this.#ctx.newId(ID_PREFIX.operation), site.id, ts);
-    await batch.update("page", stored, next, and(this.#ctx.tax.pageGuard(next), refs.guard));
+    await batch.update("page", stored, next, and(pageGuard(this.#ctx, next), refs.guard));
     batch.append(...extra);
     await plan.emit(batch);
     await runOpBatch(this.#ctx.sql, batch, {
       uniqueKind: "page",
       uniqueKey: key,
       diagnose: async () => {
-        await this.#ctx.tax.checkPagePath(next);
+        await checkPagePath(this.#ctx, next);
         await refs.diagnose();
       },
     });

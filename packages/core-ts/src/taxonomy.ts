@@ -38,6 +38,7 @@ import {
   termsPath,
 } from "./node-sql.ts";
 import type { Creatable, NodeKind, NodeTypes } from "./nodes.ts";
+import { collectionPrefixes, configuredPrefixFree, pathsOverlap } from "./permalink-paths.ts";
 import {
   ancestorPaths,
   assertNoLoop,
@@ -155,11 +156,6 @@ function isPublic(t: Term): boolean {
 
 function archivePath(tax: Taxonomy, slug: string): string {
   return `${tax.archive.basePath}/${slug}`;
-}
-
-/** `a` equals `b` or one lies under the other. */
-function pathsOverlap(a: string, b: string): boolean {
-  return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
 function cap<T>(items: T[], max: number): T[] {
@@ -346,15 +342,13 @@ export class TaxonomyEngine {
               pageId: page.id,
             },
           );
-    const collections = new Set([
-      ...(await this.#collections(tax.siteId)),
-      ...(tax.collections ?? []),
-    ]);
-    for (const c of collections)
-      if (pathsOverlap(`/${c}`, base))
+    // RFC-0038: a collection with its own permalink answers under that prefix, not `/<key>`.
+    const used = [...(await this.#collections(tax.siteId)), ...(tax.collections ?? [])];
+    for (const { prefix } of collectionPrefixes(site, used))
+      if (pathsOverlap(prefix, base))
         throw new InvariantError(
           "path_conflict",
-          `archive path ${base} collides with the collection prefix /${c}`,
+          `archive path ${base} collides with the collection prefix ${prefix}`,
         );
   }
 
@@ -362,9 +356,10 @@ export class TaxonomyEngine {
   #archiveGuard(tax: Taxonomy): Cond {
     const base = tax.archive.basePath;
     const otherBase = "json_extract(body, '$.archive.basePath')";
+    const prefixes = configuredPrefixFree(tax.siteId, base, "overlap");
     const taxonomies: Cond = {
-      sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE site_id = ? AND kind = 'taxonomy' AND id != ? AND (${otherBase} = ? OR substr(${otherBase}, 1, ?) = ? OR substr(?, 1, length(${otherBase}) + 1) = ${otherBase} || '/'))`,
-      params: [tax.siteId, tax.id, base, base.length + 1, `${base}/`, base],
+      sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE site_id = ? AND kind = 'taxonomy' AND id != ? AND (${otherBase} = ? OR substr(${otherBase}, 1, ?) = ? OR substr(?, 1, length(${otherBase}) + 1) = ${otherBase} || '/')) AND ${prefixes.sql}`,
+      params: [tax.siteId, tax.id, base, base.length + 1, `${base}/`, base, ...prefixes.params],
     };
     if (!tax.archive.enabled) return taxonomies;
     return {

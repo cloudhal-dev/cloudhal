@@ -9,6 +9,7 @@ import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
 import { assetsSuite } from "./testing-assets.ts";
 import { menuSuite } from "./testing-menu.ts";
+import { permalinksSuite } from "./testing-permalinks.ts";
 import { racingDriver, type SuiteContext, taxonomySuite } from "./testing-taxonomy.ts";
 
 export interface StoreFactory {
@@ -259,5 +260,6 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
     taxonomySuite(suite);
     menuSuite(suite);
     assetsSuite(suite);
+    permalinksSuite(suite);
   });
 }

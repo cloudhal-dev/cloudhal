@@ -1,17 +1,19 @@
-/** Site writes: create, and the CAS update with the footer region, theme config and brand assets. */
+/** Site writes: create, and the CAS update with the footer region, theme config, brand assets and collection permalinks. */
 import { assertValid, type Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import { checkTimeZone, isTimeZone } from "../availability.ts";
-import { ConflictError, InvariantError } from "../errors.ts";
+import { ConflictError, InvariantError, isOpGuardViolation } from "../errors.ts";
 import { nodeHash } from "../hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "../hosts.ts";
 import { ID_PREFIX } from "../ids.ts";
 import { fillMissingSrc } from "../media/refs.ts";
-import { casUpdateStatement, insertNodeStatement } from "../node-sql.ts";
+import { and, casUpdateStatement, insertNodeStatement } from "../node-sql.ts";
 import { type Creatable, uniquenessKey } from "../nodes.ts";
+import { changedPermalinks } from "../permalinks.ts";
 import type { SiteGuard } from "../search.ts";
 import { checkPageSurfaces, createCatalog } from "../surfaces.ts";
 import type { StoreContext } from "./context.ts";
+import { planPermalinks } from "./site-permalinks.ts";
 import { checkThemeConfig } from "./validation.ts";
 
 export class SiteEngine {
@@ -87,24 +89,45 @@ export class SiteEngine {
     const hosts = hostsOf(next);
     const hostsChanged = !stored || JSON.stringify(hostsOf(stored)) !== JSON.stringify(hosts);
     if (hostsChanged) await checkHosts(this.#ctx.sql, hosts);
+    // RFC-0038 §3: a moved collection template leaves a prefix redirect, in this batch.
+    if (stored && stored.rev !== site.rev && changedPermalinks(stored, next).length > 0)
+      throw new ConflictError("site", site.id, site.rev, stored.rev);
+    const permalinks = await planPermalinks(this.#ctx, stored, next);
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
-    const s = await casUpdateStatement("site", written, site.rev, refs.guard);
+    const s = await casUpdateStatement(
+      "site",
+      written,
+      site.rev,
+      and(refs.guard, permalinks?.guard),
+    );
     const hash = await nodeHash(written);
     const more = [
       ...(hostsChanged ? hostStatements(hosts, { siteId: site.id, hash }) : []),
       ...(extra?.({ siteId: site.id, hash }, written.updatedAt) ?? []),
       ...refs.statements(hash),
+      ...((await permalinks?.statements(hash)) ?? []),
     ];
-    const r =
-      more.length > 0
-        ? ((await this.#ctx.sql.batch([s, ...more]))[0] ?? { changes: 0 })
-        : await this.#ctx.sql.run(s.sql, s.params ?? []);
+    const r = await this.#run(s, more);
     if (r.changes !== 1) {
       const rev = await this.#ctx.revOf(site.id);
-      if (rev === site.rev) await refs.diagnose();
+      if (rev === site.rev) {
+        await permalinks?.diagnose();
+        await refs.diagnose();
+      }
       throw new ConflictError("site", site.id, site.rev, rev);
     }
     return written;
+  }
+
+  /** The CAS alone, or with its anchored statements; a failed `op_guards` assertion is a miss. */
+  async #run(s: SqlStatement, more: SqlStatement[]): Promise<{ changes: number }> {
+    if (more.length === 0) return this.#ctx.sql.run(s.sql, s.params ?? []);
+    try {
+      return (await this.#ctx.sql.batch([s, ...more]))[0] ?? { changes: 0 };
+    } catch (e) {
+      if (isOpGuardViolation(e)) return { changes: 0 };
+      throw e;
+    }
   }
 }

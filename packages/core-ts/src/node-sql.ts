@@ -158,6 +158,15 @@ export class OpBatch {
     return this.#planned;
   }
 
+  /**
+   * Anchors every write of this batch on `cond` instead of on its own first write: for statements
+   * that join another node's CAS (the site update, RFC-0038), anchored on that node's new hash.
+   */
+  anchorOn(cond: Cond): this {
+    this.#anchor ??= cond;
+    return this;
+  }
+
   #guard(own?: Cond): Cond | undefined {
     return and(this.#anchor, own);
   }
