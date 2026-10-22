@@ -1,5 +1,20 @@
 # @cloudhal/cloudflare
 
+## 0.3.12
+
+### Patch Changes
+
+- Updated dependencies [84d1fc3]
+- Updated dependencies [bc096b2]
+  - @cloudhal/core-ts@0.3.12
+  - @cloudhal/api@0.3.12
+  - @cloudhal/comments@0.3.12
+  - @cloudhal/mcp-server@0.3.12
+  - @cloudhal/agent-runtime@0.3.12
+  - @cloudhal/analytics@0.3.12
+  - @cloudhal/schedules@0.3.12
+  - @cloudhal/storage@0.3.12
+
 ## 0.3.11
 
 ### Patch Changes
