@@ -19,6 +19,7 @@
  */
 import type { ContentEntry, NodeRef, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
+import { changedPermalinks } from "./permalinks.ts";
 import { CJK_TABLE, SEARCH_TABLES, searchTable, trigramQuery } from "./search-cjk.ts";
 import {
   ftsQuery,
@@ -182,8 +183,14 @@ export async function planSearch(input: {
     !incremental ||
     target.nodes.some((n) => (n.kind === "taxonomy" || n.kind === "site") && changed(n)) ||
     (base?.nodes ?? []).some((n) => n.kind === "taxonomy" && !live.has(n.id));
+  // RFC-0038: a moved collection template changes every entry's href; rewrite all entry rows.
+  const hrefsMoved = incremental && (await permalinksMoved(target, base, input.read));
   const rewrite = target.nodes.filter(
-    (n) => INDEXED.has(n.kind) && (changed(n) || (n.kind === "term" && archivesChanged)),
+    (n) =>
+      INDEXED.has(n.kind) &&
+      (changed(n) ||
+        (n.kind === "term" && archivesChanged) ||
+        (n.kind === "contentEntry" && hrefsMoved)),
   );
   const rows: SearchRow[] = [];
   const siteRef = target.nodes.find((n) => n.kind === "site");
@@ -216,6 +223,19 @@ export async function planSearch(input: {
     ...(incremental && archivesChanged ? { removeKinds: ["term", "author"] as SearchKind[] } : {}),
     rows,
   };
+}
+
+/** Whether the site node's collection templates differ between `base` and `target`. */
+async function permalinksMoved(
+  target: Snap,
+  base: Snap | undefined,
+  read: (ref: NodeRef) => Promise<unknown>,
+): Promise<boolean> {
+  const after = target.nodes.find((n) => n.kind === "site");
+  const before = base?.nodes.find((n) => n.kind === "site");
+  if (!after || !before || after.hash === before.hash) return false;
+  const [a, b] = [(await read(after)) as Site, (await read(before)) as Site];
+  return changedPermalinks(b, a).length > 0;
 }
 
 function pushRow(rows: SearchRow[], row: SearchRow | undefined): void {
