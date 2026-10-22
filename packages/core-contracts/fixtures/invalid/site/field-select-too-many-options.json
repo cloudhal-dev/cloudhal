@@ -1,0 +1,344 @@
+{
+  "reason": "a select field has at most 50 options",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Minimal",
+    "slug": "minimal",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-10-23T20:00:00Z",
+    "updatedAt": "2026-10-23T20:00:00Z",
+    "collections": {
+      "events": {
+        "fields": [
+          {
+            "key": "format",
+            "type": "select",
+            "labels": {
+              "en": {
+                "label": "Format"
+              }
+            },
+            "localized": false,
+            "options": [
+              {
+                "value": "o0",
+                "labels": {
+                  "en": "O0"
+                }
+              },
+              {
+                "value": "o1",
+                "labels": {
+                  "en": "O1"
+                }
+              },
+              {
+                "value": "o2",
+                "labels": {
+                  "en": "O2"
+                }
+              },
+              {
+                "value": "o3",
+                "labels": {
+                  "en": "O3"
+                }
+              },
+              {
+                "value": "o4",
+                "labels": {
+                  "en": "O4"
+                }
+              },
+              {
+                "value": "o5",
+                "labels": {
+                  "en": "O5"
+                }
+              },
+              {
+                "value": "o6",
+                "labels": {
+                  "en": "O6"
+                }
+              },
+              {
+                "value": "o7",
+                "labels": {
+                  "en": "O7"
+                }
+              },
+              {
+                "value": "o8",
+                "labels": {
+                  "en": "O8"
+                }
+              },
+              {
+                "value": "o9",
+                "labels": {
+                  "en": "O9"
+                }
+              },
+              {
+                "value": "o10",
+                "labels": {
+                  "en": "O10"
+                }
+              },
+              {
+                "value": "o11",
+                "labels": {
+                  "en": "O11"
+                }
+              },
+              {
+                "value": "o12",
+                "labels": {
+                  "en": "O12"
+                }
+              },
+              {
+                "value": "o13",
+                "labels": {
+                  "en": "O13"
+                }
+              },
+              {
+                "value": "o14",
+                "labels": {
+                  "en": "O14"
+                }
+              },
+              {
+                "value": "o15",
+                "labels": {
+                  "en": "O15"
+                }
+              },
+              {
+                "value": "o16",
+                "labels": {
+                  "en": "O16"
+                }
+              },
+              {
+                "value": "o17",
+                "labels": {
+                  "en": "O17"
+                }
+              },
+              {
+                "value": "o18",
+                "labels": {
+                  "en": "O18"
+                }
+              },
+              {
+                "value": "o19",
+                "labels": {
+                  "en": "O19"
+                }
+              },
+              {
+                "value": "o20",
+                "labels": {
+                  "en": "O20"
+                }
+              },
+              {
+                "value": "o21",
+                "labels": {
+                  "en": "O21"
+                }
+              },
+              {
+                "value": "o22",
+                "labels": {
+                  "en": "O22"
+                }
+              },
+              {
+                "value": "o23",
+                "labels": {
+                  "en": "O23"
+                }
+              },
+              {
+                "value": "o24",
+                "labels": {
+                  "en": "O24"
+                }
+              },
+              {
+                "value": "o25",
+                "labels": {
+                  "en": "O25"
+                }
+              },
+              {
+                "value": "o26",
+                "labels": {
+                  "en": "O26"
+                }
+              },
+              {
+                "value": "o27",
+                "labels": {
+                  "en": "O27"
+                }
+              },
+              {
+                "value": "o28",
+                "labels": {
+                  "en": "O28"
+                }
+              },
+              {
+                "value": "o29",
+                "labels": {
+                  "en": "O29"
+                }
+              },
+              {
+                "value": "o30",
+                "labels": {
+                  "en": "O30"
+                }
+              },
+              {
+                "value": "o31",
+                "labels": {
+                  "en": "O31"
+                }
+              },
+              {
+                "value": "o32",
+                "labels": {
+                  "en": "O32"
+                }
+              },
+              {
+                "value": "o33",
+                "labels": {
+                  "en": "O33"
+                }
+              },
+              {
+                "value": "o34",
+                "labels": {
+                  "en": "O34"
+                }
+              },
+              {
+                "value": "o35",
+                "labels": {
+                  "en": "O35"
+                }
+              },
+              {
+                "value": "o36",
+                "labels": {
+                  "en": "O36"
+                }
+              },
+              {
+                "value": "o37",
+                "labels": {
+                  "en": "O37"
+                }
+              },
+              {
+                "value": "o38",
+                "labels": {
+                  "en": "O38"
+                }
+              },
+              {
+                "value": "o39",
+                "labels": {
+                  "en": "O39"
+                }
+              },
+              {
+                "value": "o40",
+                "labels": {
+                  "en": "O40"
+                }
+              },
+              {
+                "value": "o41",
+                "labels": {
+                  "en": "O41"
+                }
+              },
+              {
+                "value": "o42",
+                "labels": {
+                  "en": "O42"
+                }
+              },
+              {
+                "value": "o43",
+                "labels": {
+                  "en": "O43"
+                }
+              },
+              {
+                "value": "o44",
+                "labels": {
+                  "en": "O44"
+                }
+              },
+              {
+                "value": "o45",
+                "labels": {
+                  "en": "O45"
+                }
+              },
+              {
+                "value": "o46",
+                "labels": {
+                  "en": "O46"
+                }
+              },
+              {
+                "value": "o47",
+                "labels": {
+                  "en": "O47"
+                }
+              },
+              {
+                "value": "o48",
+                "labels": {
+                  "en": "O48"
+                }
+              },
+              {
+                "value": "o49",
+                "labels": {
+                  "en": "O49"
+                }
+              },
+              {
+                "value": "o50",
+                "labels": {
+                  "en": "O50"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

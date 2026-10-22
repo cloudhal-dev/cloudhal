@@ -34,6 +34,29 @@ export type Slug = string;
  */
 export type Locale = string;
 /**
+ * RFC-0041: one typed custom field of a collection, discriminated by `type`.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldDefinition".
+ */
+export type FieldDefinition =
+  | TextField
+  | RichTextField
+  | NumberField
+  | BooleanField
+  | DateField
+  | DateTimeField
+  | UrlField
+  | ImageField
+  | SelectField;
+/**
+ * The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code).
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldKey".
+ */
+export type FieldKey = string;
+/**
  * RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds.
  */
 export type Section =
@@ -230,6 +253,13 @@ export interface CollectionSettings {
    * RFC-0040: default order where none is given (Studio's list, entry queries without sort, MCP list_entries). Absent: newest.
    */
   sort?: "newest" | "oldest" | "title";
+  /**
+   * RFC-0041: the collection's typed custom fields, in form order. Values live in ContentEntry.fields under each key. At most 200 per site and unique keys (checked in code).
+   *
+   * @minItems 1
+   * @maxItems 30
+   */
+  fields?: [FieldDefinition, ...FieldDefinition[]];
 }
 /**
  * This interface was referenced by `Site`'s JSON-Schema
@@ -239,6 +269,234 @@ export interface CollectionLabel {
   singular: string;
   plural: string;
   description?: string;
+}
+/**
+ * Plain text: a string of at most maxLength characters.
+ */
+export interface TextField {
+  key: FieldKey;
+  type: "text";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * Absent: 5000.
+   */
+  maxLength?: number;
+  /**
+   * Line breaks allowed. Absent: false.
+   */
+  multiline?: boolean;
+  /**
+   * Its words go into site search. Absent: false.
+   */
+  searchable?: boolean;
+}
+/**
+ * The field's label and help per locale. Missing a locale: the default locale's, then the key.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldLabels".
+ */
+export interface FieldLabels {
+  [k: string]: FieldLabel | undefined;
+}
+/**
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldLabel".
+ */
+export interface FieldLabel {
+  label: string;
+  help?: string;
+}
+/**
+ * RFC-0041 §6: present only while a field operation rewrites entries.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldMigration".
+ */
+export interface FieldMigration {
+  /**
+   * Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.
+   */
+  id: string;
+  fromKey?: FieldKey;
+  fromType?:
+    "text" | "richText" | "number" | "boolean" | "date" | "datetime" | "url" | "image" | "select";
+  fromLocalized?: boolean;
+}
+/**
+ * Cloudhal Markdown v1 (ADR-0028), at most 50 000 characters.
+ */
+export interface RichTextField {
+  key: FieldKey;
+  type: "richText";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * Its words go into site search. Absent: false.
+   */
+  searchable?: boolean;
+}
+/**
+ * A finite number.
+ */
+export interface NumberField {
+  key: FieldKey;
+  type: "number";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * Whole numbers only. Absent: false.
+   */
+  integer?: boolean;
+  minimum?: number;
+  maximum?: number;
+}
+/**
+ * true or false; absent reads as false, so it cannot be required to publish.
+ */
+export interface BooleanField {
+  key: FieldKey;
+  type: "boolean";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  migration?: FieldMigration;
+}
+/**
+ * A calendar day without a zone (YYYY-MM-DD).
+ */
+export interface DateField {
+  key: FieldKey;
+  type: "date";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+}
+/**
+ * An instant with the zone it was entered in: {at, timeZone} (RFC-0008 §9.1).
+ */
+export interface DateTimeField {
+  key: FieldKey;
+  type: "datetime";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+}
+/**
+ * A link: https, http, mailto, tel, a site-relative path or a #fragment; at most 2048 characters.
+ */
+export interface UrlField {
+  key: FieldKey;
+  type: "url";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+}
+/**
+ * An image Asset of the same site, by id (asset_…).
+ */
+export interface ImageField {
+  key: FieldKey;
+  type: "image";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+}
+/**
+ * One of a closed list of options, or several when multiple.
+ */
+export interface SelectField {
+  key: FieldKey;
+  type: "select";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  options: [FieldOption, ...FieldOption[]];
+  /**
+   * The value is a list of option values. Absent: false.
+   */
+  multiple?: boolean;
+}
+/**
+ * One option of a select field. Values are unique in the field (checked in code).
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldOption".
+ */
+export interface FieldOption {
+  /**
+   * Lower-case URL segment.
+   */
+  value: string;
+  labels: {
+    [k: string]: string | undefined;
+  };
 }
 /**
  * Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.

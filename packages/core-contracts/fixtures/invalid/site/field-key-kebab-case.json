@@ -1,0 +1,36 @@
+{
+  "reason": "a field key is lower camelCase",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Minimal",
+    "slug": "minimal",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-10-23T20:00:00Z",
+    "updatedAt": "2026-10-23T20:00:00Z",
+    "collections": {
+      "events": {
+        "fields": [
+          {
+            "key": "start-date",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "Venue"
+              }
+            },
+            "localized": true
+          }
+        ]
+      }
+    }
+  }
+}

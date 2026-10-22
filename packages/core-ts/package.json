@@ -20,6 +20,7 @@
     "./names": "./src/names.ts",
     "./permalinks": "./src/permalinks.ts",
     "./collections": "./src/collections.ts",
+    "./fields": "./src/fields/index.ts",
     "./locale-paths": "./src/locale-paths.ts",
     "./taxonomy-report": "./src/taxonomy-report.ts",
     "./menu": "./src/menu.ts",
@@ -104,6 +105,10 @@
       "./collections": {
         "types": "./dist/src/collections.d.ts",
         "default": "./dist/src/collections.js"
+      },
+      "./fields": {
+        "types": "./dist/src/fields/index.d.ts",
+        "default": "./dist/src/fields/index.js"
       },
       "./locale-paths": {
         "types": "./dist/src/locale-paths.d.ts",
