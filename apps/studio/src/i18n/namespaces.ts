@@ -18,6 +18,7 @@ import type { messages as analyticsSettings } from "./lazy/analyticsSettings.en.
 import type { messages as appearance } from "./lazy/appearance.en.ts";
 import type { messages as bodyEditor } from "./lazy/bodyEditor.en.ts";
 import type { messages as build } from "./lazy/build.en.ts";
+import type { messages as collections } from "./lazy/collections.en.ts";
 import type { messages as comments } from "./lazy/comments.en.ts";
 import type { messages as commentsSettings } from "./lazy/commentsSettings.en.ts";
 import type { messages as media } from "./lazy/media.en.ts";
@@ -37,6 +38,7 @@ export interface NamespaceCatalogs {
   appearance: DeepString<(typeof appearance)["appearance"]>;
   bodyEditor: DeepString<(typeof bodyEditor)["bodyEditor"]>;
   build: DeepString<(typeof build)["build"]>;
+  collections: DeepString<(typeof collections)["collections"]>;
   comments: DeepString<(typeof comments)["comments"]>;
   commentsSettings: DeepString<(typeof commentsSettings)["commentsSettings"]>;
   media: DeepString<(typeof media)["media"]>;

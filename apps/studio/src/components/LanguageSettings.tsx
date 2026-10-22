@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { ApiRequestError, api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
+import { collectionNames, useCollections } from "../lib/collections.ts";
 import { languageName } from "../lib/languages.ts";
 import { EditionGuide } from "./EditionGuide.tsx";
 import { LanguagePicker } from "./LanguagePicker.tsx";
@@ -57,8 +58,6 @@ function withForm(site: Site, f: Form): Site {
     ...(Object.keys(localization).length ? { localization } : {}),
   };
 }
-
-const REVIEWABLE = ["pages", "posts"] as const;
 
 export function LanguageSettingsSection({ siteId }: { siteId: string }) {
   const { t, locale } = useI18n();
@@ -127,7 +126,7 @@ export function LanguageSettingsSection({ siteId }: { siteId: string }) {
       )}
       <LocalesEditor form={form} set={set} def={def} name={name} disabled={disabled} />
       <EditionGuide siteId={siteId} />
-      <LocalizationRows form={form} set={set} disabled={disabled} />
+      <LocalizationRows form={form} set={set} disabled={disabled} site={site.data} />
     </SettingsSection>
   );
 }
@@ -197,8 +196,15 @@ function LocalesEditor({
 }
 
 /** Addresses, missing translations, review before publishing, the reader's notice. */
-function LocalizationRows({ form, set, disabled }: EditorProps) {
-  const { t } = useI18n();
+function LocalizationRows({ form, set, disabled, site }: EditorProps & { site: Site | undefined }) {
+  const { t, locale } = useI18n();
+  // Pages, then every collection of the registry (RFC-0040), `posts` first.
+  const registry = useCollections(site?.id ?? "");
+  const reviewable = [
+    "pages",
+    "posts",
+    ...(registry.data ?? []).map((c) => c.key).filter((k) => k !== "posts"),
+  ];
   return (
     <dl className="-mb-3 divide-y divide-kumo-hairline border-kumo-hairline border-t">
       <SettingRow label={t("languages.routing")} hint={t("languages.routingHint")}>
@@ -227,10 +233,14 @@ function LocalizationRows({ form, set, disabled }: EditorProps) {
       </SettingRow>
       <SettingRow label={t("languages.review")} hint={t("languages.reviewHint")}>
         <span className="grid gap-2">
-          {REVIEWABLE.map((c) => (
+          {reviewable.map((c) => (
             <Checkbox
               key={c}
-              label={t(`languages.reviewOptions.${c}`)}
+              label={
+                c === "pages" || c === "posts"
+                  ? t(`languages.reviewOptions.${c as "pages" | "posts"}`)
+                  : (collectionNames(site, c, locale)?.plural ?? c)
+              }
               checked={form.review.includes(c)}
               disabled={disabled}
               onCheckedChange={(on) =>

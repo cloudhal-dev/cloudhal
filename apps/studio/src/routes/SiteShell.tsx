@@ -1,6 +1,5 @@
 import { Sidebar, SidebarSwitcher } from "@cloudhal/ui";
 import {
-  Article,
   CalendarDots,
   Camera,
   ChartLine,
@@ -22,6 +21,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { useCallback } from "react";
 import { AppFrame } from "../components/AppFrame.tsx";
+import { CollectionNav } from "../components/CollectionNav.tsx";
 import { ViewSiteButton } from "../components/LiveLinks.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { SiteSwitcherExtra } from "../components/SiteSwitcher.tsx";
@@ -45,10 +45,6 @@ export function SiteShell() {
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const sites = useQuery({ queryKey: ["sites"], queryFn: api.sites.list });
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
-  const entries = useQuery({
-    queryKey: ["entries", siteId, "posts"],
-    queryFn: () => api.entries.list(siteId, "posts"),
-  });
   const snapshots = useQuery({
     queryKey: ["snapshots", siteId],
     queryFn: () => api.snapshots.list(siteId),
@@ -143,15 +139,7 @@ export function SiteShell() {
                 {t("nav.pages")}
                 <Sidebar.MenuBadge>{pages.data?.length ?? 0}</Sidebar.MenuBadge>
               </Sidebar.MenuButton>
-              <Sidebar.MenuButton
-                icon={Article}
-                href={`${base}/articles`}
-                active={is(`${base}/articles`)}
-                tooltip={t("nav.articles")}
-              >
-                {t("nav.articles")}
-                <Sidebar.MenuBadge>{entries.data?.length ?? 0}</Sidebar.MenuBadge>
-              </Sidebar.MenuButton>
+              <CollectionNav siteId={siteId} site={site.data} is={is} />
               <Sidebar.MenuButton
                 icon={Tag}
                 href={`${base}/taxonomy`}

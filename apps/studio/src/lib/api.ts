@@ -210,6 +210,7 @@ import { agentsApi } from "./api/agents.ts";
 import { aiApi } from "./api/ai.ts";
 import { analyticsApi } from "./api/analytics.ts";
 import { approvalsApi } from "./api/approvals.ts";
+import { collectionsApi } from "./api/collections.ts";
 import { commentsApi } from "./api/comments.ts";
 import { contentApi } from "./api/content.ts";
 import { historyApi } from "./api/history.ts";
@@ -239,6 +240,7 @@ export const api = {
   projects: projectsApi,
   pages: contentApi.pages,
   entries: contentApi.entries,
+  collections: collectionsApi,
   design: contentApi.design,
   themeSettings: contentApi.themeSettings,
   blockTypes: contentApi.blockTypes,

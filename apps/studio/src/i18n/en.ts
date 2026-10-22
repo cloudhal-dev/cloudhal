@@ -176,6 +176,7 @@ export const en = {
     home: "Overview",
     pages: "Pages",
     articles: "Articles",
+    collections: "Collections",
     snapshots: "Snapshots",
     agents: "Agents",
     allSites: "All sites",
@@ -292,6 +293,13 @@ export const en = {
       empty: "No articles match these filters",
       emptyDescription: "Try another category or tag, or clear the filters.",
     },
+  },
+  collectionList: {
+    description: "Entries of the “{key}” collection.",
+    newEntry: "New entry",
+    search: "Search entries",
+    empty: "No entries yet",
+    settings: "Settings",
   },
   articleCorrections: {
     title: "Corrections",

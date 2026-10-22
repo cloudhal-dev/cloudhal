@@ -49,6 +49,8 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/ProjectPage.tsx": "dashboard",
   "routes/PagesPage.tsx": "list",
   "routes/ArticlesPage.tsx": "list",
+  "routes/CollectionsPage.tsx": "list",
+  "routes/CollectionSettingsPage.tsx": "settings",
   "routes/SnapshotsPage.tsx": "list",
   "routes/ActivityPage.tsx": "list",
   "routes/ApprovalsPage.tsx": "queue",

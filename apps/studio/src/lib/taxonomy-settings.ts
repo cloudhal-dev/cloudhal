@@ -267,12 +267,21 @@ export function archiveChange(
   return { follow: 0 };
 }
 
-/** Collections a taxonomy can apply to: the ones entries use, the ones it names, and `posts`. */
+/**
+ * Collections a taxonomy can apply to: the registry's (RFC-0040: declared, in use, `posts`), the
+ * ones entries use, and the ones it names.
+ */
 export function knownCollections(
   entries: readonly { collection: string }[],
   draft?: Pick<TaxonomyDraft, "collections">,
+  registry: readonly string[] = [],
 ): string[] {
   return [
-    ...new Set(["posts", ...entries.map((e) => e.collection), ...(draft?.collections ?? [])]),
+    ...new Set([
+      "posts",
+      ...registry,
+      ...entries.map((e) => e.collection),
+      ...(draft?.collections ?? []),
+    ]),
   ].sort();
 }
