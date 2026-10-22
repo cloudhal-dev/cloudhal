@@ -5,6 +5,10 @@ import { Button, Checkbox, Input, Link, PageLayout, Select, Text } from "@cloudh
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import {
+  COLLECTION_COMMENTS_SECTION,
+  CollectionCommentsSection,
+} from "../components/CollectionCommentsSection.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly } from "../components/Gating.tsx";
@@ -15,7 +19,7 @@ import { useToast } from "../components/Toast.ts";
 import { useGate } from "../components/useMe.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
-import { COLLECTION_ICON_NAMES, collectionNames, useCollections } from "../lib/collections.ts";
+import { COLLECTION_ICON_NAMES, collectionName, useCollections } from "../lib/collections.ts";
 import { languageOption } from "../lib/languages.ts";
 
 type Sort = NonNullable<CollectionSettings["sort"]>;
@@ -70,7 +74,8 @@ export function withForm(
 /**
  * Site › a collection › Settings (RFC-0040 §4, DESIGN.md §2c): its names in every site language,
  * icon, feed, sitemap and default order (one save, a site settings change), and which categories
- * and tags apply (saved on the taxonomies). Its address stays in Site settings › Collections.
+ * and tags apply (saved on the taxonomies), its comments (saved in `comment_settings`). Its address
+ * stays in Site settings › Collections.
  */
 export function CollectionSettingsPage() {
   const { t, locale } = useI18n("collections");
@@ -81,9 +86,7 @@ export function CollectionSettingsPage() {
   const gate = useGate("settings.write");
   const registry = useCollections(siteId);
   const info = registry.data?.find((c) => c.key === collection);
-  const name =
-    collectionNames(site.data, collection, locale)?.plural ??
-    (collection === "posts" ? t("nav.articles") : collection);
+  const name = collectionName(site.data, collection, locale, t("nav.articles"));
   return (
     <PageLayout
       crumbs={
@@ -106,6 +109,7 @@ export function CollectionSettingsPage() {
           { id: "names", label: t("collections.settings.names") },
           { id: "listing", label: t("collections.settings.listing") },
           { id: "taxonomies", label: t("collections.settings.taxonomies") },
+          { id: COLLECTION_COMMENTS_SECTION, label: t("collections.settings.comments") },
           { id: "address", label: t("collections.settings.address") },
         ]}
       >
@@ -118,6 +122,7 @@ export function CollectionSettingsPage() {
             />
           )}
           <TaxonomiesSection siteId={siteId} collection={collection} />
+          <CollectionCommentsSection siteId={siteId} collection={collection} />
           <AddressSection siteId={siteId} site={site.data} collection={collection} />
         </ReadOnly>
       </SettingsLayout>

@@ -294,7 +294,7 @@ describe("AnalyticsPage", () => {
       ),
     );
     const article = await screen.findByRole("link", { name: "Ferry timetables" });
-    expect(article).toHaveAttribute("href", "/sites/site_1/articles/entry_AAAAAA01");
+    expect(article).toHaveAttribute("href", "/sites/site_1/collections/posts/entry_AAAAAA01");
     expect(screen.getAllByText("No longer exists").length).toBeGreaterThan(0);
     expect((await screen.findAllByText("AI assistants")).length).toBeGreaterThan(0);
     expect(await screen.findByTestId("country-map")).toHaveTextContent("DE:700");

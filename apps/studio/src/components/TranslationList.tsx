@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
+import { entryHref, entryRoute } from "../lib/entry-href.ts";
 import { languageName } from "../lib/languages.ts";
 import {
   handTranslationDraft,
@@ -120,7 +121,7 @@ export function LanguageFilter({
 
 /** Where a version is edited in Studio. */
 const editorHref = (siteId: string, n: Localized) =>
-  "sections" in n ? `/sites/${siteId}/pages/${n.id}` : `/sites/${siteId}/articles/${n.id}`;
+  "sections" in n ? `/sites/${siteId}/pages/${n.id}` : entryHref(siteId, n.id, n.collection);
 
 /** A new draft in `locale` from `source`: its content to translate, linked to its group. */
 async function writeByHand(siteId: string, source: Localized, locale: string): Promise<Localized> {
@@ -154,10 +155,7 @@ export function LanguagesCell<N extends Localized>({
       await qc.invalidateQueries({ queryKey: ["sections" in node ? "pages" : "entries", siteId] });
       await ("sections" in node
         ? navigate({ to: "/sites/$siteId/pages/$pageId", params: { siteId, pageId: node.id } })
-        : navigate({
-            to: "/sites/$siteId/articles/$entryId",
-            params: { siteId, entryId: node.id },
-          }));
+        : navigate(entryRoute(siteId, node.id, node.collection)));
     },
     onError: (e) => toast.error(apiErrorText(t, e)),
   });

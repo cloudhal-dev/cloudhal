@@ -7,13 +7,15 @@ import type { Taxonomy } from "@cloudhal/core-contracts";
 import { BUILT_IN_COLLECTION } from "@cloudhal/core-ts/collections";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { COLLECTION_ICONS } from "../lib/collection-icons.ts";
 import { collectionIcon, collectionNames } from "../lib/collections.ts";
+import { entryRoute } from "../lib/entry-href.ts";
 import type { TaxonomyData } from "./Taxonomy.tsx";
 
-/** `$collection` of `/sites/$siteId/collections/$collection`; `posts` elsewhere (`/articles`). */
+/** `$collection` of `/sites/$siteId/collections/$collection(/$entryId)`; `posts` elsewhere. */
 export function useCollectionParam(): string {
   const params = useParams({ strict: false }) as { collection?: string };
   return params.collection ?? BUILT_IN_COLLECTION;
@@ -81,12 +83,27 @@ export function useNewEntry(siteId: string, collection: string, locale: string) 
       }),
     onSuccess: async (entry) => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      await navigate({
-        to: "/sites/$siteId/articles/$entryId",
-        params: { siteId, entryId: entry.id },
-      });
+      await navigate(entryRoute(siteId, entry.id, entry.collection));
     },
   });
+}
+
+/**
+ * The editor's address names the entry's own collection: a link that did not know it (`posts`, the
+ * old `/articles/$entryId`) is replaced once the entry has loaded, so the sidebar and the next
+ * "New" follow the right collection.
+ */
+export function useEntryCollectionUrl(
+  siteId: string,
+  entryId: string,
+  routeCollection: string,
+  actual: string | undefined,
+) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (actual && actual !== routeCollection)
+      void navigate({ ...entryRoute(siteId, entryId, actual), replace: true });
+  }, [navigate, siteId, entryId, routeCollection, actual]);
 }
 
 /** The editor's first crumb: the entry's collection list (Articles for `posts`). */

@@ -11,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useI18n } from "../i18n/index.tsx";
 import { api, type TranslationRow } from "../lib/api.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { languageName } from "../lib/languages.ts";
 import { ConfirmDialog } from "./ConfirmDialog.tsx";
 import { Status } from "./Status.tsx";
@@ -26,7 +27,7 @@ const METHOD_KEY = {
 function editorHref(siteId: string, row: TranslationRow): string {
   return row.kind === "page"
     ? `/sites/${siteId}/pages/${row.id}`
-    : `/sites/${siteId}/articles/${row.id}`;
+    : entryHref(siteId, row.id, row.collection);
 }
 
 export function TranslationsCard({

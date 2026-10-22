@@ -28,6 +28,7 @@ import {
   zonedParts,
 } from "@cloudhal/ui";
 import type { CalendarItem, ReleaseApprovalState, ReleaseView } from "./api.ts";
+import { entryHref } from "./entry-href.ts";
 import type { CalendarSearch } from "./schedules-search.ts";
 
 // ---------------------------------------------------------------------------------------------
@@ -292,7 +293,7 @@ export function itemHref(siteId: string, item: CalendarItem): string | undefined
   if (item.kind === "gate" && item.target.nodeId)
     return item.target.nodeId.startsWith("page_")
       ? `${base}/pages/${item.target.nodeId}`
-      : `${base}/articles/${item.target.nodeId}`;
+      : entryHref(siteId, item.target.nodeId);
   if (item.kind === "automation" && item.target.automationId)
     return `${base}/schedules/automations?edit=${item.target.automationId}`;
   return undefined;

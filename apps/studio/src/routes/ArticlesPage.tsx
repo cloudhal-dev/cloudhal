@@ -66,6 +66,7 @@ import { useCan, useSelf } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
+import { entryHref, entryRoute } from "../lib/entry-href.ts";
 import { imageRefPreviewUrl } from "../lib/media.ts";
 import { entryAccess } from "../lib/roles.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
@@ -340,7 +341,7 @@ function ArticleRow({
             }}
           />
           <div className="grid min-w-0 gap-1">
-            <Link href={`/sites/${siteId}/articles/${e.id}`} variant="plain">
+            <Link href={entryHref(siteId, e.id, e.collection)} variant="plain">
               <Text bold as="span">
                 {e.title}
               </Text>
@@ -424,12 +425,7 @@ function ArticleRow({
       {views && <ListViewsCell views={views.views} nodeId={e.id} />}
       <Table.Cell sticky="right" className="w-0 text-end">
         <RowMenu
-          onOpen={() =>
-            navigate({
-              to: "/sites/$siteId/articles/$entryId",
-              params: { siteId, entryId: e.id },
-            })
-          }
+          onOpen={() => navigate(entryRoute(siteId, e.id, e.collection))}
           items={<EntryLiveItems siteId={siteId} entry={e} />}
           onDelete={onDelete}
           deleteDisabledReason={deleteDisabledReason}

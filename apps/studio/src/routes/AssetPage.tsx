@@ -54,6 +54,7 @@ import { useToast } from "../components/Toast.ts";
 import { useCan, useGate } from "../components/useMe.ts";
 import { type KeyIn, useI18n, useT } from "../i18n/index.tsx";
 import { type AssetDetail, type AssetUse, api } from "../lib/api.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import {
   ASSET_LIMITS,
   type AssetForm,
@@ -96,16 +97,13 @@ function slotKey(field: string): KeyIn<"media"> {
 }
 
 function useHref(siteId: string) {
-  return (use: AssetUse): string | undefined =>
-    use.nodeKind === "contentEntry"
-      ? `/sites/${siteId}/articles/${use.nodeId}`
-      : use.nodeKind === "page"
-        ? `/sites/${siteId}/pages/${use.nodeId}`
-        : use.nodeKind === "term"
-          ? `/sites/${siteId}/taxonomy/${use.nodeId}`
-          : use.nodeKind === "site"
-            ? `/sites/${siteId}/settings#chrome`
-            : undefined;
+  const editors: Partial<Record<AssetUse["nodeKind"], (id: string) => string>> = {
+    contentEntry: (id) => entryHref(siteId, id),
+    page: (id) => `/sites/${siteId}/pages/${id}`,
+    term: (id) => `/sites/${siteId}/taxonomy/${id}`,
+    site: () => `/sites/${siteId}/settings#chrome`,
+  };
+  return (use: AssetUse): string | undefined => editors[use.nodeKind]?.(use.nodeId);
 }
 
 /**

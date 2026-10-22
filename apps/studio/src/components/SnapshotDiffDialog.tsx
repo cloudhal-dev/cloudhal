@@ -35,6 +35,7 @@ import {
   diffBases,
   diffRows,
 } from "../lib/diff.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { assetTitle, formatSize, typeLabel } from "../lib/media.ts";
 import type { MenuDiffSummary } from "../lib/menus.ts";
 import { archivePath } from "../lib/taxonomy.ts";
@@ -197,7 +198,7 @@ function useNodeNames(siteId: string, enabled: boolean) {
       ? {
           title: entry.title,
           detail: entryPath(site.data, entry),
-          href: `/sites/${siteId}/articles/${entry.id}`,
+          href: entryHref(siteId, entry.id, entry.collection),
         }
       : {};
   };

@@ -157,7 +157,7 @@ describe("editorHref", () => {
   it("links nodes that exist to their editor", () => {
     const node = { exists: true, title: "A", path: "/a", status: "published" };
     expect(editorHref("s", { ...node, nodeId: "entry_1", kind: "entry" })).toBe(
-      "/sites/s/articles/entry_1",
+      "/sites/s/collections/posts/entry_1",
     );
     expect(editorHref("s", { ...node, nodeId: "page_1", kind: "page" })).toBe(
       "/sites/s/pages/page_1",

@@ -4,7 +4,7 @@ import { Stack } from "@phosphor-icons/react";
 import { useI18n } from "../i18n/index.tsx";
 import {
   collectionIcon,
-  collectionNames,
+  collectionName,
   entryTotal,
   useCollectionIcons,
   useCollections,
@@ -32,15 +32,14 @@ export function CollectionNav({
     <>
       {(registry.data ?? []).map((c) => {
         const href = `${base}/collections/${c.key}`;
-        const name =
-          collectionNames(site, c.key, locale)?.plural ??
-          (c.key === "posts" ? t("nav.articles") : c.key);
+        const name = collectionName(site, c.key, locale, t("nav.articles"));
         return (
           <Sidebar.MenuButton
             key={c.key}
             icon={collectionIcon(c, icons)}
             href={href}
-            active={is(href) || (c.key === "posts" && is(`${base}/articles`))}
+            // The list, its settings and its entries' editors (`…/$collection/$entryId`).
+            active={is(href, true) || is(`${href}/`)}
             tooltip={name}
           >
             {name}

@@ -4,11 +4,13 @@ import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
+import { entryRoute } from "../lib/entry-href.ts";
 import { hitLocation } from "../lib/palette.ts";
 import type { PaletteCommand } from "./AppFrame.tsx";
 import type { PaletteSearch } from "./CommandMenu.tsx";
 import { usePublishMode } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
+import { useCollectionCommands } from "./useCollectionCommands.ts";
 import { openLive, useLiveSite } from "./useLiveSite.ts";
 
 /** The site's screens the palette goes to, in its order (a table, not a list of closures). */
@@ -16,7 +18,7 @@ const SITE_SCREENS = [
   ["overview", "commands.goOverview", "/sites/$siteId"],
   ["analytics", "commands.goAnalytics", "/sites/$siteId/analytics"],
   ["pages", "nav.pages", "/sites/$siteId/pages"],
-  ["articles", "commands.goArticles", "/sites/$siteId/articles"],
+  ["collections", "commands.goCollections", "/sites/$siteId/collections"],
   ["taxonomy", "commands.goTaxonomy", "/sites/$siteId/taxonomy"],
   ["media", "commands.goMedia", "/sites/$siteId/media"],
   ["comments", "commands.goComments", "/sites/$siteId/comments"],
@@ -79,10 +81,7 @@ export function useSitePalette({
       }),
     onSuccess: async (entry) => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      await navigate({
-        to: "/sites/$siteId/articles/$entryId",
-        params: { siteId, entryId: entry.id },
-      });
+      await navigate(entryRoute(siteId, entry.id, entry.collection));
     },
   });
   const snapshot = useMutation({
@@ -93,30 +92,32 @@ export function useSitePalette({
     },
     onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),
   });
+  const collectionCommands = useCollectionCommands(siteId);
   const screens: PaletteCommand[] = SITE_SCREENS.filter(([id]) => id !== "comments" || comments)
     .map(([id, label, to]) => ({
       id,
       label: t(label),
       run: () => navigate({ to, params: { siteId } }),
     }))
-    .flatMap((c) =>
+    .flatMap((c) => {
+      // Each collection comes before the collections overview (RFC-0040 §4).
+      if (c.id === "collections") return [...collectionCommands, c];
       // "Schedule a publish…" sits right after the schedule.
-      c.id === "schedules"
-        ? [
-            c,
-            {
-              id: "new-schedule",
-              label: t("commands.newSchedule"),
-              run: () =>
-                navigate({
-                  to: "/sites/$siteId/schedules",
-                  params: { siteId },
-                  search: { new: "publish" },
-                }),
-            },
-          ]
-        : [c],
-    )
+      if (c.id !== "schedules") return [c];
+      return [
+        c,
+        {
+          id: "new-schedule",
+          label: t("commands.newSchedule"),
+          run: () =>
+            navigate({
+              to: "/sites/$siteId/schedules",
+              params: { siteId },
+              search: { new: "publish" },
+            }),
+        },
+      ];
+    })
     .concat(
       OTHER_SCREENS.map(([id, label, to]) => ({
         id,

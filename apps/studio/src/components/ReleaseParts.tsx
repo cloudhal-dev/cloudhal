@@ -31,6 +31,7 @@ import {
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import type { ReleaseDiff, ReleaseItemView, ReleaseView } from "../lib/api.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { schedulesApi } from "../lib/schedules-api.ts";
 import { TextChange } from "./BodyChanges.tsx";
 import { type ST, scheduleKeys, useScheduleWords } from "./Schedules.tsx";
@@ -50,7 +51,7 @@ export function itemEditor(siteId: string, item: Pick<ReleaseItemView, "nodeId" 
   const base = `/sites/${siteId}`;
   switch (item.nodeKind) {
     case "contentEntry":
-      return `${base}/articles/${item.nodeId}`;
+      return entryHref(siteId, item.nodeId);
     case "page":
       return `${base}/pages/${item.nodeId}`;
     case "term":

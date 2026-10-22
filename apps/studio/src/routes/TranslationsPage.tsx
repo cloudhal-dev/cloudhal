@@ -23,13 +23,14 @@ import { usePaging } from "../components/usePaging.ts";
 import { useI18n } from "../i18n/index.tsx";
 import { api, type TranslationRow } from "../lib/api.ts";
 import { type CoverageColumn, type CoverageRow, coverageRows } from "../lib/coverage.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { languageName } from "../lib/languages.ts";
 
 type Filter = "all" | "needsWork";
 type Scope = "site" | "project";
 
 const editorHref = (m: TranslationRow) =>
-  m.kind === "page" ? `/sites/${m.siteId}/pages/${m.id}` : `/sites/${m.siteId}/articles/${m.id}`;
+  m.kind === "page" ? `/sites/${m.siteId}/pages/${m.id}` : entryHref(m.siteId, m.id, m.collection);
 
 /**
  * The coverage rows and columns: the site's languages, or with `scope: "project"` every language

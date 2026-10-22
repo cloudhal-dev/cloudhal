@@ -4,7 +4,7 @@
     "apps/studio/src/components/AnalyticsSections.tsx": 1323,
     "apps/studio/src/components/CommentSettings.tsx": 837,
     "apps/studio/src/lib/menus.ts": 829,
-    "apps/studio/src/routes/AssetPage.tsx": 855,
+    "apps/studio/src/routes/AssetPage.tsx": 853,
     "apps/studio/src/routes/CommentThreadPage.tsx": 813,
     "apps/studio/src/routes/NavigationPage.tsx": 1171,
     "apps/studio/src/routes/SchedulesPage.tsx": 1296,
@@ -181,7 +181,7 @@
       "lines": 191
     },
     "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
-      "lines": 470
+      "lines": 469
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
       "lines": 197
@@ -256,7 +256,7 @@
       "lines": 258
     },
     "apps/studio/src/routes/SiteOverviewPage.tsx::SiteOverviewPage": {
-      "lines": 216
+      "lines": 169
     },
     "apps/studio/src/routes/SiteSettingsPage.tsx::DomainsSection": {
       "lines": 216

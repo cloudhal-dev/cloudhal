@@ -80,6 +80,7 @@ import {
   revsOf,
   threadModeOf,
 } from "../lib/comments.ts";
+import { entryHref } from "../lib/entry-href.ts";
 import { isOwnEntry } from "../lib/roles.ts";
 
 const STATE_VARIANT = {
@@ -90,9 +91,8 @@ const STATE_VARIANT = {
 } as const;
 
 /**
- * The staff reply form under the comment answered (RFC-0007 §14): plain text up to 5,000
- * characters, a read-only preview rendered by `CommentText` exactly as the public page will, the
- * badge it will carry, and "Publish reply" — published at once under the person's name.
+ * The staff reply form under the comment answered (RFC-0007 §14): plain text up to 5,000 chars, a
+ * preview as the public page renders it (`CommentText`), its badge, "Publish reply" (live, signed).
  */
 function ReplyForm({
   siteId,
@@ -711,7 +711,7 @@ export function CommentThreadPage() {
       actions={
         entry.data ? (
           <LinkButton
-            href={`/sites/${siteId}/articles/${nodeId}`}
+            href={entryHref(siteId, nodeId, entry.data.collection)}
             variant="secondary"
             icon={directional(ArrowSquareOut)}
           >
