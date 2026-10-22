@@ -26,7 +26,7 @@ import { ViewSiteButton } from "../components/LiveLinks.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
 import { SiteSwitcherExtra } from "../components/SiteSwitcher.tsx";
 import { SitePublishOpener } from "../components/sitePublishOpener.ts";
-import { useTaxonomyData } from "../components/Taxonomy.tsx";
+import { useProposedTermsCount } from "../components/taxonomy-keys.ts";
 import { useCan } from "../components/useMe.ts";
 import { useNotifications } from "../components/useNotifications.ts";
 import { usePendingApprovals } from "../components/usePendingApprovals.ts";
@@ -55,8 +55,7 @@ export function SiteShell() {
   const approvals = usePendingApprovals(siteId, full);
   const pendingApprovals = approvals.data?.length ?? 0;
   // Proposed terms wait for a person (RFC-0002 §8): their count rides on the sidebar item.
-  const taxonomy = useTaxonomyData(siteId);
-  const proposedTerms = taxonomy.items.filter((i) => i.term.status === "proposed").length;
+  const proposedTerms = useProposedTermsCount(siteId);
   // Reader comments (RFC-0007 §14): on deployments that have them, for people who may read them;
   // the pending count rides on the bell's digest (own articles' count for Authors).
   const instance = useQuery({ queryKey: ["instance"], queryFn: api.instance, retry: false });

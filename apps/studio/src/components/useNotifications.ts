@@ -22,9 +22,9 @@ import {
   shouldRaiseBrowserNotification,
 } from "../lib/notifications.ts";
 import { splitHref } from "./AppLink.tsx";
-import { useExtendElevation } from "./Elevation.tsx";
-import { useShortDuration } from "./ElevationRequest.tsx";
+import { useExtendElevation } from "./elevation-actions.ts";
 import { type ToastAction, useToast } from "./Toast.ts";
+import { useShortDuration } from "./useShortDuration.ts";
 
 export const NOTIFICATIONS_KEY = ["notifications"] as const;
 

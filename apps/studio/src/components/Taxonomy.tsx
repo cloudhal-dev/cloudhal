@@ -19,13 +19,9 @@ import {
   taxonomyLabel,
   termLabel,
 } from "../lib/taxonomy.ts";
+import { taxonomyKeys } from "./taxonomy-keys.ts";
 
-/** Query keys of the taxonomy data, so every screen shares (and invalidates) the same cache. */
-export const taxonomyKeys = {
-  taxonomies: (siteId: string) => ["taxonomies", siteId] as const,
-  terms: (siteId: string) => ["terms", siteId] as const,
-  redirects: (siteId: string) => ["redirects", siteId] as const,
-};
+export { taxonomyKeys };
 
 /**
  * The site's taxonomies and all its terms with usage (every status), plus naming helpers in the

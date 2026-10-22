@@ -55,6 +55,10 @@ function screenText(file: string): string {
 const uiFiles = files.filter(
   (f) => f.file.startsWith("routes/") || f.file.startsWith("components/"),
 );
+/** The screens' and components' sources with their helpers (`.ts` too), for one-implementation checks. */
+const uiSources = walkAll(SRC)
+  .map((f) => ({ file: path.relative(SRC, f), text: readFileSync(f, "utf8") }))
+  .filter((f) => f.file.startsWith("routes/") || f.file.startsWith("components/"));
 
 /** Every screen must be composed from these; the matrix in DESIGN.md maps the rest. */
 const REQUIRED_IMPORTS: Record<string, string[]> = {
@@ -412,8 +416,16 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/AppFrame.tsx#notifications": ["NotificationsBell"],
   "components/NotificationsBell.tsx": [
     "NotificationBell",
-    "NotificationItem",
     "SectionEmpty",
+    "Badge",
+    "useNotifications",
+    "useNotificationAlerts",
+    "liveNotifications",
+    "NotificationList",
+  ],
+  // The panel's items load with the first bell that has something in it (bundle-budget.ts).
+  "components/NotificationItems.tsx": [
+    "NotificationItem",
     "Badge",
     "ButtonGroup",
     "DropdownMenu",
@@ -423,9 +435,6 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "RelativeTime",
     "useExtendElevation",
     "useEndElevation",
-    "useNotifications",
-    "useNotificationAlerts",
-    "liveNotifications",
   ],
   "components/NotificationSettings.tsx": [
     "SettingsSection",
@@ -598,7 +607,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "facetFilter",
     "TagsMigrationBanner",
   ],
-  "routes/SiteShell.tsx#taxonomy": ["useTaxonomyData", "Signpost", "Tag"],
+  "routes/SiteShell.tsx#taxonomy": ["useProposedTermsCount", "Signpost", "Tag"],
   "components/SnapshotDiffDialog.tsx#taxonomy": ["AssignmentDeltas", "useTaxonomyData"],
   // Staff roles and invites (§2q–§2s, RFC-0005): Team page, invite flow, token pages, gating.
   "routes/MembersPage.tsx": [
@@ -700,7 +709,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "routes/TermEditorPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
   "routes/RedirectsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
   "routes/SiteSettingsPage.tsx#roles": ["useGate", "ReadOnly", "ViewOnlyBanner"],
-  "components/NotificationsBell.tsx#roles": ["MemberJoinedItem", "RoleChangedItem"],
+  "components/NotificationItems.tsx#roles": ["MemberJoinedItem", "RoleChangedItem"],
   // Media library (§2u, RFC-0004 §8): library, file page, upload queue, picker, takedown.
   "routes/MediaPage.tsx": [
     "PageLayout",
@@ -962,11 +971,11 @@ describe("design rules (DESIGN.md)", () => {
   });
 
   it("every screen that can elevate a key asks for consent before Auto", () => {
-    const elevating = uiFiles.filter((f) => /api\.agentKeys\.elevate\b/.test(f.text));
-    // The dialog grants; Elevation.tsx only extends an elevation in force (next test).
-    expect(elevating.map((f) => f.file)).toEqual([
+    const elevating = uiSources.filter((f) => /api\.agentKeys\.elevate\b/.test(f.text));
+    // The dialog grants; elevation-actions.ts only extends an elevation in force (next test).
+    expect(elevating.map((f) => f.file).sort()).toEqual([
       "components/ElevateAgentKeyDialog.tsx",
-      "components/Elevation.tsx",
+      "components/elevation-actions.ts",
     ]);
     const dialog = elevating[0] as { file: string; text: string };
     expect(dialog.text).toMatch(/<AutoModeConfirm\b/);
@@ -974,7 +983,9 @@ describe("design rules (DESIGN.md)", () => {
   });
 
   it("extending re-posts the mode in force, never a new grant (ADR-0016 addendum)", () => {
-    const elevation = files.find((f) => f.file === "components/Elevation.tsx") as { text: string };
+    const elevation = uiSources.find((f) => f.file === "components/elevation-actions.ts") as {
+      text: string;
+    };
     const extend = elevation.text.slice(
       elevation.text.indexOf("export function useExtendElevation"),
     );
@@ -990,7 +1001,7 @@ describe("design rules (DESIGN.md)", () => {
   it("every notification action routes through the shared extend/end helpers", () => {
     const alerts = readFileSync(path.join(SRC, "components/useNotifications.ts"), "utf8");
     const notificationFiles = [
-      ...["components/NotificationsBell.tsx", "routes/AgentsPage.tsx"].map(
+      ...["components/NotificationItems.tsx", "routes/AgentsPage.tsx"].map(
         (file) => files.find((f) => f.file === file) as { file: string; text: string },
       ),
       { file: "components/useNotifications.ts", text: alerts },
@@ -1003,8 +1014,8 @@ describe("design rules (DESIGN.md)", () => {
     const bell = notificationFiles[0] as { text: string };
     expect(bell.text).toMatch(/\buseEndElevation\(\)/);
     // Ending early has one implementation too.
-    const ending = uiFiles.filter((f) => /api\.agentKeys\.endElevation\b/.test(f.text));
-    expect(ending.map((f) => f.file)).toEqual(["components/Elevation.tsx"]);
+    const ending = uiSources.filter((f) => /api\.agentKeys\.endElevation\b/.test(f.text));
+    expect(ending.map((f) => f.file)).toEqual(["components/elevation-actions.ts"]);
     // The toast's "Extend" is the same helper with the same default.
     expect(alerts).toMatch(/extend\(\{ targets: \[target\], minutes: DEFAULT_EXTEND_MINUTES \}\)/);
   });
