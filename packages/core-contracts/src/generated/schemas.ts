@@ -625,6 +625,15 @@ export const SiteSchema = {
             "oldest",
             "title"
           ]
+        },
+        "fields": {
+          "type": "array",
+          "description": "RFC-0041: the collection's typed custom fields, in form order. Values live in ContentEntry.fields under each key. At most 200 per site and unique keys (checked in code).",
+          "minItems": 1,
+          "maxItems": 30,
+          "items": {
+            "$ref": "#/$defs/FieldDefinition"
+          }
         }
       }
     },
@@ -678,6 +687,476 @@ export const SiteSchema = {
         },
         "primary": {
           "type": "boolean"
+        }
+      }
+    },
+    "FieldDefinition": {
+      "description": "RFC-0041: one typed custom field of a collection, discriminated by `type`.",
+      "oneOf": [
+        {
+          "title": "TextField",
+          "type": "object",
+          "description": "Plain text: a string of at most maxLength characters.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "text"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "maxLength": {
+              "type": "integer",
+              "description": "Absent: 5000.",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "multiline": {
+              "type": "boolean",
+              "description": "Line breaks allowed. Absent: false."
+            },
+            "searchable": {
+              "type": "boolean",
+              "description": "Its words go into site search. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "RichTextField",
+          "type": "object",
+          "description": "Cloudhal Markdown v1 (ADR-0028), at most 50 000 characters.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "richText"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "searchable": {
+              "type": "boolean",
+              "description": "Its words go into site search. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "NumberField",
+          "type": "object",
+          "description": "A finite number.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "number"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "integer": {
+              "type": "boolean",
+              "description": "Whole numbers only. Absent: false."
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "title": "BooleanField",
+          "type": "object",
+          "description": "true or false; absent reads as false, so it cannot be required to publish.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "boolean"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            }
+          }
+        },
+        {
+          "title": "DateField",
+          "type": "object",
+          "description": "A calendar day without a zone (YYYY-MM-DD).",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "date"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            }
+          }
+        },
+        {
+          "title": "DateTimeField",
+          "type": "object",
+          "description": "An instant with the zone it was entered in: {at, timeZone} (RFC-0008 §9.1).",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "datetime"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            }
+          }
+        },
+        {
+          "title": "UrlField",
+          "type": "object",
+          "description": "A link: https, http, mailto, tel, a site-relative path or a #fragment; at most 2048 characters.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "url"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            }
+          }
+        },
+        {
+          "title": "ImageField",
+          "type": "object",
+          "description": "An image Asset of the same site, by id (asset_…).",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "image"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            }
+          }
+        },
+        {
+          "title": "SelectField",
+          "type": "object",
+          "description": "One of a closed list of options, or several when multiple.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized",
+            "options"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "select"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs a value. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {
+                "$ref": "#/$defs/FieldOption"
+              }
+            },
+            "multiple": {
+              "type": "boolean",
+              "description": "The value is a list of option values. Absent: false."
+            }
+          }
+        }
+      ]
+    },
+    "FieldKey": {
+      "type": "string",
+      "description": "The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code).",
+      "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+    },
+    "FieldLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "help": {
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    "FieldLabels": {
+      "type": "object",
+      "description": "The field's label and help per locale. Missing a locale: the default locale's, then the key.",
+      "propertyNames": {
+        "$ref": "#/$defs/Locale"
+      },
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/FieldLabel"
+      }
+    },
+    "FieldMigration": {
+      "type": "object",
+      "description": "RFC-0041 §6: present only while a field operation rewrites entries.",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/Id",
+          "description": "The operation's \"before\" snapshot."
+        },
+        "fromKey": {
+          "$ref": "#/$defs/FieldKey"
+        },
+        "fromType": {
+          "type": "string",
+          "enum": [
+            "text",
+            "richText",
+            "number",
+            "boolean",
+            "date",
+            "datetime",
+            "url",
+            "image",
+            "select"
+          ]
+        },
+        "fromLocalized": {
+          "type": "boolean"
+        }
+      }
+    },
+    "FieldOption": {
+      "type": "object",
+      "description": "One option of a select field. Values are unique in the field (checked in code).",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "labels"
+      ],
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/Slug",
+          "description": "Stored in entries, never shown."
+        },
+        "labels": {
+          "type": "object",
+          "propertyNames": {
+            "$ref": "#/$defs/Locale"
+          },
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
         }
       }
     },
@@ -2468,7 +2947,7 @@ export const ContentEntrySchema = {
     },
     "fields": {
       "type": "object",
-      "description": "Collection-specific values; any JSON.",
+      "description": "Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value.",
       "additionalProperties": true
     },
     "tags": {

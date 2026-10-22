@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9T1",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Minimal",
+  "slug": "minimal",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [],
+  "pageIds": [],
+  "theme": {
+    "name": "blog"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-23T20:00:00Z",
+  "updatedAt": "2026-10-23T20:00:00Z",
+  "collections": {
+    "jobs": {
+      "fields": [
+        {
+          "key": "field0",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Field 0"
+            }
+          },
+          "localized": true
+        },
+        {
+          "key": "field1",
+          "type": "richText",
+          "labels": {
+            "en": {
+              "label": "Field 1"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "field2",
+          "type": "number",
+          "labels": {
+            "en": {
+              "label": "Field 2"
+            }
+          },
+          "localized": true
+        },
+        {
+          "key": "field3",
+          "type": "boolean",
+          "labels": {
+            "en": {
+              "label": "Field 3"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "field4",
+          "type": "date",
+          "labels": {
+            "en": {
+              "label": "Field 4"
+            }
+          },
+          "localized": true
+        },
+        {
+          "key": "field5",
+          "type": "datetime",
+          "labels": {
+            "en": {
+              "label": "Field 5"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "field6",
+          "type": "url",
+          "labels": {
+            "en": {
+              "label": "Field 6"
+            }
+          },
+          "localized": true
+        },
+        {
+          "key": "field7",
+          "type": "image",
+          "labels": {
+            "en": {
+              "label": "Field 7"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "field8",
+          "type": "select",
+          "labels": {
+            "en": {
+              "label": "Field 8"
+            }
+          },
+          "localized": false,
+          "options": [
+            {
+              "value": "a",
+              "labels": {
+                "en": "A"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

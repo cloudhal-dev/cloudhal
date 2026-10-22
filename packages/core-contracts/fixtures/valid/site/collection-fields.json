@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9T1",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Minimal",
+  "slug": "minimal",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [],
+  "pageIds": [],
+  "theme": {
+    "name": "blog"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-23T20:00:00Z",
+  "updatedAt": "2026-10-23T20:00:00Z",
+  "collections": {
+    "posts": {},
+    "events": {
+      "labels": {
+        "en": {
+          "singular": "Event",
+          "plural": "Events"
+        }
+      },
+      "fields": [
+        {
+          "key": "venue",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Venue",
+              "help": "Where it happens."
+            },
+            "tr": {
+              "label": "Mekan"
+            }
+          },
+          "localized": true,
+          "requiredToPublish": true,
+          "maxLength": 200,
+          "multiline": false,
+          "searchable": true
+        },
+        {
+          "key": "notes",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Internal notes"
+            }
+          },
+          "localized": false,
+          "multiline": true
+        },
+        {
+          "key": "agenda",
+          "type": "richText",
+          "labels": {
+            "en": {
+              "label": "Agenda"
+            }
+          },
+          "localized": true,
+          "requiredToPublish": false,
+          "searchable": false
+        },
+        {
+          "key": "price",
+          "type": "number",
+          "labels": {
+            "en": {
+              "label": "Price",
+              "help": "In euros."
+            }
+          },
+          "localized": false,
+          "integer": false,
+          "minimum": 0.5,
+          "maximum": 999.5
+        },
+        {
+          "key": "seats",
+          "type": "number",
+          "labels": {
+            "en": {
+              "label": "Seats"
+            }
+          },
+          "localized": false,
+          "integer": true
+        },
+        {
+          "key": "online",
+          "type": "boolean",
+          "labels": {
+            "en": {
+              "label": "Online"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "deadline",
+          "type": "date",
+          "labels": {
+            "en": {
+              "label": "Sign-up deadline"
+            }
+          },
+          "localized": false,
+          "requiredToPublish": true
+        },
+        {
+          "key": "startsAt",
+          "type": "datetime",
+          "labels": {
+            "en": {
+              "label": "Starts"
+            }
+          },
+          "localized": false,
+          "requiredToPublish": true
+        },
+        {
+          "key": "ticketUrl",
+          "type": "url",
+          "labels": {
+            "en": {
+              "label": "Tickets"
+            }
+          },
+          "localized": true
+        },
+        {
+          "key": "poster",
+          "type": "image",
+          "labels": {
+            "en": {
+              "label": "Poster"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "format",
+          "type": "select",
+          "labels": {
+            "en": {
+              "label": "Format"
+            }
+          },
+          "localized": false,
+          "requiredToPublish": true,
+          "multiple": true,
+          "options": [
+            {
+              "value": "talk",
+              "labels": {
+                "en": "Talk",
+                "tr": "Konuşma"
+              }
+            },
+            {
+              "value": "workshop",
+              "labels": {
+                "en": "Workshop"
+              }
+            }
+          ]
+        },
+        {
+          "key": "level",
+          "type": "select",
+          "labels": {
+            "en": {
+              "label": "Level"
+            }
+          },
+          "localized": false,
+          "multiple": false,
+          "options": [
+            {
+              "value": "beginner",
+              "labels": {
+                "en": "Beginner"
+              }
+            }
+          ]
+        },
+        {
+          "key": "speaker",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Speaker"
+            }
+          },
+          "localized": false,
+          "migration": {
+            "id": "snap_01HZX8K3Q9MG",
+            "fromKey": "presenter",
+            "fromType": "richText",
+            "fromLocalized": true
+          }
+        },
+        {
+          "key": "room",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Room"
+            }
+          },
+          "localized": false,
+          "migration": {
+            "id": "snap_01HZX8K3Q9MH"
+          }
+        }
+      ]
+    }
+  }
+}

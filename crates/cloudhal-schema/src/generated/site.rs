@@ -1829,6 +1829,9 @@ pub struct CollectionSettings {
     #[doc = "RFC-0040: entries appear in the site's RSS feeds. Absent: true."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub feed: ::std::option::Option<bool>,
+    #[doc = "RFC-0041: the collection's typed custom fields, in form order. Values live in ContentEntry.fields under each key. At most 200 per site and unique keys (checked in code)."]
+    #[serde(default, skip_serializing_if = "::std::vec::Vec::is_empty")]
+    pub fields: ::std::vec::Vec<FieldDefinition>,
     #[doc = "RFC-0040: a name from Studio's closed icon set (e.g. calendar, briefcase, users). Unknown names show the default icon. Never a URL or markup."]
     #[serde(skip_serializing_if = "::std::option::Option::is_none")]
     pub icon: ::std::option::Option<CollectionSettingsIcon>,
@@ -2190,6 +2193,522 @@ impl ::std::convert::TryFrom<::std::string::String> for DomainHostname {
     }
 }
 impl<'de> ::serde::Deserialize<'de> for DomainHostname {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "RFC-0041: one typed custom field of a collection, discriminated by `type`."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", deny_unknown_fields)]
+pub enum FieldDefinition {
+    #[doc = "TextField\n\nPlain text: a string of at most maxLength characters."]
+    #[serde(rename = "text")]
+    Text {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[doc = "Absent: 5000."]
+        #[serde(
+            rename = "maxLength",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        max_length: ::std::option::Option<::std::num::NonZeroU64>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "Line breaks allowed. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        multiline: ::std::option::Option<bool>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+        #[doc = "Its words go into site search. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        searchable: ::std::option::Option<bool>,
+    },
+    #[doc = "RichTextField\n\nCloudhal Markdown v1 (ADR-0028), at most 50 000 characters."]
+    #[serde(rename = "richText")]
+    RichText {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+        #[doc = "Its words go into site search. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        searchable: ::std::option::Option<bool>,
+    },
+    #[doc = "NumberField\n\nA finite number."]
+    #[serde(rename = "number")]
+    Number {
+        #[doc = "Whole numbers only. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        integer: ::std::option::Option<bool>,
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        maximum: ::std::option::Option<f64>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        minimum: ::std::option::Option<f64>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "BooleanField\n\ntrue or false; absent reads as false, so it cannot be required to publish."]
+    #[serde(rename = "boolean")]
+    Boolean {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+    },
+    #[doc = "DateField\n\nA calendar day without a zone (YYYY-MM-DD)."]
+    #[serde(rename = "date")]
+    Date {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "DateTimeField\n\nAn instant with the zone it was entered in: {at, timeZone} (RFC-0008 §9.1)."]
+    #[serde(rename = "datetime")]
+    Datetime {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "UrlField\n\nA link: https, http, mailto, tel, a site-relative path or a #fragment; at most 2048 characters."]
+    #[serde(rename = "url")]
+    Url {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "ImageField\n\nAn image Asset of the same site, by id (asset_…)."]
+    #[serde(rename = "image")]
+    Image {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "SelectField\n\nOne of a closed list of options, or several when multiple."]
+    #[serde(rename = "select")]
+    Select {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own value (missing reads the original's); false: only the translation group's original holds it."]
+        localized: bool,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "The value is a list of option values. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        multiple: ::std::option::Option<bool>,
+        options: ::std::vec::Vec<FieldOption>,
+        #[doc = "An entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+}
+#[doc = "The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldKey(::std::string::String);
+impl ::std::ops::Deref for FieldKey {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldKey> for ::std::string::String {
+    fn from(value: FieldKey) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldKey {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^[a-z][A-Za-z0-9]{0,39}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][A-Za-z0-9]{0,39}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldKey {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldKey {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldKey {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`FieldLabel`"]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldLabel {
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub help: ::std::option::Option<FieldLabelHelp>,
+    pub label: FieldLabelLabel,
+}
+#[doc = "`FieldLabelHelp`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldLabelHelp(::std::string::String);
+impl ::std::ops::Deref for FieldLabelHelp {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldLabelHelp> for ::std::string::String {
+    fn from(value: FieldLabelHelp) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldLabelHelp {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 300usize {
+            return Err("longer than 300 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldLabelHelp {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldLabelHelp {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldLabelHelp {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`FieldLabelLabel`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldLabelLabel(::std::string::String);
+impl ::std::ops::Deref for FieldLabelLabel {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldLabelLabel> for ::std::string::String {
+    fn from(value: FieldLabelLabel) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldLabelLabel {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldLabelLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldLabelLabel {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldLabelLabel {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "The field's label and help per locale. Missing a locale: the default locale's, then the key."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(transparent)]
+pub struct FieldLabels(pub ::std::collections::HashMap<Locale, FieldLabel>);
+impl ::std::ops::Deref for FieldLabels {
+    type Target = ::std::collections::HashMap<Locale, FieldLabel>;
+    fn deref(&self) -> &::std::collections::HashMap<Locale, FieldLabel> {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldLabels> for ::std::collections::HashMap<Locale, FieldLabel> {
+    fn from(value: FieldLabels) -> Self {
+        value.0
+    }
+}
+impl ::std::convert::From<::std::collections::HashMap<Locale, FieldLabel>> for FieldLabels {
+    fn from(value: ::std::collections::HashMap<Locale, FieldLabel>) -> Self {
+        Self(value)
+    }
+}
+#[doc = "RFC-0041 §6: present only while a field operation rewrites entries."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldMigration {
+    #[serde(
+        rename = "fromKey",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub from_key: ::std::option::Option<FieldKey>,
+    #[serde(
+        rename = "fromLocalized",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub from_localized: ::std::option::Option<bool>,
+    #[serde(
+        rename = "fromType",
+        skip_serializing_if = "::std::option::Option::is_none"
+    )]
+    pub from_type: ::std::option::Option<FieldMigrationFromType>,
+    #[doc = "The operation's \"before\" snapshot."]
+    pub id: Id,
+}
+#[doc = "`FieldMigrationFromType`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum FieldMigrationFromType {
+    #[serde(rename = "text")]
+    Text,
+    #[serde(rename = "richText")]
+    RichText,
+    #[serde(rename = "number")]
+    Number,
+    #[serde(rename = "boolean")]
+    Boolean,
+    #[serde(rename = "date")]
+    Date,
+    #[serde(rename = "datetime")]
+    Datetime,
+    #[serde(rename = "url")]
+    Url,
+    #[serde(rename = "image")]
+    Image,
+    #[serde(rename = "select")]
+    Select,
+}
+impl ::std::fmt::Display for FieldMigrationFromType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Text => f.write_str("text"),
+            Self::RichText => f.write_str("richText"),
+            Self::Number => f.write_str("number"),
+            Self::Boolean => f.write_str("boolean"),
+            Self::Date => f.write_str("date"),
+            Self::Datetime => f.write_str("datetime"),
+            Self::Url => f.write_str("url"),
+            Self::Image => f.write_str("image"),
+            Self::Select => f.write_str("select"),
+        }
+    }
+}
+impl ::std::str::FromStr for FieldMigrationFromType {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "text" => Ok(Self::Text),
+            "richText" => Ok(Self::RichText),
+            "number" => Ok(Self::Number),
+            "boolean" => Ok(Self::Boolean),
+            "date" => Ok(Self::Date),
+            "datetime" => Ok(Self::Datetime),
+            "url" => Ok(Self::Url),
+            "image" => Ok(Self::Image),
+            "select" => Ok(Self::Select),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldMigrationFromType {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldMigrationFromType {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "One option of a select field. Values are unique in the field (checked in code)."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldOption {
+    pub labels: ::std::collections::HashMap<Locale, FieldOptionLabelsValue>,
+    #[doc = "Stored in entries, never shown."]
+    pub value: Slug,
+}
+#[doc = "`FieldOptionLabelsValue`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldOptionLabelsValue(::std::string::String);
+impl ::std::ops::Deref for FieldOptionLabelsValue {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldOptionLabelsValue> for ::std::string::String {
+    fn from(value: FieldOptionLabelsValue) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldOptionLabelsValue {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldOptionLabelsValue {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldOptionLabelsValue {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldOptionLabelsValue {
     fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
     where
         D: ::serde::Deserializer<'de>,

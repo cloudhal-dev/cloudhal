@@ -1,0 +1,96 @@
+{
+  "type": "object",
+  "description": "Typed custom fields of this collection. Every field is optional; leave a key out to leave it unset.",
+  "properties": {
+    "venue": {
+      "type": "string",
+      "title": "Mekan",
+      "description": "Where it happens. Plain text, at most 20 characters. One line. Needed to publish."
+    },
+    "notes": {
+      "type": "string",
+      "title": "Notes",
+      "description": "Plain text, at most 5000 characters. Line breaks allowed. Set on the original only; translations read it from there."
+    },
+    "agenda": {
+      "type": "string",
+      "title": "Agenda",
+      "description": "Markdown (Cloudhal Markdown v1), at most 50000 characters."
+    },
+    "price": {
+      "type": "number",
+      "title": "Price",
+      "description": "In euros. A number. At least 0.5. At most 999.5. Set on the original only; translations read it from there."
+    },
+    "seats": {
+      "type": "integer",
+      "title": "Seats",
+      "description": "A whole number. Set on the original only; translations read it from there."
+    },
+    "online": {
+      "type": "boolean",
+      "title": "Online",
+      "description": "Absent reads as false. Set on the original only; translations read it from there."
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date",
+      "title": "Deadline",
+      "description": "A calendar day, YYYY-MM-DD, without a time zone. Set on the original only; translations read it from there."
+    },
+    "startsAt": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The instant in UTC, RFC 3339 ending in Z, e.g. 2026-11-05T16:30:00Z."
+        },
+        "timeZone": {
+          "type": "string",
+          "description": "The IANA time zone it happens in, e.g. Europe/Istanbul."
+        }
+      },
+      "required": [
+        "at",
+        "timeZone"
+      ],
+      "additionalProperties": false,
+      "title": "Starts",
+      "description": "A date and time with its time zone. Set on the original only; translations read it from there. Needed to publish."
+    },
+    "ticketUrl": {
+      "type": "string",
+      "title": "Tickets",
+      "description": "A link: https:, http:, mailto: or tel:, a site path (/about) or a #fragment; at most 2048 characters."
+    },
+    "poster": {
+      "type": "string",
+      "pattern": "^asset_[A-Za-z0-9]{6,32}$",
+      "title": "Poster",
+      "description": "The id of an image asset of this site (asset_…). Set on the original only; translations read it from there."
+    },
+    "format": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "talk",
+          "workshop"
+        ]
+      },
+      "title": "Format",
+      "description": "Any of: talk (Konuşma), workshop (Workshop); each at most once. Set on the original only; translations read it from there."
+    },
+    "level": {
+      "type": "string",
+      "enum": [
+        "beginner",
+        "expert"
+      ],
+      "title": "Seviye",
+      "description": "One of: beginner (Başlangıç), expert (Uzman). Set on the original only; translations read it from there. Needed to publish."
+    }
+  },
+  "additionalProperties": false
+}

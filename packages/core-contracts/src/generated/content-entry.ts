@@ -100,7 +100,7 @@ export interface ContentEntry {
   summary?: string;
   body: Body;
   /**
-   * Collection-specific values; any JSON.
+   * Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value.
    */
   fields: {
     [k: string]: unknown | undefined;
