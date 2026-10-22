@@ -4,7 +4,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { PendingApprovalsBanner } from "../src/components/PendingApprovalsBanner.tsx";
 import { I18nProvider } from "../src/i18n/index.tsx";
 import type { Approval } from "../src/lib/api.ts";
@@ -22,9 +21,7 @@ function wrap(children: ReactNode) {
   return (
     <I18nProvider initialLocale="en">
       <QueryClientProvider client={qc}>
-        <CodeProvider>
-          <Toasty>{children}</Toasty>
-        </CodeProvider>
+        <Toasty>{children}</Toasty>
       </QueryClientProvider>
     </I18nProvider>
   );

@@ -6,7 +6,6 @@ import { Toasty } from "@cloudhal/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { vi } from "vitest";
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
 import type { Ability, InstanceInfo, Me, Role } from "../src/lib/api.ts";
 import { FALLBACK_ABILITIES, FALLBACK_ROLE_SCOPES, holds, roleRules } from "../src/lib/roles.ts";
@@ -16,9 +15,7 @@ export function wrap(children: ReactNode, locale: Locale = "en") {
   return (
     <I18nProvider initialLocale={locale}>
       <QueryClientProvider client={qc}>
-        <CodeProvider>
-          <Toasty>{children}</Toasty>
-        </CodeProvider>
+        <Toasty>{children}</Toasty>
       </QueryClientProvider>
     </I18nProvider>
   );

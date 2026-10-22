@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivityDetailDialog } from "../src/components/ActivityDetailDialog.tsx";
 import { Decision, ToolCell } from "../src/components/Audit.tsx";
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { CreateAgentKeyDialog } from "../src/components/CreateAgentKeyDialog.tsx";
 import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
 
@@ -12,9 +11,7 @@ function wrap(children: ReactNode, locale: Locale = "en") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
     <I18nProvider initialLocale={locale}>
-      <QueryClientProvider client={qc}>
-        <CodeProvider>{children}</CodeProvider>
-      </QueryClientProvider>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>
     </I18nProvider>
   );
 }

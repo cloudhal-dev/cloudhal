@@ -8,7 +8,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CodeProvider } from "../src/components/CodeProvider.tsx";
 import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
 import type { AgentKeySummary, Approval, AuditRow } from "../src/lib/api.ts";
 import { ActivityPage } from "../src/routes/ActivityPage.tsx";
@@ -26,9 +25,7 @@ function wrap(children: ReactNode, locale: Locale = "en") {
   return (
     <I18nProvider initialLocale={locale}>
       <QueryClientProvider client={qc}>
-        <CodeProvider>
-          <Toasty>{children}</Toasty>
-        </CodeProvider>
+        <Toasty>{children}</Toasty>
       </QueryClientProvider>
     </I18nProvider>
   );

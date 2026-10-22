@@ -1,32 +1,24 @@
 /** The list rows' links to the live site: "View live" and "Copy link" (Pages, Articles). */
 import type { ContentEntry, Page } from "@cloudhal/core-contracts";
-import { entryPath } from "@cloudhal/core-ts/permalinks";
 import { DropdownMenu, directional } from "@cloudhal/ui";
 import { ArrowSquareOut, Copy } from "@phosphor-icons/react";
 import { useT } from "../i18n/index.tsx";
-import { liveUrl } from "../lib/live-site.ts";
+import { absoluteItemUrl, type LiveItem } from "../lib/item-url.ts";
 import { openLive, useCopyLink, useLiveSite } from "./useLiveSite.ts";
 
 const OpenOutside = directional(ArrowSquareOut);
 
 /**
- * A list row's "View live" and "Copy link": for a published item on a site that has a domain and
- * has been published. `path` undefined: the address is not known (see `EntryLiveItems`).
+ * A list row's "View live" and "Copy link": for a published item on a site that has been
+ * published, when a domain serves its locale. The URL carries the item's locale (its `/<locale>`
+ * prefix or the locale's own domain).
  */
-export function LiveLinkItems({
-  siteId,
-  path,
-  published,
-}: {
-  siteId: string;
-  path: string | undefined;
-  published: boolean;
-}) {
+export function LiveLinkItems({ siteId, item }: { siteId: string; item: LiveItem }) {
   const t = useT();
   const copy = useCopyLink();
-  const { origin, liveSnapshotId } = useLiveSite(siteId);
-  const url = path === undefined ? undefined : liveUrl(origin, path);
-  if (!published || !liveSnapshotId || !url) return null;
+  const { origin, liveSnapshotId, site } = useLiveSite(siteId);
+  const url = absoluteItemUrl(site, origin, item);
+  if (item.status !== "published" || !liveSnapshotId || !url) return null;
   return (
     <>
       <DropdownMenu.Item icon={OpenOutside} onClick={() => openLive(url)}>
@@ -39,21 +31,12 @@ export function LiveLinkItems({
   );
 }
 
-/** A page row's live links (a page's path is already its full site path). */
+/** A page row's live links. */
 export function PageLiveItems({ siteId, page }: { siteId: string; page: Page }) {
-  return <LiveLinkItems siteId={siteId} path={page.path} published={page.status === "published"} />;
+  return <LiveLinkItems siteId={siteId} item={page} />;
 }
 
 /** An article row's live links. */
 export function EntryLiveItems({ siteId, entry }: { siteId: string; entry: ContentEntry }) {
-  const { site } = useLiveSite(siteId);
-  // Locale prefixes for articles come later: a non-default language's address is not known yet.
-  const known = site !== undefined && entry.locale === site.defaultLocale;
-  return (
-    <LiveLinkItems
-      siteId={siteId}
-      path={known ? entryPath(site, entry) : undefined}
-      published={entry.status === "published"}
-    />
-  );
+  return <LiveLinkItems siteId={siteId} item={entry} />;
 }

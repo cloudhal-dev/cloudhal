@@ -8,6 +8,7 @@
  */
 import type { ContentEntry, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { entryPath, type PermalinkSite, termSlug } from "@cloudhal/core-ts";
+import { localeRouting, localeUrl, localizedPath } from "@cloudhal/core-ts/locale-paths";
 import type { HeadMeta } from "./seo.ts";
 import type { GraphSource } from "./source.ts";
 
@@ -36,11 +37,8 @@ export function textDirection(locale: string): "ltr" | "rtl" {
   return RTL.has(language) ? "rtl" : "ltr";
 }
 
-type Routing = "prefix-except-default" | "prefix-all";
-
-export function localeRouting(site: Site): Routing {
-  return site.localization?.routing ?? "prefix-except-default";
-}
+// The URL helpers live in core-ts (Studio builds the same addresses); re-exported unchanged.
+export { localeRouting, localeUrl, localizedPath } from "@cloudhal/core-ts/locale-paths";
 
 /** The locale a host serves on its own (`localization.domains`), if any. */
 export function hostLocale(site: Site, host: string): string | undefined {
@@ -87,19 +85,6 @@ export function localeRequest(site: Site, host: string, path: string): LocaleReq
       redirect: localizedPath(site, site.defaultLocale, path),
     };
   return { locale: site.defaultLocale, path };
-}
-
-/** A graph path as a URL path of `locale` on the site's own host (no domain mapping). */
-export function localizedPath(site: Site, locale: string, path: string): string {
-  const prefixed = localeRouting(site) === "prefix-all" || locale !== site.defaultLocale;
-  if (!prefixed) return path;
-  return path === "/" ? `/${locale}` : `/${locale}${path}`;
-}
-
-/** The absolute URL of a graph path in `locale`: its own domain when it has one. */
-export function localeUrl(site: Site, locale: string, path: string, origin: string): string {
-  const domain = site.localization?.domains?.[locale];
-  return domain ? `https://${domain}${path}` : `${origin}${localizedPath(site, locale, path)}`;
 }
 
 /** One language version of a page or entry for `hreflang` and the language switcher. */

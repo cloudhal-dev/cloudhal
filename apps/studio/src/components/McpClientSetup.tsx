@@ -1,8 +1,8 @@
 import { Select, Text } from "@cloudhal/ui";
-import { CodeHighlighted } from "@cloudhal/ui/code";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { type McpClient, mcpSnippet, REMOTE_CLIENTS, snippetLang } from "../lib/agents.ts";
+import { CodeHighlighted } from "./CodeHighlighted.tsx";
 
 /**
  * Ready-to-copy setup for one MCP client at a time (docs/agents/clients.md): a client picker, the
