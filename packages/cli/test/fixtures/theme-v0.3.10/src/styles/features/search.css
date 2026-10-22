@@ -1,0 +1,59 @@
+/* Search (RFC-0019 §3): the header form, the page's form, results with highlighted snippets. */
+.ch-header-search input {
+  @apply w-40 rounded-md border border-zinc-300 px-3 py-1.5 text-sm sm:w-48;
+}
+.ch-search h1 {
+  @apply text-3xl font-bold tracking-tight;
+}
+.ch-search-form {
+  @apply mt-4 flex gap-2;
+}
+.ch-search-form input {
+  @apply min-w-0 flex-1 rounded-md border border-zinc-300 px-3 py-2;
+}
+.ch-search-form button {
+  @apply rounded-md px-4 py-2 font-medium bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse) hover:opacity-90;
+}
+.ch-search-note {
+  @apply mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900;
+}
+.ch-search-summary {
+  @apply mt-4 text-sm text-zinc-600;
+}
+.ch-search-results {
+  @apply mt-6 space-y-6;
+}
+.ch-search-context {
+  @apply text-xs font-medium text-zinc-500;
+}
+.ch-search-results h2 {
+  @apply text-lg font-semibold;
+}
+.ch-search-results h2 a {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-search-snippet {
+  @apply mt-1 text-zinc-700;
+}
+.ch-search-snippet mark {
+  @apply rounded-sm bg-amber-100 px-0.5 text-zinc-900;
+}
+.ch-search-results time {
+  @apply mt-1 block text-sm text-zinc-500;
+}
+/* The built-in not-found page: the search page's form, a sentence and a link home. */
+.ch-not-found-text {
+  @apply mt-3 text-zinc-700;
+}
+.ch-not-found .ch-search-form {
+  @apply flex-wrap items-center;
+}
+.ch-not-found-prompt {
+  @apply w-full text-sm text-zinc-600;
+}
+.ch-not-found-home {
+  @apply mt-6;
+}
+.ch-not-found-home a {
+  @apply font-medium underline underline-offset-4;
+}

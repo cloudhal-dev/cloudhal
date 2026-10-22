@@ -15,7 +15,8 @@
       "!**/target",
       "!**/.turbo",
       "!**/node_modules",
-      "!apps/studio/src/assets/geo"
+      "!apps/studio/src/assets/geo",
+      "!packages/cli/test/fixtures/theme-*"
     ]
   },
   "formatter": {

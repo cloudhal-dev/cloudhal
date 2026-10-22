@@ -6,5 +6,5 @@
     "types": ["node", "@cloudflare/workers-types"]
   },
   "include": ["src", "test", "bin"],
-  "exclude": ["src/**/*.astro"]
+  "exclude": ["src/**/*.astro", "test/fixtures"]
 }

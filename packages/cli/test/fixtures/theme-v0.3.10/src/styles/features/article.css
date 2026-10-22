@@ -1,0 +1,215 @@
+/* The article (RFC-0018 §3): kicker, title, dek, byline, table of contents. */
+.ch-article-head {
+  @apply space-y-3 border-b border-zinc-200 pt-6 pb-6;
+}
+.ch-kicker {
+  @apply inline-block text-sm font-semibold uppercase;
+  color: var(--ch-color-link);
+  letter-spacing: 0.04em;
+}
+a.ch-kicker:hover {
+  @apply underline underline-offset-4;
+}
+.ch-article-head h1 {
+  @apply text-4xl font-bold tracking-tight sm:text-5xl;
+}
+.ch-dek {
+  @apply text-xl leading-relaxed text-zinc-600;
+}
+.ch-byline {
+  @apply flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-zinc-500;
+}
+.ch-byline > * + *::before {
+  content: "·";
+  @apply mr-3 text-zinc-400;
+}
+.ch-byline__author {
+  @apply font-medium text-zinc-800;
+}
+.ch-cover {
+  @apply my-6;
+}
+.ch-cover img {
+  @apply w-full rounded-lg;
+}
+.ch-cover figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-toc {
+  @apply my-6 rounded-lg border border-zinc-200 px-4 py-3 text-sm;
+}
+.ch-toc summary {
+  @apply cursor-pointer font-medium;
+}
+.ch-toc ol {
+  @apply mt-2 space-y-1;
+}
+.ch-toc li[data-depth="3"] {
+  @apply pl-4;
+}
+.ch-toc a {
+  @apply text-zinc-600 underline-offset-4 hover:text-zinc-900 hover:underline;
+}
+.ch-richtext :is(h2, h3)[id] {
+  scroll-margin-top: 1.5rem;
+}
+.ch-byline__author a {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-byline a[href="#ch-corrections"] {
+  @apply font-medium text-amber-800 underline underline-offset-4;
+}
+/* Corrections (RFC-0019 §2): newest first, the kind as a label. */
+.ch-corrections {
+  @apply mt-10 rounded-lg border border-amber-200 bg-amber-50 px-5 py-4;
+  scroll-margin-top: 1.5rem;
+}
+.ch-corrections h2 {
+  @apply text-lg font-semibold;
+}
+.ch-corrections ol {
+  @apply mt-3 space-y-3;
+}
+.ch-correction__meta {
+  @apply flex flex-wrap gap-x-2 text-sm text-zinc-600;
+}
+.ch-correction__meta strong {
+  @apply font-semibold text-amber-900;
+}
+.ch-correction__note {
+  @apply mt-1 text-zinc-800;
+}
+.ch-correction__note a {
+  @apply underline underline-offset-4;
+}
+/* Article lists as cards: cover thumbnail, title, summary, date and reading time. */
+.ch-card-entry {
+  @apply flex gap-4;
+}
+.ch-card-entry__cover {
+  @apply h-24 w-36 shrink-0 rounded-md object-cover sm:h-28 sm:w-44;
+}
+.ch-card-entry__body {
+  @apply min-w-0 space-y-1;
+}
+.ch-card-entry__body a {
+  @apply text-lg font-semibold leading-snug underline-offset-4 hover:underline;
+}
+.ch-card-entry__body p {
+  @apply text-sm text-zinc-600;
+}
+.ch-card-entry__meta {
+  @apply flex flex-wrap gap-x-3 text-xs text-zinc-500;
+}
+.ch-card-entry__meta > * + *::before {
+  content: "·";
+  @apply mr-3;
+}
+
+/* Breadcrumbs, term chips, archives, pagination, related posts (RFC-0002). */
+.ch-breadcrumbs ol {
+  @apply flex flex-wrap gap-1 pt-6 text-sm text-zinc-500;
+}
+.ch-breadcrumbs li + li::before {
+  content: "›";
+  @apply mr-1 text-zinc-400;
+}
+.ch-breadcrumbs a {
+  @apply hover:text-zinc-900;
+}
+.ch-terms {
+  @apply flex flex-wrap gap-2 border-t border-zinc-200 py-4;
+}
+.ch-terms__group {
+  @apply flex flex-wrap gap-2;
+}
+.ch-chip {
+  @apply inline-block rounded-full border border-zinc-300 px-3 py-1 text-sm text-zinc-700;
+}
+a.ch-chip {
+  @apply hover:border-zinc-900 hover:text-zinc-900;
+}
+.ch-terms__group[data-taxonomy="category"] .ch-chip {
+  @apply border-(--ch-color-surface-inverse) bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse) hover:text-(--ch-color-text-inverse);
+}
+.ch-archive-header {
+  @apply space-y-2 border-b border-zinc-200 pt-4 pb-6;
+}
+.ch-archive-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-archive-kind {
+  @apply text-sm font-medium tracking-wide text-zinc-500 uppercase;
+}
+.ch-archive-meta {
+  @apply flex gap-4 text-sm text-zinc-500;
+}
+.ch-archive-meta a {
+  @apply underline-offset-4 hover:underline;
+}
+.ch-archive-image {
+  @apply mt-4 w-full rounded;
+}
+/* Author pages (RFC-0019 §1): round portrait, role and profile links. */
+.ch-archive[data-taxonomy="author"] .ch-archive-image {
+  @apply h-24 w-24 rounded-full object-cover;
+}
+.ch-archive-role {
+  @apply text-lg text-zinc-600;
+}
+.ch-archive-links {
+  @apply flex flex-wrap gap-3 text-sm;
+}
+.ch-archive-links a {
+  @apply font-medium underline underline-offset-4;
+}
+.ch-entrylist {
+  @apply space-y-6 py-6;
+}
+.ch-entrylist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-entrylist p {
+  @apply text-sm text-zinc-600;
+}
+.ch-entrylist time {
+  @apply text-xs text-zinc-500;
+}
+.ch-pagination {
+  @apply flex items-center justify-between border-t border-zinc-200 py-6 text-sm text-zinc-600;
+}
+.ch-pagination a {
+  @apply font-medium text-zinc-900 underline-offset-4 hover:underline;
+}
+.ch-related {
+  @apply border-t border-zinc-200 pt-6;
+}
+.ch-related h2 {
+  @apply text-xl font-semibold;
+}
+
+/* Navigation menus (RFC-0003): dropdowns and nested items as disclosures, no JavaScript. */
+.ch-nav-menu {
+  @apply relative;
+}
+.ch-nav-menu summary {
+  @apply cursor-pointer list-none;
+}
+.ch-nav-menu summary::-webkit-details-marker {
+  display: none;
+}
+.ch-nav-menu__caret {
+  @apply ml-1 text-xs;
+}
+.ch-nav-menu[open] > summary .ch-nav-menu__caret {
+  rotate: 180deg;
+}
+.ch-nav-menu > ul {
+  @apply absolute z-10 mt-2 min-w-40 space-y-1 rounded border border-zinc-200 bg-white p-2 shadow-sm;
+}
+footer .ch-nav-menu > ul {
+  @apply bottom-full mb-2;
+}
+.ch-nav-menu .ch-nav-menu > ul {
+  @apply static mt-1 border-0 p-0 pl-3 shadow-none;
+}

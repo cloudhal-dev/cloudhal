@@ -27,6 +27,9 @@ const page = await source.pageByPath(Astro.params.path ? `/${Astro.params.path}`
 
 `.astro` files ship as source (no build step); the consumer's Astro compiles them. `astro` is a peer dependency.
 
+## Theme-facing API stability
+`cloudhal init` copies `starters/blog/src` into each project, so a site keeps calling this package's exports (and `@cloudhal/core-ts`'s) as they were when it was created. Every export a theme imports is therefore a public API: never change its meaning under the same name. A breaking change keeps a deprecated fallback for the old call. In 0.3.11 `entryPath(entry)` became `entryPath(site, entry)` without one, and every site with an older theme copy rendered empty pages until 0.3.13 restored it. `packages/cli/test/old-theme-compat.test.ts` builds frozen copies of earlier starters (`packages/cli/test/fixtures/theme-v*/`) with today's packages. Add a new frozen copy when a release changes theme-facing APIs.
+
 ## Site analytics (RFC-0006)
 
 The renderer carries the site side of Cloudhal's cookie-less analytics (`@cloudhal/analytics`):
