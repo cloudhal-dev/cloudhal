@@ -1,5 +1,24 @@
 # @cloudhal/cloudflare
 
+## 0.3.11
+
+### Patch Changes
+
+- 25b002c: Fewer D1 round trips per admin API request. The session is cached in a signed cookie for 60 seconds, so a session revoked elsewhere can stay usable that long (ADR-0010 addendum); membership and roles still apply at once. A member and their site roles load in one query. `get-session` is no longer rate limited, since the limiter's D1 read and write landed on every session check. Due comment purges are swept at most every 10 seconds per isolate instead of on every request.
+- Updated dependencies [25b002c]
+- Updated dependencies [55deb41]
+- Updated dependencies [2d0a257]
+- Updated dependencies [4cd475d]
+- Updated dependencies [1d7998a]
+  - @cloudhal/api@0.3.11
+  - @cloudhal/core-ts@0.3.11
+  - @cloudhal/mcp-server@0.3.11
+  - @cloudhal/agent-runtime@0.3.11
+  - @cloudhal/analytics@0.3.11
+  - @cloudhal/comments@0.3.11
+  - @cloudhal/schedules@0.3.11
+  - @cloudhal/storage@0.3.11
+
 ## 0.3.10
 
 ### Patch Changes
