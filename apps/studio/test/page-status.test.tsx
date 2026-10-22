@@ -112,7 +112,7 @@ describe("Pages list row menu", { timeout: 45_000 }, () => {
     fireEvent.click(await screen.findByTestId("row-publish"));
     expect(await screen.findByText("Publish “Hakkında”?")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("approve"));
-    expect(await screen.findByText("Page published")).toBeInTheDocument();
+    expect(await screen.findByText("Marked published")).toBeInTheDocument();
     expect(bodyOf(fetch, "PUT", "/api/sites/site_1/pages/page_2")).toMatchObject({
       id: "page_2",
       rev: 2,

@@ -68,7 +68,7 @@ describe("publishing follows the role (RFC-0005 §4, §6)", { timeout: 45_000 },
   });
 
   it("an Author publishes when only their own articles changed", async () => {
-    serve(
+    const fetch = serve(
       ...asRole("author"),
       ...siteRoutes,
       on("GET", "/api/sites/site_1/entries", {
@@ -77,13 +77,15 @@ describe("publishing follows the role (RFC-0005 §4, §6)", { timeout: 45_000 },
       }),
     );
     render(wrap(<SitePublish siteId="site_1" />));
-    await waitFor(() =>
+    // Until the lists arrive the guess is "request"; wait for the answer the lists give.
+    await waitFor(() => {
+      expect(fetch.mock.calls.some(([u]) => String(u).includes("/entries"))).toBe(true);
       expect(document.querySelector("[data-publish-mode]")).toHaveAttribute(
         "data-publish-mode",
         "publish",
-      ),
-    );
-    expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+      );
+      expect(screen.getByRole("button", { name: "Publish" })).toBeEnabled();
+    });
   });
 
   it("an Author whose changes include others' work requests the publish (202)", async () => {

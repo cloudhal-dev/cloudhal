@@ -259,7 +259,6 @@ export const en = {
   },
   pageStatus: {
     publishTitle: "Publish “{title}”?",
-    published: "Page published",
     unpublished: "Page moved back to draft",
     failed: "The page's status did not change",
     leftOut: "{count, plural, one {# page is not published} other {# pages are not published}}",
@@ -2655,6 +2654,20 @@ export const en = {
       "Your changes include work that isn't yours, so an Editor must approve the publish. You'll find the request in Approvals.",
     openRequest: "Open Approvals",
     refused: "You can't publish",
+  },
+  liveSite: {
+    view: "View site",
+    open: "Open site",
+    viewLive: "View live",
+    copyLink: "Copy link",
+    noDomain: "Add a domain in Settings",
+    notPublished: "Not published yet",
+    markedPublished: "Marked published",
+    markedPublishedDescription: "It goes live the next time the site is published.",
+    publishSite: "Publish site",
+    liveAt: "Live at",
+    willBeAt: "Will be at",
+    lastPublished: "Last published",
   },
   members: {
     invite: "Invite people",

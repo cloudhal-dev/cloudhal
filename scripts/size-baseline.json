@@ -175,13 +175,13 @@
       "lines": 326
     },
     "apps/studio/src/routes/ApprovalsPage.tsx::ApprovalsPage": {
-      "lines": 260
+      "lines": 259
     },
     "apps/studio/src/routes/ApprovalsPage.tsx::PendingRequest": {
       "lines": 191
     },
     "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
-      "lines": 475
+      "lines": 472
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
       "lines": 214
@@ -256,7 +256,7 @@
       "lines": 258
     },
     "apps/studio/src/routes/SiteOverviewPage.tsx::SiteOverviewPage": {
-      "lines": 239
+      "lines": 216
     },
     "apps/studio/src/routes/SiteSettingsPage.tsx::DomainsSection": {
       "lines": 216
@@ -268,13 +268,13 @@
       "lines": 164
     },
     "apps/studio/src/routes/SiteShell.tsx::SiteShell": {
-      "lines": 178
+      "lines": 172
     },
     "apps/studio/src/routes/SkillsPage.tsx::SkillsPage": {
       "lines": 170
     },
     "apps/studio/src/routes/SnapshotsPage.tsx::SnapshotsPage": {
-      "lines": 296
+      "lines": 290
     },
     "apps/studio/src/routes/TaxonomyPage.tsx::TaxonomyPage": {
       "lines": 457

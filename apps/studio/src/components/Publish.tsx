@@ -6,6 +6,7 @@ import { apiErrorText } from "../lib/api-errors.ts";
 import { ownOnlyGuess } from "../lib/roles.ts";
 import { taxonomyKeys } from "./Taxonomy.tsx";
 import { useToast } from "./Toast.ts";
+import { useLiveSiteActions } from "./useLiveSite.ts";
 import { useGate, useMe, useSelf } from "./useMe.ts";
 import { approvalsKey } from "./usePendingApprovals.ts";
 
@@ -76,6 +77,29 @@ export function usePublishMode(siteId: string): {
   return { mode: ownOnly ? "publish" : "request", reason: undefined };
 }
 
+/**
+ * An Author's publish that includes others' work became a request (202, RFC-0005 §6): an info
+ * notice that an Editor must approve, with the way to Approvals.
+ */
+export function useRequestedNotice(siteId: string): (requestId: string) => void {
+  const t = useT();
+  const toast = useToast();
+  const navigate = useNavigate();
+  return (requestId) =>
+    toast.notice({
+      id: requestId,
+      title: t("publishing.requested"),
+      description: t("publishing.requestedDescription"),
+      tone: "info",
+      actions: [
+        {
+          label: t("publishing.openRequest"),
+          onClick: () => void navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
+        },
+      ],
+    });
+}
+
 export type PublishTarget = { snapshotId: string } | { label: string };
 
 /**
@@ -87,8 +111,9 @@ export function usePublishSite(siteId: string, options: { onDone?: () => void } 
   const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
-  const navigate = useNavigate();
   const gate = useGate("publish.own");
+  const live = useLiveSiteActions(siteId);
+  const requested = useRequestedNotice(siteId);
   return useMutation({
     mutationFn: async (target: PublishTarget): Promise<PublishResult> =>
       "snapshotId" in target
@@ -106,21 +131,12 @@ export function usePublishSite(siteId: string, options: { onDone?: () => void } 
       if (result.kind === "published") {
         toast.success(
           "snapshotId" in target ? t("snapshots.published") : t("snapshots.publishedSnapshot"),
+          undefined,
+          live.viewAndCopy,
         );
         return;
       }
-      toast.notice({
-        id: result.request.id,
-        title: t("publishing.requested"),
-        description: t("publishing.requestedDescription"),
-        tone: "info",
-        actions: [
-          {
-            label: t("publishing.openRequest"),
-            onClick: () => void navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
-          },
-        ],
-      });
+      requested(result.request.id);
     },
     onError: (e) => {
       const refused = e instanceof ApiRequestError && e.status === 403;

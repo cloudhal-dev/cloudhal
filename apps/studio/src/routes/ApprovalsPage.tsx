@@ -45,6 +45,7 @@ import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useLiveSiteActions } from "../components/useLiveSite.ts";
 import { useMe, useMemberRoles, useRoleRules, useSelf } from "../components/useMe.ts";
 import { useNow } from "../components/useNow.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
@@ -501,11 +502,24 @@ function HistoryTable({
 }
 
 /** Site › Activity › Approvals: agents' gated calls waiting for a person (ADR-0014, DESIGN.md §2m). */
+/** Whose request this is, from the signed-in person's side. */
+function requesterOf(
+  request: Approval,
+  meId: string | undefined,
+  agentIds: ReadonlySet<string>,
+): Requester {
+  return {
+    mine: request.actor.kind === "human" && request.actor.id === meId,
+    myAgent: request.actor.kind === "agent" && agentIds.has(request.actor.id),
+  };
+}
+
 export function ApprovalsPage() {
   const { t } = useI18n("comments");
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const toast = useToast();
+  const live = useLiveSiteActions(siteId);
   const all = useQuery({
     queryKey: [...approvalsKey(siteId), "all"],
     queryFn: () => api.approvals.list(siteId),
@@ -514,10 +528,7 @@ export function ApprovalsPage() {
   const me = useQuery({ queryKey: ["me"], queryFn: api.me });
   const self = useSelf();
   const roles = useMemberRoles();
-  const whoFor = (request: Approval): Requester => ({
-    mine: request.actor.kind === "human" && request.actor.id === me.data?.actor.id,
-    myAgent: request.actor.kind === "agent" && self.agentIds.has(request.actor.id),
-  });
+  const whoFor = (request: Approval) => requesterOf(request, me.data?.actor.id, self.agentIds);
   const [confirming, setConfirming] = useState<Approval | undefined>();
   const [granting, setGranting] = useState<Approval | undefined>();
   const [commenting, setCommenting] = useState<Approval | undefined>();
@@ -562,6 +573,7 @@ export function ApprovalsPage() {
         toast.success(
           t("approvals.role.published"),
           t("approvals.role.publishedDescription", { name: agent }),
+          live.view,
         );
       else if (decision === "approve")
         toast.success(t("approvals.approved"), t("approvals.approvedDescription", { agent }));

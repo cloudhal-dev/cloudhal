@@ -1,4 +1,4 @@
-import { DropdownMenu, Sidebar, SidebarSwitcher } from "@cloudhal/ui";
+import { Sidebar, SidebarSwitcher } from "@cloudhal/ui";
 import {
   Article,
   CalendarDots,
@@ -14,15 +14,18 @@ import {
   Images,
   Robot,
   Signpost,
-  SquaresFour,
   Tag,
   Translate,
   TreeStructure,
 } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { Outlet, useLocation, useNavigate, useParams } from "@tanstack/react-router";
+import { useCallback } from "react";
 import { AppFrame } from "../components/AppFrame.tsx";
+import { ViewSiteButton } from "../components/LiveLinks.tsx";
 import { SitePublish } from "../components/SitePublish.tsx";
+import { SiteSwitcherExtra } from "../components/SiteSwitcher.tsx";
+import { SitePublishOpener } from "../components/sitePublishOpener.ts";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useCan } from "../components/useMe.ts";
 import { useNotifications } from "../components/useNotifications.ts";
@@ -67,15 +70,7 @@ export function SiteShell() {
   const pendingComments = pendingCommentsCount(notifications.data?.items, siteId);
   // Releases needing someone (RFC-0008 §15.1): conflict, missed, failed, approval due — from the
   // bell's own poll, so the badge costs no request of its own.
-  const scheduleAttention = (notifications.data?.items ?? []).filter(
-    (i) =>
-      "releaseId" in i &&
-      i.siteId === siteId &&
-      (i.kind === "schedule-conflict" ||
-        i.kind === "schedule-missed" ||
-        i.kind === "schedule-failed" ||
-        i.kind === "schedule-approval-due"),
-  ).length;
+  const scheduleAttention = scheduleAttentionCount(notifications.data?.items, siteId);
   const base = `/sites/${siteId}`;
   const is = (path: string, exact = false) =>
     exact ? pathname === path : pathname.startsWith(path);
@@ -86,15 +81,19 @@ export function SiteShell() {
     defaultLocale: site.data?.defaultLocale,
     comments,
   });
+  const openPublish = useCallback(() => palette.setPublishOpen(true), [palette.setPublishOpen]);
 
   return (
     <AppFrame
       actions={
-        <SitePublish
-          siteId={siteId}
-          open={palette.publishOpen}
-          onOpenChange={palette.setPublishOpen}
-        />
+        <>
+          <ViewSiteButton siteId={siteId} />
+          <SitePublish
+            siteId={siteId}
+            open={palette.publishOpen}
+            onOpenChange={palette.setPublishOpen}
+          />
+        </>
       }
       search={palette.search}
       loading={site.isPending}
@@ -104,11 +103,7 @@ export function SiteShell() {
           current={{ id: siteId, name: site.data?.name ?? "…", icon: Globe }}
           items={(sites.data ?? []).map((s) => ({ id: s.id, name: s.name, icon: Globe }))}
           onSelect={(item) => navigate({ to: "/sites/$siteId", params: { siteId: item.id } })}
-          extra={
-            <DropdownMenu.Item icon={SquaresFour} onClick={() => navigate({ to: "/sites" })}>
-              {t("nav.allSites")}
-            </DropdownMenu.Item>
-          }
+          extra={<SiteSwitcherExtra siteId={siteId} />}
         />
       }
       nav={
@@ -208,7 +203,9 @@ export function SiteShell() {
       }
       commands={palette.commands}
     >
-      <Outlet />
+      <SitePublishOpener.Provider value={openPublish}>
+        <Outlet />
+      </SitePublishOpener.Provider>
     </AppFrame>
   );
 }
@@ -341,4 +338,19 @@ function AutomationGroup({ base, is, attention }: GroupProps & { attention: numb
       </Sidebar.Menu>
     </Sidebar.Group>
   );
+}
+
+type NotificationItems = NonNullable<ReturnType<typeof useNotifications>["data"]>["items"];
+
+/** Releases needing someone (RFC-0008 §15.1): conflict, missed, failed, approval due. */
+function scheduleAttentionCount(items: NotificationItems | undefined, siteId: string): number {
+  return (items ?? []).filter(
+    (i) =>
+      "releaseId" in i &&
+      i.siteId === siteId &&
+      (i.kind === "schedule-conflict" ||
+        i.kind === "schedule-missed" ||
+        i.kind === "schedule-failed" ||
+        i.kind === "schedule-approval-due"),
+  ).length;
 }

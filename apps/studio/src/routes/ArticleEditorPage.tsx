@@ -47,6 +47,7 @@ import {
 import { EntryPath } from "../components/EntryPath.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
+import { EntryAddress } from "../components/LiveAddress.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
@@ -55,6 +56,7 @@ import { StatusActions } from "../components/StatusActions.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useSavedToast } from "../components/useLiveSite.ts";
 import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
@@ -91,12 +93,19 @@ function forSave(entry: ContentEntry): ContentEntry {
   return entry.coverImage ? { ...entry, coverImage: cleanImageRef(entry.coverImage) } : entry;
 }
 
+/** Why the form is read-only for someone who may not change this article (§2s). */
+const READ_ONLY_REASON = {
+  notOwn: "gating.entryNotOwn",
+  published: "gating.entryPublished",
+} as const;
+
 export function ArticleEditorPage() {
   const t = useT();
   const { siteId, entryId } = useParams({ from: "/sites/$siteId/articles/$entryId" });
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
+  const savedToast = useSavedToast();
   const query = useQuery({
     queryKey: ["entry", siteId, entryId],
     queryFn: () => api.entries.get(siteId, entryId),
@@ -135,7 +144,7 @@ export function ArticleEditorPage() {
       setMissing([]);
       qc.setQueryData(["entry", siteId, entryId], saved);
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
-      toast.success(t("editor.saved"), t("common.rev", { rev: saved.rev }));
+      savedToast(saved, query.data?.status);
     },
   });
   const duplicate = useMutation({
@@ -221,12 +230,7 @@ export function ArticleEditorPage() {
   };
   const migrated = (taxonomy.taxonomies.data?.length ?? 0) > 0;
   const access = entryAccess(draft, { editAny, editOwnPublished }, self);
-  const readOnlyReason =
-    access === "notOwn"
-      ? t("gating.entryNotOwn")
-      : access === "published"
-        ? t("gating.entryPublished")
-        : undefined;
+  const readOnlyReason = access === "edit" ? undefined : t(READ_ONLY_REASON[access]);
   const lockedReason = locked ? t("editor.locked") : undefined;
   // Contributors move their drafts to review; Authors and above set every status.
   const allowedStatuses: PublishStatus[] | undefined = editOwnPublished
@@ -415,6 +419,7 @@ export function ArticleEditorPage() {
                   />
                 </InputGroup>
               </Field>
+              <EntryAddress siteId={siteId} entry={draft} />
               <InputArea
                 label={t("editor.summary")}
                 value={draft.summary ?? ""}

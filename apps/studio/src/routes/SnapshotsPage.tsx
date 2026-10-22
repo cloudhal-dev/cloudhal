@@ -19,11 +19,12 @@ import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
-import { usePublishMode } from "../components/Publish.tsx";
+import { usePublishMode, useRequestedNotice } from "../components/Publish.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { SnapshotDiffDialog } from "../components/SnapshotDiffDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useToast } from "../components/Toast.ts";
+import { useLiveSiteActions } from "../components/useLiveSite.ts";
 import { useGate } from "../components/useMe.ts";
 import { usePaging } from "../components/usePaging.ts";
 import { approvalsKey } from "../components/usePendingApprovals.ts";
@@ -48,6 +49,8 @@ export function SnapshotsPage() {
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const toast = useToast();
+  const live = useLiveSiteActions(siteId);
+  const requested = useRequestedNotice(siteId);
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
   const snapshots = useQuery({
     queryKey: ["snapshots", siteId],
@@ -110,18 +113,7 @@ export function SnapshotsPage() {
       // An Author's publish that includes others' work became a request (202, RFC-0005 §6).
       if (result?.kind === "requested") {
         await qc.invalidateQueries({ queryKey: approvalsKey(siteId) });
-        toast.notice({
-          id: result.request.id,
-          title: t("publishing.requested"),
-          description: t("publishing.requestedDescription"),
-          tone: "info",
-          actions: [
-            {
-              label: t("publishing.openRequest"),
-              onClick: () => void navigate({ to: "/sites/$siteId/approvals", params: { siteId } }),
-            },
-          ],
-        });
+        requested(result.request.id);
         return;
       }
       toast.success(
@@ -132,6 +124,9 @@ export function SnapshotsPage() {
           : p.kind === "publish"
             ? t("snapshots.published")
             : t("snapshots.rolledBack"),
+        undefined,
+        // A publish offers the live site and its link; a rollback the live site.
+        p.kind === "rollback" ? live.view : result ? live.viewAndCopy : undefined,
       );
     },
     onError: (e) => toast.error(t("snapshots.failed"), apiErrorText(t, e)),

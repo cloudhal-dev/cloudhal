@@ -44,6 +44,7 @@ const files = walk(SRC).map((f) => ({
 const SCREEN_PARTS: Readonly<Record<string, string>> = {
   "routes/PageEditorPage.tsx": "components/page-editor",
   "routes/ArticleEditorPage.tsx": "components/article-editor",
+  "routes/SiteOverviewPage.tsx": "components/site-overview",
 };
 function screenText(file: string): string {
   const own = (files.find((f) => f.file === file) as { text: string }).text;
