@@ -250,9 +250,9 @@ describe("checkStructuredData (save time)", () => {
         },
       }),
     ).toEqual(["required_missing properties/location.address"]);
-    expect(codes({ type: "Product", properties: { sku: { kind: "constant", value: "A1" } } })).toEqual([
-      "required_missing properties/offers.price",
-    ]);
+    expect(
+      codes({ type: "Product", properties: { sku: { kind: "constant", value: "A1" } } }),
+    ).toEqual(["required_missing properties/offers.price"]);
     expect(
       codes({ type: "Recipe", properties: { keywords: { kind: "constant", value: "soup" } } }),
     ).toEqual([]);
