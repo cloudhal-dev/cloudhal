@@ -35,6 +35,7 @@
       "default": "./src/runtime.ts"
     },
     "./preview": "./src/preview.ts",
+    "./structured-data": "./src/structured-data.ts",
     "./resolver": "./src/resolver.ts",
     "./markdown": "./src/markdown.ts",
     "./cloudflare-entry": "./src/cloudflare-entry.ts",
@@ -179,6 +180,10 @@
       "./preview": {
         "types": "./dist/src/preview.d.ts",
         "default": "./dist/src/preview.js"
+      },
+      "./structured-data": {
+        "types": "./dist/src/structured-data.d.ts",
+        "default": "./dist/src/structured-data.js"
       },
       "./resolver": {
         "types": "./dist/src/resolver.d.ts",

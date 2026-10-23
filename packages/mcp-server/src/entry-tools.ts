@@ -33,6 +33,7 @@ import {
   FIELDS_PATCH,
   mergeFields,
 } from "./entry-fields.ts";
+import { ENTRY_QUERY_INPUT, listEntries } from "./entry-list.ts";
 import { entryTerms, reportDeltas } from "./entry-terms.ts";
 import { menuHint, menuItemsHiddenBy } from "./menu-tools.ts";
 import { assignmentDeltas, describeDeltas, TAGS_INPUT, TERMS_INPUT, termLookup } from "./terms.ts";
@@ -41,7 +42,7 @@ const listEntriesTool: ToolDefinition = {
   name: "list_entries",
   title: "List articles",
   description:
-    'Content entries, newest first. `collection` defaults to posts (unless the filter names one). `filter` selects by terms (RFC-0002 grammar): clauses joined by "+" (AND), "[a,b]" = either, "-" = none of, "primary:category:x" = primary term, "category:x>*" = x or a sub-category, "collection:posts"; values are term slugs (old slugs work) or ids. Example: "category:news+tag:[ai,llm]+-tag:sponsored".',
+    'Content entries, newest first. `collection` defaults to posts (unless the filter names one). `filter` selects by terms (RFC-0002 grammar): clauses joined by "+" (AND), "[a,b]" = either, "-" = none of, "primary:category:x" = primary term, "category:x>*" = x or a sub-category, "collection:posts"; values are term slugs (old slugs work) or ids. Example: "category:news+tag:[ai,llm]+-tag:sponsored". `where`/`orderBy` filter and sort by the collection\'s list fields (RFC-0042; list_collections → listFields), e.g. upcoming events: where [{"field":"startsAt","op":"gte","value":"now"}], orderBy {"field":"startsAt","direction":"asc"}; `limit` pages the answer (total, nextCursor → cursor).',
   inputSchema: obj(
     {
       siteId: id,
@@ -58,10 +59,18 @@ const listEntriesTool: ToolDefinition = {
         minItems: 1,
         uniqueItems: true,
       },
+      ...ENTRY_QUERY_INPUT,
     },
     ["siteId"],
   ),
-  outputSchema: obj({ entries: { type: "array", items: ENTRY } }, ["entries"]),
+  outputSchema: obj(
+    {
+      entries: { type: "array", items: ENTRY },
+      total: { type: "integer" },
+      nextCursor: { type: "string" },
+    },
+    ["entries"],
+  ),
   annotations: {
     readOnlyHint: true,
     destructiveHint: false,
@@ -82,10 +91,7 @@ const listEntriesTool: ToolDefinition = {
       ...(a.status !== undefined ? { status: a.status as ContentEntry["status"][] } : {}),
     };
     try {
-      const entries = (await ctx.store.listContentEntries(a.siteId as string, query)).sort((x, y) =>
-        y.updatedAt.localeCompare(x.updatedAt),
-      );
-      return { entries };
+      return await listEntries(ctx, a.siteId as string, query, a);
     } catch (e) {
       mapError(e);
     }
