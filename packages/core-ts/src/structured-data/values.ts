@@ -260,7 +260,7 @@ export function sourceValue(
       return fromEntry(source.property, input);
     case "site":
       return fromSite(source.property, input);
-    case "text":
+    case "constant":
       return fromConstant(source.value, input.spec);
     default:
       return undefined;

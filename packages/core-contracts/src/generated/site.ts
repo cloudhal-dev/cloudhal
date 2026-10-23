@@ -63,7 +63,7 @@ export type FieldKey = string;
  * via the `definition` "StructuredDataSource".
  */
 export type StructuredDataSource =
-  FieldValueSource | EntryValueSource | SiteValueSource | TextValueSource;
+  FieldValueSource | EntryValueSource | SiteValueSource | ConstantValueSource;
 /**
  * RFC-0042: entry properties a structured-data property may read.
  *
@@ -590,8 +590,8 @@ export interface SiteValueSource {
 /**
  * A plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code).
  */
-export interface TextValueSource {
-  kind: "text";
+export interface ConstantValueSource {
+  kind: "constant";
   value: string;
 }
 /**

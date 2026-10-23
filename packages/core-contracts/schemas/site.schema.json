@@ -231,7 +231,7 @@
           }
         },
         {
-          "title": "TextValueSource",
+          "title": "ConstantValueSource",
           "type": "object",
           "description": "A plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code).",
           "additionalProperties": false,
@@ -239,7 +239,7 @@
           "properties": {
             "kind": {
               "type": "string",
-              "enum": ["text"]
+              "enum": ["constant"]
             },
             "value": {
               "type": "string",

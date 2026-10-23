@@ -5390,9 +5390,9 @@ pub enum StructuredDataSource {
     #[doc = "SiteValueSource\n\nA property of the site."]
     #[serde(rename = "site")]
     Site { property: SiteValueProperty },
-    #[doc = "TextValueSource\n\nA plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code)."]
-    #[serde(rename = "text")]
-    Text { value: StructuredDataSourceValue },
+    #[doc = "ConstantValueSource\n\nA plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code)."]
+    #[serde(rename = "constant")]
+    Constant { value: StructuredDataSourceValue },
 }
 #[doc = "`StructuredDataSourceValue`"]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

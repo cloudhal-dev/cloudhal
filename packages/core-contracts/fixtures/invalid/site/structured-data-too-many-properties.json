@@ -151,167 +151,167 @@
           "type": "Event",
           "properties": {
             "pa": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pb": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pc": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pd": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pe": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pf": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pg": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "ph": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pi": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pj": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pk": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pl": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pm": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pn": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "po": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pp": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pq": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pr": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "ps": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pt": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pu": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pv": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pw": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "px": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "py": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pz": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pA": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pB": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pC": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pD": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pE": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pF": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pG": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pH": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pI": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pJ": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pK": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pL": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pM": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pN": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             },
             "pO": {
-              "kind": "text",
+              "kind": "constant",
               "value": "x"
             }
           }

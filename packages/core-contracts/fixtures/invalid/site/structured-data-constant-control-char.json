@@ -1,5 +1,5 @@
 {
-  "reason": "a text constant is at most 200 characters",
+  "reason": "a text constant has no control characters",
   "data": {
     "schemaVersion": 1,
     "id": "site_01HZX8K3Q9T1",
@@ -171,7 +171,7 @@
               "field": "city"
             },
             "location.address.addressCountry": {
-              "kind": "text",
+              "kind": "constant",
               "value": "TR"
             },
             "eventStatus": {
@@ -191,7 +191,7 @@
               "field": "price"
             },
             "offers.priceCurrency": {
-              "kind": "text",
+              "kind": "constant",
               "value": "TRY"
             },
             "offers.url": {
@@ -203,8 +203,8 @@
               "field": "poster"
             },
             "description": {
-              "kind": "text",
-              "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              "kind": "constant",
+              "value": "line\nbreak"
             }
           }
         }

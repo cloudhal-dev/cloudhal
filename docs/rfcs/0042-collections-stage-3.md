@@ -76,8 +76,8 @@ All additions are optional. No `schemaVersion` bump.
       "properties": { "kind": { "type": "string", "enum": ["entry"] }, "property": { "$ref": "#/$defs/EntryValueProperty" } } },
     { "title": "SiteValueSource", "type": "object", "additionalProperties": false, "required": ["kind", "property"],
       "properties": { "kind": { "type": "string", "enum": ["site"] }, "property": { "$ref": "#/$defs/SiteValueProperty" } } },
-    { "title": "TextValueSource", "type": "object", "additionalProperties": false, "required": ["kind", "value"],
-      "properties": { "kind": { "type": "string", "enum": ["text"] },
+    { "title": "ConstantValueSource", "type": "object", "additionalProperties": false, "required": ["kind", "value"],
+      "properties": { "kind": { "type": "string", "enum": ["constant"] },
                       "value": { "type": "string", "minLength": 1, "maxLength": 200, "pattern": "^[^\\x00-\\x1F\\x7F]+$" } } }
   ]
 },
@@ -111,9 +111,9 @@ All additions are optional. No `schemaVersion` bump.
 - **Discriminator `kind`** for sources, rule 2's default: these are not field types.
 - **Condition values are strings, typed by the field.** A `type: ["string","number","boolean"]` union is outside the generator-safe subset, and a `oneOf` per value type would make sections verbose for agents. RFC-0002's filter is a string read against the site's taxonomy in the same way.
 - **The two `property` enums are named `$defs`.** With them inline, cargo-typify 0.8.0 names both `StructuredDataSourceProperty`, keeps only the first, and Rust then refuses `{"kind":"site","property":"name"}`. The mechanical check below caught it.
-- **Checked on this branch, then reverted:** with this diff, `pnpm gen` succeeded for TypeScript (`StructuredDataSource = FieldValueSource | EntryValueSource | SiteValueSource | TextValueSource`) and Rust (`#[serde(tag = "kind", deny_unknown_fields)] enum StructuredDataSource`). The core-contracts tests passed (492), and `cargo test -p cloudhal-schema` passed (19) with these fixtures:
+- **Checked on this branch, then reverted:** with this diff, `pnpm gen` succeeded for TypeScript (`StructuredDataSource = FieldValueSource | EntryValueSource | SiteValueSource | ConstantValueSource`) and Rust (`#[serde(tag = "kind", deny_unknown_fields)] enum StructuredDataSource`). The core-contracts tests passed (492), and `cargo test -p cloudhal-schema` passed (19) with these fixtures:
   - `valid/site/collection-stage3.json` (an `events` collection with `listFields`, `expiry` and an `Event` preset using all four source kinds) and `valid/section/content-list-where.json` (`startsAt gte now`, `status in [scheduled]`, `orderBy startsAt asc`).
-  - `invalid/site/`: preset type `FAQPage`; path `Location`; source kind `html`; a control character in a text constant; a field source with a `value`; expiry action `delete`; a grace of 20,000 minutes; five list fields; a duplicate list field.
+  - `invalid/site/`: preset type `FAQPage`; path `Location`; source kind `html`; a control character in a constant; a field source with a `value`; expiry action `delete`; a grace of 20,000 minutes; five list fields; a duplicate list field.
   - `invalid/section/`: op `like`; twelve conditions; direction `up`.
 
 ### 2. JSON-LD presets

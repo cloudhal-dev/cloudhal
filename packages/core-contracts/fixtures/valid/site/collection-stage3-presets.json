@@ -74,11 +74,11 @@
             "field": "remote"
           },
           "applicantLocationRequirements.name": {
-            "kind": "text",
+            "kind": "constant",
             "value": "Türkiye"
           },
           "employmentType": {
-            "kind": "text",
+            "kind": "constant",
             "value": "FULL_TIME"
           }
         }
@@ -105,7 +105,7 @@
             "property": "updatedAt"
           },
           "offers.priceCurrency": {
-            "kind": "text",
+            "kind": "constant",
             "value": "EUR"
           }
         }

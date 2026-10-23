@@ -170,7 +170,7 @@
               "field": "city"
             },
             "location.address.addressCountry": {
-              "kind": "text",
+              "kind": "constant",
               "value": "TR"
             },
             "eventStatus": {
@@ -190,7 +190,7 @@
               "field": "price"
             },
             "offers.priceCurrency": {
-              "kind": "text",
+              "kind": "constant",
               "value": "TRY"
             },
             "offers.url": {

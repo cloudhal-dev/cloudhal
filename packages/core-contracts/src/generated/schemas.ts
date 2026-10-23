@@ -1880,7 +1880,7 @@ export const SiteSchema = {
           }
         },
         {
-          "title": "TextValueSource",
+          "title": "ConstantValueSource",
           "type": "object",
           "description": "A plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code).",
           "additionalProperties": false,
@@ -1892,7 +1892,7 @@ export const SiteSchema = {
             "kind": {
               "type": "string",
               "enum": [
-                "text"
+                "constant"
               ]
             },
             "value": {

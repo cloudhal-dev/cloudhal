@@ -149,12 +149,12 @@ describe("checkStructuredData (save time)", () => {
   it("refuses paths outside the type's table", () => {
     const p = {
       ...EVENT,
-      properties: { ...EVENT.properties, aggregateRating: { kind: "text", value: "5" } },
+      properties: { ...EVENT.properties, aggregateRating: { kind: "constant", value: "5" } },
     };
     expect(codes(p as StructuredDataPreset)).toEqual(["unknown_path properties/aggregateRating"]);
     const proto = {
       ...EVENT,
-      properties: { ...EVENT.properties, toString: { kind: "text", value: "x" } },
+      properties: { ...EVENT.properties, toString: { kind: "constant", value: "x" } },
     };
     expect(codes(proto as StructuredDataPreset)).toEqual(["unknown_path properties/toString"]);
   });
@@ -196,7 +196,7 @@ describe("checkStructuredData (save time)", () => {
     const p = (value: string, path: string) =>
       codes({
         ...EVENT,
-        properties: { ...EVENT.properties, [path]: { kind: "text", value } },
+        properties: { ...EVENT.properties, [path]: { kind: "constant", value } },
       } as StructuredDataPreset);
     expect(p("EUR", "offers.priceCurrency")).toEqual([]);
     expect(p("eur", "offers.priceCurrency")).toEqual([
@@ -246,15 +246,15 @@ describe("checkStructuredData (save time)", () => {
         type: "Event",
         properties: {
           ...EVENT.properties,
-          "location.address.addressLocality": { kind: "text", value: "Istanbul" },
+          "location.address.addressLocality": { kind: "constant", value: "Istanbul" },
         },
       }),
     ).toEqual(["required_missing properties/location.address"]);
-    expect(codes({ type: "Product", properties: { sku: { kind: "text", value: "A1" } } })).toEqual([
+    expect(codes({ type: "Product", properties: { sku: { kind: "constant", value: "A1" } } })).toEqual([
       "required_missing properties/offers.price",
     ]);
     expect(
-      codes({ type: "Recipe", properties: { keywords: { kind: "text", value: "soup" } } }),
+      codes({ type: "Recipe", properties: { keywords: { kind: "constant", value: "soup" } } }),
     ).toEqual([]);
   });
 
@@ -267,9 +267,9 @@ describe("checkStructuredData (save time)", () => {
         type: "JobPosting",
         properties: {
           jobLocationType: { kind: "field", field: "remote" },
-          "applicantLocationRequirements.name": { kind: "text", value: "Türkiye" },
+          "applicantLocationRequirements.name": { kind: "constant", value: "Türkiye" },
           employmentType: { kind: "field", field: "kinds" },
-          "baseSalary.unitText": { kind: "text", value: "MONTH" },
+          "baseSalary.unitText": { kind: "constant", value: "MONTH" },
         },
       }),
     ).toEqual([]);
@@ -328,9 +328,9 @@ describe("structuredDataFor (per entry)", () => {
         ...EVENT.properties,
         endDate: { kind: "field", field: "day" },
         eventStatus: { kind: "field", field: "status" },
-        "location.address.addressCountry": { kind: "text", value: "TR" },
+        "location.address.addressCountry": { kind: "constant", value: "TR" },
         "offers.price": { kind: "field", field: "price" },
-        "offers.priceCurrency": { kind: "text", value: "TRY" },
+        "offers.priceCurrency": { kind: "constant", value: "TRY" },
         "offers.url": { kind: "field", field: "tickets" },
         "organizer.name": { kind: "site", property: "name" },
         "organizer.url": { kind: "site", property: "url" },
@@ -416,11 +416,11 @@ describe("structuredDataFor (per entry)", () => {
       properties: {
         validThrough: { kind: "field", field: "day" },
         jobLocationType: { kind: "field", field: "remote" },
-        "applicantLocationRequirements.name": { kind: "text", value: "Türkiye" },
+        "applicantLocationRequirements.name": { kind: "constant", value: "Türkiye" },
         employmentType: { kind: "field", field: "kinds" },
         "baseSalary.value": { kind: "field", field: "price" },
-        "baseSalary.currency": { kind: "text", value: "EUR" },
-        "baseSalary.unitText": { kind: "text", value: "month" },
+        "baseSalary.currency": { kind: "constant", value: "EUR" },
+        "baseSalary.unitText": { kind: "constant", value: "month" },
         directApply: { kind: "field", field: "remote" },
         identifier: { kind: "field", field: "venue" },
       },
@@ -507,7 +507,7 @@ describe("structuredDataFor (per entry)", () => {
       properties: {
         "offers.price": { kind: "field", field: "price" },
         "offers.priceCurrency": { kind: "field", field: "venue" },
-        "offers.availability": { kind: "text", value: "in-stock" },
+        "offers.availability": { kind: "constant", value: "in-stock" },
         "offers.priceValidUntil": { kind: "entry", property: "updatedAt" },
       },
     };

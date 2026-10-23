@@ -143,7 +143,7 @@ function checkSource(ctx: PathContext, source: StructuredDataSource): Structured
               `${path} does not take the site's ${source.property}`,
             ),
           ];
-    case "text":
+    case "constant":
       return checkConstant(ctx, source.value);
     default:
       return [err(at, "source_mismatch", "an unknown source")];
@@ -168,7 +168,7 @@ function checkRequired(preset: StructuredDataPreset, at: string): StructuredData
     if (remote) continue;
     const fromEntry = group.some((p) => {
       const s = preset.properties[p];
-      return s !== undefined && s.kind !== "text";
+      return s !== undefined && s.kind !== "constant";
     });
     if (!fromEntry) {
       const prefix = group[0]?.replace(/\.[^.]+$/, "") ?? "";
