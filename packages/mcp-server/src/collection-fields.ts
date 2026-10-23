@@ -62,7 +62,7 @@ export function withFields(
 }
 
 /** JSON with sorted keys: stored definitions may list properties in another order. */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
   return JSON.stringify(value, (_k, v: unknown) =>
     v && typeof v === "object" && !Array.isArray(v)
       ? Object.fromEntries(Object.entries(v).sort(([x], [y]) => x.localeCompare(y)))

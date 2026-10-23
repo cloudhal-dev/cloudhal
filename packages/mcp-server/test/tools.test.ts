@@ -95,6 +95,7 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "list_collections",
       "create_collection",
       "update_collection",
+      "preview_structured_data",
       "rename_field",
       "change_field_type",
       "set_field_localized",

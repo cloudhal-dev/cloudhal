@@ -26,6 +26,7 @@ import {
   unknownBlocksOf,
 } from "./content-shared.ts";
 import { menuHint, menuItemsHiddenBy } from "./menu-tools.ts";
+import { checkSectionQueries } from "./section-queries.ts";
 
 const listSitesTool: ToolDefinition = {
   name: "list_sites",
@@ -141,6 +142,7 @@ const createPageTool: ToolDefinition = {
     openWorldHint: false,
   },
   scopes: ["content:write"],
+  precheck: (a, ctx) => checkSectionQueries(ctx, a.siteId as string, a.sections),
   handler: async (a, ctx) => {
     assertNoHtmlSections(a.sections);
     const site = await requireSite(ctx, a.siteId as string);
@@ -216,6 +218,11 @@ const updatePageTool: ToolDefinition = {
     openWorldHint: false,
   },
   scopes: ["content:write"],
+  precheck: async (a, ctx) => {
+    const page = await ctx.store.getPage(a.pageId as string);
+    if (!page || page.siteId !== a.siteId) return;
+    await checkSectionQueries(ctx, page.siteId, a.sections, page.sections);
+  },
   handler: async (a, ctx) => {
     assertNoHtmlSections(a.sections);
     const page = await ctx.store.getPage(a.pageId as string);
