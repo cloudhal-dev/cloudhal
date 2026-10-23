@@ -1,5 +1,37 @@
 # @cloudhal/api
 
+## 0.6.0
+
+### Minor Changes
+
+- 90d0828: Collections stage 3 in the store and the API (RFC-0042 step 2, ADR-0044). `updateSite` checks the new collection settings when they change: `listFields` and `expiry.field` name fields of the collection (`unknown_field`), the expiry field is a date or datetime field (`invalid_expiry`), and a structured-data preset passes `checkStructuredData` (`structured_data_invalid`; warnings are not refused). Unlisting, dropping or retyping a list field, or dropping a select option, that `contentList` sections still filter or sort by is refused as `list_field_in_use` naming the pages, kept true by a guard on the site CAS. Page writes check changed `contentList` `where`/`orderBy` against the collection's list fields (`invalid_query`, with `sections/<i>/…` paths). Field operations follow: `rename_field` renames the field in `listFields`, `expiry`, structured-data sources and sections' queries in phase A's batch (and back on revert); `remove_field` refuses while any of them names the field; `change_field_type` refuses when the new type would break them. New `queryContentEntries` (and `applyFieldQuery`) filters and orders a collection's entries by list fields with the shared evaluator over resolved values. `GET /api/sites/:id/entries` takes `where` (JSON), `orderBy` (JSON), `limit` (1–100) and `cursor`; with `limit` it answers `{ entries, total, nextCursor? }`, without it the plain array as before. New error codes `invalid_query`, `structured_data_invalid`, `invalid_expiry` (422) and `list_field_in_use` (409). Sites without the new settings behave as before.
+- 2e89658: Collections stage 3, step 5 (RFC-0042 §7 / ADR-0044): Studio.
+  
+  - **Collection settings** get three cards, each saved on its own: **Listing fields** (up to four fields, ordered; a field content lists still use names those pages), **Expiry** (a date or date-and-time field, "Leave lists" or "Hide the page" explained in words, a grace in minutes, and how many published entries are already past it; a site Worker that does not apply expiry yet says to deploy first) and **Structured data** (Event, Job posting, Product or Recipe; every property offers only the sources that fit it, required ones are marked, problems show while editing, and a chosen entry's JSON-LD is previewed with a link to Google's Rich Results Test).
+  - **Create listing page** makes a draft page at the collection's address with a content list of it (upcoming first for a collection with a date listing field and an expiry) and opens it; when a page already lives there, the action opens that page.
+  - **Collection lists** show listing fields as columns, filter by them and sort by number and date fields. Filters and sort live in the URL and ask the API by field, one page at a time.
+  - **Page editor**: content list sections get conditions and an order by the collection's listing fields; refused conditions show on their row.
+  - Words for `invalid_query`, `structured_data_invalid`, `invalid_expiry`, `list_field_in_use` and `gates_unsupported`, the `preview_structured_data` tool and the expiry auto-publish check. Translations are AI drafts awaiting review.
+  - `@cloudhal/api`: new read-only `GET /api/sites/:siteId/entries/:entryId/structured-data` (`content:read`), the REST twin of MCP's `preview_structured_data`: the preset document an entry's page emits, its issues and the preset's warnings.
+
+### Patch Changes
+
+- Updated dependencies [321e8be]
+- Updated dependencies [5aced9a]
+- Updated dependencies [4f3f520]
+- Updated dependencies [3e93878]
+- Updated dependencies [90d0828]
+- Updated dependencies [84c6d94]
+  - @cloudhal/core-contracts@0.6.0
+  - @cloudhal/core-ts@0.6.0
+  - @cloudhal/astro-renderer@0.6.0
+  - @cloudhal/mcp-server@0.6.0
+  - @cloudhal/agent-runtime@0.6.0
+  - @cloudhal/analytics@0.6.0
+  - @cloudhal/comments@0.6.0
+  - @cloudhal/schedules@0.6.0
+  - @cloudhal/storage@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

@@ -1,6 +1,0 @@
----
-"@cloudhal/astro-renderer": minor
-"@cloudhal/cli": minor
----
-
-Per-collection feeds (RFC-0042 step 6, ADR-0044). Each collection with a permalink prefix has an RSS feed at `<prefix>/rss.xml` (and `/<locale><prefix>/rss.xml` or the locale's domain): its newest listed entries, so expiry and time gates apply as in the site feed, with the same cache tag and edge-cache cap; `feed: false` answers 404. The `cloudhal()` integration serves it from a middleware on every target, only where the theme's own routes answered 404, so a theme's own route wins and old theme copies gain the feeds; static builds write them because `staticPaths().feeds` now lists every collection feed path for the starter's `[...path]/rss.xml` route. New theme API `collectionFeedLink(site, collection, origin, locale?)` (`./seo`, `./collection-feeds`) gives the `<link rel="alternate">`; the blog starter adds it on entry pages and on pages that list a collection. Previews now list `contentList` sections with `where`/`orderBy` through the same evaluator as the site (`renderSectionHtml`'s new optional `listing` argument, passed by `renderPagePreview`), so an entry without the field's value no longer shows under "upcoming". New guide: `docs/guides/structured-data.md`.
