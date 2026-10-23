@@ -37,6 +37,7 @@ import { type ToolContext, type ToolDefinition, ToolError, toToolError } from ".
 import { designTools } from "./design-tools.ts";
 import { elevationTools } from "./elevation-tools.ts";
 import { entryTools } from "./entry-tools.ts";
+import { fieldTools } from "./field-tools.ts";
 import { menuTools } from "./menu-tools.ts";
 import { pageRemovalTools, siteAndPageTools } from "./page-tools.ts";
 import { permalinkTools } from "./permalink-tools.ts";
@@ -89,6 +90,8 @@ export function defineTools(): ToolDefinition[] {
     ...taxonomyTools(),
     // RFC-0040 §5: the collection registry; new collections are a person's decision.
     ...collectionTools(),
+    // RFC-0041 §8: field operations rewrite entries; always a person's decision.
+    ...fieldTools(),
     // RFC-0038 §5: where a collection's entries live (always a person's decision).
     ...permalinkTools(),
     ...menuTools(),

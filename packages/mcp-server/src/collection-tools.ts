@@ -4,7 +4,7 @@
  * settings in every mode (a new collection widens what agents may write). `requireRegistered` is
  * the precheck of every tool that creates an entry: no entries in a collection nobody approved.
  */
-import type { CollectionSettings, Site } from "@cloudhal/core-contracts";
+import type { CollectionSettings, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import {
   type CollectionInfo,
   collectionSettings,
@@ -12,6 +12,12 @@ import {
   MAX_COLLECTIONS,
 } from "@cloudhal/core-ts/collections";
 import { collectionPermalink } from "@cloudhal/core-ts/permalinks";
+import {
+  describeFieldEdits,
+  FIELD_DEFINITIONS_INPUT,
+  fieldsView,
+  withFields,
+} from "./collection-fields.ts";
 import {
   autoSnapshot,
   id,
@@ -92,6 +98,7 @@ function settingsOf(a: Record<string, unknown>, current: CollectionSettings): Co
   for (const k of ["icon", "feed", "sitemap", "sort"] as const)
     if (a[k] !== undefined) (next as Record<string, unknown>)[k] = a[k];
   if (typeof a.permalink === "string") next.permalink = a.permalink;
+  if (Array.isArray(a.fields)) return withFields(current, next, a.fields as FieldDefinition[]);
   return next;
 }
 
@@ -167,6 +174,12 @@ function describe(p: Plan, mode: "create" | "update"): string {
   ];
   const other = Object.keys(p.settings.labels ?? {}).filter((l) => l !== p.site.defaultLocale);
   if (other.length) lines.push(`  also named in: ${other.join(", ")}`);
+  const fields = describeFieldEdits(
+    p.existing?.settings?.fields ?? [],
+    p.settings.fields ?? [],
+    p.site.defaultLocale,
+  );
+  if (fields) lines.push(fields);
   return `${head}\n${lines.join("\n")}`;
 }
 
@@ -178,6 +191,8 @@ const COLLECTION_OUT: JsonSchema = obj(
     counts: { type: "object" },
     permalink: { type: "string" },
     taxonomies: { type: "array", items: { type: "string" } },
+    fields: { type: "array", items: { type: "object" } },
+    fieldsSchema: { type: "object" },
   },
   ["key", "declared", "settings", "counts", "permalink", "taxonomies"],
 );
@@ -186,8 +201,11 @@ const listCollectionsTool: ToolDefinition = {
   name: "list_collections",
   title: "List collections",
   description:
-    "The site's collections (RFC-0040): declared ones, ones that already have entries, and posts. Each with its names per locale, icon, entry counts by status, its permalink template, feed/sitemap/sort settings (defaults filled in) and the taxonomies that apply. Entries may only be created in these collections; call create_collection for a new one.",
-  inputSchema: obj({ siteId: id }, ["siteId"]),
+    "The site's collections (RFC-0040): declared ones, ones that already have entries, and posts. Each with its names per locale, icon, entry counts by status, its permalink template, feed/sitemap/sort settings (defaults filled in) and the taxonomies that apply. A collection with typed custom fields (RFC-0041) also has `fields` (the definitions) and `fieldsSchema`, the JSON Schema of an entry's `fields` with labels and help in `locale` (default: the site's default locale): read it before create_entry or update_entry with fields. Entries may only be created in these collections; call create_collection for a new one.",
+  inputSchema: obj(
+    { siteId: id, locale: str("BCP 47 locale of field labels and help; default the site's") },
+    ["siteId"],
+  ),
   outputSchema: obj({ collections: { type: "array", items: COLLECTION_OUT } }, ["collections"]),
   annotations: {
     readOnlyHint: true,
@@ -202,9 +220,11 @@ const listCollectionsTool: ToolDefinition = {
       ctx.store.listCollections(site.id),
       ctx.store.listTaxonomies(site.id),
     ]);
+    const locale = (a.locale as string | undefined) ?? site.defaultLocale;
     return {
       collections: registry.map((c) => ({
         ...c,
+        ...fieldsView(site, c.key, locale),
         settings: collectionSettings(site, c.key),
         permalink: collectionPermalink(site, c.key),
         taxonomies: taxonomies
@@ -223,7 +243,7 @@ function writeTool(mode: "create" | "update"): ToolDefinition {
     description:
       mode === "create"
         ? "Declare a new collection (RFC-0040), e.g. events, team or jobs, with its names in the site's default locale (labels), an optional icon, permalink (/<prefix>/{slug}, default /<key>/{slug}), feed, sitemap and default sort. Its address may not overlap a page, archive, another collection, /search or a locale prefix. A person who may change site settings approves it in every mode; dryRun: true checks without asking. Then create_entry with this collection. Declaring a collection that already has entries names it."
-        : "Change a collection's names (merged per locale), icon, feed, sitemap or default sort (RFC-0040). The permalink changes only through set_collection_permalink (it moves URLs). A person who may change site settings approves it; dryRun: true checks without asking.",
+        : "Change a collection's names (merged per locale), icon, feed, sitemap, default sort (RFC-0040) or its typed custom fields (`fields`, the whole list; RFC-0041). Field edits that keep every stored value are free here; renaming a key, changing a type, localization or multiple, and dropping a key or option still in use are refused (field_change_needs_operation) and go through rename_field, change_field_type, set_field_localized or remove_field. The permalink changes only through set_collection_permalink (it moves URLs). A person who may change site settings approves it; dryRun: true checks without asking.",
     inputSchema: obj(
       {
         siteId: id,
@@ -232,6 +252,7 @@ function writeTool(mode: "create" | "update"): ToolDefinition {
           maxLength: 64,
         }),
         ...SETTINGS_INPUT,
+        ...(mode === "update" ? { fields: FIELD_DEFINITIONS_INPUT } : {}),
         ...(mode === "create"
           ? {
               permalink: str("Template, e.g. /etkinlik/{slug}; default /<key>/{slug}", {
