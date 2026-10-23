@@ -7,6 +7,7 @@ import type { ContentEntry, Page, Taxonomy, Term } from "@cloudhal/core-contract
 import { termName } from "./names.ts";
 import { entryPath, type PermalinkSite } from "./permalinks.ts";
 import { MARK_CLOSE, MARK_OPEN, SEARCH_TEXT_MAX, type SearchRow } from "./search-common.ts";
+import { searchableFieldTexts } from "./search-fields.ts";
 import { termSlug } from "./term-locales.ts";
 
 const iso = (value: string | undefined) => {
@@ -68,12 +69,33 @@ function entryTermIds(entry: ContentEntry): string[] {
 }
 
 /**
+ * An article's body text, then the words of its `searchable` fields (RFC-0041 §10), when it has
+ * any; exactly `searchText(body)` otherwise.
+ */
+function entryText(
+  entry: ContentEntry,
+  site: PermalinkSite | undefined,
+  original: Pick<ContentEntry, "id" | "fields"> | undefined,
+): string {
+  const body = searchText(entry.body);
+  const fields = searchableFieldTexts(site, entry, original);
+  if (fields.length === 0) return body;
+  const words = fields.map((value) => searchText({ format: "markdown", value }));
+  return clip([body, ...words].filter(Boolean).join(" "));
+}
+
+/**
  * The index row of an article, or undefined when readers never see it (not published; with
- * `drafts`, as `cloudhal dev` shows them, only archived ones are left out).
+ * `drafts`, as `cloudhal dev` shows them, only archived ones are left out). `original` is the
+ * translation group's original, read for a translation's searchable fields.
  */
 export function searchRowOf(
   entry: ContentEntry,
-  options: { drafts?: boolean; site?: PermalinkSite | undefined } = {},
+  options: {
+    drafts?: boolean;
+    site?: PermalinkSite | undefined;
+    original?: Pick<ContentEntry, "id" | "fields"> | undefined;
+  } = {},
 ): SearchRow | undefined {
   if (!shown(entry.status, options.drafts)) return undefined;
   const terms = entryTermIds(entry);
@@ -83,7 +105,7 @@ export function searchRowOf(
     kind: "article",
     title: entry.title,
     summary: entry.summary ?? "",
-    body: searchText(entry.body),
+    body: entryText(entry, options.site, options.original),
     href: entryPath(options.site, entry),
     publishedAt: iso(entry.publishedAt),
     gateFrom: iso(entry.availability?.from),
@@ -248,8 +270,14 @@ export function searchDocuments(input: {
   const options = { drafts: input.drafts ?? false };
   const entryOptions = { ...options, site: input.site };
   const byId = new Map(input.taxonomies.map((t) => [t.id, t]));
+  const entries = new Map(input.entries.map((e) => [e.id, e]));
   const rows: (SearchRow | undefined)[] = [
-    ...input.entries.map((e) => searchRowOf(e, entryOptions)),
+    ...input.entries.map((e) =>
+      searchRowOf(e, {
+        ...entryOptions,
+        original: e.translation ? entries.get(e.translation.group) : undefined,
+      }),
+    ),
     ...input.pages.map((p) => pageSearchRow(p, options)),
   ];
   for (const term of input.terms) {

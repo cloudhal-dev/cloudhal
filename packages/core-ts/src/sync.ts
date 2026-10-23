@@ -11,11 +11,12 @@
 
 import { type Asset, assertValid, type Site } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
-import { mediaBlobKey, refsRebuild } from "./assets.ts";
+import { mediaBlobKey } from "./assets.ts";
 import { checkAvailability, checkTimeZone, type GateSupport, isTimeZone } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "./hosts.ts";
+import { refsRebuild } from "./media/refs-rebuild.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
 import { keepTargetPublished } from "./sync-published.ts";

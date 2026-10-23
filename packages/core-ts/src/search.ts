@@ -34,6 +34,7 @@ import {
   searchKinds,
   searchPaging,
 } from "./search-common.ts";
+import { searchableChanged, searchableFields } from "./search-fields.ts";
 import { pageSearchRow, searchRowOf, termSearchRows } from "./search-rows.ts";
 
 export * from "./search-common.ts";
@@ -200,8 +201,11 @@ export async function planSearch(input: {
     : undefined;
   for (const ref of rewrite) {
     const node = await input.read(ref);
-    if (ref.kind === "contentEntry") pushRow(rows, searchRowOf(node as ContentEntry, { site }));
-    else if (ref.kind === "page") pushRow(rows, pageSearchRow(node as Page));
+    if (ref.kind === "contentEntry") {
+      const entry = node as ContentEntry;
+      const original = await originalFor(entry, site, target, input.read);
+      pushRow(rows, searchRowOf(entry, { site, original }));
+    } else if (ref.kind === "page") pushRow(rows, pageSearchRow(node as Page));
     else if (archives) {
       const term = node as Term;
       const taxonomy = archives.taxonomies.get(term.taxonomyId);
@@ -225,7 +229,10 @@ export async function planSearch(input: {
   };
 }
 
-/** Whether the site node's collection templates differ between `base` and `target`. */
+/**
+ * Whether every entry row changes with the site node between `base` and `target`: a moved
+ * collection template (RFC-0038, new hrefs) or other searchable fields (RFC-0041 §10, new words).
+ */
 async function permalinksMoved(
   target: Snap,
   base: Snap | undefined,
@@ -235,7 +242,21 @@ async function permalinksMoved(
   const before = base?.nodes.find((n) => n.kind === "site");
   if (!after || !before || after.hash === before.hash) return false;
   const [a, b] = [(await read(after)) as Site, (await read(before)) as Site];
-  return changedPermalinks(b, a).length > 0;
+  return changedPermalinks(b, a).length > 0 || searchableChanged(b, a);
+}
+
+/** A translation's original in `target`, read only when its collection has searchable fields. */
+async function originalFor(
+  entry: ContentEntry,
+  site: Site | undefined,
+  target: Snap,
+  read: (ref: NodeRef) => Promise<unknown>,
+): Promise<ContentEntry | undefined> {
+  const group = entry.translation?.group;
+  if (!group || group === entry.id || searchableFields(site, entry.collection).length === 0)
+    return undefined;
+  const ref = target.nodes.find((n) => n.id === group && n.kind === "contentEntry");
+  return ref ? ((await read(ref)) as ContentEntry) : undefined;
 }
 
 function pushRow(rows: SearchRow[], row: SearchRow | undefined): void {

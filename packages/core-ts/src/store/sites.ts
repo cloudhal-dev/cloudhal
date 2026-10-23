@@ -15,6 +15,7 @@ import type { SiteGuard } from "../search.ts";
 import { checkPageSurfaces, createCatalog } from "../surfaces.ts";
 import { planDeclarations } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
+import { planFieldDefinitions } from "./site-fields.ts";
 import { planPermalinks } from "./site-permalinks.ts";
 import { checkThemeConfig } from "./validation.ts";
 
@@ -38,6 +39,7 @@ export class SiteEngine {
     assertValid("site", site);
     checkTimeZone(site.timeZone);
     checkThemeConfig(this.#ctx.graph.themeSettings, site.theme.config, undefined);
+    await planFieldDefinitions(this.#ctx, undefined, site);
     // RFC-0034 §4: a hostname belongs to one site of the installation.
     const hosts = hostsOf(site);
     await checkHosts(this.#ctx.sql, hosts);
@@ -103,6 +105,8 @@ export class SiteEngine {
     const permalinks = await planPermalinks(this.#ctx, stored, next);
     // RFC-0040 §3: a collection in use stays declared; a new one claims a free prefix.
     const declared = await planDeclarations(this.#ctx, stored, next);
+    // RFC-0041 §6: field definitions follow their rules, and a plain edit never loses a value.
+    const fields = await planFieldDefinitions(this.#ctx, stored, next);
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
     if (options.dryRun) return written;
@@ -110,7 +114,7 @@ export class SiteEngine {
       "site",
       written,
       site.rev,
-      and(refs.guard, permalinks?.guard, declared?.guard),
+      and(refs.guard, permalinks?.guard, declared?.guard, fields?.guard),
     );
     const hash = await nodeHash(written);
     const more = [
@@ -125,6 +129,7 @@ export class SiteEngine {
       if (rev === site.rev) {
         await permalinks?.diagnose();
         await declared?.diagnose();
+        await fields?.diagnose();
         await refs.diagnose();
       }
       throw new ConflictError("site", site.id, site.rev, rev);

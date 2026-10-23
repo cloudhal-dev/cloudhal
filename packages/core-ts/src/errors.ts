@@ -174,7 +174,28 @@ export type InvariantCode =
   /** A declared collection with entries (or named by a taxonomy) cannot be undeclared. */
   | "collection_in_use"
   /** `create_collection` for a key that is already declared. */
-  | "collection_exists";
+  | "collection_exists"
+  // ── RFC-0041 (typed custom fields); `details.issues` lists every problem with its path ──
+  /** Field values that do not fit their definitions (or several kinds of problem at once). */
+  | "invalid_fields"
+  /** A new key without a definition in a collection that has definitions. */
+  | "unknown_field"
+  /** A translation holds its own copy of a non-localized value. */
+  | "field_not_localized"
+  /** An entry in review or published lacks a `requiredToPublish` value. */
+  | "required_field"
+  /** A field key that is a built-in entry property or JavaScript name. */
+  | "field_key_reserved"
+  /** A field key used twice in one collection. */
+  | "field_key_duplicate"
+  /** A select option value listed twice. */
+  | "field_option_duplicate"
+  /** A number field's `minimum` above its `maximum`. */
+  | "field_bounds"
+  /** More fields than a collection (30) or a site (200) may have, or options than a select (50). */
+  | "too_many_fields"
+  /** A definition change that could lose or reinterpret stored values; it needs a field operation. */
+  | "field_change_needs_operation";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";
