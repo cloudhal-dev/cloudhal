@@ -44,7 +44,7 @@ import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";     // fet
 | `delete_entry` | `content:write` | write (destructive) | by the key's mode | Delete a content entry. |
 | `list_translations` | `content:read` | read | — | Every language version of a page or entry (its translation group): locale, status, method (original, human, machine, machine-reviewed), whether it is stale (its source changed sin… |
 | `list_stale_translations` | `content:read` | read | — | Translations whose source changed since they were made (or whose source is gone), optionally in one locale: the work queue for keeping languages in step. |
-| `get_translation_source` | `content:read` | read | — | What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), th… |
+| `get_translation_source` | `content:read` | read | — | What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), fo… |
 | `save_translation` | `content:write` | write | by the key's mode | Save your translation of a page or entry into `locale` as a draft linked to the source's current revision, with your model as its provenance. |
 | `search_site` | `content:read` | read | — | Find nodes by words instead of listing everything. |
 | `get_theme_settings` | `content:read` | read | — | The theme's design settings (RFC-0017): their schema (colors as #rrggbb, enums, numbers; per-locale titles), the contrast rules colors must meet, and the site's current values. |

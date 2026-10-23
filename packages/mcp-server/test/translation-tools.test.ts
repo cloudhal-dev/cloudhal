@@ -335,4 +335,76 @@ describe("translation tools", () => {
       call("save_translation", { ...args, targetSiteId: other.id }),
     ).rejects.toMatchObject({ code: "not_found" });
   });
+
+  it("translates only localized text fields and refuses shared ones (RFC-0041 §5)", async () => {
+    const label = (en: string) => ({ en: { label: en } });
+    site = await store.updateSite({
+      ...site,
+      collections: {
+        events: {
+          labels: { en: { singular: "Event", plural: "Events" } },
+          fields: [
+            { key: "speaker", type: "text", labels: label("Speaker"), localized: true },
+            { key: "agenda", type: "richText", labels: label("Agenda"), localized: true },
+            { key: "seats", type: "number", labels: label("Seats"), localized: true },
+            { key: "day", type: "date", labels: label("Day"), localized: false },
+            { key: "host", type: "text", labels: label("Host"), localized: false },
+          ],
+        },
+      },
+    });
+    const event = await store.createContentEntry({
+      siteId: site.id,
+      collection: "events",
+      slug: "launch",
+      locale: "en",
+      status: "draft",
+      title: "Launch",
+      body: { format: "markdown", value: "Join the newsroom." },
+      fields: {
+        speaker: "Ada",
+        agenda: "Talks about *Cloudhal*",
+        seats: 120,
+        day: "2026-11-05",
+        host: "Hall A",
+      },
+      tags: [],
+      author: person,
+    } as never);
+    const src = await call("get_translation_source", {
+      siteId: site.id,
+      nodeId: event.id,
+      locale: "es",
+    });
+    expect(src.result.fields).toEqual({ speaker: "Ada", agenda: "Talks about *Cloudhal*" });
+    expect(src.result.sharedFields).toEqual(["day", "host"]);
+    expect(src.result.source).not.toHaveProperty("fields");
+    expect(src.result.glossary).toEqual(
+      expect.arrayContaining([expect.objectContaining({ term: "Cloudhal" })]),
+    );
+
+    const base = { siteId: site.id, nodeId: event.id, locale: "es", title: "Lanzamiento" };
+    const shared = await call("save_translation", {
+      ...base,
+      fields: { speaker: "Ada", day: "2027-01-01" },
+    }).catch((e) => e as { code: string; details: { issues: { path: string }[] } });
+    expect(shared).toMatchObject({ code: "field_not_localized" });
+    expect((shared as { details: { issues: { path: string }[] } }).details.issues).toEqual([
+      expect.objectContaining({ path: "fields/day", code: "field_not_localized" }),
+    ]);
+    // Refused before anything was written: the source is not even marked as the original yet.
+    expect((await store.getContentEntry(event.id))?.translation).toBeUndefined();
+
+    const saved = (
+      await call("save_translation", {
+        ...base,
+        fields: { speaker: "Ada", agenda: "Charlas sobre *Cloudhal*" },
+      })
+    ).result.node as ContentEntry;
+    // Shared values are never copied; the untranslated localized number falls back to the original.
+    expect(saved.fields).toEqual({ speaker: "Ada", agenda: "Charlas sobre *Cloudhal*" });
+    const again = (await call("save_translation", { ...base, fields: { speaker: "Ada L." } }))
+      .result.node as ContentEntry;
+    expect(again.fields).toEqual({ speaker: "Ada L.", agenda: "Charlas sobre *Cloudhal*" });
+  });
 });

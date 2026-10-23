@@ -55,6 +55,12 @@ export {
   resolveFields,
 } from "./resolve.ts";
 export {
+  localizedFieldValues,
+  sharedFieldIssues,
+  sharedFieldKeys,
+  translatableFieldValues,
+} from "./translation.ts";
+export {
   FIELD_LIMITS,
   FIELD_TYPES,
   type FieldIssue,
