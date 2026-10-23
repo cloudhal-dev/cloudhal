@@ -37,6 +37,7 @@ export const KNOWN_TOOLS = [
   "list_snapshots",
   "diff_snapshots",
   "preview_page",
+  "preview_structured_data",
   "publish",
   "rollback",
   "request_elevation",

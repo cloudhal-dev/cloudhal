@@ -240,5 +240,32 @@ export function describeListingsApi(label: string, factory: ApiStoreFactory): vo
         ["collection invalid_query"],
       ]);
     });
+
+    it("GET /entries/:id/structured-data previews the preset document and its issues", async () => {
+      await seeded();
+      const city = { startsAt: at("2026-11-05T16:30:00Z"), city: "Istanbul" };
+      expect((await entry("d", city)).status).toBe(201);
+      const all = (await list({})).body as unknown as Json[];
+      const id = (slug: string) => all.find((e) => e.slug === slug)?.id as string;
+      const preview = (entryId: string) =>
+        call(`/api/sites/${siteId}/entries/${entryId}/structured-data`);
+      const d = await preview(id("d"));
+      expect(d.status, JSON.stringify(d.body)).toBe(200);
+      expect(d.body).toMatchObject({
+        preset: "Event",
+        origin: expect.stringMatching(/^https?:\/\//),
+        document: { "@type": "Event", name: "d", startDate: "2026-11-05T19:30:00+03:00" },
+      });
+      // No start date: no document, and the reason.
+      const c = await preview(id("c"));
+      expect(c.body.document).toBeNull();
+      expect((c.body.issues as { code: string }[]).map((i) => i.code)).toContain(
+        "required_value_missing",
+      );
+      expect((await preview("entry_missing")).status).toBe(404);
+      expect((await put({ ...EVENTS, structuredData: undefined })).status).toBe(200);
+      const none = await preview(id("d"));
+      expect([none.body.preset, none.body.document]).toEqual([null, null]);
+    });
   });
 }

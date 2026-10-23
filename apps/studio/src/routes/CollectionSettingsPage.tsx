@@ -21,6 +21,7 @@ import {
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly } from "../components/Gating.tsx";
+import { LISTING_SECTIONS } from "../components/listings/sections.ts";
 import { SettingsLayout, SettingsSection } from "../components/Settings.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
 import { SwitchField } from "../components/TaxonomySettingsDialog.tsx";
@@ -34,6 +35,13 @@ import { languageOption } from "../lib/languages.ts";
 // RFC-0041 §7: the fields builder and its operation dialogs load with this screen's section only.
 const FieldsSection = lazy(() =>
   import("../components/fields/FieldsSection.tsx").then((m) => ({ default: m.FieldsSection })),
+);
+
+// RFC-0042 §7: listing fields, expiry, structured data and "Create listing page", one lazy chunk.
+const listingsModule = () => import("../components/listings/ListingSections.tsx");
+const ListingSections = lazy(() => listingsModule().then((m) => ({ default: m.ListingSections })));
+const CreateListingPage = lazy(() =>
+  listingsModule().then((m) => ({ default: m.CreateListingPage })),
 );
 
 type Sort = NonNullable<CollectionSettings["sort"]>;
@@ -92,7 +100,7 @@ export function withForm(
  * stays in Site settings › Collections.
  */
 export function CollectionSettingsPage() {
-  const { t, locale } = useI18n("collections", "fields");
+  const { t, locale } = useI18n("collections", "fields", "listings");
   const { siteId, collection } = useParams({
     from: "/sites/$siteId/collections/$collection/settings",
   });
@@ -115,6 +123,13 @@ export function CollectionSettingsPage() {
       }
       title={t("collections.settings.title", { name })}
       description={t("collections.settings.description")}
+      actions={
+        site.data && (
+          <Suspense fallback={null}>
+            <CreateListingPage site={site.data} collection={collection} />
+          </Suspense>
+        )
+      }
     >
       <ErrorBanner error={site.error ?? registry.error} />
       <SettingsLayout
@@ -123,6 +138,9 @@ export function CollectionSettingsPage() {
           { id: "names", label: t("collections.settings.names") },
           { id: "listing", label: t("collections.settings.listing") },
           { id: "fields", label: t("fields.builder.title") },
+          { id: LISTING_SECTIONS.listFields, label: t("listings.listFields.title") },
+          { id: LISTING_SECTIONS.expiry, label: t("listings.expiry.title") },
+          { id: LISTING_SECTIONS.structuredData, label: t("listings.structuredData.title") },
           { id: "taxonomies", label: t("collections.settings.taxonomies") },
           { id: COLLECTION_COMMENTS_SECTION, label: t("collections.settings.comments") },
           { id: "address", label: t("collections.settings.address") },
@@ -139,6 +157,16 @@ export function CollectionSettingsPage() {
           {site.data && (
             <Suspense fallback={<FieldsSkeleton />}>
               <FieldsSection
+                site={site.data}
+                collection={collection}
+                settings={site.data.collections?.[collection] ?? {}}
+                readOnlyReason={gate.reason}
+              />
+            </Suspense>
+          )}
+          {site.data && (
+            <Suspense fallback={<SectionSkeleton id={LISTING_SECTIONS.listFields} />}>
+              <ListingSections
                 site={site.data}
                 collection={collection}
                 settings={site.data.collections?.[collection] ?? {}}
@@ -307,8 +335,14 @@ function SettingsForm({
 /** The Fields section while its code loads. */
 function FieldsSkeleton() {
   const { t } = useI18n("fields");
+  return <SectionSkeleton id="fields" title={t("fields.builder.title")} />;
+}
+
+/** A settings section while its code loads. */
+function SectionSkeleton({ id, title }: { id: string; title?: string }) {
+  const { t } = useI18n("listings");
   return (
-    <SettingsSection id="fields" title={t("fields.builder.title")}>
+    <SettingsSection id={id} title={title ?? t("listings.listFields.title")}>
       <div className="grid gap-3" role="status">
         <span className="sr-only">{t("common.loading")}</span>
         <SkeletonLine minWidth={30} maxWidth={45} />

@@ -61,7 +61,9 @@ export type AutoCheckCode =
   | "too-many"
   | "media"
   | "outside-window"
-  | "correction";
+  | "correction"
+  /** RFC-0042 §3.5: a live entry gains a derived gate (its collection's expiry) or an earlier one. */
+  | "expires";
 export interface AutoCheck {
   rule: "low-risk-publish";
   lowRisk: boolean;

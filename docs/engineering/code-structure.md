@@ -70,7 +70,7 @@ of cases. Test files still have a file cap; split suites by behaviour (`store.pu
 
 Generated and vendored code is never measured: `packages/core-contracts/src/generated`,
 `crates/cloudhal-schema/src/generated`, `packages/core-ts/src/generated`,
-`packages/ui/src/blocks/kumo`, `dist`, `node_modules`, `*.d.ts`, tool configs.
+`apps/studio/src/i18n/generated` (message parameter types), `packages/ui/src/blocks/kumo`, `dist`, `node_modules`, `*.d.ts`, tool configs.
 
 ## 3. The ratchet
 

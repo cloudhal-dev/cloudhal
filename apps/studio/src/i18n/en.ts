@@ -669,6 +669,15 @@ export const en = {
       field_values_unconvertible:
         "Some values can't be converted. Allow clearing them, or change those entries first.",
       field_operation_incomplete: "That field change hasn't finished, or was already reverted.",
+      invalid_query:
+        "This filter or sort doesn't fit: use the collection's listing fields and their conditions.",
+      structured_data_invalid:
+        "The structured data settings don't fit this collection's fields. Check the marked properties.",
+      invalid_expiry: "Expiry needs a date or date-and-time field of this collection.",
+      list_field_in_use:
+        "Content list sections still filter or sort by this field. Change those pages first.",
+      gates_unsupported:
+        "This site's live server doesn't support this yet. Deploy the site first, then try again.",
       network: "Can't reach the server. Check your connection and try again.",
       status: "The request failed (HTTP {status}).",
     },
@@ -1543,6 +1552,7 @@ export const en = {
       media: "it adds or changes media that is not part of an article change",
       "outside-window": "it would run after the agent's autonomy ends",
       correction: "it adds a correction to a published article",
+      expires: "it makes a published entry end sooner under its collection's expiry",
     },
     noHistory: "No decisions yet",
     noHistoryDescription: "Approved, denied, used and expired requests are listed here.",
@@ -1675,6 +1685,7 @@ export const en = {
     list_snapshots: "List snapshots",
     diff_snapshots: "Compare snapshots",
     preview_page: "Preview page",
+    preview_structured_data: "Preview structured data",
     publish: "Publish site",
     rollback: "Roll back site",
     list_menus: "List menus",
