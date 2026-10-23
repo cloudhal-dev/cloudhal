@@ -1,6 +1,6 @@
 # RFC-0042: Collections stage 3: field presets, structured data, date-driven expiry and field listings
 
-- Status: Draft
+- Status: Accepted (2026-10-23, by Halil; ADR-0044). Open questions decided as recommended.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-23
 - Related:
   - #71 stage 3; RFC-0040 / ADR-0042 ("Stage 3 and later (sketch)"), RFC-0041 / ADR-0043 (§7 "Later", §9 renderer, open question 7: Studio list columns and filters).
@@ -382,7 +382,7 @@ Step 3 ships before step 4, so agents never set a rule the live site ignores. St
 - **Queries:** a closed operator set, ≤ 4 conditions, ≤ 20 values, values ≤ 100 characters, and no regex or `LIKE`. Evaluation is linear in the collection size the site already loads.
 - **Tenant isolation:** unchanged; everything is per site.
 
-## Open questions (recommended defaults)
+## Open questions (decided as recommended, 2026-10-23)
 
 1. **Initial preset set:** `Event`, `JobPosting`, `Product`, `Recipe`; `FAQPage` out (removed by Google in 2026). *Recommended.*
 2. **Default expiry action:** `unlist`. *Recommended*; `hide` is one click away.
