@@ -1,7 +1,7 @@
 /** Surfaces in markdown bodies (RFC-0020 §5): fences, parsing and checks. */
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
-import type { PropsIssue } from "../blocks.ts";
-import type { Catalog } from "./catalog/index.ts";
+import { BUILT_IN_BLOCK_TYPES, type PropsIssue } from "../blocks.ts";
+import type { Catalog, CatalogEntry } from "./catalog/index.ts";
 import { INPUT_COMPONENTS } from "./catalog/props.ts";
 import { checkSurface } from "./checks/index.ts";
 import { isObj } from "./shared.ts";
@@ -130,6 +130,19 @@ export function bodySurfaces(markdown: string): BodySurface[] {
   return out;
 }
 
+const BUILT_IN = new Set(BUILT_IN_BLOCK_TYPES.map((t) => t.name));
+
+/**
+ * Whether a catalog component may sit in an article body's surface: every primitive and built-in
+ * block (Cloudhal draws them anywhere), and a theme's block only when its type allows `body`. A
+ * section-only theme block (`where: ["section"]`) is drawn by the theme's page sections alone.
+ */
+export function allowedInBody(entry: CatalogEntry): boolean {
+  return (
+    entry.kind === "primitive" || BUILT_IN.has(entry.name) || entry.type.where.includes("body")
+  );
+}
+
 /** Problems with a body's surfaces (paths start with the fence's id); unknown components pass. */
 export function checkBodySurfaces(markdown: string, catalog: Catalog): PropsIssue[] {
   const out: PropsIssue[] = [];
@@ -143,6 +156,14 @@ export function checkBodySurfaces(markdown: string, catalog: Catalog): PropsIssu
     for (const i of f.issues) out.push({ path: `${at}${i.path}`, message: i.message });
     for (const i of checkSurface(f.section, catalog).issues)
       out.push({ path: `${at}${i.path}`, message: i.message });
+    f.section.components.forEach((c, n) => {
+      const entry = catalog.get(c.component);
+      if (entry && !allowedInBody(entry))
+        out.push({
+          path: `${at}/components/${n}/component`,
+          message: `${c.component} is a section block of the theme, not allowed in article bodies; put it in a page section`,
+        });
+    });
   }
   return out;
 }

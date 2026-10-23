@@ -2,6 +2,7 @@
 import { BLOCK_LIMITS, localized, type PropSchema } from "../blocks.ts";
 import { ICON_GROUPS } from "../icon-names.ts";
 import { SURFACE_FUNCTIONS } from "./bindings/values.ts";
+import { allowedInBody } from "./body.ts";
 import { type Catalog, childRule } from "./catalog/index.ts";
 import { MOTION_REVEALS, MOTION_STAGGER } from "./motion.ts";
 import { SURFACE_LIMITS } from "./shared.ts";
@@ -52,6 +53,17 @@ export function describeProp(name: string, s: PropSchema, required: boolean): st
  * Instructions for a model writing surfaces against this catalog: the format, bindings, limits
  * and every component with its props and an example. The same catalog validates what it writes.
  */
+/** Which blocks a body surface may use, when the theme has blocks it may not. */
+function bodyBlockLines(catalog: Catalog): string[] {
+  const blocks = catalog.entries().filter((e) => e.kind === "block");
+  const pagesOnly = blocks.filter((e) => !allowedInBody(e)).map((e) => e.name);
+  if (!pagesOnly.length) return ["Every component below may be used in a body surface."];
+  const allowed = blocks.filter(allowedInBody).map((e) => e.name);
+  return [
+    `Every primitive may be used in a body surface, and these blocks: ${allowed.join(", ") || "none"}. These are page-section blocks only and are refused in bodies: ${pagesOnly.join(", ")}.`,
+  ];
+}
+
 export function catalogPrompt(catalog: Catalog, locale = "en"): string {
   const lines: string[] = [
     `# Cloudhal surfaces — catalog ${catalog.id}`,
@@ -100,6 +112,7 @@ export function catalogPrompt(catalog: Catalog, locale = "en"): string {
     '{"id":"t","component":"Text","props":{"text":"Hello"}}',
     "```",
     "Body surfaces cannot load entries ($source); page surfaces can.",
+    ...bodyBlockLines(catalog),
     "",
     "## Editing",
     "Change a page with RFC 6902 JSON Patch operations on /title, /sections and /seo, e.g.",
