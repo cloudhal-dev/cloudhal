@@ -32,6 +32,13 @@ export * from "./cross-site.ts";
 export * from "./design.ts";
 export * from "./domains.ts";
 export * from "./editions.ts";
+export {
+  applyFieldQuery,
+  ENTRY_PAGE_LIMIT,
+  type FieldEntryList,
+  type FieldEntryListQuery,
+  queryContentEntries,
+} from "./entry-query.ts";
 export * from "./errors.ts";
 export * from "./fields-operations/index.ts";
 export * from "./filter.ts";

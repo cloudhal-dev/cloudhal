@@ -8,6 +8,7 @@ import { patchBody } from "../body.ts";
 import type { Env } from "../context.ts";
 import { entryDraft } from "../drafts.ts";
 import { withoutNullFields } from "../entry-fields.ts";
+import { listEntriesByField, usesFieldQuery } from "../entry-list.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { API_ACTOR, writerOf } from "../governance.ts";
 import { editsLiveCorrections, entryLimit, personOf } from "../own.ts";
@@ -29,15 +30,30 @@ export const entries: Hono<Env> = new Hono<Env>()
     const filter = c.req.query("filter") || undefined;
     const locale = c.req.query("locale") || undefined;
     const status = statusList(c.req.query("status"));
+    const base = {
+      ...(collection ? { collection } : {}),
+      ...(filter ? { filter } : {}),
+      ...(locale ? { locale } : {}),
+      ...(status ? { status } : {}),
+    };
+    // RFC-0042 §4: `where`/`orderBy` by list fields, `limit`/`cursor` paging (`422 invalid_query`).
+    const fieldQuery = {
+      where: c.req.query("where"),
+      orderBy: c.req.query("orderBy"),
+      limit: c.req.query("limit"),
+      cursor: c.req.query("cursor"),
+    };
+    if (usesFieldQuery(fieldQuery))
+      return c.json(
+        await listEntriesByField(
+          c.get("store"),
+          param(c, "siteId"),
+          { ...base, now: c.get("now")().getTime() },
+          fieldQuery,
+        ),
+      );
     // `filter` is the RFC-0002 §5 language; a FilterError maps to 400 with suggestions.
-    return c.json(
-      await c.get("store").listContentEntries(param(c, "siteId"), {
-        ...(collection ? { collection } : {}),
-        ...(filter ? { filter } : {}),
-        ...(locale ? { locale } : {}),
-        ...(status ? { status } : {}),
-      }),
-    );
+    return c.json(await c.get("store").listContentEntries(param(c, "siteId"), base));
   })
   .post("/", async (c) => {
     const siteId = param(c, "siteId");

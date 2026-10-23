@@ -20,6 +20,7 @@ import {
   runningMarker,
   targetDefinition,
 } from "./plan.ts";
+import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
 import { buildReport } from "./report.ts";
 import { type Decide, loadEntries, rewritePass } from "./rewrite.ts";
 import {
@@ -123,6 +124,9 @@ export async function runFieldOperation(
   checkOperation(site, op);
   const running = runningMarker(site.collections?.[op.collection]?.fields ?? []);
   if (running) refuseRunning(op.collection, running.id);
+  // RFC-0042 §4: what list fields, expiry, structured data and sections make of the change.
+  await checkSectionReferences(ctx, site, op);
+  checkSettingsReferences(site, op);
   const report = await dryRun(ctx, site, op);
   if (options.dryRun)
     return {
@@ -212,7 +216,12 @@ async function proceed(
     if (!isApplied(site, op, targetDefinition(def, op))) {
       const running = runningMarker(site.collections?.[op.collection]?.fields ?? []);
       if (running) refuseRunning(op.collection, running.id);
-      await writeSite(ctx, siteId, (s) => phaseASite(s, op, id));
+      const sections =
+        op.op === "rename_field"
+          ? (s: Site) =>
+              renamedPages(ctx, s, { collection: op.collection, from: op.from, to: op.to })
+          : undefined;
+      await writeSite(ctx, siteId, (s) => phaseASite(s, op, id), { pages: sections });
       site = await requireSite(ctx, siteId);
     }
   }
@@ -240,12 +249,9 @@ async function proceed(
   const marked = markedField(site, op.collection, id);
   if (marked) {
     const pending = pendingCondition(siteId, op.collection, marked.def);
-    const wrote = await writeSite(
-      ctx,
-      siteId,
-      (s) => phaseCSite(s, op.collection, id),
-      nothingPending(pending),
-    );
+    const wrote = await writeSite(ctx, siteId, (s) => phaseCSite(s, op.collection, id), {
+      guard: nothingPending(pending),
+    });
     if (wrote === "guarded") return result(record, report, { rewritten, skipped, done: false });
   }
   const after = await ctx.store.createSnapshot(siteId, {

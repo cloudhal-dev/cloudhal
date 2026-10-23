@@ -8,7 +8,9 @@
 import { assertValid, type Site, type Snapshot } from "@cloudhal/core-contracts";
 import { ConflictError, InvariantError, NotFoundError } from "../errors.ts";
 import { checkFieldDefinitions, refuseFieldIssues } from "../fields/index.ts";
-import { type Cond, casUpdateStatement } from "../node-sql.ts";
+import { ID_PREFIX, newId } from "../ids.ts";
+import { type Cond, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
+import type { PageRewrite } from "./references.ts";
 import {
   FIELD_MIGRATION,
   type FieldOperation,
@@ -71,8 +73,13 @@ export async function writeSite(
   ctx: OperationContext,
   siteId: string,
   transform: (site: Site) => Site | undefined,
-  guard?: Cond,
+  options: {
+    guard?: Cond | undefined;
+    /** Pages rewritten in the same batch (a rename's `contentList` sections, RFC-0042 §4). */
+    pages?: ((site: Site) => Promise<readonly PageRewrite[]>) | undefined;
+  } = {},
 ): Promise<SiteWrite> {
+  const { guard, pages } = options;
   let rev: number | undefined;
   for (let attempt = 0; attempt < 5; attempt++) {
     const site = await requireSite(ctx, siteId);
@@ -81,13 +88,42 @@ export async function writeSite(
     const next: Site = { ...changed, rev: site.rev + 1, updatedAt: ctx.stamp() };
     assertValid("site", next);
     refuseFieldIssues(checkFieldDefinitions(next));
-    const s = await casUpdateStatement("site", next, site.rev, guard);
-    const r = await ctx.store.sql.run(s.sql, s.params ?? []);
-    if (r.changes === 1) return "written";
+    const rewrites = (await pages?.(site)) ?? [];
+    if (rewrites.length > 0) {
+      if (await writeWithPages(ctx, { site, next, guard, rewrites })) return "written";
+    } else {
+      const s = await casUpdateStatement("site", next, site.rev, guard);
+      const r = await ctx.store.sql.run(s.sql, s.params ?? []);
+      if (r.changes === 1) return "written";
+    }
     rev = (await ctx.store.getSite(siteId))?.rev;
-    if (rev === site.rev) return "guarded";
+    if (rev === site.rev && rewrites.length === 0) return "guarded";
   }
   throw new ConflictError("site", siteId, rev ?? 0, rev);
+}
+
+/**
+ * The site CAS and the pages' CAS in one batch (RFC-0042 §4: a rename's sections), asserted by
+ * `op_guards` so that either all land or none (rule 4); false when a node moved meanwhile.
+ */
+async function writeWithPages(
+  ctx: OperationContext,
+  write: { site: Site; next: Site; guard: Cond | undefined; rewrites: readonly PageRewrite[] },
+): Promise<boolean> {
+  const batch = new OpBatch(newId(ID_PREFIX.operation), write.site.id, write.next.updatedAt);
+  await batch.update("site", write.site, write.next, write.guard);
+  for (const p of write.rewrites) {
+    assertValid("page", p.next);
+    await batch.update("page", p.prev, p.next);
+  }
+  try {
+    await runOpBatch(ctx.store.sql, batch);
+    return true;
+  } catch (e) {
+    // An `OperationConflictError` is a ConflictError too.
+    if (e instanceof ConflictError) return false;
+    throw e;
+  }
 }
 
 /** `NOT EXISTS` over a pending-entries condition (phase C's guard). */

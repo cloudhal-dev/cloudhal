@@ -85,6 +85,12 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   operation_in_progress: 409,
   field_values_unconvertible: 422,
   field_operation_incomplete: 409,
+  // RFC-0042 (collections stage 3): a query or setting that does not fit the collection's fields
+  // is 422; dropping or retyping a list field sections still use collides with them, 409.
+  invalid_query: 422,
+  structured_data_invalid: 422,
+  invalid_expiry: 422,
+  list_field_in_use: 409,
   reserved_key: 400,
   immutable_field: 400,
   primary_not_assigned: 422,

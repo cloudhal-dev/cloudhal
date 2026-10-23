@@ -8,6 +8,7 @@ import type { FieldDefinition, FieldMigration, Site } from "@cloudhal/core-contr
 import { InvariantError } from "../errors.ts";
 import { RESERVED_FIELD_KEYS } from "../fields/types.ts";
 import type { Cond } from "../node-sql.ts";
+import { renameSettingsReferences } from "../store/collection-settings.ts";
 import { FIELD_OPERATIONS, type FieldOperation, finalKey, operationKey } from "./types.ts";
 
 const KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
@@ -123,12 +124,18 @@ export function withFields(site: Site, collection: string, fields: FieldDefiniti
   return { ...site, collections: { ...site.collections, [collection]: next } };
 }
 
-/** Phase A: the target definition (or, for a removal, the field as it is) with the marker. */
+/**
+ * Phase A: the target definition (or, for a removal, the field as it is) with the marker; a rename
+ * also renames the field in the collection's stage 3 settings (RFC-0042 §4).
+ */
 export function phaseASite(site: Site, op: FieldOperation, id: string): Site {
   const { defs, def, index } = currentDefinition(site, op);
   const marked = { ...(targetDefinition(def, op) ?? def), migration: markerOf(id, def, op) };
   const fields = defs.map((d, i) => (i === index ? (marked as FieldDefinition) : d));
-  return withFields(site, op.collection, fields);
+  const next = withFields(site, op.collection, fields);
+  return op.op === "rename_field"
+    ? renameSettingsReferences(next, op.collection, op.from, op.to)
+    : next;
 }
 
 /** The field carrying the operation's marker, if the site still has it. */
