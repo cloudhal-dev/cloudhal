@@ -1,12 +1,13 @@
 # @cloudhal/astro-renderer
 
-Renders a Cloudhal Site Graph with Astro 7. Three pieces:
+Renders a Cloudhal Site Graph with Astro 7. The main pieces:
 
 | Export | What |
 |---|---|
 | `@cloudhal/astro-renderer/integration` | `cloudhal({ dataDir, siteId })` — exposes the project config as `virtual:cloudhal/config`, externalises the native SQLite module, and in dev watches the data directory to clear Astro's route cache when pages are added (Astro ≥6.3 caches `getStaticPaths()` across requests). |
 | `@cloudhal/astro-renderer/runtime` | `getSource(config)` — a `GraphSource`: **live** nodes in dev (drafts visible), a **snapshot** in builds (`CLOUDHAL_SOURCE=snapshot:<id>`). |
 | `@cloudhal/astro-renderer/components` | `Sections` dispatcher + `Hero`, `RichText`, `Image`, `ContentList` `.astro` components. Themes override any of them through the `components` prop. |
+| `@cloudhal/astro-renderer/fields` | Typed custom fields (RFC-0041 §9): `entryFields`, `renderFields`, `hasShownFields`, and `resolveFields`, `formatFieldValue`, `fieldLabel`, `fieldHelp`, `optionLabel` re-exported from `@cloudhal/core-ts/fields`. `EntryFields.astro` in `./components` draws them. |
 
 A page route in a starter looks like this:
 
@@ -29,6 +30,20 @@ const page = await source.pageByPath(Astro.params.path ? `/${Astro.params.path}`
 
 ## Theme-facing API stability
 `cloudhal init` copies `starters/blog/src` into each project, so a site keeps calling this package's exports (and `@cloudhal/core-ts`'s) as they were when it was created. Every export a theme imports is therefore a public API: never change its meaning under the same name. A breaking change keeps a deprecated fallback for the old call. In 0.3.11 `entryPath(entry)` became `entryPath(site, entry)` without one, and every site with an older theme copy rendered empty pages until 0.3.13 restored it. `packages/cli/test/old-theme-compat.test.ts` builds frozen copies of earlier starters (`packages/cli/test/fixtures/theme-v*/`) with today's packages. Add a new frozen copy when a release changes theme-facing APIs.
+
+### Typed custom fields (RFC-0041, added in 0.5.0)
+Additive; `entry.fields` still means exactly what is stored, and themes that never call these keep rendering as before (`theme-v0.4.0` in the compat test).
+
+| Export | Signature |
+|---|---|
+| `GraphSource.entryFields?` | `(entry: ContentEntry, options?: EntryFieldsOptions) => Promise<RenderedFields>` on `LiveSource` and `SnapshotSource` (optional on the interface, like `search?`) |
+| `entryFields` (`./fields`, `.`) | `(source: FieldsSource, entry: ContentEntry, options?: EntryFieldsOptions) => Promise<RenderedFields>`: the same for any source (`site()`, optional `entryById()` and `asset()`) |
+| `renderFields` | `(resolved: ResolvedFields, options: RenderFieldsOptions) => RenderedFields`: the pure step, for values you resolved yourself |
+| `hasShownFields` | `(fields: RenderedFields) => boolean` |
+| `resolveFields`, `formatFieldValue`, `fieldLabel`, `fieldHelp`, `optionLabel` | re-exported from `@cloudhal/core-ts/fields` |
+| `EntryFields` (`./components`) | `<EntryFields fields={…} label?="Details" class?="…" />`: a `<dl class="ch-fields">` of the fields with a value, nothing when none has one; no styles of its own |
+
+`EntryFieldsOptions`: `locale` (default: the entry's), `media` (the page's `MediaContext`), `timeZone`, `words` (`{ yes, no }`), `sizes`. Each `RenderedField` has `key`, `label`, `help?`, `empty`, `text` (escaped plain text), and per type `html` (rich text through the body's markdown pipeline), `href` (`safeHref`, dropped when unsafe), `image` (`imageAttributes` plus `assetId`, alt in the page's language) or `datetime`, plus `def`, `value` and `fromOriginal` from `resolveFields`. Theme guide: [`docs/guides/fields.md`](../../docs/guides/fields.md).
 
 ## Site analytics (RFC-0006)
 

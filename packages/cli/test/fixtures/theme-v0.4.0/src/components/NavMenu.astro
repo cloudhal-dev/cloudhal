@@ -1,0 +1,95 @@
+---
+/**
+ * An item with children as a disclosure (`<details>`, no JavaScript): the item's link (or a group's
+ * label) as the summary, its children below. Renders up to three levels; deeper items are left out
+ * (the menu's `maxDepth` is data, the theme decides what it shows). The active trail starts open.
+ * In the header's bar (`popover`, RFC-0025 §2) a group opens as a popover under its button instead,
+ * so it never pushes the bar: the browser opens and closes it (Escape, a click elsewhere) with no
+ * script, and a disclosure button never becomes `role=menu`. A top-level item with `display: mega`
+ * (RFC-0025 25d) opens one wide panel under the header instead: each child group is a column of its
+ * links (a child with no children of its own joins a first column of links).
+ */
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import { renderIcon } from "@cloudhal/core-ts/icons";
+import { iconSet } from "../icons.ts";
+import NavLink from "./NavLink.astro";
+
+interface Props {
+  item: ActiveNavItem;
+  on: string;
+  off: string;
+  /** 1 for a top-level item. */
+  level?: number;
+  /** A popover under a button (the header's bar), with this id. */
+  popover?: string | undefined;
+  /** RFC-0026 26c: the site's icon weight. */
+  iconWeight?: string | undefined;
+}
+const { item, on, off, level = 1, popover, iconWeight } = Astro.props;
+const icon = (name: string, className?: string) =>
+  renderIcon(name, { className, weight: iconWeight, set: iconSet });
+const MAX_LEVEL = 3;
+const mega = popover !== undefined && level === 1 && item.display === "mega";
+const columns = mega ? item.children.filter((c) => c.children.length > 0) : [];
+const loose = mega ? item.children.filter((c) => c.children.length === 0) : [];
+---
+{popover ? (
+  <div class="ch-nav-menu" data-popover="">
+    {item.href && <NavLink item={item} on={on} off={off} />}
+    <button
+      type="button"
+      class:list={["ch-nav-menu__btn", item.current || item.inTrail ? on : off]}
+      popovertarget={popover}
+      aria-label={item.href ? item.label : undefined}
+    >{!item.href && item.label}<Fragment set:html={icon("chevron-down")} /></button>
+    <div popover="auto" id={popover} class:list={["ch-nav-menu__pop", mega && "ch-nav-menu__pop--mega"]}>
+      {mega ? (
+        <div class="ch-mega">
+          {loose.length > 0 && (
+            <ul class="ch-mega__col">
+              {loose.map((c) => <li><NavLink item={c} on={on} off={off} /></li>)}
+            </ul>
+          )}
+          {columns.map((col) => (
+            <div class="ch-mega__col">
+              <p class="ch-mega__heading">{col.href ? <NavLink item={col} on={on} off={off} /> : col.label}</p>
+              <ul>
+                {col.children.map((c) => <li><NavLink item={c} on={on} off={off} /></li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      ) : (
+      <ul>
+        {item.children.map((child) => (
+          <li>
+            {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
+              <Astro.self item={child} on={on} off={off} level={level + 1} iconWeight={iconWeight} />
+            ) : (
+              <NavLink item={child} on={on} off={off} />
+            )}
+          </li>
+        ))}
+      </ul>
+      )}
+    </div>
+  </div>
+) : (
+<details class="ch-nav-menu" open={item.inTrail && level > 1 ? true : undefined}>
+  <summary class={(item.current || item.inTrail ? on : off) || undefined}>
+    {item.href ? <NavLink item={item} on={on} off={off} /> : <span>{item.label}</span>}
+    <Fragment set:html={icon("chevron-down", "ch-nav-menu__caret")} />
+  </summary>
+  <ul>
+    {item.children.map((child) => (
+      <li>
+        {child.children.length > 0 && level + 1 < MAX_LEVEL ? (
+          <Astro.self item={child} on={on} off={off} level={level + 1} iconWeight={iconWeight} />
+        ) : (
+          <NavLink item={child} on={on} off={off} />
+        )}
+      </li>
+    ))}
+  </ul>
+</details>
+)}

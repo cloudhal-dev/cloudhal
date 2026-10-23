@@ -1,0 +1,105 @@
+---
+/**
+ * An article (RFC-0018 §3, the article view): kicker (the primary category), title, dek, byline
+ * (author, published, updated, reading time), cover, an "On this page" table of contents for
+ * longer pieces (headings carry ids; no JavaScript), then the body with the theme's own blocks and
+ * the corrections, newest first (RFC-0019 §2; the latest one is the "Updated" date).
+ */
+import { Body } from "@cloudhal/astro-renderer/components";
+import { articleCorrections, articleOutline } from "@cloudhal/astro-renderer/kit";
+import { entryArticleParts } from "@cloudhal/astro-renderer/markdown";
+import type { MediaContext } from "@cloudhal/astro-renderer/media";
+import type { EntryTaxonomy } from "@cloudhal/astro-renderer/taxonomy";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import type { BlockType } from "@cloudhal/core-ts/blocks";
+import type { ThemeStrings } from "../theme.ts";
+
+interface Props {
+  entry: ContentEntry;
+  terms: EntryTaxonomy;
+  locale: string;
+  t: ThemeStrings;
+  media?: MediaContext;
+  blocks?: Record<string, unknown>;
+  blockTypes?: readonly BlockType[];
+}
+const { entry, terms, locale, t, media, blocks, blockTypes } = Astro.props;
+const parts = entryArticleParts(entry, locale, media);
+const outline = articleOutline(entry);
+const date = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+const published = entry.publishedAt ?? undefined;
+const corrections = articleCorrections(entry);
+const newest = corrections.items[0];
+// "Updated": the latest correction; without one, only a real later edit, not the publish itself.
+const updated =
+  corrections.latest ??
+  (published && Date.parse(entry.updatedAt) - Date.parse(published) > 24 * 3600 * 1000
+    ? entry.updatedAt
+    : undefined);
+// RFC-0019 §1: the byline's authors link to their pages; without one, a person who wrote it.
+const authors = terms.authors;
+const author =
+  authors.length === 0 && entry.author.kind === "human" ? entry.author.name : undefined;
+---
+<article class="ch-article" data-entry-id={entry.id}>
+  <header class="ch-article-head">
+    {terms.section && (
+      terms.section.href ? (
+        <a class="ch-kicker" href={terms.section.href}>{terms.section.name}</a>
+      ) : (
+        <span class="ch-kicker">{terms.section.name}</span>
+      )
+    )}
+    <h1>{entry.title}</h1>
+    {entry.summary && <p class="ch-dek">{entry.summary}</p>}
+    <p class="ch-byline">
+      {authors.length > 0 && (
+        <span class="ch-byline__author">
+          {t.byPrefix}
+          {authors.map((a, i) => (
+            <Fragment>
+              {i > 0 && (i === authors.length - 1 ? t.and : ", ")}
+              {a.href ? <a href={a.href} rel="author">{a.name}</a> : a.name}
+            </Fragment>
+          ))}
+        </span>
+      )}
+      {author && <span class="ch-byline__author">{t.by(author)}</span>}
+      {published && <time datetime={published}>{date(published)}</time>}
+      {updated && <span>{t.updated(date(updated))}</span>}
+      {newest && <a href="#ch-corrections">{t.appended(t.correctionKind[newest.kind])}</a>}
+      <span>{t.minRead(outline.readingMinutes)}</span>
+    </p>
+  </header>
+  <Fragment set:html={parts.cover} />
+  {outline.toc.length >= 3 && (
+    <details class="ch-toc" open>
+      <summary>{t.onThisPage}</summary>
+      <ol>
+        {outline.toc.map((item) => (
+          <li data-depth={item.depth}><a href={`#${item.id}`}>{item.text}</a></li>
+        ))}
+      </ol>
+    </details>
+  )}
+  <div class="ch-richtext">
+    <Body body={parts.body} media={parts.media} blocks={blocks} blockTypes={blockTypes} />
+  </div>
+  {newest && (
+    <section id="ch-corrections" class="ch-corrections" aria-labelledby="ch-corrections-title">
+      <h2 id="ch-corrections-title">{t.corrections}</h2>
+      <ol>
+        {corrections.items.map((c) => (
+          <li data-kind={c.kind}>
+            <p class="ch-correction__meta">
+              <strong>{t.correctionKind[c.kind]}</strong>
+              <time datetime={c.at}>{date(c.at)}</time>
+            </p>
+            <p class="ch-correction__note" set:html={c.html} />
+          </li>
+        ))}
+      </ol>
+    </section>
+  )}
+</article>

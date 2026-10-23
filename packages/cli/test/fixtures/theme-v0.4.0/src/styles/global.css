@@ -1,0 +1,31 @@
+/* Scan `src/` only: automatic detection may walk up the file system (docs/design/starter-references.md §6). */
+@import "tailwindcss" source("..");
+@import "./fonts.css";
+@import "./font-fallbacks.css";
+
+/*
+ * One file per feature (docs/engineering/code-structure.md §8), in cascade order. Unlayered on
+ * purpose: `layer(...)` would let utilities beat component classes, and later files override
+ * earlier ones at equal specificity (reduced motion after reveals, the transparent header after
+ * chrome, forced colors after icons). CSS needs every @import first, so `@theme` lives in tokens.
+ */
+@import "./features/tokens.css";
+@import "./features/prose.css";
+@import "./features/blocks.css";
+@import "./features/article.css";
+@import "./features/comments.css";
+@import "./features/surfaces.css";
+@import "./features/surface-media.css";
+@import "./features/live-surfaces.css";
+@import "./features/motion.css";
+@import "./features/motion-scroll.css";
+@import "./features/motion-effects.css";
+@import "./features/ambient.css";
+@import "./features/search.css";
+@import "./features/search-dialog.css";
+@import "./features/chrome.css";
+@import "./features/chrome-menus.css";
+@import "./features/overlays.css";
+@import "./features/icons.css";
+@import "./features/carousel.css";
+@import "./features/languages.css";

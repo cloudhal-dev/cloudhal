@@ -3,6 +3,7 @@ export { default as Body } from "./Body.astro";
 export { default as Comments } from "./Comments.astro";
 export { default as ContentList } from "./ContentList.astro";
 export { default as EntryArticle } from "./EntryArticle.astro";
+export { default as EntryFields } from "./EntryFields.astro";
 export { default as Hero } from "./Hero.astro";
 export { default as Image } from "./Image.astro";
 export { default as RichText } from "./RichText.astro";

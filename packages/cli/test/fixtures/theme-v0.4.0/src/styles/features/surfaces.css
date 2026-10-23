@@ -1,0 +1,309 @@
+/* Generated UI (RFC-0020): surfaces built by agents from the catalog's primitives. Values arrive
+   as data-* attributes from closed sets; nothing a model wrote reaches this file. */
+.ch-surface {
+  @apply py-6;
+}
+.ch-stack {
+  @apply flex flex-col gap-4;
+}
+.ch-row {
+  @apply flex flex-wrap items-center gap-4;
+}
+.ch-row[data-wrap="no"] {
+  @apply flex-nowrap;
+}
+.ch-grid {
+  @apply grid grid-cols-1 gap-4 sm:grid-cols-2;
+}
+.ch-grid[data-cols="1"] {
+  @apply sm:grid-cols-1;
+}
+@media (min-width: 48rem) {
+  .ch-grid[data-cols="3"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="4"] {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="5"] {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .ch-grid[data-cols="6"] {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.ch-columns {
+  @apply grid grid-cols-1 gap-6 md:grid-cols-2;
+}
+@media (min-width: 48rem) {
+  .ch-columns[data-ratio="2-1"] {
+    grid-template-columns: 2fr 1fr;
+  }
+  .ch-columns[data-ratio="1-2"] {
+    grid-template-columns: 1fr 2fr;
+  }
+  .ch-columns[data-ratio="1-1-1"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ch-columns[data-ratio="1-2-1"] {
+    grid-template-columns: 1fr 2fr 1fr;
+  }
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="none"] {
+  gap: 0;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="s"] {
+  gap: 0.5rem;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="l"] {
+  gap: 2rem;
+}
+:is(.ch-stack, .ch-row, .ch-grid, .ch-columns)[data-gap="xl"] {
+  gap: 3rem;
+}
+:is(.ch-stack, .ch-row)[data-align="center"] {
+  @apply items-center text-center;
+}
+:is(.ch-stack, .ch-row)[data-align="end"] {
+  @apply items-end;
+}
+.ch-row[data-justify="center"] {
+  @apply justify-center;
+}
+.ch-row[data-justify="end"] {
+  @apply justify-end;
+}
+.ch-row[data-justify="between"] {
+  @apply justify-between;
+}
+/* A band leaves the reading column: full width, or wider than the text. */
+.ch-band {
+  @apply relative py-12;
+  margin-inline: calc(50% - 50vw);
+  padding-inline: max(1rem, calc(50vw - 36rem));
+}
+.ch-band[data-width="narrow"] .ch-band__inner {
+  @apply mx-auto max-w-2xl;
+}
+.ch-band[data-width="wide"] .ch-band__inner,
+.ch-band:not([data-width]) .ch-band__inner {
+  @apply mx-auto max-w-6xl;
+}
+/* A band's own children (heading, text, buttons, a grid) need room between them; the theme's
+   spacing unit scales it with the density. */
+.ch-band__inner > * + * {
+  margin-block-start: calc(var(--spacing) * 4);
+}
+.ch-band__inner > .ch-heading + :is(.ch-grid, .ch-columns, .ch-stack, .ch-tabs, .ch-table-wrap) {
+  margin-block-start: calc(var(--spacing) * 6);
+}
+.ch-band[data-spacing="s"] {
+  @apply py-6;
+}
+.ch-band[data-spacing="l"] {
+  @apply py-16;
+}
+.ch-band[data-spacing="xl"] {
+  @apply py-24;
+}
+/*
+ * Surfaces (RFC-0023 §4): what a band or card is painted with, from the color roles only, so
+ * text keeps the contrast the token expansion checked. `data-tone` (older pages) is an alias.
+ */
+:is([data-surface="muted"], [data-tone="muted"]):is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-muted);
+}
+[data-surface="raised"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-raised);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 6px 20px -6px rgb(0 0 0 / 0.12);
+}
+:is([data-surface="brand"], [data-tone="brand"]):is(.ch-band, .ch-card) {
+  background: var(--ch-color-brand);
+  color: var(--ch-color-on-brand);
+}
+:is([data-surface="inverse"], [data-tone="inverse"]):is(.ch-band, .ch-card) {
+  background: var(--ch-color-surface-inverse);
+  color: var(--ch-color-text-inverse);
+}
+[data-surface="accent"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-accent);
+  color: var(--ch-color-on-accent);
+}
+/* From the brand to its gradient end: text on brand reads on both (the expansion checks it). */
+[data-surface="gradient"]:is(.ch-band, .ch-card) {
+  background: var(--ch-color-brand);
+  background-image: linear-gradient(
+    135deg in oklch,
+    var(--ch-color-brand),
+    var(--ch-color-gradient)
+  );
+  color: var(--ch-color-on-brand);
+}
+/* Soft light from the brand and accent over the muted surface; plain muted where unsupported. */
+[data-surface="mesh"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image:
+    radial-gradient(
+      at 12% 18%,
+      color-mix(in oklch, var(--ch-color-brand) 16%, transparent),
+      transparent 55%
+    ),
+    radial-gradient(
+      at 88% 8%,
+      color-mix(in oklch, var(--ch-color-accent) 14%, transparent),
+      transparent 50%
+    ),
+    radial-gradient(
+      at 55% 100%,
+      color-mix(in oklch, var(--ch-color-brand) 9%, transparent),
+      transparent 60%
+    );
+}
+[data-surface="dots"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image: radial-gradient(var(--ch-color-border-strong) 1px, transparent 1.5px);
+  background-size: 18px 18px;
+}
+[data-surface="grid"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image:
+    linear-gradient(var(--ch-color-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ch-color-border) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+/* A fixed grey grain (no color in it), faint on light and dark alike. */
+[data-surface="noise"]:is(.ch-band, .ch-card) {
+  background-color: var(--ch-color-surface-muted);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* Loud surfaces: their text, buttons and links follow the surface's own text color. */
+:is(
+  [data-surface="brand"],
+  [data-surface="inverse"],
+  [data-surface="accent"],
+  [data-surface="gradient"],
+  [data-tone="brand"],
+  [data-tone="inverse"]
+) :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
+  color: inherit;
+  opacity: 0.85;
+}
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-button--primary {
+  @apply bg-(--ch-color-surface) text-(--ch-color-text);
+}
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-button--secondary {
+  @apply border-current/60 text-inherit;
+}
+:is(
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  .ch-link {
+  color: inherit;
+}
+:is(
+  [data-surface="brand"],
+  [data-surface="inverse"],
+  [data-surface="accent"],
+  [data-surface="gradient"],
+  [data-surface="raised"]
+).ch-card {
+  border-color: transparent;
+}
+/* A band with an anchor stops below the top of the window when a link jumps to it. */
+.ch-band[id] {
+  scroll-margin-top: 1rem;
+}
+.ch-card {
+  @apply flex flex-col gap-3 rounded-lg border border-zinc-200 p-5 no-underline;
+}
+a.ch-card {
+  @apply hover:border-zinc-400;
+}
+.ch-spacer {
+  @apply h-8;
+}
+.ch-spacer[data-size="s"] {
+  @apply h-4;
+}
+.ch-spacer[data-size="l"] {
+  @apply h-16;
+}
+.ch-spacer[data-size="xl"] {
+  @apply h-24;
+}
+.ch-divider {
+  @apply my-2 border-zinc-200;
+}
+.ch-heading {
+  @apply font-bold tracking-tight;
+}
+h1.ch-heading {
+  @apply text-4xl sm:text-5xl;
+}
+h2.ch-heading {
+  @apply text-3xl;
+}
+h3.ch-heading {
+  @apply text-xl;
+}
+h4.ch-heading {
+  @apply text-lg;
+}
+.ch-text {
+  @apply space-y-2 leading-relaxed;
+}
+.ch-text[data-size="s"] {
+  @apply text-sm;
+}
+.ch-text[data-size="l"] {
+  @apply text-xl;
+  /* A lead keeps a readable measure, even at a dramatic type scale. */
+  max-inline-size: 48ch;
+}
+.ch-text[data-muted="yes"] {
+  @apply text-zinc-600;
+}
+[data-align="center"]:is(.ch-heading, .ch-text) {
+  @apply text-center;
+}
+[data-align="end"]:is(.ch-heading, .ch-text) {
+  @apply text-right;
+}
+.ch-figure img {
+  @apply w-full rounded-lg object-cover;
+}
+.ch-figure[data-ratio="16:9"] img {
+  aspect-ratio: 16 / 9;
+}
+.ch-figure[data-ratio="4:3"] img {
+  aspect-ratio: 4 / 3;
+}
+.ch-figure[data-ratio="1:1"] img {
+  aspect-ratio: 1;
+}
+.ch-figure[data-ratio="3:4"] img {
+  aspect-ratio: 3 / 4;
+}

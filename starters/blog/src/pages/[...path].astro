@@ -10,6 +10,7 @@ import {
 import { commentsJsonLd, loadComments } from "@cloudhal/astro-renderer/comments";
 import { Comments, Sections } from "@cloudhal/astro-renderer/components";
 import { EMBED_HEADER, usesEmbeds } from "@cloudhal/astro-renderer/embeds";
+import type { RenderedFields } from "@cloudhal/astro-renderer/fields";
 import { gateNotice } from "@cloudhal/astro-renderer/gates";
 import {
   alternatesFor,
@@ -256,6 +257,7 @@ let entries: Record<string, ContentEntry[]> = {};
 let surfaces: Awaited<ReturnType<typeof loadSurfaceSources>> = {};
 let terms = entryTaxonomy(undefined, { tags: [] });
 let related: ContentEntry[] = [];
+let fields: RenderedFields | undefined;
 if (route.kind === "page") {
   tags.push(nodeCacheTag(route.page.id));
   // Lists of the site's entries change with any entry: the site's list tag covers them.
@@ -287,6 +289,11 @@ if (route.kind === "page") {
 } else if (route.kind === "entry") {
   terms = entryTaxonomy(index, route.entry);
   related = relatedEntries(route.entry, all, index, RELATED_POSTS);
+  // RFC-0041 §9: typed fields in the entry's language; values read from the original tag it too.
+  fields = await source.entryFields?.(route.entry, { media, words: { yes: t.yes, no: t.no } });
+  const group = route.entry.translation?.group;
+  if (group && Object.values(fields ?? {}).some((f) => f.fromOriginal))
+    tags.push(nodeCacheTag(group));
   tags.push(
     nodeCacheTag(route.entry.id),
     // the related posts it links to: a retitled or removed one purges this page too
@@ -448,7 +455,7 @@ const searchForm = searchAvailable(config, source)
           { name: route.entry.title },
         ]}
       />
-      <Article entry={route.entry} terms={terms} locale={locale} t={t} media={media} blocks={blocks} blockTypes={blockTypes} />
+      <Article entry={route.entry} terms={terms} locale={locale} t={t} media={media} blocks={blocks} blockTypes={blockTypes} fields={fields} />
       <PostTerms taxonomy={terms} locale={locale} />
       <RelatedPosts title={t.related} entries={related} locale={locale} media={media} />
       <Comments view={comments} />

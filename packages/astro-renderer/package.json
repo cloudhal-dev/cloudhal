@@ -16,6 +16,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./source": "./src/source.ts",
+    "./fields": "./src/fields.ts",
     "./routing": "./src/routing.ts",
     "./search": "./src/search.ts",
     "./seo": "./src/seo.ts",
@@ -109,6 +110,10 @@
       "./source": {
         "types": "./dist/src/source.d.ts",
         "default": "./dist/src/source.js"
+      },
+      "./fields": {
+        "types": "./dist/src/fields.d.ts",
+        "default": "./dist/src/fields.js"
       },
       "./routing": {
         "types": "./dist/src/routing.d.ts",
