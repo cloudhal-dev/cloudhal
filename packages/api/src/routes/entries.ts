@@ -7,6 +7,7 @@ import { Hono } from "hono";
 import { patchBody } from "../body.ts";
 import type { Env } from "../context.ts";
 import { entryDraft } from "../drafts.ts";
+import { withoutNullFields } from "../entry-fields.ts";
 import { badRequest, notFound } from "../errors.ts";
 import { API_ACTOR, writerOf } from "../governance.ts";
 import { editsLiveCorrections, entryLimit, personOf } from "../own.ts";
@@ -41,10 +42,15 @@ export const entries: Hono<Env> = new Hono<Env>()
   .post("/", async (c) => {
     const siteId = param(c, "siteId");
     if (!(await c.get("store").getSite(siteId))) throw notFound("site not found");
-    const input = (await c.req.json()) as Omit<
-      ContentEntry,
-      "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
-    >;
+    // RFC-0041: in a collection with typed fields, `null` removes a key.
+    const input = await withoutNullFields(
+      c.get("store"),
+      siteId,
+      (await c.req.json()) as Omit<
+        ContentEntry,
+        "id" | "rev" | "createdAt" | "updatedAt" | "schemaVersion"
+      >,
+    );
     // RFC-0040 §5: a new collection is declared first (Studio's New collection).
     const registry = await c.get("store").listCollections(siteId);
     if (typeof input.collection === "string" && !isRegistered(registry, input.collection))
@@ -104,9 +110,10 @@ export const entries: Hono<Env> = new Hono<Env>()
     return c.json(entry);
   })
   .put("/:entryId", async (c) => {
-    const body = (await c.req.json()) as ContentEntry;
-    if (body.id !== param(c, "entryId") || body.siteId !== param(c, "siteId"))
+    const raw = (await c.req.json()) as ContentEntry;
+    if (raw.id !== param(c, "entryId") || raw.siteId !== param(c, "siteId"))
       throw badRequest("ids must match the URL");
+    const body = await withoutNullFields(c.get("store"), raw.siteId, raw);
     const limit = entryLimit(c.get("principal"));
     if (limit) {
       const stored = await c.get("store").getContentEntry(body.id);

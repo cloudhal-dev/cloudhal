@@ -17,7 +17,7 @@
     "packages/comments/src/pipeline.ts": 898,
     "packages/comments/src/sql/store.ts": 2111,
     "packages/comments/src/testing.ts": 1665,
-    "packages/core-ts/src/assets.ts": 1390,
+    "packages/core-ts/src/assets.ts": 1370,
     "packages/core-ts/src/automations.ts": 1003,
     "packages/core-ts/src/menu.ts": 928,
     "packages/core-ts/src/releases.ts": 996,

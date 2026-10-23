@@ -31,6 +31,7 @@ import { ID_PREFIX } from "./ids.ts";
 import { RASTER_TYPES } from "./media/image.ts";
 import { type InspectOptions, inspectUpload } from "./media/ingest.ts";
 import { type AssetRefUse, assetRefsOf, canonicalImageRefs } from "./media/refs.ts";
+import { refsRebuild } from "./media/refs-rebuild.ts";
 import { sniff } from "./media/sniff.ts";
 import {
   assetKindFor,
@@ -1021,7 +1022,7 @@ export class AssetEngine {
   /** Rebuilds a site's `asset_refs` from its current nodes (sync import, repair). */
   async rebuildRefsStatements(siteId: string): Promise<SqlStatement[]> {
     const rows = await this.#sql.all<{ id: string; kind: string; body: string }>(
-      "SELECT id, kind, body FROM nodes WHERE site_id = ? AND kind IN ('page', 'contentEntry', 'term')",
+      "SELECT id, kind, body FROM nodes WHERE site_id = ? AND kind IN ('page', 'contentEntry', 'term', 'site')",
       [siteId],
     );
     return refsRebuild(siteId, rows);
@@ -1352,27 +1353,6 @@ function pickFields(f: AssetFields): Partial<Asset> {
 
 function refsKey(refs: readonly AssetRefUse[]): string {
   return refs.map((r) => `${r.assetId}\t${r.field}`).join("\n");
-}
-
-/** `asset_refs` for a whole site from node rows (DELETE + one INSERT). */
-export function refsRebuild(
-  siteId: string,
-  rows: readonly { id: string; kind: string; body: string }[],
-): SqlStatement[] {
-  const all: { a: string; n: string; k: string; f: string }[] = [];
-  for (const r of rows)
-    for (const ref of assetRefsOf(r.kind, JSON.parse(r.body)))
-      all.push({ a: ref.assetId, n: r.id, k: r.kind, f: ref.field });
-  const out: SqlStatement[] = [
-    { sql: "DELETE FROM asset_refs WHERE site_id = ?", params: [siteId] },
-  ];
-  if (all.length > 0)
-    out.push({
-      sql: `INSERT OR IGNORE INTO asset_refs (site_id, asset_id, node_id, node_kind, field)
-            SELECT ?, json_extract(value, '$.a'), json_extract(value, '$.n'), json_extract(value, '$.k'), json_extract(value, '$.f') FROM json_each(?)`,
-      params: [siteId, json(all)],
-    });
-  return out;
 }
 
 function encodeCursor(at: string, id: string): string {

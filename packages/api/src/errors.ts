@@ -69,6 +69,18 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   collection_undeclared: 422,
   collection_in_use: 409,
   collection_exists: 409,
+  // RFC-0041 (typed custom fields): values and definitions the data rules refuse are 422, rules
+  // a request can never meet as written 400, and a change that would lose stored values 409.
+  invalid_fields: 422,
+  unknown_field: 422,
+  field_not_localized: 422,
+  required_field: 422,
+  too_many_fields: 422,
+  field_key_reserved: 400,
+  field_key_duplicate: 400,
+  field_option_duplicate: 400,
+  field_bounds: 400,
+  field_change_needs_operation: 409,
   reserved_key: 400,
   immutable_field: 400,
   primary_not_assigned: 422,

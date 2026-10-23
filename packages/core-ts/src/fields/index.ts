@@ -22,6 +22,7 @@ export {
   fieldsPropsSchema,
   INSTANT_PATTERN,
 } from "./props.ts";
+export { fieldRefusalCode, refuseFieldIssues } from "./refusal.ts";
 export {
   type FieldsEntry,
   type FieldsOriginal,

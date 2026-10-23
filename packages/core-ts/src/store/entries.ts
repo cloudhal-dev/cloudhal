@@ -13,6 +13,7 @@ import { entryPath } from "../permalinks.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import { entersCollection, planNewCollection } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
+import { planEntryFields } from "./entry-fields.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkBodyDirectives } from "./validation.ts";
@@ -59,6 +60,8 @@ export class EntryEngine {
     assertValid("content-entry", canonicalTerms(draft));
     checkLocalizedNode("contentEntry", site, draft);
     await checkTranslationLinks(this.#ctx, { kind: "contentEntry", site, node: draft, stored });
+    // RFC-0041 §3: typed field values, requiredToPublish and their asset references.
+    const fields = await planEntryFields(this.#ctx, site, draft, stored);
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {
@@ -95,8 +98,9 @@ export class EntryEngine {
     const opening = entersCollection(stored, entry)
       ? await planNewCollection(this.#ctx, site, entry.collection, entry.id)
       : undefined;
-    const guard = and(prepared.guard, refs.guard, opening?.guard);
-    const extra = refs.statements(await nodeHash(entry));
+    const guard = and(prepared.guard, refs.guard, opening?.guard, fields.guard);
+    const hash = await nodeHash(entry);
+    const extra = [...refs.statements(hash), ...fields.statements(hash)];
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
@@ -120,6 +124,7 @@ export class EntryEngine {
           throw new ConflictError("contentEntry", entry.id, stored.rev, rev);
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
+        await fields.diagnose();
         await opening?.diagnose();
         throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
       }
@@ -138,6 +143,7 @@ export class EntryEngine {
       diagnose: async () => {
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
+        await fields.diagnose();
         await opening?.diagnose();
       },
     });

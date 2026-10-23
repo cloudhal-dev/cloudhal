@@ -14,6 +14,7 @@ The design and its reasons are in [RFC-0029](../rfcs/0029-search-providers-and-s
 - **Published content only.**
   - Found: articles, pages, categories and tags, and authors.
   - Never found: drafts, pages marked `noindex`, embargoed or expired content outside its time window.
+- **Custom fields** (RFC-0041) are not searched unless a text or rich-text field is marked *searchable* in its collection's settings. Then its words count as part of the article's text from the next publish on. A translation without its own value uses the original's.
 - **Categories, tags and authors** are found only while at least one article readers can see carries them. This is the same rule that decides whether their archive page exists.
 - **Matching.** Every word must start a word of the title, summary or text, and title matches come first. Accents and Turkish letters are folded, so "cay" finds "Çay".
 - **Language.** Results come in the site's default language.
