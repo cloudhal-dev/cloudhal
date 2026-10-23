@@ -1,0 +1,25 @@
+{
+  "reason": "a condition names its operator",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "startsAt",
+        "value": "now"
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": ["scheduled"]
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

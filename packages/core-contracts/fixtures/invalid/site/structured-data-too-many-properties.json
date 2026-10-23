@@ -1,0 +1,322 @@
+{
+  "reason": "a preset maps at most 40 properties",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "timeZone": "Europe/Istanbul",
+    "rev": 0,
+    "createdAt": "2026-10-23T20:00:00Z",
+    "updatedAt": "2026-10-23T20:00:00Z",
+    "collections": {
+      "events": {
+        "labels": {
+          "en": {
+            "singular": "Event",
+            "plural": "Events"
+          }
+        },
+        "fields": [
+          {
+            "key": "startsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "startsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "endsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "endsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "day",
+            "type": "date",
+            "labels": {
+              "en": {
+                "label": "day"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "venue",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "venue"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "city",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "city"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "price",
+            "type": "number",
+            "labels": {
+              "en": {
+                "label": "price"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "eventStatus",
+            "type": "select",
+            "labels": {
+              "en": {
+                "label": "eventStatus"
+              }
+            },
+            "localized": false,
+            "options": [
+              {
+                "value": "scheduled",
+                "labels": {
+                  "en": "Scheduled"
+                }
+              },
+              {
+                "value": "cancelled",
+                "labels": {
+                  "en": "Cancelled"
+                }
+              }
+            ]
+          },
+          {
+            "key": "poster",
+            "type": "image",
+            "labels": {
+              "en": {
+                "label": "poster"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "tickets",
+            "type": "url",
+            "labels": {
+              "en": {
+                "label": "tickets"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "notes",
+            "type": "richText",
+            "labels": {
+              "en": {
+                "label": "notes"
+              }
+            },
+            "localized": false
+          }
+        ],
+        "listFields": ["startsAt", "eventStatus", "price", "day"],
+        "expiry": {
+          "field": "endsAt",
+          "action": "unlist",
+          "afterMinutes": 60
+        },
+        "structuredData": {
+          "type": "Event",
+          "properties": {
+            "pa": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pb": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pc": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pd": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pe": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pf": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pg": {
+              "kind": "text",
+              "value": "x"
+            },
+            "ph": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pi": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pj": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pk": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pl": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pm": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pn": {
+              "kind": "text",
+              "value": "x"
+            },
+            "po": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pp": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pq": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pr": {
+              "kind": "text",
+              "value": "x"
+            },
+            "ps": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pt": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pu": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pv": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pw": {
+              "kind": "text",
+              "value": "x"
+            },
+            "px": {
+              "kind": "text",
+              "value": "x"
+            },
+            "py": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pz": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pA": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pB": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pC": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pD": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pE": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pF": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pG": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pH": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pI": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pJ": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pK": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pL": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pM": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pN": {
+              "kind": "text",
+              "value": "x"
+            },
+            "pO": {
+              "kind": "text",
+              "value": "x"
+            }
+          }
+        }
+      }
+    }
+  }
+}

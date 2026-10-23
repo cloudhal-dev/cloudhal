@@ -1,0 +1,26 @@
+{
+  "reason": "values has at least one item",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "startsAt",
+        "op": "gte",
+        "value": "now"
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": []
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

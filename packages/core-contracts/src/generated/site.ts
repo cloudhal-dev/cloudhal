@@ -57,6 +57,29 @@ export type FieldDefinition =
  */
 export type FieldKey = string;
 /**
+ * RFC-0042: where one JSON-LD property's value comes from, discriminated by `kind`.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "StructuredDataSource".
+ */
+export type StructuredDataSource =
+  FieldValueSource | EntryValueSource | SiteValueSource | TextValueSource;
+/**
+ * RFC-0042: entry properties a structured-data property may read.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "EntryValueProperty".
+ */
+export type EntryValueProperty =
+  "title" | "summary" | "body" | "coverImage" | "url" | "publishedAt" | "updatedAt";
+/**
+ * RFC-0042: site properties a structured-data property may read.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "SiteValueProperty".
+ */
+export type SiteValueProperty = "name" | "url" | "logo";
+/**
  * RFC-0025 §2: one optional surface (kind `surface`) above the footer's columns, built and checked like any surface; the store refuses other section kinds.
  */
 export type Section =
@@ -260,6 +283,19 @@ export interface CollectionSettings {
    * @maxItems 30
    */
   fields?: [FieldDefinition, ...FieldDefinition[]];
+  /**
+   * RFC-0042: fields that listings, queries, Studio columns and MCP may filter and sort by, in column order. Keys of this collection's fields (checked in code).
+   *
+   * @minItems 1
+   * @maxItems 4
+   */
+  listFields?:
+    | [FieldKey]
+    | [FieldKey, FieldKey]
+    | [FieldKey, FieldKey, FieldKey]
+    | [FieldKey, FieldKey, FieldKey, FieldKey];
+  expiry?: CollectionExpiry;
+  structuredData?: StructuredDataPreset;
 }
 /**
  * This interface was referenced by `Site`'s JSON-Schema
@@ -497,6 +533,66 @@ export interface FieldOption {
   labels: {
     [k: string]: string | undefined;
   };
+}
+/**
+ * RFC-0042: a time gate every entry derives from one of its date or datetime fields, checked at render time like Availability.until. A date ends at the start of the next day in the site's time zone.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "CollectionExpiry".
+ */
+export interface CollectionExpiry {
+  field: FieldKey;
+  /**
+   * unlist: the page stays, the entry leaves listings, feeds, the sitemap and search. hide: every public route answers 404.
+   */
+  action: "unlist" | "hide";
+  /**
+   * Grace after the field's instant. Absent: 0.
+   */
+  afterMinutes?: number;
+}
+/**
+ * RFC-0042: the JSON-LD type an entry page emits in place of BlogPosting, with its properties mapped to value sources. Paths, fitting field types and required properties are a closed table in code (@cloudhal/core-ts/structured-data).
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "StructuredDataPreset".
+ */
+export interface StructuredDataPreset {
+  type: "Event" | "JobPosting" | "Product" | "Recipe";
+  /**
+   * Keyed by property path, e.g. startDate or location.address.addressLocality.
+   */
+  properties: {
+    [k: string]: StructuredDataSource | undefined;
+  };
+}
+/**
+ * A typed field of this collection, converted by its type.
+ */
+export interface FieldValueSource {
+  kind: "field";
+  field: FieldKey;
+}
+/**
+ * A built-in property of the entry.
+ */
+export interface EntryValueSource {
+  kind: "entry";
+  property: EntryValueProperty;
+}
+/**
+ * A property of the site.
+ */
+export interface SiteValueSource {
+  kind: "site";
+  property: SiteValueProperty;
+}
+/**
+ * A plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code).
+ */
+export interface TextValueSource {
+  kind: "text";
+  value: string;
 }
 /**
  * Theme (a.k.a. Experience) applied by the renderer. Config is theme-defined and validated by the theme's own schema, not here.
@@ -769,6 +865,223 @@ export interface ContentListSection {
    * Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.
    */
   filter?: string;
+  /**
+   * RFC-0042: conditions on the collection's list fields, ANDed.
+   *
+   * @minItems 1
+   * @maxItems 4
+   */
+  where?:
+    | [FieldCondition]
+    | [FieldCondition, FieldCondition]
+    | [FieldCondition, FieldCondition, FieldCondition]
+    | [FieldCondition, FieldCondition, FieldCondition, FieldCondition];
+  orderBy?: FieldOrder;
+}
+/**
+ * RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldCondition".
+ */
+export interface FieldCondition {
+  /**
+   * A field key (site.schema.json FieldKey's pattern, repeated).
+   */
+  field: string;
+  op: "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "in" | "set" | "unset";
+  value?: string;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  values?:
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
+}
+/**
+ * RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldOrder".
+ */
+export interface FieldOrder {
+  /**
+   * A field key (site.schema.json FieldKey's pattern, repeated).
+   */
+  field: string;
+  direction: "asc" | "desc";
 }
 /**
  * A typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates.

@@ -105,8 +105,8 @@ function partsIn(zone: string, epochMs: number): Record<string, number> {
   return out;
 }
 
-/** The zone's offset from UTC at an instant, in milliseconds. */
-function offsetMs(zone: string, epochMs: number): number {
+/** The zone's offset from UTC at an instant, in milliseconds (throws on an unknown zone). */
+export function offsetMs(zone: string, epochMs: number): number {
   const p = partsIn(zone, epochMs);
   const local = Date.UTC(
     p.year as number,

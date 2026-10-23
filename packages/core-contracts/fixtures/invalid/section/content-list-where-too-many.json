@@ -1,0 +1,64 @@
+{
+  "reason": "a section has at most four conditions",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "fa",
+        "op": "set"
+      },
+      {
+        "field": "fb",
+        "op": "set"
+      },
+      {
+        "field": "fc",
+        "op": "set"
+      },
+      {
+        "field": "fd",
+        "op": "set"
+      },
+      {
+        "field": "fe",
+        "op": "set"
+      },
+      {
+        "field": "ff",
+        "op": "set"
+      },
+      {
+        "field": "fg",
+        "op": "set"
+      },
+      {
+        "field": "fh",
+        "op": "set"
+      },
+      {
+        "field": "fi",
+        "op": "set"
+      },
+      {
+        "field": "fj",
+        "op": "set"
+      },
+      {
+        "field": "fk",
+        "op": "set"
+      },
+      {
+        "field": "fl",
+        "op": "set"
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

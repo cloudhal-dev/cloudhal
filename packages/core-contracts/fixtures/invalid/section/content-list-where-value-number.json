@@ -1,0 +1,26 @@
+{
+  "reason": "condition values are strings, typed by the field",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "startsAt",
+        "op": "gte",
+        "value": 5
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": ["scheduled"]
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

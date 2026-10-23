@@ -16,7 +16,7 @@ The open stage 3 items from RFC-0040 and RFC-0041 address these: structured data
 1. **Contract:** new optional collection settings. There is no `schemaVersion` bump.
    - `listFields`: up to 4 keys.
    - `expiry`: `{field, action: "unlist" | "hide", afterMinutes?}`.
-   - `structuredData`: `{type, properties}`. Each property names its source by `kind`: `field`, `entry`, `site` or `constant`. The entry and site property names are named `$defs` (cargo-typify merges inline enums).
+   - `structuredData`: `{type, properties}`. Each property names its source by `kind`: `field`, `entry`, `site` or `text` (a plain-text constant). The entry and site property names are named `$defs` (cargo-typify merges inline enums).
    - `contentList` sections gain `where` (up to 4 conditions) and `orderBy`.
    - Which properties each type accepts, the field types that fit them and the required ones are a closed table in code (`@cloudhal/core-ts/structured-data`).
 2. **Presets:** Event, JobPosting, Product and Recipe.

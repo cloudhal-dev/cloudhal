@@ -1,0 +1,27 @@
+{
+  "reason": "a condition has only field, op, value and values",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "startsAt",
+        "op": "gte",
+        "value": "now",
+        "offset": "7d"
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": ["scheduled"]
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

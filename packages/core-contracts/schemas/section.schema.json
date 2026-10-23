@@ -61,7 +61,15 @@
           "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
           "minLength": 1,
           "maxLength": 512
-        }
+        },
+        "where": {
+          "type": "array",
+          "description": "RFC-0042: conditions on the collection's list fields, ANDed.",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": { "$ref": "common.schema.json#/$defs/FieldCondition" }
+        },
+        "orderBy": { "$ref": "common.schema.json#/$defs/FieldOrder" }
       }
     },
     {

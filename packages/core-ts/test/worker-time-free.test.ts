@@ -78,11 +78,12 @@ const usesTemporal = (external: Set<string>) =>
   [...external].filter((s) => s === "temporal-polyfill" || s.startsWith("temporal-polyfill/"));
 
 describe("the site Worker never bundles the time-zone library (§9.4)", () => {
-  it("core-ts's index, its availability and fields entries and the schedules engine reach no temporal-polyfill", async () => {
+  it("core-ts's index, its availability, fields and structured-data entries and the schedules engine reach no temporal-polyfill", async () => {
     for (const entry of [
       path.join(PACKAGES, "core-ts/src/index.ts"),
       path.join(PACKAGES, "core-ts/src/availability.ts"),
       path.join(PACKAGES, "core-ts/src/fields/index.ts"),
+      path.join(PACKAGES, "core-ts/src/structured-data/index.ts"),
       path.join(PACKAGES, "schedules/src/engine.ts"),
       path.join(PACKAGES, "astro-renderer/src/cloudflare-entry.ts"),
       path.join(PACKAGES, "astro-renderer/src/runtime-workerd.ts"),

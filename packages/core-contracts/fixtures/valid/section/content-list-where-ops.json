@@ -1,0 +1,32 @@
+{
+  "id": "sec_01HZX8K3Q9WO",
+  "kind": "contentList",
+  "collection": "events",
+  "limit": 5,
+  "sort": "oldest",
+  "filter": "tag:music",
+  "where": [
+    {
+      "field": "poster",
+      "op": "set"
+    },
+    {
+      "field": "price",
+      "op": "lte",
+      "value": "100"
+    },
+    {
+      "field": "day",
+      "op": "lt",
+      "value": "2026-12-31"
+    },
+    {
+      "field": "free",
+      "op": "unset"
+    }
+  ],
+  "orderBy": {
+    "field": "price",
+    "direction": "desc"
+  }
+}
