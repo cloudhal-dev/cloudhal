@@ -6,11 +6,13 @@
  * - non-localized: the original's value on a translation, the entry's own otherwise;
  * - a language edition (an original in another site) owns all its values;
  * - during a field operation the `migration` marker is read through: a missing key falls back to
- *   `fromKey`. A value still in `fromType` that does not fit the new type resolves to `undefined`
- *   with an issue until the operation converts it (the closed conversion table is RFC-0041 §6's,
- *   applied by the operation runner).
+ *   `fromKey`; a value still in `fromType` that does not fit the new type is converted by RFC-0041
+ *   §6's closed table (`conversions.ts`), and resolves to `undefined` with an issue only when the
+ *   table cannot convert it; a field being removed is already gone.
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
+import { convertFieldValue } from "./conversions.ts";
+import { convertContext, isBeingRemoved } from "./migration.ts";
 import { type FieldIssue, fieldDefinitions, isRecord, type SiteFields } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
@@ -70,6 +72,7 @@ export function resolveFields(
 ): ResolvedFields {
   const out: ResolvedFields = {};
   for (const def of fieldDefinitions(site, entry.collection)) {
+    if (isBeingRemoved(def)) continue;
     const { value, fromOriginal } = pick(def, entry, original);
     if (value === undefined) {
       out[def.key] = { def, value: undefined, fromOriginal: false };
@@ -82,6 +85,17 @@ export function resolveFields(
       continue;
     }
     const converting = def.migration?.fromType;
+    const converted = converting
+      ? convertFieldValue(converting, def, value, convertContext(site))
+      : undefined;
+    if (converted?.ok) {
+      out[def.key] = {
+        def,
+        value: converted.value,
+        fromOriginal: converted.value !== undefined && fromOriginal,
+      };
+      continue;
+    }
     out[def.key] = {
       def,
       value: undefined,
@@ -90,7 +104,7 @@ export function resolveFields(
         path: first.path,
         code: "field_value_unreadable",
         message: converting
-          ? `still a ${converting} value, being converted to ${def.type}`
+          ? `a ${converting} value that does not convert to ${def.type}`
           : first.message,
       },
     };

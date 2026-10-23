@@ -14,6 +14,7 @@ The core routes are below; the feature routes (taxonomy, menus, media, comments,
 | `/api/sites/:id/pages[/:pageId]` | pages (POST creates and appends to `Site.pageIds` atomically; DELETE needs `?rev=`) |
 | `/api/sites/:id/entries[/:entryId]` | content entries (`?collection=` filter); `fields` is checked against the collection's typed fields (RFC-0041), and `null` removes a key there |
 | `/api/sites/:id/collections[/:key]` | the collection registry; `PUT /:key {settings, rev}` (`?dryRun=1`) declares a collection or changes its settings, typed `fields` included; `DELETE /:key?rev=` |
+| `/api/sites/:id/collections/:key/fields/operations` | RFC-0041 §6 field operations (`site:settings` and `content:write`): `POST {op, …, dryRun?}` with `op` one of `rename_field {from, to}`, `change_field_type {key, type, options?, multiple?, onInvalid?: "clear"}`, `set_field_localized {key, localized}`, `remove_field {key}` → `{operationId, done, report, rewritten, skipped}` (a dry run writes nothing; `done: false` when the 2,000-entry / 20 s budget ran out, then `POST ?continue=<operationId>`); `GET /:operationId` → state and pending entries; `POST /:operationId/revert` (again while `done: false`). Only the draft graph changes |
 | `/api/sites/:id/snapshots` | create (`{label, publish}`), list, `:id/publish`, `:id/rollback`, `:a/diff/:b` |
 | `/api/agent-keys` | API keys for agents: `POST {name, scopes}` (key shown once), `GET`, `DELETE /:id` — signed-in humans only |
 | `/mcp` | the Cloudhal MCP server (ADR-0011); session cookie → human, `x-api-key` or `Authorization: Bearer <key>` → agent limited to the key's scopes (REST answers agent keys with a pointer to `/mcp`) |
@@ -32,6 +33,9 @@ Typed fields (RFC-0041) answer with every problem and its path in `details.issue
 | `field_key_reserved`, `field_key_duplicate`, `field_option_duplicate`, `field_bounds` | 400 | definitions that can never be saved as written |
 | `too_many_fields` | 422 | over 30 fields per collection, 200 per site or 50 options per select |
 | `field_change_needs_operation` | 409 | changing a field's type, localization or `multiple`, or dropping a key or option that entries still hold |
+| `operation_in_progress` | 409 | another field operation is still rewriting the collection (`details.operationId`) |
+| `field_values_unconvertible` | 422 | a type change would drop values the conversion table cannot convert, without `onInvalid: "clear"` (`details.report` is the dry run) |
+| `field_operation_incomplete` | 409 | reverting an operation that has not finished, or was already reverted |
 
 ```ts
 import { createApi } from "@cloudhal/api";

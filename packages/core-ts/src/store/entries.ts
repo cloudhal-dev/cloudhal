@@ -13,7 +13,8 @@ import { entryPath } from "../permalinks.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import { entersCollection, planNewCollection } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
-import { planEntryFields } from "./entry-fields.ts";
+import { normalizeEntryFields, planEntryFields } from "./entry-fields.ts";
+import { planSourceForward } from "./source-forward.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkBodyDirectives } from "./validation.ts";
@@ -57,6 +58,7 @@ export class EntryEngine {
       });
       draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
     }
+    draft = normalizeEntryFields(site, draft);
     assertValid("content-entry", canonicalTerms(draft));
     checkLocalizedNode("contentEntry", site, draft);
     await checkTranslationLinks(this.#ctx, { kind: "contentEntry", site, node: draft, stored });
@@ -100,7 +102,9 @@ export class EntryEngine {
       : undefined;
     const guard = and(prepared.guard, refs.guard, opening?.guard, fields.guard);
     const hash = await nodeHash(entry);
-    const extra = [...refs.statements(hash), ...fields.statements(hash)];
+    // RFC-0041 §5: a change to non-localized values alone leaves translations fresh.
+    const forward = await planSourceForward(this.#ctx, site, { stored, entry, ts });
+    const extra = [...refs.statements(hash), ...fields.statements(hash), ...(await forward(hash))];
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {

@@ -98,7 +98,7 @@ describe("resolveFields", () => {
     expect(r.level?.value).toBeUndefined();
   });
 
-  it("reads through a migration marker: fromKey fallback, and unconverted values flagged", () => {
+  it("reads through a migration marker: fromKey fallback, conversion, removal", () => {
     const renamed: FieldDefinition = {
       key: "speaker",
       type: "text",
@@ -118,10 +118,15 @@ describe("resolveFields", () => {
       localized: false,
       migration: { id: "snap_01HZX8K3Q9MG", fromType: "text" },
     };
-    const r = resolveFields(site([retyped]), entry({ seats: "120" }));
+    // RFC-0041 §6: values still in fromType are converted on read by the closed table.
+    expect(resolveFields(site([retyped]), entry({ seats: "120" })).seats?.value).toBe(120);
+    const r = resolveFields(site([retyped]), entry({ seats: "many" }));
     expect(r.seats?.value).toBeUndefined();
-    expect(r.seats?.issue?.message).toContain("still a text value");
+    expect(r.seats?.issue?.message).toContain("does not convert to number");
     expect(resolveFields(site([retyped]), entry({ seats: 120 })).seats?.value).toBe(120);
+    // A field being removed (a marker without from*) is already gone for readers.
+    const removing = { ...retyped, migration: { id: "snap_01HZX8K3Q9MG" } } as FieldDefinition;
+    expect(resolveFields(site([removing]), entry({ seats: 120 })).seats).toBeUndefined();
   });
 });
 

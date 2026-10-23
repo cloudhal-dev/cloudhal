@@ -160,5 +160,46 @@ export function describeFieldsApi(label: string, factory: ApiStoreFactory): void
       expect(made.status, JSON.stringify(made.body)).toBe(201);
       expect(made.body.fields).toEqual(loose);
     });
+
+    it("field operations: dry run, run, status, continue and revert (RFC-0041 §6)", async () => {
+      expect((await put(EVENTS)).status).toBe(200);
+      const made = await create({ venue: "Hall", level: "expert" });
+      expect(made.status).toBe(201);
+      const ops = `/api/sites/${siteId}/collections/events/fields/operations`;
+      const post = (body: Json, query = "") =>
+        call(`${ops}${query}`, { method: "POST", body: JSON.stringify(body) });
+      expect((await post({ op: "explode" })).status).toBe(400);
+      const unknown = await post({ op: "remove_field", key: "colour" });
+      expect(unknown.status).toBe(422);
+      expect(unknown.body.error).toBe("unknown_field");
+      const dry = await post({ op: "rename_field", from: "venue", to: "place", dryRun: true });
+      expect(dry.status, JSON.stringify(dry.body)).toBe(200);
+      expect(dry.body).toMatchObject({ dryRun: true, report: { moved: 1, touched: 1 } });
+      const run = await post({ op: "rename_field", from: "venue", to: "place" });
+      expect(run.status, JSON.stringify(run.body)).toBe(200);
+      expect(run.body.done).toBe(true);
+      const id = run.body.operationId as string;
+      const entry = await call(`/api/sites/${siteId}/entries/${made.body.id}`);
+      expect(entry.body.fields).toEqual({ place: "Hall", level: "expert" });
+      const status = await call(`${ops}/${id}`);
+      expect(status.body).toMatchObject({ state: "done", pending: 0 });
+      expect((await post({}, `?continue=${id}`)).body).toMatchObject({ done: true });
+      // A type change that would lose values is refused with the report (422).
+      const lossy = await post({ op: "change_field_type", key: "level", type: "number" });
+      expect(lossy.status).toBe(422);
+      expect(lossy.body.error).toBe("field_values_unconvertible");
+      expect((lossy.body.details as Json).report).toMatchObject({ unconvertible: 1 });
+      const back = await call(`${ops}/${id}/revert`, { method: "POST" });
+      expect(back.status, JSON.stringify(back.body)).toBe(200);
+      expect(back.body).toMatchObject({ done: true, restored: 1 });
+      expect((await call(`/api/sites/${siteId}/entries/${made.body.id}`)).body.fields).toEqual({
+        venue: "Hall",
+        level: "expert",
+      });
+      const again = await call(`${ops}/${id}/revert`, { method: "POST" });
+      expect(again.status).toBe(409);
+      expect(again.body.error).toBe("field_operation_incomplete");
+      expect((await call(`${ops}/snap_doesnotexist`)).status).toBe(404);
+    });
   });
 }

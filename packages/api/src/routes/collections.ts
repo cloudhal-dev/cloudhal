@@ -4,12 +4,14 @@
  * `PUT /:key { settings, rev }` (site:settings) declares a collection or replaces its settings
  * through the site update, so the store's overlap and permalink-redirect checks run (`rev` is the
  * site's: a stale one is 409); `?dryRun=1` runs them and writes nothing. `DELETE /:key?rev=`
- * (site:settings) undeclares a collection without entries.
+ * (site:settings) undeclares a collection without entries. Field operations (RFC-0041 §6) live
+ * under `/:key/fields/operations` (`../field-operations.ts`).
  */
 import type { CollectionSettings, Site } from "@cloudhal/core-contracts";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
 import { badRequest, notFound } from "../errors.ts";
+import { fieldOperations } from "../field-operations.ts";
 import { param } from "../params.ts";
 
 const KEY = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -70,4 +72,5 @@ export const collections: Hono<Env> = new Hono<Env>()
     if (!site.collections?.[key]) throw notFound("collection not declared");
     const next = withCollection({ ...site, rev: revOf(c.req.query("rev")) }, key, undefined);
     return c.json({ site: await store.updateSite(next) });
-  });
+  })
+  .route("/", fieldOperations);

@@ -35,6 +35,9 @@
  *   run, then the summary (RFC-0020 open question 7, `cloudhal ai build-eval --remote`); in memory
  * - `POST /api/admin/sites/:siteId/search/reindex` → rebuilds the search index from the live
  *   snapshot (RFC-0019 §3, `cloudhal search reindex --remote`)
+ * - `POST /api/admin/sites/:siteId/collections/:key/fields/operations[?continue=<id>]`, `GET
+ *   …/operations/:id` and `POST …/operations/:id/revert`: field operations as the operator
+ *   (RFC-0041 §6, `cloudhal fields … --remote`; the same handlers as Studio's, `../field-operations.ts`)
  * - `GET  /api/admin/sites/:siteId/media-placeholders?all=1` → images without a placeholder, and
  *   `PUT …/media-placeholders/:assetId` ← {rev, lqip?, color?}: `cloudhal media placeholders
  *   --remote` draws them in a local Chrome (RFC-0028 §5)
@@ -52,12 +55,13 @@ import type { RenderDeps } from "@cloudhal/mcp-server/tools";
 import { Hono } from "hono";
 import type { AiTransport } from "../ai/client.ts";
 import type { Env } from "../context.ts";
+import { fieldOperationHandlers } from "../field-operations.ts";
 import { aiAdminRoutes } from "./admin/ai.ts";
 import { analyticsAdminRoutes } from "./admin/analytics.ts";
 import { commentsAdminRoutes } from "./admin/comments.ts";
 import { ownerAdminRoutes } from "./admin/owner.ts";
 import { schedulesAdminRoutes } from "./admin/schedules.ts";
-import { timingSafeEqual } from "./admin/shared.ts";
+import { OPERATOR_ACTOR, timingSafeEqual } from "./admin/shared.ts";
 import { siteOpsAdminRoutes } from "./admin/site-ops.ts";
 import { siteWorkersAdminRoutes } from "./admin/site-workers.ts";
 import { sitesAdminRoutes } from "./admin/sites.ts";
@@ -91,6 +95,10 @@ export function adminRoutes(
       .route("/", sitesAdminRoutes(deps))
       .route("/", siteWorkersAdminRoutes(deps))
       .route("/", siteOpsAdminRoutes())
+      .route(
+        "/sites/:siteId/collections",
+        fieldOperationHandlers(() => OPERATOR_ACTOR),
+      )
       .route("/", syncAdminRoutes(deps))
   );
 }

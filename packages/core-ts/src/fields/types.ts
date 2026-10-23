@@ -9,6 +9,10 @@ export type SelectFieldDefinition = Extract<FieldDefinition, { type: "select" }>
 /** What field code reads of a site: its collection settings. */
 export interface SiteFields {
   collections?: Site["collections"] | undefined;
+  /** Conversions during a type change (`date → datetime`); `UTC` when absent. */
+  timeZone?: string | undefined;
+  /** Conversions during a type change (`text → select` labels); `en` when absent. */
+  defaultLocale?: string | undefined;
 }
 
 /** The nine closed types, in the contract's order. */

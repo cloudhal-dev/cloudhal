@@ -66,6 +66,18 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", "/api/admin/sites/:siteId/ai/judge-check", "deploy-token"],
   // RFC-0019 §3: `cloudhal search reindex --remote`
   ["POST", "/api/admin/sites/:siteId/search/reindex", "deploy-token"],
+  // RFC-0041 §6: `cloudhal fields rename|retype|localize|remove|revert --remote`
+  ["POST", "/api/admin/sites/:siteId/collections/:key/fields/operations", "deploy-token"],
+  [
+    "GET",
+    "/api/admin/sites/:siteId/collections/:key/fields/operations/:operationId",
+    "deploy-token",
+  ],
+  [
+    "POST",
+    "/api/admin/sites/:siteId/collections/:key/fields/operations/:operationId/revert",
+    "deploy-token",
+  ],
   // RFC-0028 §5: `cloudhal media placeholders --remote`
   ["GET", "/api/admin/sites/:siteId/media-placeholders", "deploy-token"],
   ["PUT", "/api/admin/sites/:siteId/media-placeholders/:assetId", "deploy-token"],
@@ -124,6 +136,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", `${S}/collections`, "content:read"],
   ["PUT", `${S}/collections/:key`, "site:settings"],
   ["DELETE", `${S}/collections/:key`, "site:settings"],
+  // RFC-0041 §6: field operations (the handler also asks content:write; they rewrite entries)
+  ["POST", `${S}/collections/:key/fields/operations`, "site:settings"],
+  ["GET", `${S}/collections/:key/fields/operations/:operationId`, "content:read"],
+  ["POST", `${S}/collections/:key/fields/operations/:operationId/revert`, "site:settings"],
   ["GET", `${S}/pages`, "content:read"],
   ["POST", `${S}/pages`, "content:write"],
   ["GET", `${S}/pages/:pageId/preview`, "content:read"],
