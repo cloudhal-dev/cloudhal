@@ -8,6 +8,7 @@
  */
 export * from "./archive.ts";
 export * from "./cache-tags.ts";
+export * from "./collection-feeds.ts";
 export * from "./entry-query.ts";
 export * from "./fields.ts";
 export * from "./gates.ts";

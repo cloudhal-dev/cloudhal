@@ -18,6 +18,7 @@ import {
   parseArchivePath,
   termForSlug,
 } from "./archive.ts";
+import { collectionFeedPaths } from "./collection-feeds.ts";
 import { routableEntries } from "./entry-views.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { type SearchView, searchRequest } from "./search.ts";
@@ -261,7 +262,7 @@ export function redirectPaths(redirects: readonly Redirect[], served: readonly s
 export interface StaticPaths {
   /** For the catch-all page route: pages, entries, archive pages, then paths that redirect. */
   readonly pages: string[];
-  /** For the term feed route (`<archive>/rss.xml`). */
+  /** For the term feed route (`<archive>/rss.xml`), then each collection's (`<prefix>/rss.xml`). */
   readonly feeds: string[];
 }
 
@@ -293,7 +294,14 @@ export async function staticPaths(
     )
     .filter((p) => !taken.has(p));
   const served = [...base, ...archivePages];
-  const feeds = archives.flatMap((a) => (a.feedPath ? [a.feedPath] : []));
+  // RFC-0042 §5: each collection's feed too (the starter's feed route answers 404 for it, and the
+  // renderer's middleware answers with the feed), so old theme copies write it as well.
+  const feeds = [
+    ...new Set([
+      ...archives.flatMap((a) => (a.feedPath ? [a.feedPath] : [])),
+      ...collectionFeedPaths(site, entries),
+    ]),
+  ];
   // `…/page/1` answers with a 301 to the archive root (a meta-refresh page in static builds).
   const firstPages = archives.map((a) => `${a.path}/page/1`);
   return {

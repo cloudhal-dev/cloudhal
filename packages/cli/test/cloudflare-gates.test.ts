@@ -8,6 +8,10 @@
  *   archives and their pages, term feeds, `rss.xml`, `sitemap.xml`, `robots.txt`, every media URL,
  *   the 404 page, every gated node's own URL — is fetched, and no body or header may name a gated
  *   node. Previews (live and snapshot links) show them, with the notice.
+ * - **Derived gates (RFC-0042 §3).** Entries past an `unlist` and a `hide` expiry (from their own
+ *   date fields, `derived-gates-fixture.ts`) in the same sweep: the hidden one is a 404 named on no
+ *   route, the unlisted one keeps its page and is named on no other route, the collections' own
+ *   feeds (served by the renderer's middleware) included.
  * - **Cache cap (S10).** Published responses carry `max-age` up to the next gate; a gate a few
  *   seconds ahead opens on its own, with no purge and no scheduler.
  * - **Features handshake (§7.7).** `GET /__cloudhal/features` answers `{ "gates": 2 }` to the admin
@@ -40,6 +44,10 @@ import { createTestHarness } from "wrangler";
 // The renderer is not a dependency of the CLI; its sources (and the sweep fixture) are read in place.
 import { staticPaths } from "../../astro-renderer/src/routing.ts";
 import { SnapshotSource } from "../../astro-renderer/src/source.ts";
+import {
+  applyDerivedGatesFixture,
+  type DerivedGatesFixture,
+} from "../../astro-renderer/test/derived-gates-fixture.ts";
 import { applyGatesFixture, type GatesFixture } from "../../astro-renderer/test/gates-fixture.ts";
 import { prepareAdminWorker } from "../src/cloudflare/admin.ts";
 import { buildSiteWorker } from "../src/cloudflare/build.ts";
@@ -126,6 +134,7 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
   let harness: Harness;
   let remote: SiteGraphStore;
   let fx: GatesFixture;
+  let dx: DerivedGatesFixture;
   let snapshotId: string;
   let candidates: string[];
 
@@ -165,6 +174,8 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     // The fixture is written straight into D1 once the Workers run, so `t` is "now" for them.
     remote = new SiteGraphStore({ ...target, gates: GATES_ENFORCED });
     fx = await applyGatesFixture(remote, p.siteId, Date.now());
+    // RFC-0042 §3: entries past an `unlist` and a `hide` expiry, derived from their fields.
+    dx = await applyDerivedGatesFixture(remote, p.siteId, Date.now());
     const snap = await remote.createSnapshot(p.siteId, { actor: human, reason: "publish" });
     await remote.publish((await remote.getSite(p.siteId)) as Site, snap.id);
     snapshotId = snap.id;
@@ -177,6 +188,9 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
         ...all.pages,
         ...all.feeds,
         ...fx.watched.map((w) => w.path),
+        ...dx.watched.map((w) => w.path),
+        "/shows/rss.xml",
+        "/deals/rss.xml",
         fx.tagPath,
         `${fx.tagPath}/rss.xml`,
         "/rss.xml",
@@ -194,9 +208,14 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     if (p) await rm(p.tmp, { recursive: true, force: true });
   });
 
-  /** Fetches every candidate; returns every body and header as text, and each status. */
-  async function sweep(): Promise<{ text: string; status: Map<string, number> }> {
+  /** Fetches every candidate; returns every body and header as text, each status and each route's. */
+  async function sweep(): Promise<{
+    text: string;
+    status: Map<string, number>;
+    byRoute: Map<string, string>;
+  }> {
     const status = new Map<string, number>();
+    const byRoute = new Map<string, string>();
     const parts: string[] = [];
     for (const route of candidates) {
       const res = await siteFetch(route);
@@ -204,12 +223,14 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
       // what the site sent, never the URL asked for (the gated URLs are among the candidates)
       const body = await res.text();
       // Astro's 404 page echoes the path asked for ("Path: /posts/…"): that is the request, not a leak.
-      parts.push(
+      const sent = [
         JSON.stringify([...res.headers]),
         res.status === 404 ? body.split(route).join("<requested path>") : body,
-      );
+      ];
+      parts.push(...sent);
+      byRoute.set(route, sent.join("\n"));
     }
-    return { text: parts.join("\n"), status };
+    return { text: parts.join("\n"), status, byRoute };
   }
 
   it("serves no gated node on any route, and everything that is open (S9)", async () => {
@@ -247,6 +268,39 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     // a gated 404 is never cached
     const gated = await siteFetch("/posts/embargoed-scoop");
     expect(gated.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+  });
+
+  it("derived gates: a hidden entry is gone everywhere, an unlisted one keeps only its page (RFC-0042 §3)", async () => {
+    const { text, status, byRoute } = await sweep();
+    for (const w of dx.watched) {
+      if (w.action === "hide") {
+        expect(status.get(w.path), w.name).toBe(404);
+        for (const leak of w.leaks)
+          expect(text.includes(leak), `${w.name} leaks "${leak}"`).toBe(false);
+        continue;
+      }
+      expect(status.get(w.path), w.name).toBe(200);
+      expect(byRoute.get(w.path), w.name).toContain(w.leaks[2] as string);
+      // every other route: lists, feeds (the site's and the collections'), the sitemap, menus
+      for (const [route, sent] of byRoute)
+        if (route !== w.path)
+          for (const leak of w.leaks)
+            expect(sent.includes(leak), `${w.name} listed on ${route}: "${leak}"`).toBe(false);
+    }
+    // the open entries stay listed, in their collections' feeds (RFC-0042 §5, served by the
+    // renderer's middleware on the Worker) and the sitemap
+    for (const e of dx.open) expect(text).toContain(`/${e.collection}/${e.slug}</loc>`);
+    expect(byRoute.get("/shows")).toContain("/shows/next-show");
+    for (const feed of ["/shows/rss.xml", "/deals/rss.xml"]) {
+      expect(status.get(feed), feed).toBe(200);
+      expect(byRoute.get(feed), feed).toContain("application/rss+xml");
+    }
+    expect(byRoute.get("/shows/rss.xml")).toContain("/shows/next-show</link>");
+    expect(byRoute.get("/deals/rss.xml")).toContain("/deals/open-deal</link>");
+    // the hidden entry's own URL is never cached
+    const hidden = await siteFetch("/deals/ended-deal");
+    await hidden.body?.cancel();
+    expect(hidden.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
   });
 
   it("previews show gated nodes with a notice, never cached", async () => {

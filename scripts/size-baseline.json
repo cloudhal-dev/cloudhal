@@ -352,7 +352,7 @@
       "params": 5
     },
     "packages/astro-renderer/src/integration.ts::cloudhal": {
-      "lines": 181
+      "lines": 172
     },
     "packages/astro-renderer/src/preview.ts::document": {
       "params": 5

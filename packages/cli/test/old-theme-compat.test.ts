@@ -6,8 +6,9 @@
  * pre-0.3.11 theme served empty pages. The site also has a collection with typed fields
  * (RFC-0041): themes from before fields render its entries and simply do not show the values.
  * Its collection has RFC-0042's settings too (list fields, an `unlist` expiry, an `Event` preset)
- * and a page lists it by field: old themes keep the generic `BlogPosting`, and get the expiry and
- * the field listing on upgrade (both live in the renderer's sources and `ContentList.astro`).
+ * and a page lists it by field: old themes keep the generic `BlogPosting`, and get the expiry, the
+ * field listing (both live in the renderer's sources and `ContentList.astro`) and the collection's
+ * feed (the renderer's middleware) on upgrade.
  */
 import { spawn } from "node:child_process";
 import { cp, mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
@@ -222,6 +223,11 @@ describe.each(FROZEN)("a theme copied at %s still builds with today's packages",
     expect(listing).not.toContain("/events/retro");
     expect(await read("sitemap.xml")).not.toContain("/events/retro");
     expect(await read("rss.xml")).not.toContain("Retro night");
+    // RFC-0042 §5: the collection's own feed comes with the renderer too (the theme's feed route
+    // answers 404 for it, the renderer's middleware answers with the feed)
+    const feed = await read("events", "rss.xml");
+    expect(feed).toContain("<title>Launch party</title>");
+    expect(feed).not.toContain("Retro night");
 
     // No page of the build is empty (a theme that throws mid-stream leaves a bare document).
     const files = await htmlFiles(dist);

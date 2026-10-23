@@ -3,8 +3,12 @@
  * one source, path by path. Shared by the time-gate sweep (`gates-sweep.test.ts`) and the derived
  * gate sweep (`derived-gates-sweep.test.ts`, RFC-0042 §3).
  */
+import type { Section } from "@cloudhal/core-contracts";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { archiveSummaries } from "../src/archive.ts";
+import { collectionFeedXml } from "../src/collection-feed-route.ts";
+import { collectionForFeedPath } from "../src/collection-feeds.ts";
+import { contentListEntries } from "../src/entry-query.ts";
 import { archiveFeedXml, robotsTxt, rssXml, sitemapUrls, sitemapXml } from "../src/feeds.ts";
 import { renderEntryArticle } from "../src/markdown.ts";
 import { loadAssetIndex, type MediaContext } from "../src/media.ts";
@@ -61,13 +65,19 @@ export async function sweep(
     const before = out.length;
     const route = await resolveRoute(source, path);
     routes.set(path, route.kind);
-    if (route.kind === "page") {
-      const lists: Record<string, Awaited<ReturnType<GraphSource["entries"]>>> = {};
-      for (const s of route.page.sections)
-        if (s.kind === "contentList") lists[s.collection] = await source.entries(s.collection);
+    // RFC-0042 §5: a collection's feed answers where the starter's routes answer 404.
+    const feedOf = route.kind === "not-found" ? collectionForFeedPath(site, path, all) : undefined;
+    if (feedOf) {
+      routes.set(path, "collection-feed");
+      out.push(await collectionFeedXml(source, { origin: ORIGIN, locale, collection: feedOf }));
+    } else if (route.kind === "page") {
+      // what `Sections` draws: a section listing by field gets its own query's entries
+      const lists = await contentListEntries(source, route.page.sections);
+      const listOf = (s: Section) =>
+        s.kind === "contentList" && lists[s.id] ? { [s.collection]: lists[s.id] ?? [] } : lists;
       out.push(
         JSON.stringify(pageHead(site, route.page, ORIGIN, media)),
-        ...route.page.sections.map((s) => renderSectionHtml(s, lists, media)),
+        ...route.page.sections.map((s) => renderSectionHtml(s, listOf(s), media)),
       );
     } else if (route.kind === "entry") {
       const terms = entryTaxonomy(index, route.entry);

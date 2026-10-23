@@ -168,6 +168,12 @@ describe("cloudhal init → dev → snapshot → build", () => {
       const edited = await (await fetch(new URL("/about", server.url))).text();
       expect(edited).toContain("<title>About (edited live) · ");
       expect((await fetch(new URL("/nope", server.url))).status).toBe(404);
+      // RFC-0042 §5: a collection's feed, answered by the renderer where the theme's routes 404
+      const feed = await fetch(new URL("/posts/rss.xml", server.url));
+      expect(feed.status).toBe(200);
+      expect(feed.headers.get("content-type")).toContain("application/rss+xml");
+      expect(await feed.text()).toContain("/posts/hello-world</link>");
+      expect((await fetch(new URL("/nope/rss.xml", server.url))).status).toBe(404);
       // the seeded category's archive is served live too (one post: thin, so noindex)
       const archive = await fetch(new URL("/category/news", server.url));
       expect(archive.status).toBe(200);
@@ -913,6 +919,23 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(await read("rss.xml")).not.toContain("Retro night");
     expect(await read("sitemap.xml")).not.toContain("/events/retro");
     expect(await read("sitemap.xml")).toContain("/events/launch");
+    // RFC-0042 §5: the collection's own feed (the renderer answers the starter route's 404), per
+    // locale, without the past event; the entry and listing pages link it.
+    const feed = await read("events", "rss.xml");
+    expect(feed).toContain("<title>Launch party</title>");
+    expect(feed).toContain("/events/launch</link>");
+    expect(feed).not.toContain("Retro night");
+    expect(feed).not.toContain("/posts/hello-world");
+    const trFeed = await read("tr", "events", "rss.xml");
+    expect(trFeed).toContain("<language>tr</language>");
+    expect(trFeed).toContain("/tr/events/launch</link>");
+    const feedLink =
+      /<link rel="alternate" type="application\/rss\+xml" title="[^"]+" href="[^"]+\/events\/rss\.xml">/;
+    expect(await read("events", "launch", "index.html")).toMatch(feedLink);
+    expect(listing).toMatch(feedLink);
+    expect(await read("tr", "events", "launch", "index.html")).toMatch(
+      /type="application\/rss\+xml"[^>]*href="[^"]+\/tr\/events\/rss\.xml"/,
+    );
     // A collection without the settings renders as before: its article and its JSON-LD.
     const postAfter = await read("posts", "hello-world", "index.html");
     expect(article(postAfter)).toBe(article(postHtml));

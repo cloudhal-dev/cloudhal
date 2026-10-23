@@ -61,6 +61,26 @@ const RESOLVED_CLIENT_ID = `\0${CLIENT_ID}`;
 const COMMENTS_CLIENT_ID = "virtual:cloudhal/comments-client";
 const RESOLVED_COMMENTS_CLIENT_ID = `\0${COMMENTS_CLIENT_ID}`;
 
+/** The virtual modules: the project config, and in dev the built analytics and comments clients. */
+function configPlugin(modules: { config: unknown; client: unknown; comments: unknown }) {
+  const ids: Record<string, string> = {
+    [VIRTUAL_ID]: RESOLVED_ID,
+    [CLIENT_ID]: RESOLVED_CLIENT_ID,
+    [COMMENTS_CLIENT_ID]: RESOLVED_COMMENTS_CLIENT_ID,
+  };
+  const bodies: Record<string, unknown> = {
+    [RESOLVED_ID]: modules.config,
+    [RESOLVED_CLIENT_ID]: modules.client,
+    [RESOLVED_COMMENTS_CLIENT_ID]: modules.comments,
+  };
+  return {
+    name: "cloudhal-config",
+    resolveId: (id: string) => (Object.hasOwn(ids, id) ? ids[id] : undefined),
+    load: (id: string) =>
+      Object.hasOwn(bodies, id) ? `export default ${JSON.stringify(bodies[id])};` : undefined,
+  };
+}
+
 export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   let resolved: CloudhalRendererConfig = config;
   let client: AnalyticsClient | undefined;
@@ -120,28 +140,19 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
               order: "pre",
             });
         }
+        // RFC-0042 §5: a collection's feed where the theme's routes answer 404, on every target.
+        addMiddleware({
+          entrypoint: "@cloudhal/astro-renderer/collection-feed-middleware",
+          order: "pre",
+        });
         updateConfig({
           vite: {
             plugins: [
-              {
-                name: "cloudhal-config",
-                resolveId: (id: string) =>
-                  id === VIRTUAL_ID
-                    ? RESOLVED_ID
-                    : id === CLIENT_ID
-                      ? RESOLVED_CLIENT_ID
-                      : id === COMMENTS_CLIENT_ID
-                        ? RESOLVED_COMMENTS_CLIENT_ID
-                        : undefined,
-                load: (id: string) =>
-                  id === RESOLVED_ID
-                    ? `export default ${JSON.stringify(resolved)};`
-                    : id === RESOLVED_CLIENT_ID
-                      ? `export default ${JSON.stringify(cloudflare ? null : (client ?? null))};`
-                      : id === RESOLVED_COMMENTS_CLIENT_ID
-                        ? `export default ${JSON.stringify(cloudflare ? null : (comments ?? null))};`
-                        : undefined,
-              },
+              configPlugin({
+                config: resolved,
+                client: cloudflare ? null : (client ?? null),
+                comments: cloudflare ? null : (comments ?? null),
+              }),
             ],
             // Native module must stay external in Node SSR; workerd never loads it.
             ...(cloudflare ? {} : { ssr: { external: ["better-sqlite3"] } }),

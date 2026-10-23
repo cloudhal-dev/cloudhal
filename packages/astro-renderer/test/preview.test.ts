@@ -167,3 +167,41 @@ describe("section URLs (H3)", async () => {
     expect(safeSrc("mailto:a@b.c")).toBeUndefined();
   });
 });
+
+describe("previews list by field like the site (RFC-0042 §4)", async () => {
+  const { stage3, T, HOUR } = await import("./stage3-fixture.ts");
+  const { contentListEntries } = await import("../src/entry-query.ts");
+  const { SnapshotSource } = await import("../src/source.ts");
+  const fx = await stage3();
+  const events = { events: await fx.store.listContentEntries(fx.site.id, "events") };
+  const section = fx.home.sections.find((s) => s.id === "sec_upcoming0001");
+  if (section?.kind !== "contentList") throw new Error("fixture: no upcoming list");
+  const titles = (html: string) =>
+    [...html.matchAll(/<a href="[^"]+">([^<]+)<\/a>/g)].map((m) => m[1]);
+
+  it("applies where/orderBy in page previews: upcoming only, soonest first", () => {
+    const html = renderPagePreview(fx.site, fx.home, events, undefined, T).html;
+    const list = html.slice(html.indexOf('data-section-id="sec_upcoming0001"'));
+    const shown = titles(list.slice(0, list.indexOf("</section>")));
+    // an entry without the field's value, or before `now`, is not upcoming
+    expect(shown).toEqual(["Gig soon", "Gig later"]);
+    // `now` is the preview's instant
+    const later = renderPagePreview(fx.site, fx.home, events, undefined, T + 3 * HOUR).html;
+    const rest = later.slice(later.indexOf('data-section-id="sec_upcoming0001"'));
+    expect(titles(rest.slice(0, rest.indexOf("</section>")))).toEqual(["Gig later"]);
+  });
+
+  it("matches the live renderer's list for the same section and instant", async () => {
+    const source = (await SnapshotSource.open(fx.store, fx.snapshotId)).at(T);
+    const live = (await contentListEntries(source, [section])).sec_upcoming0001 ?? [];
+    const preview = titles(
+      renderSectionHtml(section, events, undefined, { site: fx.site, now: T }),
+    );
+    expect(preview).toEqual(live.map((e) => e.title));
+  });
+
+  it("keeps the old behaviour without a site: the collection by the section's sort", () => {
+    const shown = titles(renderSectionHtml(section, events));
+    expect(shown).toHaveLength(4);
+  });
+});
