@@ -17,116 +17,15 @@ import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeAll, describe, expect, it } from "vitest";
 import { publishedNode } from "../src/analytics.ts";
-import { archiveSummaries } from "../src/archive.ts";
-import { archiveFeedXml, robotsTxt, rssXml, sitemapUrls, sitemapXml } from "../src/feeds.ts";
-import { renderEntryArticle } from "../src/markdown.ts";
-import { loadAssetIndex, type MediaContext } from "../src/media.ts";
-import { serveMediaRequest } from "../src/media-route.ts";
-import { derivedNavigation } from "../src/navigation.ts";
-import { renderEntryPreview, renderPagePreview, renderSectionHtml } from "../src/preview.ts";
+import { loadAssetIndex } from "../src/media.ts";
+import { renderEntryPreview, renderPagePreview } from "../src/preview.ts";
 import { resolveRoute, staticPaths } from "../src/routing.ts";
-import { archiveHead, entryHead, pageHead } from "../src/seo.ts";
-import { type GraphSource, LiveSource, SnapshotSource } from "../src/source.ts";
-import { entryTaxonomy, loadTaxonomyIndex, relatedEntries } from "../src/taxonomy.ts";
+import { LiveSource, SnapshotSource } from "../src/source.ts";
 import { applyGatesFixture, type GatesFixture } from "./gates-fixture.ts";
+import { ORIGIN, sweep } from "./sweep.ts";
 
-const ORIGIN = "https://gates.example";
 const T = Date.UTC(2026, 10, 2, 6, 0, 0);
 const person = { kind: "human" as const, id: "user_gates000002", name: "Halil" };
-
-interface Swept {
-  /** Every public body and header, joined: what a leak would show up in. */
-  readonly text: string;
-  /** What each path answered (`page`, `entry`, `archive`, `feed`, `not-found`, …). */
-  readonly routes: Map<string, string>;
-  /** Media URL → status. */
-  readonly media: Map<string, number>;
-}
-
-/** What the blog starter's routes put on the wire for one source, path by path. */
-async function sweep(
-  source: GraphSource,
-  candidates: readonly string[],
-  assets: readonly string[],
-  store: SiteGraphStore,
-): Promise<Swept> {
-  const out: string[] = [];
-  const routes = new Map<string, string>();
-  const site = await source.site();
-  const locale = site.defaultLocale;
-  const index = await loadTaxonomyIndex(source);
-  const media: MediaContext = {
-    assets: await loadAssetIndex(source),
-    locale,
-    defaultLocale: locale,
-  };
-  const all = await source.allEntries();
-  const primary = await source.navigation("primary", locale);
-  const header = derivedNavigation(
-    site,
-    await source.pages(),
-    archiveSummaries(index, all).filter((a) => a.taxonomy.key === "category"),
-    locale,
-  );
-  out.push(JSON.stringify(primary), JSON.stringify(header));
-  const { pages, feeds } = await staticPaths(source);
-  for (const path of new Set([...pages, ...feeds, ...candidates])) {
-    const route = await resolveRoute(source, path);
-    routes.set(path, route.kind);
-    if (route.kind === "page") {
-      const lists: Record<string, Awaited<ReturnType<GraphSource["entries"]>>> = {};
-      for (const s of route.page.sections)
-        if (s.kind === "contentList") lists[s.collection] = await source.entries(s.collection);
-      out.push(
-        JSON.stringify(pageHead(site, route.page, ORIGIN, media)),
-        ...route.page.sections.map((s) => renderSectionHtml(s, lists, media)),
-      );
-    } else if (route.kind === "entry") {
-      const terms = entryTaxonomy(index, route.entry);
-      out.push(
-        JSON.stringify(entryHead(site, route.entry, ORIGIN, terms, media)),
-        renderEntryArticle(route.entry, locale, media),
-        JSON.stringify(terms),
-        JSON.stringify(relatedEntries(route.entry, all, index, 3).map((e) => [e.id, e.title])),
-      );
-    } else if (route.kind === "archive") {
-      out.push(
-        JSON.stringify(archiveHead(site, route.archive, ORIGIN, media)),
-        JSON.stringify(route.archive.entries.map((e) => [e.id, e.title, e.summary])),
-        String(route.archive.total),
-      );
-    } else if (route.kind === "feed") {
-      out.push(archiveFeedXml({ site, origin: ORIGIN, archive: route.archive, taxonomy: index }));
-    } else if (route.kind === "redirect") {
-      out.push(route.location);
-    }
-  }
-  out.push(
-    rssXml({
-      site,
-      origin: ORIGIN,
-      entries: all,
-      taxonomy: index,
-      assets: await loadAssetIndex(source),
-    }),
-    sitemapXml(sitemapUrls(site, await source.pages(), all, ORIGIN, archiveSummaries(index, all))),
-    robotsTxt(ORIGIN),
-  );
-  const mediaStatus = new Map<string, number>();
-  for (const url of assets) {
-    const res = (await serveMediaRequest(new Request(`${ORIGIN}${url}`), {
-      siteId: site.id,
-      mode: "published",
-      assetByPrefix: async (p) => source.assetByPrefix?.(p),
-      blobState: (sha) => store.blobState(site.id, sha),
-      blobs: store.blobs,
-    })) as Response;
-    mediaStatus.set(url, res.status);
-    out.push(JSON.stringify([...res.headers]));
-    await res.body?.cancel();
-  }
-  return { text: out.join("\n"), routes, media: mediaStatus };
-}
 
 describe("route sweep: no gated node in any public output (S9)", () => {
   let store: SiteGraphStore;

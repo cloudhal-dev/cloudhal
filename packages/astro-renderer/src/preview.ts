@@ -8,6 +8,7 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import { entryPath } from "@cloudhal/core-ts";
+import { derivedGate } from "@cloudhal/core-ts/fields";
 import {
   type ArchiveState,
   type ArchiveView,
@@ -17,7 +18,7 @@ import {
   viewPagePath,
 } from "./archive.ts";
 import { renderComponentSection } from "./blocks.ts";
-import { gateNotice } from "./gates.ts";
+import { formatGateTime, gateNotice } from "./gates.ts";
 import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
 import { archiveHead, siteOrigin } from "./seo.ts";
@@ -161,16 +162,25 @@ export interface PreviewDocument {
 /** Words of the preview's gate notice (RFC-0008 §7.3), as the blog starter says them. */
 const GATE_WORDS: Record<
   string,
-  { embargoed: (when: string) => string; expired: (when: string) => string }
+  {
+    embargoed: (when: string) => string;
+    expired: (when: string) => string;
+    /** RFC-0042 §3.3: past the collection's `unlist` expiry. */
+    ended: (when: string) => string;
+  }
 > = {
   en: {
     embargoed: (when) => `Embargoed until ${when}. Only previews show it until then.`,
     expired: (when) => `Expired on ${when}. Only previews show it now.`,
+    ended: (when) =>
+      `Ended on ${when} (collection rule). It keeps its address but is left out of lists, feeds and search.`,
   },
   tr: {
     embargoed: (when) =>
       `${when} tarihine kadar ambargolu. O zamana kadar yalnızca önizlemede görünür.`,
     expired: (when) => `${when} tarihinde yayından kalktı. Artık yalnızca önizlemede görünür.`,
+    ended: (when) =>
+      `${when} tarihinde sona erdi (koleksiyon kuralı). Adresi kalır, ama listelerde, akışlarda ve aramada yer almaz.`,
   },
 };
 
@@ -186,10 +196,36 @@ export function gateNoticeHtml(
 ): string {
   const notice = gateNotice(node, site, locale, now);
   if (!notice) return "";
+  return noticeHtml(notice.state, notice.at, notice.when, locale);
+}
+
+function noticeHtml(
+  state: "embargoed" | "expired" | "ended",
+  at: string,
+  when: string,
+  locale: string,
+) {
   const words =
     GATE_WORDS[locale.split("-")[0] ?? locale] ??
     (GATE_WORDS.en as NonNullable<typeof GATE_WORDS.en>);
-  return `<p class="ch-gate-notice" role="status" data-gate="${notice.state}" data-gate-at="${esc(notice.at)}">${esc(words[notice.state](notice.when))}</p>`;
+  return `<p class="ch-gate-notice" role="status" data-gate="${state}" data-gate-at="${esc(at)}">${esc(words[state](when))}</p>`;
+}
+
+/**
+ * The notice for an entry past its collection's expiry at `now` (RFC-0042 §3.3): "Ended on …"
+ * for `unlist`, "Expired on …" for `hide`; empty before it, or when its own gates already speak.
+ */
+export function derivedGateNoticeHtml(
+  site: Site,
+  entry: ContentEntry,
+  now: number,
+  locale = site.defaultLocale,
+): string {
+  const gate = derivedGate(site, entry);
+  if (!gate || now < gate.at) return "";
+  const at = new Date(gate.at).toISOString();
+  const state = gate.action === "hide" ? "expired" : "ended";
+  return noticeHtml(state, at, formatGateTime(at, site, locale), locale);
 }
 
 /**
@@ -233,7 +269,7 @@ export function renderEntryPreview(
   now: number = Date.now(),
 ): PreviewDocument {
   const body =
-    gateNoticeHtml(site, entry, now) +
+    (gateNoticeHtml(site, entry, now) || derivedGateNoticeHtml(site, entry, now)) +
     renderEntryArticle(entry, site.defaultLocale, previewMedia(site, media));
   return {
     title: entry.title,

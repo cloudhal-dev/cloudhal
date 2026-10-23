@@ -234,6 +234,11 @@ describe("auto-mode releases (RFC-0008 §10.7, D9)", () => {
         { ...entry("entry_b00001", true), corrects: true },
       ]),
     ).toMatchObject({ lowRisk: false, code: "correction" });
+    // RFC-0042 §3.5: an article whose derived gate the release adds or moves earlier waits too
+    expect(checkAutoRelease([{ ...entry("entry_b00001", true), expires: true }])).toMatchObject({
+      lowRisk: false,
+      code: "expires",
+    });
   });
 
   it("the window ends at the elevation's end or after 24 hours, whichever is first", () => {

@@ -1,0 +1,144 @@
+/*
+ * RFC-0029 §6: the search modal. Painted from the color roles like the overlays (RFC-0025 §3):
+ * centered and 40rem wide on wide screens, a full-height sheet on phones, and the page behind it
+ * does not scroll (`overlays.css`).
+ */
+.ch-search-dialog {
+  margin: 10dvh auto auto;
+  padding: 0;
+  border: 0;
+  width: 100%;
+  max-width: min(40rem, calc(100vw - 2rem));
+  max-height: min(75dvh, 40rem);
+  overflow: hidden;
+  border-radius: var(--ch-radius-l, 0.75rem);
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+  box-shadow: 0 24px 60px -16px rgb(0 0 0 / 0.4);
+}
+.ch-search-dialog[open] {
+  display: flex;
+}
+.ch-search-dialog::backdrop {
+  background: rgb(0 0 0 / 0.5);
+}
+.ch-search-dialog__panel {
+  @apply flex min-h-0 w-full flex-col;
+}
+.ch-search-dialog__bar {
+  @apply flex items-center gap-2 px-4 py-3;
+  border-bottom: 1px solid var(--ch-color-border);
+}
+.ch-search-dialog__bar input {
+  @apply min-w-0 flex-1 bg-transparent py-1 text-lg outline-none;
+}
+.ch-search-dialog__bar input::-webkit-search-cancel-button {
+  display: none;
+}
+.ch-search-dialog__close {
+  @apply shrink-0 cursor-pointer rounded-md px-2 py-1 text-sm;
+  color: var(--ch-color-text-muted);
+}
+.ch-search-dialog__close:hover {
+  background: color-mix(in oklab, currentColor 12%, transparent);
+}
+.ch-search-dialog__body {
+  @apply min-h-0 flex-1 overflow-y-auto px-2 py-2;
+  overscroll-behavior: contain;
+}
+.ch-search-dialog__body:has(.ch-search-dialog__list:empty):has(.ch-search-dialog__note[hidden]) {
+  display: none;
+}
+.ch-search-group + .ch-search-group {
+  @apply mt-2;
+}
+.ch-search-group__label {
+  @apply px-3 pt-2 pb-1 text-xs font-medium;
+  color: var(--ch-color-text-subtle);
+}
+.ch-search-option {
+  @apply grid gap-0.5 rounded-md px-3 py-2 no-underline;
+  color: inherit;
+  scroll-margin: 0.5rem;
+}
+.ch-search-option[aria-selected="true"] {
+  background: color-mix(in oklab, var(--ch-color-link, currentColor) 12%, transparent);
+}
+.ch-search-option__context {
+  @apply text-xs;
+  color: var(--ch-color-text-subtle);
+}
+.ch-search-option__title {
+  @apply font-medium;
+}
+.ch-search-option__snippet {
+  @apply line-clamp-2 text-sm;
+  color: var(--ch-color-text-muted);
+}
+.ch-search-option__snippet mark {
+  @apply rounded-sm px-0.5;
+  background: color-mix(in oklab, #f59e0b 30%, transparent);
+  color: inherit;
+}
+.ch-search-option--all .ch-search-option__title {
+  @apply text-sm;
+  color: var(--ch-color-link, inherit);
+}
+.ch-search-dialog__note {
+  @apply flex flex-wrap items-center gap-2 px-3 py-3 text-sm;
+  color: var(--ch-color-text-muted);
+}
+.ch-search-dialog__note a {
+  @apply underline underline-offset-4;
+}
+.ch-search-clear {
+  @apply cursor-pointer text-sm underline underline-offset-4;
+}
+.ch-search-dialog__keys {
+  @apply hidden items-center gap-4 px-4 py-2 text-xs sm:flex;
+  border-top: 1px solid var(--ch-color-border);
+  color: var(--ch-color-text-subtle);
+}
+.ch-search-dialog__keys kbd {
+  @apply me-1 rounded px-1 font-mono;
+  border: 1px solid var(--ch-color-border);
+}
+.ch-search-dialog[aria-busy="true"] .ch-search-dialog__list {
+  opacity: 0.6;
+}
+/* Phones: a full-height sheet with the field at the top. */
+@media (max-width: 639px) {
+  .ch-search-dialog {
+    margin: 0;
+    max-width: none;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+  }
+}
+/* The header field opens the modal once the module is here. */
+:root[data-ch-search-ready] [data-ch-search-open] input {
+  cursor: pointer;
+}
+/* Entrance at the site's motion level (RFC-0024); none under reduced motion. */
+:root:not([data-ch-motion="none"]) .ch-search-dialog {
+  transition:
+    opacity var(--ch-dur-2, 0.2s) ease-out,
+    translate var(--ch-dur-2, 0.2s) var(--ch-ease-out, ease-out),
+    display var(--ch-dur-2, 0.2s) allow-discrete,
+    overlay var(--ch-dur-2, 0.2s) allow-discrete;
+}
+:root:not([data-ch-motion="none"]) .ch-search-dialog:not([open]) {
+  opacity: 0;
+}
+@starting-style {
+  .ch-search-dialog[open] {
+    opacity: 0;
+    translate: 0 -0.5rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ch-search-dialog {
+    transition: none !important;
+  }
+}

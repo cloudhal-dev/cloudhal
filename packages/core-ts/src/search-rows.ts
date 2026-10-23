@@ -4,6 +4,8 @@
  * `cloudhal dev` (from the live graph) index the same things. Worker-safe.
  */
 import type { ContentEntry, Page, Taxonomy, Term } from "@cloudhal/core-contracts";
+import { type DerivedGate, derivedGate } from "./fields/entry-gates.ts";
+import type { SiteFields } from "./fields/types.ts";
 import { termName } from "./names.ts";
 import { entryPath, type PermalinkSite } from "./permalinks.ts";
 import { MARK_CLOSE, MARK_OPEN, SEARCH_TEXT_MAX, type SearchRow } from "./search-common.ts";
@@ -59,6 +61,21 @@ export function searchText(body: Pick<ContentEntry["body"], "format" | "value">)
   return clip(text);
 }
 
+/** What an article row reads of the site: permalinks, and the expiry rules and zone (RFC-0042). */
+export type SearchRowSite = PermalinkSite & Pick<SiteFields, "timeZone">;
+
+/**
+ * A row's `gateUntil`: the entry's own `until`, or the earlier of it and its derived gate
+ * (RFC-0042 §3.4), so an unlisted or hidden entry leaves search when its gate passes.
+ */
+function rowUntil(entry: ContentEntry, derived: DerivedGate | undefined): string | undefined {
+  const own = iso(entry.availability?.until);
+  if (!derived) return own;
+  return new Date(
+    own === undefined ? derived.at : Math.min(Date.parse(own), derived.at),
+  ).toISOString();
+}
+
 /** Readers see it: published, or (with `drafts`, as `cloudhal dev` shows them) anything not archived. */
 const shown = (status: string, drafts: boolean | undefined) =>
   status === "published" || (drafts === true && status !== "archived");
@@ -93,11 +110,12 @@ export function searchRowOf(
   entry: ContentEntry,
   options: {
     drafts?: boolean;
-    site?: PermalinkSite | undefined;
+    site?: SearchRowSite | undefined;
     original?: Pick<ContentEntry, "id" | "fields"> | undefined;
   } = {},
 ): SearchRow | undefined {
   if (!shown(entry.status, options.drafts)) return undefined;
+  const derived = options.site ? derivedGate(options.site, entry, options.original) : undefined;
   const terms = entryTermIds(entry);
   return {
     nodeId: entry.id,
@@ -109,7 +127,7 @@ export function searchRowOf(
     href: entryPath(options.site, entry),
     publishedAt: iso(entry.publishedAt),
     gateFrom: iso(entry.availability?.from),
-    gateUntil: iso(entry.availability?.until),
+    gateUntil: rowUntil(entry, derived),
     ...(terms.length > 0 ? { terms } : {}),
   };
 }
@@ -264,8 +282,8 @@ export function searchDocuments(input: {
   drafts?: boolean;
   /** The site's default locale, whose archive slugs are the terms' own (default: `locales[0]`). */
   defaultLocale?: string;
-  /** The site's collection permalinks (RFC-0038), for article links. */
-  site?: PermalinkSite;
+  /** The site's collection permalinks (RFC-0038), for article links; its expiry rules (RFC-0042). */
+  site?: SearchRowSite;
 }): SearchRow[] {
   const options = { drafts: input.drafts ?? false };
   const entryOptions = { ...options, site: input.site };

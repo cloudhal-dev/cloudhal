@@ -68,7 +68,12 @@ export type AutoCheckCode =
   /** RFC-0008 §10.7 (D9): the release would run after the key's window (elevation end or 24 h). */
   | "outside-window"
   /** RFC-0019 §2.4: an article gains a correction, an editorial statement a person signs off. */
-  | "correction";
+  | "correction"
+  /**
+   * RFC-0042 §3.5: a live article gains a derived gate (its collection's expiry) or an earlier one,
+   * which removes content at a set time, like `schedule_unpublish`.
+   */
+  | "expires";
 
 /** The `auto`-mode check behind a publish (stored on audit rows and approvals, ADR-0015). */
 export interface AutoCheck {
@@ -92,6 +97,7 @@ const AUTO_CHECK_TEXT: Record<AutoCheckCode, (c: AutoCheck) => string> = {
   "outside-window": () =>
     "it would run after your autonomy ends (the elevation's end, or 24 hours from now)",
   correction: () => "it adds a correction to a published article",
+  expires: () => "it makes a published article expire sooner (its collection's expiry rule)",
 };
 
 /** English wording of a check, for agents and audit reasons. */
@@ -109,7 +115,8 @@ export function describeAutoCheck(check: AutoCheck): string {
  * not count toward the limit. Any other asset change is `media` and waits for a person.
  *
  * Corrections (RFC-0019 §2.4): an entry in `corrections` (it adds a correction to its live
- * version; the store decides) makes the publish wait for a person.
+ * version; the store decides) makes the publish wait for a person. So does an entry in `expiries`
+ * (RFC-0042 §3.5: it adds or advances a live entry's derived gate; core-ts `expiringEntries`).
  */
 export function checkAutoPublish(
   diff: {
@@ -117,10 +124,15 @@ export function checkAutoPublish(
     changed: { after: PendingChange }[];
     removed: PendingChange[];
   },
-  options: { ridingAssets?: ReadonlySet<string>; corrections?: ReadonlySet<string> } = {},
+  options: {
+    ridingAssets?: ReadonlySet<string>;
+    corrections?: ReadonlySet<string>;
+    expiries?: ReadonlySet<string>;
+  } = {},
 ): AutoCheck {
   const riding = options.ridingAssets ?? new Set<string>();
   const corrects = options.corrections ?? new Set<string>();
+  const expires = options.expiries ?? new Set<string>();
   const rides = (n: PendingChange) => n.kind === "asset" && riding.has(n.id);
   const added = diff.added.filter((n) => !rides(n));
   const touched = [...added, ...diff.changed.map((c) => c.after)];
@@ -129,21 +141,18 @@ export function checkAutoPublish(
     changes: touched.length + diff.removed.length,
     limit: AUTO_PUBLISH_LIMIT,
   };
-  const media = touched.some((n) => n.kind === "asset");
-  const code: AutoCheckCode =
-    diff.removed.length > 0
-      ? "removes-content"
-      : touched.length === 0
-        ? "nothing"
-        : touched.some((n) => n.kind !== "contentEntry" && n.kind !== "asset")
-          ? "structure"
-          : media
-            ? "media"
-            : touched.some((n) => corrects.has(n.id))
-              ? "correction"
-              : touched.length > AUTO_PUBLISH_LIMIT
-                ? "too-many"
-                : "low-risk";
+  const any = (test: (n: PendingChange) => boolean) => touched.some(test);
+  // The first rule that holds decides, in this order; none: low risk.
+  const rules: [AutoCheckCode, () => boolean][] = [
+    ["removes-content", () => diff.removed.length > 0],
+    ["nothing", () => touched.length === 0],
+    ["structure", () => any((n) => n.kind !== "contentEntry" && n.kind !== "asset")],
+    ["media", () => any((n) => n.kind === "asset")],
+    ["correction", () => any((n) => corrects.has(n.id))],
+    ["expires", () => any((n) => expires.has(n.id))],
+    ["too-many", () => touched.length > AUTO_PUBLISH_LIMIT],
+  ];
+  const code: AutoCheckCode = rules.find(([, holds]) => holds())?.[0] ?? "low-risk";
   return { ...base, code, lowRisk: code === "low-risk" };
 }
 
@@ -235,6 +244,8 @@ export interface ReleaseItemRisk {
   deps?: readonly string[];
   /** RFC-0019 §2.4: the target adds a correction to the live version. */
   corrects?: boolean;
+  /** RFC-0042 §3.5: the target adds or advances the live version's derived gate. */
+  expires?: boolean;
 }
 
 /**
@@ -262,6 +273,7 @@ export function checkAutoRelease(items: readonly ReleaseItemRisk[]): AutoCheck {
           .map((i) => i.nodeId),
       ),
       corrections: new Set(set.filter((i) => i.corrects).map((i) => i.nodeId)),
+      expiries: new Set(set.filter((i) => i.expires).map((i) => i.nodeId)),
     },
   );
   return { ...check, rule: "low-risk-release" };

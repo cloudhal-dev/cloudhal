@@ -26,7 +26,7 @@
     "packages/core-ts/src/taxonomy.ts": 1718,
     "packages/mcp-server/src/menu-tools.ts": 1058,
     "packages/mcp-server/src/schedule-tools.ts": 1596,
-    "packages/mcp-server/src/schedules.ts": 866,
+    "packages/mcp-server/src/schedules.ts": 833,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
     "packages/schedules/src/recurrence.ts": 939,
     "packages/schedules/src/scheduler.ts": 1343,
@@ -520,7 +520,7 @@
       "params": 6
     },
     "packages/mcp-server/src/tools.ts::runTool": {
-      "lines": 247
+      "lines": 244
     },
     "packages/schedules/src/builtins.ts::createBuiltinRunner": {
       "lines": 249

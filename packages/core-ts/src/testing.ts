@@ -4,6 +4,7 @@ import { ContractValidationError } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { GATES_ENFORCED } from "./availability.ts";
 import { ConflictError, UniqueConstraintError } from "./errors.ts";
 import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
@@ -40,6 +41,8 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
         sql,
         blobs,
         now: () => new Date(Date.UTC(2026, 9, 7, 20, 0, tick++)),
+        // Node: the renderer and the writer are one process (RFC-0042's expiry needs it).
+        gates: GATES_ENFORCED,
       });
       await store.init();
     });
@@ -260,6 +263,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
           sql: racingDriver(sql, hook, when),
           blobs,
           now: () => new Date(Date.UTC(2026, 9, 7, 20, 0, tick++)),
+          gates: GATES_ENFORCED,
         }),
     };
     taxonomySuite(suite);

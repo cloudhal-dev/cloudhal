@@ -6,6 +6,7 @@
  * guard on the site CAS keeps "no section uses it" true (rule 4).
  */
 import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
+import { EXPIRY_GATES_VERSION } from "../availability.ts";
 import { InvariantError } from "../errors.ts";
 import { isBeingRemoved } from "../fields/migration.ts";
 import { sameJson } from "../fields/types.ts";
@@ -91,6 +92,33 @@ export async function refuseListFieldUses(
   });
 }
 
+/** The collections whose `expiry` `next` sets or changes (removing one is always allowed). */
+export function changedExpiries(stored: Site | undefined, next: Site): string[] {
+  return Object.entries(next.collections ?? {})
+    .filter(([key, s]) => s?.expiry && !sameJson(s.expiry, stored?.collections?.[key]?.expiry))
+    .map(([key]) => key);
+}
+
+/**
+ * RFC-0042 §3.6: an older site Worker ignores `expiry` and would keep showing expired entries, so a
+ * write that sets or changes one is refused (`gates_unsupported`) until the site's renderer
+ * reports derived gates (`gates: 2`).
+ */
+export async function checkExpiryGates(
+  ctx: Pick<StoreContext, "graph">,
+  stored: Site | undefined,
+  next: Site,
+): Promise<void> {
+  const changed = changedExpiries(stored, next);
+  if (changed.length === 0) return;
+  if (await ctx.graph.gatesEnforced(next.id, EXPIRY_GATES_VERSION)) return;
+  throw new InvariantError(
+    "gates_unsupported",
+    "this site's renderer has not confirmed it enforces derived gates (collection expiry); deploy the current site Worker first",
+    { siteId: next.id, collections: changed },
+  );
+}
+
 /**
  * Checks `next`'s stage 3 settings (when they change) and refuses list-field changes that
  * sections still depend on; returns the CAS guard, undefined when nothing needs one.
@@ -102,6 +130,7 @@ export async function planListings(
 ): Promise<SiteListingsPlan | undefined> {
   if (stored && sameJson(stored.collections, next.collections)) return undefined;
   checkCollectionSettings(next);
+  await checkExpiryGates(ctx, stored, next);
   if (!stored) return undefined;
   const changes = listFieldChanges(stored, next);
   if (changes.length === 0) return undefined;

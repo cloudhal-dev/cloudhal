@@ -10,8 +10,9 @@
  *   sends after working out what a publish changed; without one, everything is purged.
  * - `GET /__cloudhal/features` (Bearer `CLOUDHAL_PURGE_TOKEN`) says what this Worker enforces, so
  *   the admin Worker never writes data an older site Worker would mishandle (RFC-0008 §7.7):
- *   `{ "gates": 1 }` — every public path checks pages' and entries' time gates per request and
- *   caps the edge cache at the next one. Until it answers so, writers refuse `availability`.
+ *   `{ "gates": 2 }` — every public path checks pages' and entries' time gates per request, and
+ *   entries' derived gates from a collection's `expiry` (RFC-0042 §3), and caps the edge cache at
+ *   the next one. Writers refuse `availability` below 1 and `expiry` below 2.
  * - Redirects (RFC-0002) are answered by the routes themselves (real 301s, `no-store` here like
  *   every non-200), so a publish that adds or removes one needs no purge of its own.
  * - Preview responses get every internal link rewritten to keep the signed token, so navigation

@@ -1,0 +1,254 @@
+/*
+ * Motion (RFC-0024): presets the renderer writes as data-ch-* attributes; the tokens come from
+ * themeVariables, one set per level, picked by data-ch-motion on <html>. Content is complete
+ * without this layer; nothing animates layout; nothing moves at "none" or under reduced motion.
+ * Reveals use opacity, translate, scale, filter and clip-path; hover effects use transform and
+ * box-shadow, so one element can have both without their transitions overriding each other.
+ */
+[data-ch-reveal] {
+  --ch-from-tr: none;
+  --ch-from-sc: none;
+  --ch-from-f: none;
+  --ch-from-c: none;
+  --ch-rv-dur: var(--ch-dur-normal, 0ms);
+}
+[data-ch-reveal="rise"] {
+  --ch-from-tr: 0 var(--ch-move-m, 0);
+}
+[data-ch-reveal="sink"] {
+  --ch-from-tr: 0 calc(var(--ch-move-m, 0) * -1);
+}
+[data-ch-reveal="slide-start"] {
+  --ch-from-tr: calc(var(--ch-move-l, 0) * -1) 0;
+}
+[data-ch-reveal="slide-end"] {
+  --ch-from-tr: var(--ch-move-l, 0) 0;
+}
+[dir="rtl"] [data-ch-reveal="slide-start"] {
+  --ch-from-tr: var(--ch-move-l, 0) 0;
+}
+[dir="rtl"] [data-ch-reveal="slide-end"] {
+  --ch-from-tr: calc(var(--ch-move-l, 0) * -1) 0;
+}
+[data-ch-reveal="scale-in"] {
+  --ch-from-sc: 0.94;
+}
+[data-ch-reveal="blur-in"] {
+  --ch-from-f: blur(10px);
+}
+[data-ch-reveal="wipe-up"] {
+  --ch-from-c: inset(100% 0 0 0);
+}
+[data-ch-reveal="wipe-start"] {
+  --ch-from-c: inset(0 100% 0 0);
+}
+[data-ch-reveal="mask-rise"] {
+  --ch-from-c: inset(0 0 100% 0);
+  --ch-from-tr: 0 var(--ch-move-s, 0);
+}
+[data-ch-speed="fast"] {
+  --ch-rv-dur: var(--ch-dur-fast, 0ms);
+}
+[data-ch-speed="slow"] {
+  --ch-rv-dur: var(--ch-dur-slow, 0ms);
+}
+[data-ch-d="1"] {
+  --ch-d: 1;
+}
+[data-ch-d="2"] {
+  --ch-d: 2;
+}
+[data-ch-d="3"] {
+  --ch-d: 3;
+}
+[data-ch-d="4"] {
+  --ch-d: 4;
+}
+[data-ch-d="5"] {
+  --ch-d: 5;
+}
+[data-ch-d="6"] {
+  --ch-d: 6;
+}
+[data-ch-d="7"] {
+  --ch-d: 7;
+}
+[data-ch-d="8"] {
+  --ch-d: 8;
+}
+[data-ch-d="9"] {
+  --ch-d: 9;
+}
+[data-ch-d="10"] {
+  --ch-d: 10;
+}
+[data-ch-d="11"] {
+  --ch-d: 11;
+}
+[data-ch-d="12"] {
+  --ch-d: 12;
+}
+[data-ch-d="13"] {
+  --ch-d: 13;
+}
+[data-ch-d="14"] {
+  --ch-d: 14;
+}
+[data-ch-d="15"] {
+  --ch-d: 15;
+}
+[data-ch-d="16"] {
+  --ch-d: 16;
+}
+/* At "subtle" every reveal is a short fade. */
+:root[data-ch-motion="subtle"] [data-ch-reveal] {
+  --ch-from-tr: none;
+  --ch-from-sc: none;
+  --ch-from-f: none;
+  --ch-from-c: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-reveal] {
+    --ch-tr-r:
+      opacity var(--ch-rv-dur) var(--ch-ease-standard) calc(var(--ch-stagger) * var(--ch-d, 0)),
+      translate var(--ch-rv-dur) var(--ch-ease-standard) calc(var(--ch-stagger) * var(--ch-d, 0)),
+      scale var(--ch-rv-dur) var(--ch-ease-standard) calc(var(--ch-stagger) * var(--ch-d, 0)),
+      filter var(--ch-rv-dur) var(--ch-ease-standard) calc(var(--ch-stagger) * var(--ch-d, 0)),
+      clip-path var(--ch-rv-dur) var(--ch-ease-standard) calc(var(--ch-stagger) * var(--ch-d, 0));
+  }
+  /* Below the first screen: the motion module adds .ch-pre while off screen, removes it on entry. */
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+  [data-ch-reveal].ch-pre {
+    opacity: 0;
+    translate: var(--ch-from-tr);
+    scale: var(--ch-from-sc);
+    filter: var(--ch-from-f);
+    clip-path: var(--ch-from-c);
+  }
+  /* On the first screen: the entrance plays from the first frame, with no script. */
+  @starting-style {
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      [data-ch-reveal] {
+      opacity: 0;
+      translate: var(--ch-from-tr);
+      scale: var(--ch-from-sc);
+      filter: var(--ch-from-f);
+      clip-path: var(--ch-from-c);
+    }
+  }
+}
+:root:not([data-ch-motion="none"]) [data-ch-hover] {
+  --ch-tr-h:
+    transform var(--ch-dur-fast, 0ms) var(--ch-ease-standard),
+    box-shadow var(--ch-dur-fast, 0ms) var(--ch-ease-standard),
+    background-size var(--ch-dur-normal, 0ms) var(--ch-ease-standard);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-ch-hover] {
+    --ch-tr-h: outline-color 0s;
+  }
+}
+:is([data-ch-reveal], [data-ch-hover]) {
+  transition: var(--ch-tr-r, outline-offset 0s), var(--ch-tr-h, outline-color 0s);
+}
+/* A hover effect starts at once, whatever its element's reveal delay. */
+[data-ch-hover]:is(:hover, :focus-visible, :focus-within) {
+  transition-delay: 0s;
+}
+/* Effects that do not move anything: every level but "none". */
+:root:not([data-ch-motion="none"])
+[data-ch-hover="glow"]:is(:hover, :focus-visible, :focus-within) {
+  box-shadow:
+    0 0 0 1px color-mix(in oklch, var(--ch-color-brand) 45%, transparent),
+    0 10px 30px -10px color-mix(in oklch, var(--ch-color-brand) 55%, transparent);
+}
+:root:not([data-ch-motion="none"])
+  :is(
+    [data-ch-hover="underline"]:not(.ch-card),
+    [data-ch-hover="underline"].ch-card :is(h2, h3, h4)
+  ) {
+  text-decoration: none;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 0% 1px;
+}
+:root:not([data-ch-motion="none"])
+  :is(
+    [data-ch-hover="underline"]:not(.ch-card):is(:hover, :focus-visible),
+    [data-ch-hover="underline"].ch-card:is(:hover, :focus-within) :is(h2, h3, h4)
+  ) {
+  background-size: 100% 1px;
+}
+:root:not([data-ch-motion="none"]) [data-ch-hover="spotlight"] {
+  position: relative;
+  isolation: isolate;
+}
+:root:not([data-ch-motion="none"]) [data-ch-hover="spotlight"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(
+    280px circle at calc(var(--ch-mx, 0.5) * 100%) calc(var(--ch-my, 0.5) * 100%),
+    color-mix(in oklch, var(--ch-color-brand) 18%, transparent),
+    transparent 70%
+  );
+  transition: opacity var(--ch-dur-fast, 0ms) var(--ch-ease-standard);
+}
+:root:not([data-ch-motion="none"]) [data-ch-hover="spotlight"]:hover::after {
+  opacity: 1;
+}
+/* Effects that move: "standard" and "expressive", for readers who have not asked for less. */
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="lift"]:is(:hover, :focus-visible, :focus-within) {
+    transform: translateY(calc(var(--ch-move-s) * -0.5));
+    box-shadow: 0 16px 36px -16px rgb(0 0 0 / 0.3);
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="scale"]:is(:hover, :focus-visible, :focus-within) {
+    transform: scale(1.03);
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="zoom-media"] {
+    overflow: clip;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="zoom-media"]
+    img {
+    transition: transform var(--ch-dur-slow) var(--ch-ease-standard);
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="zoom-media"]:is(:hover, :focus-within)
+    img {
+    transform: scale(1.06);
+  }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="tilt"]:hover {
+    transform: perspective(900px) rotateX(calc((0.5 - var(--ch-my, 0.5)) * 7deg))
+      rotateY(calc((var(--ch-mx, 0.5) - 0.5) * 7deg));
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-hover="magnetic"]:hover {
+    transform: translate(
+      calc((var(--ch-mx, 0.5) - 0.5) * 12px),
+      calc((var(--ch-my, 0.5) - 0.5) * 12px)
+    );
+  }
+}
+/* The reader's pause control (RFC-0024 §1) stops every loop on the page, ambient layers included. */
+:root[data-ch-motion-paused] *,
+:root[data-ch-motion-paused] *::before,
+:root[data-ch-motion-paused] *::after {
+  animation-play-state: paused !important;
+}
+.ch-motion {
+  display: block;
+}

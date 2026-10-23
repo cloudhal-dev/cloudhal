@@ -19,7 +19,6 @@ import {
   type OwnershipResolver,
   ownsEntry,
   type Principal,
-  type ReleaseItemRisk,
   type Role,
   roleScopes,
 } from "@cloudhal/agent-runtime";
@@ -38,7 +37,7 @@ import type {
   ScheduleRun,
   Site,
 } from "@cloudhal/core-contracts";
-import { addedCorrections, nodeHash, type SiteGraphStore, sha256Hex } from "@cloudhal/core-ts";
+import { nodeHash, type SiteGraphStore, sha256Hex } from "@cloudhal/core-ts";
 import {
   type ReleasePurger,
   ReleaseService,
@@ -58,6 +57,7 @@ import {
   untrustedEffectiveScopes,
 } from "@cloudhal/schedules";
 import type { ReleaseRecord, SqlScheduleStore } from "@cloudhal/schedules/sql";
+import { releaseRiskFor } from "./release-risk.ts";
 import { titleOf } from "./release-titles.ts";
 
 /** What a deployment provides for schedules (RFC-0008 §16). */
@@ -195,41 +195,8 @@ export async function nodeBinding(
   return releaseHash(site.id, [item]);
 }
 
-/** The items as the low-risk check sees them (§10.3). */
-export function releaseRisk(
-  items: readonly Pick<StoredReleaseItem, "item" | "deps">[],
-  corrects: ReadonlySet<string> = new Set(),
-) {
-  return items.map(
-    (p): ReleaseItemRisk => ({
-      kind: p.item.kind,
-      nodeId: p.item.nodeId,
-      nodeKind: p.item.nodeKind,
-      live: p.item.base !== undefined,
-      deps: p.deps,
-      ...(corrects.has(p.item.nodeId) ? { corrects: true } : {}),
-    }),
-  );
-}
-
-/** RFC-0019 §2.4: the release's articles whose target adds a correction to the live version. */
-export async function releaseCorrections(
-  graph: SiteGraphStore,
-  items: readonly Pick<StoredReleaseItem, "item">[],
-): Promise<Set<string>> {
-  const out = new Set<string>();
-  for (const { item } of items) {
-    if (item.kind !== "set" || item.nodeKind !== "contentEntry") continue;
-    const ref = { id: item.nodeId, kind: item.nodeKind };
-    const after = await nodeVersion<ContentEntry>(graph, { ...ref, ...item.target });
-    if (!after?.corrections?.length) continue;
-    const before = item.base
-      ? await nodeVersion<ContentEntry>(graph, { ...ref, ...item.base })
-      : undefined;
-    if (addedCorrections(before, after).length > 0) out.add(item.nodeId);
-  }
-  return out;
-}
+// The low-risk view of a release's items (§10.3) lives in `release-risk.ts`.
+export { releaseCorrections, releaseRisk } from "./release-risk.ts";
 
 /** A release removes content or carries an expiry: canceling it keeps content up (§12 `cancel_schedule`). */
 export async function removesContent(
@@ -359,7 +326,7 @@ export async function autoReleaseVerdict(
   now: Date,
 ): Promise<AutoVerdict> {
   const windowEnds = autoReleaseWindowEnds(now, principal.elevation?.until);
-  const check = checkAutoRelease(releaseRisk(items, await releaseCorrections(graph, items)));
+  const check = checkAutoRelease(await releaseRiskFor(graph, items));
   const no = (reason: string): AutoVerdict => ({ ok: false, reason, windowEnds, check });
   if (effectiveMode(principal) !== "auto") return no("not in auto mode");
   if (!principal.keyId) return no("auto-mode releases need an API key");

@@ -21,6 +21,7 @@ import {
   describeOwnOnly,
   effectiveMode,
 } from "@cloudhal/agent-runtime";
+import { expiringEntries, type SiteGraphStore, type SnapshotDiff } from "@cloudhal/core-ts";
 import {
   afterRunCall,
   checkRunBudget,
@@ -136,6 +137,19 @@ export interface CallResult {
 }
 
 /**
+ * What the store knows about a pending publish for the `auto`-mode check: new images riding with
+ * articles (RFC-0004 §6.3), corrections (RFC-0019 §2.4) and derived gates added or moved earlier
+ * on live articles (RFC-0042 §3.5).
+ */
+async function autoPublishFacts(store: SiteGraphStore, siteId: string, pending: SnapshotDiff) {
+  return {
+    ridingAssets: await store.ridingAssets(siteId, pending),
+    corrections: await store.correctingEntries(siteId, pending),
+    expiries: await expiringEntries(store, siteId, pending),
+  };
+}
+
+/**
  * Policy → audit → handler. Transports call this; it is the only path a tool runs through.
  * `confirmed` is set by the transport once the human said yes (MRTR response or confirm token);
  * `approved` once an out-of-band approval was redeemed — someone who could make the full call
@@ -246,10 +260,7 @@ export async function runTool(
   ) {
     const pending = await ctx.store.pendingChanges(siteId);
     // New raster images used only by the articles in this publish ride along (RFC-0004 §6.3).
-    autoCheck = checkAutoPublish(pending, {
-      ridingAssets: await ctx.store.ridingAssets(siteId, pending),
-      corrections: await ctx.store.correctingEntries(siteId, pending),
-    });
+    autoCheck = checkAutoPublish(pending, await autoPublishFacts(ctx.store, siteId, pending));
     if (autoCheck.lowRisk)
       autoNote = `auto mode: published without approval (${describeAutoCheck(autoCheck)})`;
     else

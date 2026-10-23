@@ -808,4 +808,114 @@ describe("cloudhal init → dev → snapshot → build", () => {
     expect(after).not.toContain("ch-fields");
     expect(after).toBe(before);
   });
+
+  it("build emits a collection's JSON-LD preset, keeps past events' pages out of lists and lists by field (RFC-0042)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const outDir = path.join(projectDir, "dist");
+    const read = (...p: string[]) => readFile(path.join(outDir, ...p), "utf8");
+    const jsonLd = (html: string) =>
+      [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map(
+        (m) => m[1],
+      );
+    const article = (html: string) => html.match(/<article[\s\S]*?<\/article>/)?.[0] ?? "";
+    const postHtml = await read("posts", "hello-world", "index.html");
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    let site = await local.store.getSite(cfg.siteId);
+    const events = site?.collections?.events;
+    if (!site || !events?.fields) throw new Error("the RFC-0041 test sets up events first");
+    const label = { en: { label: "Ends" } };
+    site = await local.store.updateSite({
+      ...site,
+      collections: {
+        ...site.collections,
+        events: {
+          ...events,
+          fields: [
+            ...events.fields,
+            { key: "endsAt", type: "datetime", labels: label, localized: false },
+            { key: "city", type: "text", labels: { en: { label: "City" } }, localized: false },
+          ],
+          listFields: ["startsAt"],
+          expiry: { field: "endsAt", action: "unlist" },
+          structuredData: {
+            type: "Event",
+            properties: {
+              startDate: { kind: "field", field: "startsAt" },
+              endDate: { kind: "field", field: "endsAt" },
+              "location.name": { kind: "field", field: "venue" },
+              "location.address.addressLocality": { kind: "field", field: "city" },
+            },
+          },
+        },
+      },
+    });
+    const day = 86_400_000;
+    const at = (ms: number) => ({ at: new Date(ms).toISOString(), timeZone: "Europe/Istanbul" });
+    const now = Date.now();
+    const all = await local.store.listContentEntries(cfg.siteId, "events");
+    const launch = all.find((e) => e.slug === "launch" && e.locale === "en");
+    if (!launch) throw new Error("no launch event");
+    await local.store.updateContentEntry({
+      ...launch,
+      fields: {
+        ...launch.fields,
+        city: "Istanbul",
+        startsAt: at(now + 30 * day),
+        endsAt: at(now + 30 * day + 1),
+      },
+    });
+    await local.store.createContentEntry({
+      siteId: cfg.siteId,
+      collection: "events",
+      slug: "retro",
+      locale: "en",
+      status: "published",
+      title: "Retro night",
+      body: { format: "markdown", value: "An evening that already happened." },
+      fields: { venue: "Moda Stage", startsAt: at(now - 3 * day), endsAt: at(now - 2 * day) },
+      tags: [],
+      ...(launch.terms ? { terms: launch.terms } : {}),
+      author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
+    } as never);
+    await local.store.createPage(site, {
+      siteId: cfg.siteId,
+      path: "/events",
+      title: "Events",
+      locale: "en",
+      status: "published",
+      sections: [
+        {
+          id: "sec_upcomingevt1",
+          kind: "contentList",
+          collection: "events",
+          limit: 10,
+          sort: "newest",
+          where: [{ field: "startsAt", op: "gte", value: "now" }],
+          orderBy: { field: "startsAt", direction: "asc" },
+        },
+      ],
+    } as never);
+    await local.close();
+    await snapshot({ projectDir, label: "stage 3", publish: true });
+    await spawnBuild(projectDir);
+
+    // The preset replaces the BlogPosting; the breadcrumbs stay; values are escaped.
+    const event = jsonLd(await read("events", "launch", "index.html"));
+    expect(event.map((d) => JSON.parse(d ?? "{}")["@type"])).toEqual(["Event", "BreadcrumbList"]);
+    expect(event[0]).toContain("\\u003cb\\u003eKadıköy");
+    expect(event[0]).not.toContain("<b>");
+    // A past event keeps its page (and its preset, dates in the past) but leaves every list.
+    const retro = await read("events", "retro", "index.html");
+    expect(retro).toContain("Retro night");
+    const listing = await read("events", "index.html");
+    expect(listing).toContain('href="/events/launch"');
+    expect(listing).not.toContain("/events/retro");
+    expect(await read("rss.xml")).not.toContain("Retro night");
+    expect(await read("sitemap.xml")).not.toContain("/events/retro");
+    expect(await read("sitemap.xml")).toContain("/events/launch");
+    // A collection without the settings renders as before: its article and its JSON-LD.
+    const postAfter = await read("posts", "hello-world", "index.html");
+    expect(article(postAfter)).toBe(article(postHtml));
+    expect(jsonLd(postAfter)).toEqual(jsonLd(postHtml));
+  });
 });

@@ -1,6 +1,6 @@
 /** Agent modes end to end over a real MCP client (ADR-0015). */
 import { type AgentMode, ApprovalStore, AuditLog } from "@cloudhal/agent-runtime";
-import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { GATES_ENFORCED, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { Client, InMemoryTransport } from "@modelcontextprotocol/client";
@@ -10,7 +10,7 @@ import { createCloudhalMcpServer } from "../src/server.ts";
 async function setup(mode: AgentMode) {
   const sql = await BetterSqlite3Driver.open(":memory:");
   await migrate(sql, migrations);
-  const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+  const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore(), gates: GATES_ENFORCED });
   const site = await seedStarterSite(store, { name: "Modes", slug: "modes" });
   const audit = new AuditLog(sql);
   const approvals = new ApprovalStore(sql);
@@ -91,6 +91,53 @@ describe("agent modes over MCP", () => {
     );
     expect(rbApproval).toMatchObject({ mode: "auto", cause: "tool" });
     expect(rbApproval?.autoCheck).toBeUndefined();
+  });
+
+  it("auto: a publish that makes a live article expire sooner waits for a person (RFC-0042 §3.5)", async () => {
+    const { store, site, approvals, call } = await setup("auto");
+    const owner = { kind: "human" as const, id: "user_owner000001" };
+    const publishAsPerson = async () => {
+      const s = await store.createSnapshot(site.id, { actor: owner, reason: "publish" });
+      await store.publish(
+        (await store.getSite(site.id)) as NonNullable<Awaited<ReturnType<typeof store.getSite>>>,
+        s.id,
+      );
+    };
+    const fresh = (await store.getSite(site.id)) as NonNullable<
+      Awaited<ReturnType<typeof store.getSite>>
+    >;
+    await store.updateSite({
+      ...fresh,
+      collections: {
+        ...fresh.collections,
+        posts: {
+          fields: [
+            {
+              key: "endsAt",
+              type: "datetime",
+              labels: { en: { label: "Ends" } },
+              localized: false,
+            },
+          ],
+          expiry: { field: "endsAt", action: "hide" },
+        },
+      },
+    });
+    const created = (await call("create_entry", article(site.id, "expiring")))
+      .structuredContent as { entry: { id: string; rev: number } };
+    await publishAsPerson();
+    const ends = { at: "2030-01-01T00:00:00Z", timeZone: "UTC" };
+    const edited = await call("update_entry", {
+      siteId: site.id,
+      entryId: created.entry.id,
+      rev: created.entry.rev,
+      fields: { endsAt: ends },
+    });
+    expect(edited.isError, edited.text).toBeFalsy();
+    const publish = await call("publish", { siteId: site.id });
+    expect(publish.text).toMatch(/^approval pending:/);
+    const [waiting] = await approvals.list({ siteId: site.id, status: "pending" });
+    expect(waiting?.autoCheck).toMatchObject({ lowRisk: false, code: "expires" });
   });
 
   it("auto: a publish that adds a correction waits for a person (RFC-0019 §2.4)", async () => {

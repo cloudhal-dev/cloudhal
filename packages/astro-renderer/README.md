@@ -45,6 +45,21 @@ Additive; `entry.fields` still means exactly what is stored, and themes that nev
 
 `EntryFieldsOptions`: `locale` (default: the entry's), `media` (the page's `MediaContext`), `timeZone`, `words` (`{ yes, no }`), `sizes`. Each `RenderedField` has `key`, `label`, `help?`, `empty`, `text` (escaped plain text), and per type `html` (rich text through the body's markdown pipeline), `href` (`safeHref`, dropped when unsafe), `image` (`imageAttributes` plus `assetId`, alt in the page's language) or `datetime`, plus `def`, `value` and `fromOriginal` from `resolveFields`. Theme guide: [`docs/guides/fields.md`](../../docs/guides/fields.md).
 
+### Collections stage 3 (RFC-0042, added in 0.6.0)
+Additive. `entryHead`, `entries()`, `allEntries()` and every existing export keep their meaning; the only differences an old theme copy renders come from settings a site opts into (`theme-v0.5.0` in the compat test): entries past a collection's `expiry` leave lists, feeds, the sitemap and search, and `contentList` sections with `where`/`orderBy` list by field (`ContentList.astro` ships here and queries the source a theme's list came from).
+
+| Export | Signature |
+|---|---|
+| `GraphSource.queryEntries?` | `(q: FieldEntryQuery) => Promise<FieldEntryResult>` on `LiveSource` and `SnapshotSource`: `{ collection, locale?, where?, orderBy?, sort?, filter?, limit? (1–100, default 20), offset?, includeExpired? }` → `{ entries, total }`; `now` in conditions is the source's instant |
+| `queryEntries` (`./queries`, `.`) | `(source: GraphSource, q: FieldEntryQuery) => Promise<FieldEntryResult>`: any source (falls back to `entries()` on sources without `queryEntries`); an invalid query matches nothing and is logged |
+| `contentListEntries` (`./queries`, `.`) | `(source, sections, locale?) => Promise<Record<string, ContentEntry[]>>`: the `entries` map `Sections` reads (by collection; by section id for `filter` and for `where`/`orderBy`) |
+| `sectionQuery`, `listsByField`, `evaluateEntryQuery` (`./queries`) | the query a section runs; whether it lists by field; the pure evaluator both sources share |
+| `GraphSource.routableEntries?` | `(locale?) => Promise<ContentEntry[]>`: every entry with a public URL, unlisted ones included (routes, static builds, alternates); `allEntries` stays the listed ones |
+| `withStructuredData` (`./seo`, `.`) | `(head: HeadMeta, source, entry, { origin, media? }) => Promise<HeadMeta>`: call after `entryHead`; replaces the `BlogPosting` with the collection's preset (`Event`, `JobPosting`, `Product`, `Recipe`) when the entry has every required value, keeps the `BreadcrumbList`, returns `head` unchanged otherwise |
+| `entryStructuredData` (`./seo`, `.`) | `(source, entry, { origin, media? }) => Promise<{ doc?, issues }>`: the preset document and why there is none |
+
+Derived gates: `unlist` keeps an entry's page (200), comments and menu links but leaves `entries()`, `allEntries()`, `entriesByFilter`/`entriesByTerm` (archives, related), feeds, the sitemap and search; `hide` is a 404 like an expired `availability`. Both sources apply them, the gate index caps the edge cache at every derived instant and at every value instant of date/datetime list fields (for `now` conditions), and previews ignore them with an "Ended on …" notice. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2 }`; writers refuse `expiry` until it does.
+
 ## Site analytics (RFC-0006)
 
 The renderer carries the site side of Cloudhal's cookie-less analytics (`@cloudhal/analytics`):

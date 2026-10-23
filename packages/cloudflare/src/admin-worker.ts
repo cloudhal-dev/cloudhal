@@ -284,8 +284,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   let migrated = false;
   /** The request backstop's isolate state (RFC-0008 §8.6); plain numbers. */
   const backstop: BackstopState = { lastCheck: 0, lastRun: 0 };
-  /** The site Worker confirmed it enforces time gates (RFC-0008 §7.7); a plain boolean. */
-  let gatesConfirmed = false;
+  /** The gates version the site Worker confirmed (RFC-0008 §7.7, RFC-0042 §3.6); 0: none yet. */
+  let gatesConfirmed = 0;
   const ensureMigrated = async (sql: SqlDriver) => {
     if (migrated) return;
     try {
@@ -387,8 +387,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
             : undefined,
           token: purgeToken,
           confirmed: () => gatesConfirmed,
-          remember: () => {
-            gatesConfirmed = true;
+          remember: (version) => {
+            gatesConfirmed = version;
           },
           log,
         }),
