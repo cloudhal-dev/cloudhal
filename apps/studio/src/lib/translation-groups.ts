@@ -3,7 +3,8 @@
  * one row per translation group (`translation.group`; a node without one is its own group), shown
  * by its default-language version (or the original), with one language state per site locale.
  */
-import type { ContentEntry, Page } from "@cloudhal/core-contracts";
+import type { ContentEntry, Page, Site } from "@cloudhal/core-contracts";
+import { fieldDefinitions, localizedFieldValues } from "@cloudhal/core-ts/fields";
 import type { NewEntry, NewPage } from "./api/content.ts";
 
 type Localized = Page | ContentEntry;
@@ -94,12 +95,15 @@ export function handTranslation(
 /**
  * The new version a person writes by hand for a missing language: a draft in `locale` holding a
  * copy of `source`'s content to translate (title, path or slug, sections or body), linked to the
- * group. Its schedule, publishing record and metadata are its own, so they are not copied.
+ * group. Its schedule, publishing record and metadata are its own, so they are not copied, and
+ * of an entry's typed fields only the localized values are (RFC-0041 §5: shared ones are read from
+ * the original, `site`'s definitions).
  */
 export function handTranslationDraft(
   source: Localized,
   locale: string,
   hash: string,
+  site?: Pick<Site, "collections">,
 ): { kind: "page"; input: NewPage } | { kind: "entry"; input: NewEntry } {
   const translation = handTranslation(source, hash);
   if ("sections" in source) {
@@ -129,5 +133,8 @@ export function handTranslationDraft(
     publishedAt,
     ...entry
   } = source;
-  return { kind: "entry", input: { ...entry, locale, status: "draft", translation } };
+  const fields = site
+    ? localizedFieldValues(fieldDefinitions(site, entry.collection), entry.fields)
+    : entry.fields;
+  return { kind: "entry", input: { ...entry, fields, locale, status: "draft", translation } };
 }

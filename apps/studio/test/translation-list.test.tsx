@@ -180,6 +180,39 @@ describe("handTranslationDraft", () => {
     );
     expect(draft.input.translation?.group).toBe("entry_1");
   });
+
+  it("copies only an entry's localized field values (RFC-0041 §5)", () => {
+    const entry = {
+      schemaVersion: 1,
+      id: "entry_2",
+      siteId: "site_1",
+      collection: "events",
+      slug: "launch",
+      locale: "en",
+      status: "draft",
+      title: "Launch",
+      body: { format: "markdown", value: "Hi" },
+      fields: { speaker: "Ada", day: "2026-11-05" },
+      tags: [],
+      author: { kind: "human", id: "u_1" },
+      rev: 1,
+      createdAt: AT,
+      updatedAt: AT,
+    } as ContentEntry;
+    const site = {
+      collections: {
+        events: {
+          labels: { en: { singular: "Event", plural: "Events" } },
+          fields: [
+            { key: "speaker", type: "text", labels: { en: { label: "Speaker" } }, localized: true },
+            { key: "day", type: "date", labels: { en: { label: "Day" } }, localized: false },
+          ],
+        },
+      },
+    } as Pick<Site, "collections">;
+    const draft = handTranslationDraft(entry, "es", HASH, site);
+    expect(draft.kind === "entry" && draft.input.fields).toEqual({ speaker: "Ada" });
+  });
 });
 
 describe("working language", () => {

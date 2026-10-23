@@ -14,19 +14,18 @@
  *
  * Sites without any field definition run only the size check and add no statements.
  */
-import type { Asset, ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import {
   checkFieldValues,
   checkRequiredToPublish,
   convertContext,
-  type FieldIssue,
   fieldDefinitions,
   normalizeThroughMarkers,
   refuseFieldIssues,
 } from "../fields/index.ts";
 import { sameJson } from "../fields/types.ts";
-import { fieldAssetRefs } from "../media/field-refs.ts";
+import { fieldAssetIssues, fieldAssetRefs } from "../media/field-refs.ts";
 import type { AssetRefUse } from "../media/refs.ts";
 import type { Cond } from "../node-sql.ts";
 import type { StoreContext } from "./context.ts";
@@ -105,60 +104,12 @@ export async function planEntryFields(
   const kept = stored
     ? fieldAssetRefs(fieldDefinitions(site, stored.collection), stored.fields)
     : [];
-  const invalid = new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/")));
-  const fresh = newRefs(refs, kept).filter((r) => !invalid.has(r.field.replace(".", "/")));
-  issues.push(...(await assetIssues(ctx, { site, defs, refs: fresh, kept })));
+  const skip = new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/")));
+  const lookup = (ids: readonly string[]) => ctx.assets.getAssets(site.id, ids);
+  issues.push(...(await fieldAssetIssues({ defs, refs, kept, lookup, skip })));
   issues.push(...checkRequiredToPublish(site, draft, original));
   refuseFieldIssues(issues);
   return refsPlan(ctx, { site, draft, refs, kept, defs });
-}
-
-/** References a write adds: not held by the stored entry under the same field. */
-function newRefs(refs: readonly AssetRefUse[], kept: readonly AssetRefUse[]): AssetRefUse[] {
-  const held = new Set(kept.map((r) => `${r.assetId}\n${r.field}`));
-  return refs.filter((r) => !held.has(`${r.assetId}\n${r.field}`));
-}
-
-interface AssetCheck {
-  site: Site;
-  defs: readonly FieldDefinition[];
-  refs: readonly AssetRefUse[];
-  kept: readonly AssetRefUse[];
-}
-
-/** RFC-0041 §2: new references name files of the site; an image field's is an image, not retired. */
-async function assetIssues(ctx: StoreContext, check: AssetCheck): Promise<FieldIssue[]> {
-  const { site, defs, refs, kept } = check;
-  if (refs.length === 0) return [];
-  const assets = await ctx.assets.getAssets(
-    site.id,
-    refs.map((r) => r.assetId),
-  );
-  const keptIds = new Set(kept.map((r) => r.assetId));
-  const types = new Map(defs.map((d) => [d.key, d.type]));
-  const out: FieldIssue[] = [];
-  for (const ref of refs) {
-    const key = ref.field.slice("fields.".length);
-    const problem = assetProblem(assets.get(ref.assetId), types.get(key), keptIds.has(ref.assetId));
-    if (problem)
-      out.push({
-        path: `fields/${key}`,
-        code: "invalid_value",
-        message: `${ref.assetId} ${problem}`,
-      });
-  }
-  return out;
-}
-
-function assetProblem(
-  asset: Asset | undefined,
-  type: FieldDefinition["type"] | undefined,
-  kept: boolean,
-): string | undefined {
-  if (!asset) return "is not a file of this site";
-  if (type === "image" && asset.kind !== "image") return `is a ${asset.kind} file, not an image`;
-  if (asset.status === "retired" && !kept) return "was retired and cannot be newly used";
-  return undefined;
 }
 
 /**
@@ -213,9 +164,8 @@ function refsPlan(ctx: StoreContext, input: RefsInput): EntryFieldsPlan {
     sql: "(SELECT count(*) FROM nodes WHERE kind = 'asset' AND site_id = ? AND id IN (SELECT value FROM json_each(?)) AND (json_extract(body, '$.status') = 'active' OR id IN (SELECT value FROM json_each(?)))) = ?",
     params: [site.id, JSON.stringify(ids), JSON.stringify(keptIds), ids.length],
   };
+  const lookup = (wanted: readonly string[]) => ctx.assets.getAssets(site.id, wanted);
   const diagnose = async () =>
-    refuseFieldIssues(
-      await assetIssues(ctx, { site, defs: input.defs ?? [], refs: newRefs(refs, kept), kept }),
-    );
+    refuseFieldIssues(await fieldAssetIssues({ defs: input.defs ?? [], refs, kept, lookup }));
   return { guard, statements, diagnose };
 }

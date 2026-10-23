@@ -124,10 +124,16 @@ const editorHref = (siteId: string, n: Localized) =>
   "sections" in n ? `/sites/${siteId}/pages/${n.id}` : entryHref(siteId, n.id, n.collection);
 
 /** A new draft in `locale` from `source`: its content to translate, linked to its group. */
-async function writeByHand(siteId: string, source: Localized, locale: string): Promise<Localized> {
+async function writeByHand(input: {
+  siteId: string;
+  site: Site;
+  source: Localized;
+  locale: string;
+}): Promise<Localized> {
+  const { siteId, site, source, locale } = input;
   const group = await api.translations.group(siteId, source.id);
   const hash = group.items.find((m) => m.id === source.id)?.hash ?? "";
-  const draft = handTranslationDraft(source, locale, hash);
+  const draft = handTranslationDraft(source, locale, hash, site);
   if (draft.kind === "page") return (await api.pages.create(siteId, draft.input)).page;
   return api.entries.create(siteId, draft.input);
 }
@@ -149,7 +155,14 @@ export function LanguagesCell<N extends Localized>({
   const toast = useToast();
   const source = row.cells.find((c) => c.node?.id === row.group)?.node ?? row.node;
   const create = useMutation({
-    mutationFn: (target: string) => writeByHand(siteId, source, target),
+    mutationFn: async (target: string) => {
+      // RFC-0041 §5: the collection's definitions say which field values a translation holds.
+      const site = await qc.ensureQueryData({
+        queryKey: ["site", siteId],
+        queryFn: () => api.sites.get(siteId),
+      });
+      return writeByHand({ siteId, site, source, locale: target });
+    },
     onSuccess: async (node) => {
       await qc.invalidateQueries({ queryKey: ["translations", siteId] });
       await qc.invalidateQueries({ queryKey: ["sections" in node ? "pages" : "entries", siteId] });

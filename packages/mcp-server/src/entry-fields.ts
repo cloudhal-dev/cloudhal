@@ -6,20 +6,18 @@
  * `fields` as a merge patch (`null` removes a key), and its approval prompt names each typed change
  * readably: labels, option labels, dates in their zone, values quoted and truncated.
  */
-import type { Asset, ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import {
-  ASSET_ID_PATTERN,
   checkFieldValues,
   checkRequiredToPublish,
   convertContext,
-  type FieldIssue,
   fieldDefinitions,
   fieldLabel,
   normalizeThroughMarkers,
   optionLabel,
   refuseFieldIssues,
 } from "@cloudhal/core-ts/fields";
-import { markdownAssetIds } from "@cloudhal/core-ts/media";
+import { fieldAssetIssues, fieldAssetRefs } from "@cloudhal/core-ts/media";
 import { type JsonSchema, quote, type ToolContext } from "./common.ts";
 
 type Values = Record<string, unknown>;
@@ -61,56 +59,6 @@ async function originalOf(
   return original?.siteId === entry.siteId ? original : undefined;
 }
 
-const ASSET_ID = new RegExp(ASSET_ID_PATTERN);
-
-/** `fields.<key>` → asset ids an image or rich-text value refers to. */
-function assetRefs(defs: readonly FieldDefinition[], values: Values | undefined): Set<string> {
-  const out = new Set<string>();
-  for (const def of defs) {
-    const value = values?.[def.key];
-    if (typeof value !== "string") continue;
-    if (def.type === "image" && ASSET_ID.test(value)) out.add(`${def.key}\n${value}`);
-    else if (def.type === "richText" && value.includes("asset:"))
-      for (const id of markdownAssetIds(value)) out.add(`${def.key}\n${id}`);
-  }
-  return out;
-}
-
-function assetProblem(asset: Asset | undefined, def: FieldDefinition, siteId: string) {
-  if (!asset || asset.siteId !== siteId) return "is not a file of this site";
-  if (def.type === "image" && asset.kind !== "image")
-    return `is a ${asset.kind} file, not an image`;
-  if (asset.status === "retired") return "was retired and cannot be newly used";
-  return undefined;
-}
-
-/** New references (not held by the stored entry under the same key) name usable files of the site. */
-async function assetIssues(
-  ctx: ToolContext,
-  check: {
-    siteId: string;
-    defs: readonly FieldDefinition[];
-    values: Values;
-    stored?: Values | undefined;
-  },
-): Promise<FieldIssue[]> {
-  const held = assetRefs(check.defs, check.stored);
-  const byKey = new Map(check.defs.map((d) => [d.key, d]));
-  const out: FieldIssue[] = [];
-  for (const ref of assetRefs(check.defs, check.values)) {
-    if (held.has(ref)) continue;
-    const [key = "", assetId = ""] = ref.split("\n");
-    const problem = assetProblem(
-      await ctx.store.getAsset(assetId),
-      byKey.get(key) as FieldDefinition,
-      check.siteId,
-    );
-    if (problem)
-      out.push({ path: `fields/${key}`, code: "invalid_value", message: `${assetId} ${problem}` });
-  }
-  return out;
-}
-
 /** What an entry write would store, for the check. */
 export interface FieldsCheck {
   site: Site;
@@ -150,9 +98,16 @@ export async function checkEntryFields(ctx: ToolContext, check: FieldsCheck): Pr
     original: original ? { id: original.id, values: original.fields ?? {} } : undefined,
     blocks: ctx.store.blocks,
   });
-  const invalid = new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/")));
-  const assets = await assetIssues(ctx, { siteId: site.id, defs, values, stored: previous });
-  issues.push(...assets.filter((i) => !invalid.has(i.path)));
+  // The store's asset check: new references name usable files of the site.
+  issues.push(
+    ...(await fieldAssetIssues({
+      defs,
+      refs: fieldAssetRefs(defs, values),
+      kept: stored ? fieldAssetRefs(fieldDefinitions(site, stored.collection), stored.fields) : [],
+      lookup: (ids) => ctx.store.getAssets(site.id, ids),
+      skip: new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/"))),
+    })),
+  );
   issues.push(...checkRequiredToPublish(site, { ...next, fields: values }, original));
   refuseFieldIssues(issues);
 }

@@ -4,7 +4,8 @@
  * it uses and the current translation; `save_translation` writes a draft in the target locale,
  * linked to the source revision, with its provenance and the deterministic checks
  * (`checkTranslation`). Agents never review: only a person does, in Studio. A translation a person
- * wrote or reviewed is never overwritten here.
+ * wrote or reviewed is never overwritten here. Typed fields follow RFC-0041 §5
+ * (`translation-fields.ts`): only localized text is translated, shared values stay on the original.
  */
 import { forSite, holds } from "@cloudhal/agent-runtime";
 import type {
@@ -34,6 +35,12 @@ import {
   ToolError,
 } from "./common.ts";
 import { ENTRY, mcpWriter, PAGE, SNAPSHOT, sectionInput } from "./content-shared.ts";
+import {
+  refuseSharedFields,
+  TRANSLATED_FIELDS,
+  translatedFields,
+  translationSourceFields,
+} from "./translation-fields.ts";
 
 type Localized = Page | ContentEntry;
 
@@ -100,7 +107,7 @@ const getSourceTool: ToolDefinition = {
   name: "get_translation_source",
   title: "Get translation source",
   description:
-    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
+    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), for an entry with typed fields the localized text and rich-text values to translate (`fields`) and the shared fields a translation reads from the original (`sharedFields`, never translated), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
   inputSchema: obj(
     {
       siteId: id,
@@ -118,6 +125,17 @@ const getSourceTool: ToolDefinition = {
     {
       source: { type: "object" },
       glossary: { type: "array", items: { type: "object" } },
+      fields: {
+        type: "object",
+        description:
+          "Entries: the localized text and rich-text field values to translate, by key; send them translated as save_translation's `fields`",
+      },
+      sharedFields: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Entries: keys of the fields that are not localized: every language version reads them from the original, so they are not translated",
+      },
       existing: { type: "object" },
       stale: { type: "boolean" },
       layout: {
@@ -140,7 +158,10 @@ const getSourceTool: ToolDefinition = {
     const group = await ctx.store.translationGroup(site, source.translation?.group ?? source.id);
     const member = group.members.find((m) => m.locale === locale && m.siteId === target.id);
     const existing = member ? await nodeOf(ctx, target.id, member.id) : undefined;
-    const text = JSON.stringify("sections" in source ? source.sections : source.body.value);
+    const typed = translationSourceFields(site, source);
+    const text = JSON.stringify(
+      "sections" in source ? source.sections : [source.body.value, typed.fields ?? {}],
+    );
     // RFC-0033 §4a: a linked page translation follows the source's layout; nothing is written.
     const layout =
       existing &&
@@ -150,7 +171,7 @@ const getSourceTool: ToolDefinition = {
         ? linkedLayout(source, existing)
         : undefined;
     return {
-      source,
+      ...typed,
       glossary: glossaryFor(
         await ctx.store.glossary.get(site.id),
         `${source.title} ${text}`,
@@ -166,7 +187,7 @@ const saveTranslationTool: ToolDefinition = {
   name: "save_translation",
   title: "Save translation",
   description:
-    "Save your translation of a page or entry into `locale` as a draft linked to the source's current revision, with your model as its provenance. Pages: send title, path and sections (same ids, kinds and order as the source; translated text). Entries: title, slug, body and summary. The checks (structure, links, numbers, glossary, length) run and are returned; a failed check keeps it from being published until fixed. A person reviews it in Studio before it goes live where the site asks for review. Refused for a translation a person wrote or reviewed. Snapshots afterwards.",
+    "Save your translation of a page or entry into `locale` as a draft linked to the source's current revision, with your model as its provenance. Pages: send title, path and sections (same ids, kinds and order as the source; translated text). Entries: title, slug, body, summary and the translated `fields` (only the localized text and rich-text ones get_translation_source returns; shared fields are refused with field_not_localized). The checks (structure, links, numbers, glossary, length) run and are returned; a failed check keeps it from being published until fixed. A person reviews it in Studio before it goes live where the site asks for review. Refused for a translation a person wrote or reviewed. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -178,6 +199,7 @@ const saveTranslationTool: ToolDefinition = {
       sections: sectionInput,
       body: str("Entries: the translated markdown body"),
       summary: str("Entries: the translated summary"),
+      fields: TRANSLATED_FIELDS,
       coverAlt: str(
         "Entries: the cover image's alt text in `locale`. Without it a new translation leaves the cover alt empty, so the image's own alt text in `locale` (update_asset) is shown",
         { maxLength: 500 },
@@ -207,6 +229,13 @@ const saveTranslationTool: ToolDefinition = {
     openWorldHint: false,
   },
   scopes: ["content:write"],
+  // RFC-0041 §5: a shared (non-localized) field value is refused before anything is written.
+  precheck: async (a, ctx) => {
+    if (a.fields === undefined) return;
+    const site = await ctx.store.getSite(a.siteId as string);
+    const source = await ctx.store.getContentEntry(a.nodeId as string);
+    if (site && source?.siteId === site.id) refuseSharedFields(site, source, a.fields);
+  },
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
     const target = await targetOf(ctx, site, a.targetSiteId);
@@ -247,7 +276,25 @@ const saveTranslationTool: ToolDefinition = {
       },
     };
     try {
-      const made = translatedNode({ a, site: target.id, locale, source, existing, translation });
+      const fields =
+        "sections" in source
+          ? undefined
+          : translatedFields({
+              site,
+              source,
+              existing: existing as ContentEntry | undefined,
+              given: a.fields as Record<string, unknown> | undefined,
+              cross,
+            });
+      const made = translatedNode({
+        a,
+        site: target.id,
+        locale,
+        source,
+        existing,
+        translation,
+        fields,
+      });
       // RFC-0034 §6: on an edition, the images come along and the terms are the edition's.
       const draft = cross
         ? await forEdition(ctx.store, made, {
@@ -318,6 +365,8 @@ function translatedNode(input: {
   source: Localized;
   existing: Localized | undefined;
   translation: Translation;
+  /** Entries: the translation's typed field values (`translatedFields`). */
+  fields?: Record<string, unknown> | undefined;
 }): Localized {
   const { a, site, locale, source, existing, translation } = input;
   const common = {
@@ -347,6 +396,7 @@ function translatedNode(input: {
     body: { format: "markdown", value: (a.body as string | undefined) ?? base.body.value },
     ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
     ...(cover ? { coverImage: cover } : {}),
+    ...(input.fields ? { fields: input.fields } : {}),
   } as ContentEntry;
 }
 

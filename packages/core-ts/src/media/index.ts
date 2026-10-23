@@ -2,9 +2,11 @@
  * `@cloudhal/core-ts/media` — the Worker-safe media pipeline of RFC-0004: the type table, sniffing,
  * image headers and metadata stripping, the SVG validator, the upload inspection every path runs,
  * the SSRF-safe fetcher (Workers transport; the Node one is `@cloudhal/core-ts/media-node`), and
- * reference extraction. Pure TypeScript, no native image library.
+ * reference extraction (typed field values' too, with their asset check). Pure TypeScript, no
+ * native image library.
  */
 export * from "./fetcher.ts";
+export * from "./field-refs.ts";
 export * from "./image.ts";
 export * from "./ingest.ts";
 export * from "./placeholders.ts";
