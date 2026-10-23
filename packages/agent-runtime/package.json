@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/agent-runtime",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Cloudhal agent runtime: policy engine (actors, scopes, approvals), skill loader, audit log",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
