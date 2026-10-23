@@ -34,7 +34,9 @@ export const BUNDLE_BUDGET = {
    * `loadLocale`) and the `menus` words moved to a lazy namespace, so the budget came down from
    * 455 kB. 387.6 kB on 2026-10-22 (was 419.9 kB) once the bell's items, the elevation and
    * agent-mode UI and the taxonomy model left the shell (`LAZY_ONLY`); the budget stays at
-   * 420 kB as headroom for shell features.
+   * 420 kB as headroom for shell features. 390.0 kB on 2026-10-23 with collections stage 3 (RFC-0042):
+   * its screens are lazy; the shell gained the router's list-field search check, five error
+   * sentences and the expiry auto-check words, and Kumo's shared chunks split once more (+0.8 kB).
    */
   initialGzipBytes: 420_000,
 };
@@ -83,6 +85,13 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]packages[\\/]core-ts[\\/]src[\\/]fields[\\/]/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]fields[\\/]/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](fields|field-form)\.ts$/,
+  // Collections stage 3 (RFC-0042 §7): the listing, expiry and structured-data cards, the list's
+  // field columns and filters, "Create listing page", the content list conditions, their model and
+  // client, and the preset table load with their screens (the shell keeps `listing-search.ts`).
+  /[\\/]packages[\\/]core-ts[\\/]src[\\/]structured-data[\\/]/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]listings[\\/]/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]useCollectionEntries\.ts$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](listings|listing-query|api[\\/]listings)\.ts$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
   // Core catalogs other than English load with their language (`loadLocale`), never with English.

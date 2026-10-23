@@ -9,7 +9,7 @@ import {
   TextAlignLeft,
   TextHOne,
 } from "@phosphor-icons/react";
-import type { NewPage } from "../../lib/api.ts";
+import { ApiRequestError, type NewPage } from "../../lib/api.ts";
 
 export const KINDS: Section["kind"][] = ["hero", "richText", "image", "contentList"];
 export const KIND_ICON: Record<Section["kind"], Icon> = {
@@ -60,3 +60,22 @@ export function duplicateOf(page: Page, title: string): NewPage {
 
 /** Field rows inside a section card: stacked on phones, side by side when there is room. */
 export const FIELD_ROW = "items-start gap-x-4 gap-y-5";
+
+/**
+ * RFC-0042: a refused save's `invalid_query` issues of section `index` (`sections/<i>/where/0/value`
+ * → `where/0/value`), for the content list editor to show on their row.
+ */
+export function sectionQueryIssues(
+  error: unknown,
+  index: number,
+): { path: string; message: string }[] {
+  if (!(error instanceof ApiRequestError) || error.body.error !== "invalid_query") return [];
+  const issues = (error.body.details as { issues?: unknown } | undefined)?.issues;
+  if (!Array.isArray(issues)) return [];
+  const prefix = `sections/${index}/`;
+  return issues.flatMap((i: { path?: unknown; message?: unknown }) =>
+    typeof i?.path === "string" && i.path.startsWith(prefix)
+      ? [{ path: i.path.slice(prefix.length), message: String(i.message ?? "") }]
+      : [],
+  );
+}

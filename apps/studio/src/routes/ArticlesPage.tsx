@@ -1,4 +1,4 @@
-import type { ContentEntry, Taxonomy } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldOrder, Site, Taxonomy } from "@cloudhal/core-contracts";
 import {
   Badge,
   Button,
@@ -28,7 +28,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { useState } from "react";
+import { lazy, type ReactNode, Suspense, useState } from "react";
 import { CollectionActions } from "../components/CollectionActions.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
@@ -56,6 +56,7 @@ import {
   type TranslationList,
   useTranslationList,
 } from "../components/TranslationList.tsx";
+import { type ServerPaging, useCollectionEntries } from "../components/useCollectionEntries.ts";
 import {
   scopeTaxonomies,
   useCollectionHeader,
@@ -67,10 +68,17 @@ import { usePaging } from "../components/usePaging.ts";
 import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { entryHref, entryRoute } from "../lib/entry-href.ts";
+import { listingQuery, withFilter } from "../lib/listing-query.ts";
 import { imageRefPreviewUrl } from "../lib/media.ts";
 import { entryAccess } from "../lib/roles.ts";
 import { primaryHostname } from "../lib/site-settings.ts";
 import { facetFilter, needsTagsMigration } from "../lib/taxonomy.ts";
+
+// RFC-0042 §4: a collection with listing fields gets their columns, filters and sort (lazy).
+const columnsModule = () => import("../components/listings/ListFieldColumns.tsx");
+const ListFieldFilters = lazy(() => columnsModule().then((m) => ({ default: m.ListFieldFilters })));
+const ListFieldHeads = lazy(() => columnsModule().then((m) => ({ default: m.ListFieldHeads })));
+const ListFieldCells = lazy(() => columnsModule().then((m) => ({ default: m.ListFieldCells })));
 
 const AUTHOR_ICON: Record<ContentEntry["author"]["kind"], Icon> = {
   human: User,
@@ -102,7 +110,8 @@ export function ArticlesPage() {
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const collection = useCollectionParam();
   const header = useCollectionHeader(siteId, collection);
-  const facets = useSearch({ strict: false }) as { category?: string; tag?: string };
+  const facets = useSearch({ strict: false }) as Record<string, string> & Facets;
+  const listing = listingQuery(facets);
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
@@ -116,11 +125,9 @@ export function ArticlesPage() {
         : undefined,
     tag: tagTax && facets.tag ? { key: tagTax.key, slug: facets.tag } : undefined,
   });
-  const entries = useQuery({
-    queryKey: filter ? ["entries", siteId, collection, filter] : ["entries", siteId, collection],
-    queryFn: () => api.entries.list(siteId, { collection, filter }),
-    enabled: !filter || data.taxonomies.isSuccess,
-  });
+  const enabled = !filter || data.taxonomies.isSuccess;
+  const entries = useCollectionEntries({ siteId, collection, filter, listing, enabled });
+  const listFields = site.data?.collections?.[collection]?.listFields?.length ?? 0;
   const all = useQuery({
     queryKey: ["entries", siteId, collection],
     queryFn: () => api.entries.list(siteId, collection),
@@ -135,23 +142,27 @@ export function ArticlesPage() {
     siteId,
     toDelete ? { kind: "contentEntry", id: toDelete.id } : undefined,
   );
-  const sorted = [...(entries.data ?? [])].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const list = useTranslationList(siteId, site.data, sorted);
+  const list = useTranslationList(siteId, site.data, entries.data ?? []);
   const paging = usePaging(
     list.items,
     (e, q, fold) => fold(e.title).includes(q) || e.slug.includes(q),
   );
-  const setFacets = (next: { category?: string | undefined; tag?: string | undefined }) =>
+  const setSearch = (search: Record<string, string>) =>
     navigate({
       to: "/sites/$siteId/collections/$collection",
       params: { siteId, collection },
-      search: {
-        ...(next.category ? { category: next.category } : {}),
-        ...(next.tag ? { tag: next.tag } : {}),
-      },
+      search,
       replace: true,
     });
-  const filtered = Boolean(facets.category || facets.tag);
+  const setFacets = (next: Facets) => {
+    const { category: _c, tag: _t, ...rest } = facets;
+    setSearch({
+      ...(next.category || next.tag ? rest : {}),
+      ...(next.category ? { category: next.category } : {}),
+      ...(next.tag ? { tag: next.tag } : {}),
+    });
+  };
+  const filtered = Boolean(facets.category || facets.tag || listing.where.length);
   const create = useNewEntry(siteId, collection, list.newLocale);
   const remove = useMutation({
     mutationFn: (entry: ContentEntry) => api.entries.remove(entry),
@@ -173,7 +184,8 @@ export function ArticlesPage() {
   );
   const migrated = (data.taxonomies.data?.length ?? 0) > 0;
   const facetsShown = migrated && Boolean(catTax || tagTax);
-  const columns = 6 + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + (list.groupOf ? 1 : 0);
+  const columns =
+    6 + listFields + (catTax ? 1 : 0) + (viewsColumn ? 1 : 0) + (list.groupOf ? 1 : 0);
   return (
     <PageLayout
       crumbs={<SiteCrumbs siteId={siteId} trail={[{ label: header.title }]} />}
@@ -191,7 +203,7 @@ export function ArticlesPage() {
         onSearch={paging.setSearch}
         placeholder={header.search}
         actions={
-          facetsShown || list.multilingual ? (
+          facetsShown || list.multilingual || listFields > 0 ? (
             <div className="flex flex-wrap items-center justify-end gap-2">
               {filtered && (
                 <Button variant="ghost" onClick={() => setFacets({})} data-testid="clear-facets">
@@ -204,48 +216,45 @@ export function ArticlesPage() {
                 </Toolbar>
               )}
               {facetsShown && <ArticleFacets data={data} facets={facets} setFacets={setFacets} />}
+              {site.data && listFields > 0 && (
+                <Suspense fallback={null}>
+                  <ListFieldFilters
+                    site={site.data}
+                    collection={collection}
+                    filters={listing.filters}
+                    onFilter={(field, token) => setSearch(withFilter(facets, field, token))}
+                  />
+                </Suspense>
+              )}
             </div>
           ) : undefined
         }
       />
       {entries.data?.length === 0 ? (
-        filtered ? (
-          <Empty
-            icon={<FunnelSimple size={48} className="text-kumo-inactive" />}
-            title={t("articles.facets.empty")}
-            description={t("articles.facets.emptyDescription")}
-            contents={
-              <Button variant="secondary" onClick={() => setFacets({})}>
-                {t("articles.facets.clear")}
-              </Button>
-            }
-          />
-        ) : (
-          <Empty
-            icon={<header.Icon size={48} className="text-kumo-inactive" />}
-            title={header.empty}
-            description={t("articles.emptyDescription")}
-            contents={newButton}
-          />
-        )
+        <ArticlesEmpty
+          filtered={filtered}
+          onClear={() => setFacets({})}
+          Icon={header.Icon}
+          title={header.empty}
+          newButton={newButton}
+        />
       ) : (
         <LayerCard className="overflow-x-auto p-0">
           <Table>
-            <Table.Header>
-              <Table.Row>
-                <Table.Head>{t("articles.columns.title")}</Table.Head>
-                {catTax && <Table.Head>{data.label(catTax, "singular")}</Table.Head>}
-                <Table.Head>{tagTax ? data.label(tagTax) : t("editor.tags")}</Table.Head>
-                <Table.Head>{t("articles.columns.author")}</Table.Head>
-                {list.groupOf && <Table.Head>{t("translationList.column")}</Table.Head>}
-                <Table.Head>{t("articles.columns.status")}</Table.Head>
-                <Table.Head>{t("articles.columns.updated")}</Table.Head>
-                {viewsColumn && <ListViewsHead />}
-                <Table.Head sticky="right" className="w-0">
-                  <span className="sr-only">{t("site.rowMenu")}</span>
-                </Table.Head>
-              </Table.Row>
-            </Table.Header>
+            <ArticlesHead
+              site={listFields > 0 ? site.data : undefined}
+              collection={collection}
+              data={data}
+              translations={Boolean(list.groupOf)}
+              views={Boolean(viewsColumn)}
+              orderBy={listing.orderBy}
+              onSort={(o) =>
+                setSearch({
+                  ...withoutSort(facets),
+                  ...(o ? { sort: `${o.field}:${o.direction}` } : {}),
+                })
+              }
+            />
             {entries.isPending ? (
               <TableSkeleton columns={columns} />
             ) : (
@@ -258,6 +267,7 @@ export function ArticlesPage() {
                     host={host}
                     data={data}
                     list={list}
+                    fields={site.data && listFields > 0 ? site.data : undefined}
                     views={viewsColumn}
                     deleteDisabledReason={
                       entryAccess(e, { editAny, editOwnPublished }, self) === "edit"
@@ -272,14 +282,7 @@ export function ArticlesPage() {
           </Table>
         </LayerCard>
       )}
-      {paging.total > paging.perPage && (
-        <Pagination
-          page={paging.page}
-          perPage={paging.perPage}
-          totalCount={paging.total}
-          setPage={paging.setPage}
-        />
-      )}
+      <ListPagination server={entries.server} paging={paging} />
       <DeleteResource
         open={toDelete !== undefined}
         onOpenChange={(o) => !o && setToDelete(undefined)}
@@ -295,6 +298,114 @@ export function ArticlesPage() {
   );
 }
 
+/** Nothing to list: no entries yet, or none matching the filters. */
+function ArticlesEmpty({
+  filtered,
+  onClear,
+  Icon,
+  title,
+  newButton,
+}: {
+  filtered: boolean;
+  onClear: () => void;
+  Icon: Icon;
+  title: string;
+  newButton: ReactNode;
+}) {
+  const t = useT();
+  return filtered ? (
+    <Empty
+      icon={<FunnelSimple size={48} className="text-kumo-inactive" />}
+      title={t("articles.facets.empty")}
+      description={t("articles.facets.emptyDescription")}
+      contents={
+        <Button variant="secondary" onClick={onClear}>
+          {t("articles.facets.clear")}
+        </Button>
+      }
+    />
+  ) : (
+    <Empty
+      icon={<Icon size={48} className="text-kumo-inactive" />}
+      title={title}
+      description={t("articles.emptyDescription")}
+      contents={newButton}
+    />
+  );
+}
+
+/** The list's header row; `site` when the collection has listing fields (their columns, lazy). */
+function ArticlesHead({
+  site,
+  collection,
+  data,
+  translations,
+  views,
+  orderBy,
+  onSort,
+}: {
+  site: Site | undefined;
+  collection: string;
+  data: TaxonomyData;
+  translations: boolean;
+  views: boolean;
+  orderBy: FieldOrder | undefined;
+  onSort: (orderBy: FieldOrder | undefined) => void;
+}) {
+  const t = useT();
+  const { category: catTax, tag: tagTax } = data.defaults;
+  return (
+    <Table.Header>
+      <Table.Row>
+        <Table.Head>{t("articles.columns.title")}</Table.Head>
+        {site && (
+          <Suspense fallback={null}>
+            <ListFieldHeads site={site} collection={collection} orderBy={orderBy} onSort={onSort} />
+          </Suspense>
+        )}
+        {catTax && <Table.Head>{data.label(catTax, "singular")}</Table.Head>}
+        <Table.Head>{tagTax ? data.label(tagTax) : t("editor.tags")}</Table.Head>
+        <Table.Head>{t("articles.columns.author")}</Table.Head>
+        {translations && <Table.Head>{t("translationList.column")}</Table.Head>}
+        <Table.Head>{t("articles.columns.status")}</Table.Head>
+        <Table.Head>{t("articles.columns.updated")}</Table.Head>
+        {views && <ListViewsHead />}
+        <Table.Head sticky="right" className="w-0">
+          <span className="sr-only">{t("site.rowMenu")}</span>
+        </Table.Head>
+      </Table.Row>
+    </Table.Header>
+  );
+}
+
+/** Server pages (previous / next) while the list asks by field, else the client-side pages. */
+function ListPagination({
+  server,
+  paging,
+}: {
+  server: ServerPaging | undefined;
+  paging: { page: number; perPage: number; total: number; setPage: (page: number) => void };
+}) {
+  if (server)
+    return server.total > server.perPage ? (
+      <Pagination
+        controls="simple"
+        page={server.page}
+        perPage={server.perPage}
+        totalCount={server.total}
+        setPage={server.setPage}
+      />
+    ) : null;
+  return paging.total > paging.perPage ? (
+    <Pagination
+      page={paging.page}
+      perPage={paging.perPage}
+      totalCount={paging.total}
+      setPage={paging.setPage}
+    />
+  ) : null;
+}
+
 /** One article; on a multilingual site's grouped list, with its group's Languages cell. */
 function ArticleRow({
   entry: e,
@@ -302,6 +413,7 @@ function ArticleRow({
   host,
   data,
   list,
+  fields,
   views,
   deleteDisabledReason,
   onDelete,
@@ -311,6 +423,8 @@ function ArticleRow({
   host: string | undefined;
   data: TaxonomyData;
   list: TranslationList<ContentEntry>;
+  /** The site, when the collection has listing fields to show (RFC-0042). */
+  fields: Site | undefined;
   views: ListViewsColumn;
   deleteDisabledReason: string | undefined;
   onDelete: () => void;
@@ -350,6 +464,11 @@ function ArticleRow({
           </div>
         </div>
       </Table.Cell>
+      {fields && (
+        <Suspense fallback={null}>
+          <ListFieldCells site={fields} collection={e.collection} entry={e} />
+        </Suspense>
+      )}
       {catTax && (
         <Table.Cell className="whitespace-nowrap" data-testid="category-cell">
           {cats.names.length === 0 ? (
@@ -436,6 +555,12 @@ function ArticleRow({
 }
 
 type Facets = { category?: string | undefined; tag?: string | undefined };
+
+/** The URL search without the field sort. */
+function withoutSort(search: Record<string, string>): Record<string, string> {
+  const { sort: _s, ...rest } = search;
+  return rest;
+}
 
 /** The category and tag filters, which query the API's filter language (DESIGN.md §2p). */
 function ArticleFacets({

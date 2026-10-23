@@ -14,6 +14,7 @@ import { API_ACTOR, writerOf } from "../governance.ts";
 import { editsLiveCorrections, entryLimit, personOf } from "../own.ts";
 import { param } from "../params.ts";
 import { type DraftPreview, previewResponse } from "../preview.ts";
+import { previewStructuredData } from "../structured-data.ts";
 
 const STATUSES = new Set<PublishStatus>(["draft", "review", "published", "archived"]);
 
@@ -119,6 +120,15 @@ export const entries: Hono<Env> = new Hono<Env>()
     return c.json({
       html: renderEntryPreview(site, draft, { blocks: store.blocks }).html,
     } satisfies DraftPreview);
+  })
+  // RFC-0042 §7: the JSON-LD the entry's page emits under its collection's preset (read-only).
+  .get("/:entryId/structured-data", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    const entry = await store.getContentEntry(param(c, "entryId"));
+    if (!entry || entry.siteId !== site.id) throw notFound("entry not found");
+    return c.json(await previewStructuredData(store, site, entry));
   })
   .get("/:entryId", async (c) => {
     const entry = await c.get("store").getContentEntry(param(c, "entryId"));

@@ -13,6 +13,7 @@ import { type AnalyticsSearch, validateAnalyticsSearch } from "./lib/analytics-s
 import { api } from "./lib/api.ts";
 import { authClient } from "./lib/auth.ts";
 import { isQueueTab, type QueueTab } from "./lib/comments-shell.ts";
+import { listingSearch } from "./lib/listing-search.ts";
 import { cachedSession } from "./lib/session-cache.ts";
 import { AccountShell } from "./routes/AccountShell.tsx";
 import { SiteShell } from "./routes/SiteShell.tsx";
@@ -48,7 +49,7 @@ const ArticleEditorPage = lazyRouteComponent(
   "ArticleEditorPage",
 );
 const ArticlesPage = lazyRouteComponent(
-  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers", "menus"]),
+  () => withMessages(import("./routes/ArticlesPage.tsx"), ["readers", "menus", "listings"]),
   "ArticlesPage",
 );
 const CollectionsPage = lazyRouteComponent(
@@ -61,6 +62,7 @@ const CollectionSettingsPage = lazyRouteComponent(
       "collections",
       "commentsSettings",
       "fields",
+      "listings",
     ]),
   "CollectionSettingsPage",
 );
@@ -94,6 +96,7 @@ const PageEditorPage = lazyRouteComponent(
       "bodyEditor",
       "media",
       "menus",
+      "listings",
     ]),
   "PageEditorPage",
 );
@@ -321,7 +324,11 @@ const collectionsRoute = createRoute({
 const collectionRoute = createRoute({
   getParentRoute: () => siteRoute,
   path: "/collections/$collection",
-  validateSearch: facetSearch,
+  // RFC-0042 §4: list-field filters (`f_<field>`) and the field sort (`sort`) live in the URL too.
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...facetSearch(search),
+    ...listingSearch(search),
+  }),
   component: ArticlesPage,
 });
 const collectionSettingsRoute = createRoute({

@@ -2,6 +2,7 @@
 import type { Section } from "@cloudhal/core-contracts";
 import type { BlockType } from "@cloudhal/core-ts/blocks";
 import { Grid, Input, InputArea, Select } from "@cloudhal/ui";
+import { lazy, Suspense } from "react";
 import { useT } from "../../i18n/index.tsx";
 import { validateImageRef } from "../../lib/seo.ts";
 import { setOptional } from "../../lib/util.ts";
@@ -10,6 +11,11 @@ import { BodyEditor } from "../BodyEditor.tsx";
 import { ImageRefField } from "../MediaPicker.tsx";
 import { SurfaceSectionEditor } from "../SurfaceSectionEditor.tsx";
 import { FIELD_ROW } from "./sections.ts";
+
+// RFC-0042 §4: conditions and order by the listed collection's listing fields (lazy).
+const ContentListQuery = lazy(() =>
+  import("../listings/ContentListQuery.tsx").then((m) => ({ default: m.ContentListQuery })),
+);
 
 /** Where a section's image comes from: the site (media library, primary domain). */
 export interface MediaContext {
@@ -27,6 +33,7 @@ export function SectionForm({
   media,
   blocks,
   readOnly,
+  queryIssues = [],
 }: {
   section: Section;
   onChange: (s: Section) => void;
@@ -35,6 +42,8 @@ export function SectionForm({
   blocks: readonly BlockType[];
   /** The fieldset turns off native fields; the rich body editor needs telling. */
   readOnly: boolean;
+  /** A content list's `invalid_query` issues from the last save (RFC-0042). */
+  queryIssues?: readonly { path: string; message: string }[];
 }) {
   const t = useT();
   switch (section.kind) {
@@ -139,7 +148,19 @@ export function SectionForm({
         </>
       );
     case "contentList":
-      return <ContentListFields section={section} onChange={onChange} />;
+      return (
+        <>
+          <ContentListFields section={section} onChange={onChange} />
+          <Suspense fallback={null}>
+            <ContentListQuery
+              siteId={media.siteId}
+              section={section}
+              onChange={onChange}
+              issues={queryIssues}
+            />
+          </Suspense>
+        </>
+      );
   }
 }
 

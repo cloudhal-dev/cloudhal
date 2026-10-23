@@ -16,7 +16,7 @@ import { useT } from "../../i18n/index.tsx";
 import { blockIcon, newBlockSection } from "../BlockSection.tsx";
 import { BodyProposals } from "../BodyProposals.tsx";
 import { SectionForm } from "./SectionForm.tsx";
-import { KIND_ICON, KINDS, newSection, sectionId } from "./sections.ts";
+import { KIND_ICON, KINDS, newSection, sectionId, sectionQueryIssues } from "./sections.ts";
 import type { PageEditorState } from "./usePageEditor.ts";
 
 export function SectionList({
@@ -123,6 +123,7 @@ export function SectionList({
                 }}
                 blocks={blockTypes}
                 readOnly={readOnly}
+                queryIssues={sectionQueryIssues(ed.save.error, i)}
               />
               {s.kind === "richText" && s.format === "markdown" && (
                 <BodyProposals

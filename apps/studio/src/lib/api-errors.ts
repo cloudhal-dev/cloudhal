@@ -4,6 +4,9 @@ import { ApiRequestError } from "./api/http.ts";
 
 type ApiErrorKey = keyof (typeof en)["errors"]["api"];
 
+/** True when the catalog words this API error code (`errors.api.<code>`). */
+export const isWordedCode = (code: string | undefined) => code !== undefined && isKnown(code);
+
 /** A 409: someone changed the document since it was read (CAS on `rev`). */
 export const isConflict = (e: unknown) => e instanceof ApiRequestError && e.status === 409;
 

@@ -22,6 +22,7 @@ import type { messages as collections } from "./lazy/collections.en.ts";
 import type { messages as comments } from "./lazy/comments.en.ts";
 import type { messages as commentsSettings } from "./lazy/commentsSettings.en.ts";
 import type { messages as fields } from "./lazy/fields.en.ts";
+import type { messages as listings } from "./lazy/listings.en.ts";
 import type { messages as media } from "./lazy/media.en.ts";
 import type { messages as menus } from "./lazy/menus.en.ts";
 import type { messages as readers } from "./lazy/readers.en.ts";
@@ -43,6 +44,7 @@ export interface NamespaceCatalogs {
   comments: DeepString<(typeof comments)["comments"]>;
   commentsSettings: DeepString<(typeof commentsSettings)["commentsSettings"]>;
   fields: DeepString<(typeof fields)["fields"]>;
+  listings: DeepString<(typeof listings)["listings"]>;
   media: DeepString<(typeof media)["media"]>;
   menus: DeepString<(typeof menus)["menus"]>;
   readers: DeepString<(typeof readers)["readers"]>;

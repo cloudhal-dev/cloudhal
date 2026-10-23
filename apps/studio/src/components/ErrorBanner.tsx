@@ -2,7 +2,7 @@ import { Banner } from "@cloudhal/ui";
 import { ArrowClockwise, WarningCircle } from "@phosphor-icons/react";
 import { useT } from "../i18n/index.tsx";
 import { ApiRequestError } from "../lib/api.ts";
-import { apiErrorText } from "../lib/api-errors.ts";
+import { apiErrorText, isWordedCode } from "../lib/api-errors.ts";
 
 /**
  * Page/section error (DESIGN.md §5): plain-language message (`apiErrorText`), optional retry
@@ -24,7 +24,8 @@ export function ErrorBanner({
   const t = useT();
   if (!error) return null;
   const message =
-    error instanceof ApiRequestError && error.status === 409
+    // A 409 is someone else's change, unless its code has words of its own (`list_field_in_use`).
+    error instanceof ApiRequestError && error.status === 409 && !isWordedCode(error.body?.error)
       ? t("errors.conflict")
       : apiErrorText(t, error);
   return (

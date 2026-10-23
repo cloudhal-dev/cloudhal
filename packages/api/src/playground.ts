@@ -130,6 +130,7 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   `POST ${S}/entries`,
   `GET ${S}/entries/:entryId/preview`,
   `POST ${S}/entries/:entryId/preview`,
+  `GET ${S}/entries/:entryId/structured-data`,
   `POST ${S}/entries/preview-fragment`,
   `GET ${S}/entries/:entryId`,
   `PUT ${S}/entries/:entryId`,
