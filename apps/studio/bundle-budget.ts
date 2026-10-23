@@ -77,6 +77,12 @@ export const LAZY_ONLY: readonly RegExp[] = [
   // keeps the hooks (`elevation-actions.ts`, `useShortDuration.ts`, `taxonomy-keys.ts`).
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/](NotificationItems|AgentModes|Elevation|ElevationRequest|Taxonomy|RelativeTime)\.tsx$/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](taxonomy|seo|activity)\.ts$/,
+  // Typed custom fields (RFC-0041 §7): the entry form, its zone helpers, the builder, the operation
+  // dialogs and the field model load with a collection that has fields, never with the shell.
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](EntryFieldsForm|entry-fields-model|zoned-time)\.tsx?$/,
+  /[\\/]packages[\\/]core-ts[\\/]src[\\/]fields[\\/]/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]fields[\\/]/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](fields|field-form)\.ts$/,
   // Lazy message namespaces: their words load with the screens that show them.
   /[\\/]apps[\\/]studio[\\/]src[\\/]i18n[\\/]lazy[\\/]/,
   // Core catalogs other than English load with their language (`loadLocale`), never with English.

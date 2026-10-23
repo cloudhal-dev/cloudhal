@@ -17,7 +17,15 @@ import { ELEVATION_PRESETS } from "./elevation.ts";
 export const APPROVALS_POLL_MS = 15_000;
 
 /** Tools whose approval changes what visitors see or deletes content: confirm before approving. */
-export const CONFIRM_TOOLS = ["publish", "rollback", "delete_page", "delete_entry"] as const;
+export const CONFIRM_TOOLS = [
+  "publish",
+  "rollback",
+  "delete_page",
+  "delete_entry",
+  // RFC-0041 §8: destructive field operations (values converted or removed in every entry).
+  "change_field_type",
+  "remove_field",
+] as const;
 
 export function needsConfirmation(tool: string): boolean {
   return (CONFIRM_TOOLS as readonly string[]).includes(tool);

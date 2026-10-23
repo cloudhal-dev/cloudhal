@@ -1070,6 +1070,8 @@ describe("design rules (DESIGN.md)", () => {
       "components/MediaPicker.tsx",
       "components/MediaUpload.tsx",
       "components/Seo.tsx",
+      // RFC-0041: an image field's chosen media-library file (assetPreviewUrl).
+      "components/fields/FieldImage.tsx",
       "routes/ArticlesPage.tsx",
     ]);
     for (const f of users) {

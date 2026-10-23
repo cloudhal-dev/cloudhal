@@ -63,6 +63,12 @@ export type {
 } from "./api/analytics.ts";
 export type { Approval, ApprovalChanges, ApprovalStatus } from "./api/approvals.ts";
 export type {
+  FieldOperationRequest,
+  FieldOperationResult,
+  FieldOperationStatus,
+  FieldRevertResult,
+} from "./api/collections.ts";
+export type {
   CommentBan,
   CommentCounts,
   CommentEraseResult,

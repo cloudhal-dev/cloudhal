@@ -16,6 +16,14 @@ export const KNOWN_TOOLS = [
   "create_entry",
   "update_entry",
   "delete_entry",
+  // RFC-0040 collections, RFC-0041 typed fields (operations wait for a person with site:settings)
+  "list_collections",
+  "create_collection",
+  "update_collection",
+  "rename_field",
+  "change_field_type",
+  "set_field_localized",
+  "remove_field",
   // RFC-0019 corrections
   "add_correction",
   // RFC-0014 body tools, RFC-0015 block types
