@@ -116,7 +116,7 @@ describe("Collection settings", () => {
       status: 409,
       body: {
         error: "path_conflict",
-        message: 'collection "posts" at /about would cover page /about',
+        message: 'collection "posts" at /about would cover page /about/team',
       },
     });
     render(wrap(<CollectionSettingsSection siteId="site_1" />));

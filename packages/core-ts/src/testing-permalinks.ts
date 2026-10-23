@@ -109,7 +109,7 @@ export function permalinksSuite(ctx: SuiteContext): void {
       expect(dry).toMatchObject({ rev: s.rev + 1, collections: next.collections });
       expect((await fresh(site)).rev).toBe(s.rev);
       expect(await redirects(site)).toEqual([]);
-      const clash = { ...s, collections: { posts: { permalink: "/about/{slug}" } } };
+      const clash = { ...s, collections: { posts: { permalink: "/tag/{slug}" } } };
       expect(await code(ctx.store().updateSite(clash, { dryRun: true }))).toBe("path_conflict");
     });
 
@@ -157,7 +157,6 @@ export function permalinksSuite(ctx: SuiteContext): void {
         tags: [],
         author: person,
       } as never);
-      expect(await code(move(site, "/about/{slug}"))).toBe("path_conflict");
       expect(await code(move(site, "/work/{slug}"))).toBe("path_conflict");
       expect(await code(move(site, "/category/{slug}"))).toBe("path_conflict");
       expect(await code(move(site, "/tag/posts/{slug}"))).toBe("path_conflict");
@@ -188,7 +187,6 @@ export function permalinksSuite(ctx: SuiteContext): void {
       ({ site } = await page("/posts/landing"));
       // A page in the way is refused when the template moves there, not afterwards.
       site = await move(site, "/blog/{slug}");
-      expect(await code(page("/blog"))).toBe("path_conflict");
       expect(await code(page("/blog/about"))).toBe("path_conflict");
       const about = (await store.listPages(site.id)).find((p) => p.path === "/about");
       expect(about).toBeDefined();
@@ -211,6 +209,29 @@ export function permalinksSuite(ctx: SuiteContext): void {
       expect(await code(tax("/blog/series"))).toBe("path_conflict");
       // Outside the configured prefix (the old default included), pages are written as before.
       expect((await page("/posts/new")).page.path).toBe("/posts/new");
+    });
+
+    it("§4.1: the page at a template's prefix is the collection's index page, not a conflict", async () => {
+      let site = await setup();
+      const store = ctx.store();
+      const page = (path: string) =>
+        store.createPage(site, {
+          siteId: site.id,
+          path,
+          title: "P",
+          locale: "en",
+          status: "draft",
+          sections: [],
+        });
+      // The listing page exists first; entries then move under it. Both writes run their SQL race
+      // guards (`noPageUnder`, `configuredPrefixFree`) in the batch, so those pass too.
+      ({ site } = await page("/blog"));
+      site = await move(site, "/blog/{slug}");
+      expect(site.collections?.posts?.permalink).toBe("/blog/{slug}");
+      // …or the template is there first and the listing page comes after.
+      site = await move(site, "/notes/{slug}");
+      ({ site } = await page("/notes"));
+      expect((await store.listPages(site.id)).map((p) => p.path)).toContain("/notes");
     });
 
     it("§3: a stale site rev raises ConflictError and writes no redirect", async () => {
