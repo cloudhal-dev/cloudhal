@@ -1,5 +1,48 @@
 # @cloudhal/cli
 
+## 0.5.0
+
+### Minor Changes
+
+- cc263c3: Typed custom fields, step 3 (RFC-0041 §6 / ADR-0043): field operations.
+  
+  - **`runFieldOperation` / `continueFieldOperation` / `revertFieldOperation` / `fieldOperationStatus`** in `@cloudhal/core-ts` run `rename_field`, `change_field_type`, `set_field_localized` and `remove_field`: a dry run (entries touched, values moved, converted, cleared, removed, unchanged and unconvertible, per locale, with samples), a `before …` snapshot whose id is the operation id, the new definition with its `migration` marker (phase A), entries rewritten in guarded batches of 200 that resume after an interruption (phase B), the marker dropped once nothing is pending (phase C) and an `after` snapshot. Only the draft graph changes. A type change follows a closed conversion table (`convertFieldValue`, exported from `@cloudhal/core-ts/fields`) and refuses values it cannot convert (`field_values_unconvertible`) unless `onInvalid: "clear"`. One operation per collection at a time (`operation_in_progress`). Reverting restores the earlier definition and the entries nobody edited since, and converts edited ones back.
+  - **Readers stay consistent mid-run:** `resolveFields` converts values still in the old type, and a field being removed reads as gone; a person's entry write during an operation goes through the marker, so edits and the operation converge.
+  - **Translations:** changing only non-localized field values of an original no longer marks its translations stale (their recorded source hash follows, in the same batch); operations keep fresh translations fresh.
+  - **API:** `POST /api/sites/:id/collections/:key/fields/operations` (`dryRun`, `?continue=<id>`), `GET …/:operationId`, `POST …/:operationId/revert` (`site:settings` and `content:write`), and the same under `/api/admin` with the deployment token.
+  - **CLI:** `cloudhal fields rename|retype|localize|remove|continue|revert [--dry-run] [--remote]`; the dry run also lists theme files that read the field directly.
+- 92d3362: Typed custom fields, step 6 (RFC-0041 §9 / ADR-0043): renderer and themes. Additive only: `entry.fields` still means exactly what is stored, and themes copied before this release build and render as before (a frozen 0.4.0 theme joins the compat test).
+  
+  - **`GraphSource.entryFields(entry, options?)`** on live and snapshot sources (and `entryFields(source, entry, options?)` from `@cloudhal/astro-renderer/fields` for any source): an entry's typed fields as a theme draws them, by key in definition order. Values are resolved by the language rules (a translation's empty localized field reads the original's, `fromOriginal`; non-localized fields come from the translation group's original; language editions own their values), labelled in the page's language and made safe: rich text as HTML from the article body's markdown pipeline (raw HTML escaped, `safeHref` on links), URLs through `safeHref` (dropped when unsafe), images as `<img>` attributes with the asset's alt in the page's language, everything else as formatted text. Also `renderFields`, `hasShownFields`, and `resolveFields`, `formatFieldValue`, `fieldLabel`, `fieldHelp`, `optionLabel` re-exported.
+  - **`formatFieldValue(value, def, { locale, defaultLocale?, timeZone?, words? })`** in `@cloudhal/core-ts/fields`: a value as plain text with `Intl` (numbers, dates that never shift a day, instants in their own zone, option labels as a list, yes/no words).
+  - **`EntryFields.astro`** in `@cloudhal/astro-renderer/components`: a plain, unstyled `<dl class="ch-fields">` of the fields that have a value, with `data-field` / `data-type` hooks for themes; nothing at all when none has one.
+  - **Blog starter:** articles of collections with fields show a "Details" list under the cover (English, Turkish and Japanese words). Entries of collections without definitions render byte for byte as before.
+  - New guide: `docs/guides/fields.md` (defining fields in Studio, MCP, the API and the CLI; operations; languages; theme API; security).
+- 05274d3: Typed custom fields, step 5 (RFC-0041 §7 / ADR-0043): Studio.
+  
+  - **Entry editor › Fields:** collections with field definitions get a "Fields" card in the entry editor (loaded only for them), one control per type — text, rich text (the body editor), number, yes/no, date, date and time in its own zone, link, image (the media picker) and choice (one or several). Labels and help follow the Studio language, required fields say "Needed to publish", and the API's issues show on their field. On a translation, shared (non-localized) fields are read-only with the original's value and a link to it; empty per-language fields show the original's value as their placeholder. Values save with the entry.
+  - **Collection settings › Fields:** a builder to add fields (the key follows the label until saved), reorder them and edit labels, help, limits and options, saved together. Renaming, changing a type or the languages of a saved field, and removing one open a dialog that runs the dry run first (entries changed, values moved, converted or cleared, per language, examples, a note about themes), needs confirmation — and an explicit opt-in to clear values that cannot be converted — then runs the operation to the end and offers Revert. A running operation shows its progress and can be continued. Only people who may change site settings edit fields; others see them read-only.
+  - Activity and Approvals name the collection and field tools, field operations that convert or remove values ask for confirmation before approval, and every field error code reads as a sentence in the Studio language. New words live in a lazy `fields` namespace (drafts in every language, awaiting review).
+
+### Patch Changes
+
+- 0ba1e01: Studio (RFC-0040 §4): a collection's settings get a Comments section (saved in the site's comment settings), the site overview lists recent content across every collection, and entries open at `/sites/<id>/collections/<collection>/<entry>` — the old `/articles/<entry>` links redirect there. The command palette goes to each collection.
+- Updated dependencies [672b993]
+- Updated dependencies [9d04a37]
+- Updated dependencies [cc263c3]
+- Updated dependencies [92d3362]
+- Updated dependencies [bd5af88]
+  - @cloudhal/core-contracts@0.5.0
+  - @cloudhal/core-ts@0.5.0
+  - @cloudhal/mcp-server@0.5.0
+  - @cloudhal/api@0.5.0
+  - @cloudhal/agent-runtime@0.5.0
+  - @cloudhal/analytics@0.5.0
+  - @cloudhal/comments@0.5.0
+  - @cloudhal/schedules@0.5.0
+  - @cloudhal/storage@0.5.0
+  - @cloudhal/cloudflare@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
