@@ -33,6 +33,7 @@ export * from "./design.ts";
 export * from "./domains.ts";
 export * from "./editions.ts";
 export * from "./errors.ts";
+export * from "./fields-operations/index.ts";
 export * from "./filter.ts";
 export * from "./hash.ts";
 export type { NodeHold } from "./holds.ts";

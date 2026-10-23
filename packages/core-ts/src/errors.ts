@@ -195,7 +195,13 @@ export type InvariantCode =
   /** More fields than a collection (30) or a site (200) may have, or options than a select (50). */
   | "too_many_fields"
   /** A definition change that could lose or reinterpret stored values; it needs a field operation. */
-  | "field_change_needs_operation";
+  | "field_change_needs_operation"
+  /** RFC-0041 §6: another field operation is still rewriting this collection's entries. */
+  | "operation_in_progress"
+  /** RFC-0041 §6: values a type change cannot convert, without `onInvalid: "clear"` (`details.report`). */
+  | "field_values_unconvertible"
+  /** RFC-0041 §6: the field operation has not finished (revert waits for it), or was already reverted. */
+  | "field_operation_incomplete";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

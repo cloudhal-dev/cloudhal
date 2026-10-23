@@ -19,8 +19,10 @@ import type { SqlStatement } from "@cloudhal/storage";
 import {
   checkFieldValues,
   checkRequiredToPublish,
+  convertContext,
   type FieldIssue,
   fieldDefinitions,
+  normalizeThroughMarkers,
   refuseFieldIssues,
 } from "../fields/index.ts";
 import { sameJson } from "../fields/types.ts";
@@ -58,6 +60,22 @@ async function originalOf(
   if (!t || t.group === entry.id || t.source?.siteId !== undefined) return undefined;
   const original = await ctx.graph.getContentEntry(t.group);
   return original?.siteId === entry.siteId ? original : undefined;
+}
+
+/**
+ * RFC-0041 §6: while a field operation runs, a write goes through its marker (a renamed key moves,
+ * a value still in the old type converts, a removed field or a translation's copy of a field that
+ * stops being localized goes), so a person's edit and the operation converge.
+ */
+export function normalizeEntryFields(site: Site, draft: ContentEntry): ContentEntry {
+  const defs = fieldDefinitions(site, draft.collection);
+  if (!defs.some((d) => d.migration)) return draft;
+  const t = draft.translation;
+  const fields = normalizeThroughMarkers(defs, draft.fields, {
+    convert: convertContext(site),
+    translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
+  });
+  return fields ? { ...draft, fields } : draft;
 }
 
 /** Checks the field part of an entry write and plans its asset references; throws on issues. */
@@ -143,6 +161,37 @@ function assetProblem(
   return undefined;
 }
 
+/**
+ * The `fields.*` rows of `asset_refs` for an entry, rewritten: anchored on its new hash, so they
+ * run only when the entry's write did (rule 4). Field operations use it for every entry they move.
+ */
+export function fieldRefStatements(
+  siteId: string,
+  nodeId: string,
+  refs: readonly AssetRefUse[],
+  hash: string,
+): SqlStatement[] {
+  const out: SqlStatement[] = [
+    {
+      sql: `DELETE FROM asset_refs WHERE node_id = ? AND field LIKE 'fields.%' AND ${ANCHOR}`,
+      params: [nodeId, nodeId, hash],
+    },
+  ];
+  if (refs.length > 0)
+    out.push({
+      sql: `INSERT INTO asset_refs (site_id, asset_id, node_id, node_kind, field)
+            SELECT ?, json_extract(value, '$.a'), ?, 'contentEntry', json_extract(value, '$.f') FROM json_each(?) WHERE ${ANCHOR}`,
+      params: [
+        siteId,
+        nodeId,
+        JSON.stringify(refs.map((r) => ({ a: r.assetId, f: r.field }))),
+        nodeId,
+        hash,
+      ],
+    });
+  return out;
+}
+
 interface RefsInput {
   site: Site;
   draft: ContentEntry;
@@ -157,27 +206,7 @@ function refsPlan(ctx: StoreContext, input: RefsInput): EntryFieldsPlan {
   const nodeId = draft.id;
   const ids = [...new Set(refs.map((r) => r.assetId))];
   const keptIds = [...new Set(kept.map((r) => r.assetId))];
-  const statements = (hash: string): SqlStatement[] => {
-    const out: SqlStatement[] = [
-      {
-        sql: `DELETE FROM asset_refs WHERE node_id = ? AND field LIKE 'fields.%' AND ${ANCHOR}`,
-        params: [nodeId, nodeId, hash],
-      },
-    ];
-    if (refs.length > 0)
-      out.push({
-        sql: `INSERT INTO asset_refs (site_id, asset_id, node_id, node_kind, field)
-              SELECT ?, json_extract(value, '$.a'), ?, 'contentEntry', json_extract(value, '$.f') FROM json_each(?) WHERE ${ANCHOR}`,
-        params: [
-          site.id,
-          nodeId,
-          JSON.stringify(refs.map((r) => ({ a: r.assetId, f: r.field }))),
-          nodeId,
-          hash,
-        ],
-      });
-    return out;
-  };
+  const statements = (hash: string) => fieldRefStatements(site.id, nodeId, refs, hash);
   if (ids.length === 0) return { guard: undefined, statements, diagnose: async () => {} };
   // The files still exist, and are active unless the entry already used them (as `planRefs`).
   const guard: Cond = {

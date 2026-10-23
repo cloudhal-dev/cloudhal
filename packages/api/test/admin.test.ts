@@ -91,6 +91,36 @@ describe("admin search reindex (RFC-0019 §3)", () => {
   });
 });
 
+describe("admin field operations (RFC-0041 §6)", () => {
+  it("runs a field operation as the operator behind the deploy token", async () => {
+    const b = await backend();
+    let site = await seedStarterSite(b.store, { name: "Ops", slug: "ops" });
+    site = await b.store.updateSite({
+      ...site,
+      collections: {
+        events: {
+          fields: [{ key: "venue", type: "text", labels: { en: { label: "V" } }, localized: true }],
+        },
+      },
+    });
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const res = await app.request(
+      `/api/admin/sites/${site.id}/collections/events/fields/operations`,
+      {
+        method: "POST",
+        headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ op: "rename_field", from: "venue", to: "place" }),
+      },
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { done: boolean; operationId: string };
+    expect(body.done).toBe(true);
+    const before = await b.store.getSnapshot(body.operationId);
+    expect(before?.actor.id).toBe("sys_operator01");
+    expect((await b.store.getSite(site.id))?.collections?.events?.fields?.[0]?.key).toBe("place");
+  });
+});
+
 describe("admin placeholder backfill (RFC-0028 §5)", () => {
   it("lists images without a colour and stores what the CLI drew, keeping measured fields", async () => {
     const b = await backend();
@@ -314,6 +344,9 @@ describe("admin token guard", () => {
     ["POST", "/api/admin/sites/site_x/ai/build-eval"],
     ["POST", "/api/admin/sites/site_x/ai/judge-check"],
     ["POST", "/api/admin/sites/site_x/search/reindex"],
+    ["POST", "/api/admin/sites/site_x/collections/events/fields/operations"],
+    ["GET", "/api/admin/sites/site_x/collections/events/fields/operations/snap_x"],
+    ["POST", "/api/admin/sites/site_x/collections/events/fields/operations/snap_x/revert"],
     ["GET", "/api/admin/sites/site_x/media-placeholders"],
     ["PUT", "/api/admin/sites/site_x/media-placeholders/asset_x"],
     ["GET", "/api/admin/sites/site_x/bundle"],

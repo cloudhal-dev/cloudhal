@@ -37,6 +37,10 @@ Usage:
   cloudhal migrate tags-to-terms [--dry-run] [--revert <id>]
                                                           move entry tags into tag terms (RFC-0002);
                                                           resumable; --revert <id> undoes a run
+  cloudhal fields rename <c> <from> <to> | retype <c> <key> <type> [--options a,b] [--multiple] [--clear] | localize <c> <key> on|off | remove <c> <key> | continue|revert <c> <id>  [--dry-run] [--remote]
+                                                          change a collection's typed fields with their values
+                                                          (RFC-0041): snapshotted, resumable; --dry-run reports
+                                                          and greps the theme; revert <id> undoes a run
   cloudhal media import-urls [--dry-run] [--include-markdown] [--allow-host <host>]… | --revert <id>
                                                           copy linked images into the media library
                                                           (RFC-0004); revertible

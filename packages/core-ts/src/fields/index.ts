@@ -5,6 +5,17 @@
  * receive, and the values readers see (`resolveFields`). Worker-safe and Temporal-free.
  */
 export {
+  type Conversion,
+  type ConvertContext,
+  canConvert,
+  convertFieldValue,
+  dayIn,
+  escapeMarkdown,
+  FIELD_CONVERSIONS,
+  markdownToPlain,
+  midnightIn,
+} from "./conversions.ts";
+export {
   checkFieldDefinitions,
   type FieldDefinitionChange,
   fieldDefinitionChanges,
@@ -15,6 +26,17 @@ export {
   JSON_SCHEMA_KEYWORDS,
   type JsonSchema,
 } from "./json-schema.ts";
+export {
+  convertContext,
+  type FieldMigrationKind,
+  isBeingRemoved,
+  migrationKind,
+  normalizeThroughMarkers,
+  type RewriteInput,
+  type RewriteResult,
+  rewriteFields,
+  type ValueChange,
+} from "./migration.ts";
 export {
   ASSET_ID_PATTERN,
   DATE_PATTERN,

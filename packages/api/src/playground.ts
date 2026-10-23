@@ -114,6 +114,10 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   `GET ${S}/collections`,
   `PUT ${S}/collections/:key`,
   `DELETE ${S}/collections/:key`,
+  // RFC-0041 §6: field operations rewrite the visitor's own draft entries.
+  `POST ${S}/collections/:key/fields/operations`,
+  `GET ${S}/collections/:key/fields/operations/:operationId`,
+  `POST ${S}/collections/:key/fields/operations/:operationId/revert`,
   `GET ${S}/pages`,
   `POST ${S}/pages`,
   `GET ${S}/pages/:pageId/preview`,

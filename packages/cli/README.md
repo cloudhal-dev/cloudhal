@@ -137,6 +137,22 @@ Locally, `cloudhal studio` reads the project's SQLite (`analytics_events`), roll
 
 `cloudhal migrate tags-to-terms` moves the deprecated `ContentEntry.tags` of the local site into terms of the `tag` taxonomy. It snapshots the site first (`before tags-to-terms`; its id is the migration id), creates the default `category` and `tag` taxonomies if they are missing (`category` is not required on an existing site), creates one active tag per distinct slug, rewrites entries in batches of 200 and snapshots again (`tags-to-terms`). An interrupted run resumes; a second run does nothing. Nothing goes live until you publish. `--dry-run` reports what would change; `--revert <id>` restores the tags of entries nobody edited since, then removes the terms and taxonomies the run created that are no longer used.
 
+### Changing typed fields (RFC-0041)
+
+`cloudhal fields` changes a collection's typed fields together with the values entries hold, which a plain edit of the definitions refuses (`field_change_needs_operation`):
+
+```bash
+cloudhal fields rename events speaker presenter --dry-run   # report only; also lists theme files reading fields.speaker
+cloudhal fields rename events speaker presenter
+cloudhal fields retype events seats number [--clear]          # closed conversion table; --clear drops values it cannot convert
+cloudhal fields retype events format select --options talk,workshop=Workshop [--multiple]
+cloudhal fields localize events notes off                     # translations' own copies go; the original's value is read
+cloudhal fields remove events notes
+cloudhal fields revert events <operationId>
+```
+
+Each run snapshots the site first (`before rename_field events.speaker`; its id is the operation id), writes the new definition with a `migration` marker so every reader stays consistent, rewrites entries in guarded batches of 200, drops the marker and snapshots again. Translations that were up to date stay up to date. An interrupted run resumes with `cloudhal fields continue <collection> <id>`; one operation per collection runs at a time. `--remote` runs it on the deployment with the deployment token. Only the draft graph changes: nothing goes live until you publish.
+
 ### Deploying to Cloudflare (ADR-0012)
 
 `cloudhal deploy` uses **your** wrangler login (`npx wrangler login`, or `CLOUDFLARE_API_TOKEN`); Cloudhal never reads those credentials. It creates the D1 database and R2 bucket if needed (with a lifecycle rule that expires the snapshot bundles under `bundles/` after 30 days, RFC-0010), generates the deployment secrets once into `.cloudhal/deploy/secrets.json` (0600 — keep it out of git), builds and deploys the **site Worker** (Astro on demand, edge-cached) and the **admin Worker** (Studio, API, auth, MCP), and on the first deploy pushes your local site.

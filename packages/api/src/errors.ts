@@ -81,6 +81,10 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   field_option_duplicate: 400,
   field_bounds: 400,
   field_change_needs_operation: 409,
+  // RFC-0041 §6 field operations: one at a time per collection, values a type change would lose.
+  operation_in_progress: 409,
+  field_values_unconvertible: 422,
+  field_operation_incomplete: 409,
   reserved_key: 400,
   immutable_field: 400,
   primary_not_assigned: 422,

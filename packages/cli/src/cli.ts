@@ -65,6 +65,9 @@ export const OPTIONS = {
   project: { type: "string" },
   theme: { type: "string" },
   confirm: { type: "string" },
+  options: { type: "string" },
+  multiple: { type: "boolean" },
+  clear: { type: "boolean" },
 } as const;
 
 /** `cloudhal <command>` → its handler. */

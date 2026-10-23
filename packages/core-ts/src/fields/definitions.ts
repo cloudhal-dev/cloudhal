@@ -144,7 +144,11 @@ export function fieldDefinitionChanges(
     for (const def of settings?.fields ?? []) {
       const match = next.get(def.key);
       if (match) out.push(...compareField(collection, def, match));
-      else out.push({ collection, key: def.key, change: "removed" });
+      else {
+        out.push({ collection, key: def.key, change: "removed" });
+        // A field an operation is rewriting stays until the operation ends it.
+        if (def.migration) out.push({ collection, key: def.key, change: "migration" });
+      }
     }
   }
   // A marker on a field that did not exist before is an operation's too.

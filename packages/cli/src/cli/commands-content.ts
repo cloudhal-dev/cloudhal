@@ -4,6 +4,7 @@ import {
   commentsStatusCli,
   describeCommentsStatus,
 } from "../commands/comments.ts";
+import { fieldsCommand } from "../commands/fields.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "../commands/media.ts";
 import { describePlaceholders, mediaPlaceholders } from "../commands/media-placeholders.ts";
 import { describeMigration, migrateTags } from "../commands/migrate.ts";
@@ -139,6 +140,7 @@ const commentsCommand = subcommands(
 
 export const CONTENT_COMMANDS = {
   migrate: migrateCommand,
+  fields: fieldsCommand,
   media: mediaCommand,
   search: searchCommand,
   comments: commentsCommand,
