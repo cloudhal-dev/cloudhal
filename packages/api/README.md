@@ -12,7 +12,7 @@ The core routes are below; the feature routes (taxonomy, menus, media, comments,
 | `GET/PUT /api/sites[/:id]` | sites (PUT = full document, CAS on `rev`) |
 | `GET /api/sites/:id/pending` | what a publish would carry, as counts (Studio's badge beside Publish) |
 | `/api/sites/:id/pages[/:pageId]` | pages (POST creates and appends to `Site.pageIds` atomically; DELETE needs `?rev=`) |
-| `/api/sites/:id/entries[/:entryId]` | content entries (`?collection=` filter); `fields` is checked against the collection's typed fields (RFC-0041), and `null` removes a key there |
+| `/api/sites/:id/entries[/:entryId]` | content entries (`?collection=`, `locale`, `status`, `filter`); `fields` is checked against the collection's typed fields (RFC-0041), and `null` removes a key there. RFC-0042 §4: with `collection`, `where` (a JSON list of up to 4 `{field, op, value?/values?}`; ops by type, `value: "now"` for date/datetime fields) and `orderBy` (JSON `{field, direction: "asc"\|"desc"}`) filter and sort by the collection's `listFields`, e.g. `?collection=events&where=[{"field":"startsAt","op":"gte","value":"now"}]&orderBy={"field":"startsAt","direction":"asc"}` (URL-encoded). `limit` (1–100) pages the answer as `{entries, total, nextCursor?}`, continued with `cursor=<nextCursor>`; without `limit` the answer stays the plain array |
 | `/api/sites/:id/collections[/:key]` | the collection registry; `PUT /:key {settings, rev}` (`?dryRun=1`) declares a collection or changes its settings, typed `fields` included; `DELETE /:key?rev=` |
 | `/api/sites/:id/collections/:key/fields/operations` | RFC-0041 §6 field operations (`site:settings` and `content:write`): `POST {op, …, dryRun?}` with `op` one of `rename_field {from, to}`, `change_field_type {key, type, options?, multiple?, onInvalid?: "clear"}`, `set_field_localized {key, localized}`, `remove_field {key}` → `{operationId, done, report, rewritten, skipped}` (a dry run writes nothing; `done: false` when the 2,000-entry / 20 s budget ran out, then `POST ?continue=<operationId>`); `GET /:operationId` → state and pending entries; `POST /:operationId/revert` (again while `done: false`). Only the draft graph changes |
 | `/api/sites/:id/snapshots` | create (`{label, publish}`), list, `:id/publish`, `:id/rollback`, `:a/diff/:b` |
@@ -36,6 +36,16 @@ Typed fields (RFC-0041) answer with every problem and its path in `details.issue
 | `operation_in_progress` | 409 | another field operation is still rewriting the collection (`details.operationId`) |
 | `field_values_unconvertible` | 422 | a type change would drop values the conversion table cannot convert, without `onInvalid: "clear"` (`details.report` is the dry run) |
 | `field_operation_incomplete` | 409 | reverting an operation that has not finished, or was already reverted |
+
+Collections stage 3 (RFC-0042) answers the same way (`details.issues`, slash paths):
+
+| Code | Status | When |
+|---|---|---|
+| `invalid_query` | 422 | an entry list's `where`/`orderBy`/`limit`/`cursor`, or a `contentList` section's (`sections/2/where/0/value`), names an unlisted field, an operator or value its type does not take, or breaks a bound |
+| `unknown_field` | 422 | `listFields` or `expiry.field` names no field of the collection |
+| `invalid_expiry` | 422 | `expiry.field` is not a date or datetime field |
+| `structured_data_invalid` | 422 | a `structuredData` preset that does not fit the type's table or the collection's fields (warnings are not refused) |
+| `list_field_in_use` | 409 | unlisting, dropping or retyping a list field (or dropping a select option) that `contentList` sections still use (`details.pages`); `remove_field` of a field named by `listFields`, `expiry` or `structuredData`; a type change that would break those sections. `rename_field` renames those references instead |
 
 ```ts
 import { createApi } from "@cloudhal/api";

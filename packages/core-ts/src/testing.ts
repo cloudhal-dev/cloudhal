@@ -9,8 +9,10 @@ import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
 import { assetsSuite } from "./testing-assets.ts";
 import { collectionsSuite } from "./testing-collections.ts";
+import { entryQuerySuite } from "./testing-entry-query.ts";
 import { fieldOperationsSuite } from "./testing-field-operations.ts";
 import { fieldsSuite } from "./testing-fields.ts";
+import { listingsSuite } from "./testing-listings.ts";
 import { menuSuite } from "./testing-menu.ts";
 import { permalinksSuite } from "./testing-permalinks.ts";
 import { racingDriver, type SuiteContext, taxonomySuite } from "./testing-taxonomy.ts";
@@ -267,5 +269,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
     collectionsSuite(suite);
     fieldsSuite(suite);
     fieldOperationsSuite(suite);
+    listingsSuite(suite);
+    entryQuerySuite(suite);
   });
 }

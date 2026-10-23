@@ -6,9 +6,10 @@ import { nodeHash } from "../hash.ts";
 import { assertUnlocked } from "../holds.ts";
 import { ID_PREFIX } from "../ids.ts";
 import { fillMissingSrc } from "../media/refs.ts";
-import { and, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
+import { and, casUpdateStatement, hashIs, OpBatch, runOpBatch } from "../node-sql.ts";
 import { type Creatable, uniquenessKey } from "../nodes.ts";
 import type { StoreContext } from "./context.ts";
+import { checkPageQueries } from "./page-queries.ts";
 import { checkPagePath, pageGuard } from "./site-permalinks.ts";
 import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
@@ -42,6 +43,8 @@ export class PageEngine {
     if (draft.siteId !== site.id) throw new Error("page.siteId must match site.id");
     checkReservedPath(draft.path);
     checkLocalizedNode("page", site, draft);
+    // RFC-0042 §4: field queries run against the site this batch's site CAS writes over.
+    checkPageQueries(site, draft);
     await checkTranslationLinks(this.#ctx, { kind: "page", site, node: draft });
     await this.#ctx.checkGates(site.id, undefined, draft.availability);
     const refs = await this.#ctx.assets.planRefs("page", site.id, draft, undefined);
@@ -97,6 +100,10 @@ export class PageEngine {
     const site = await this.#ctx.graph.getSite(next.siteId);
     if (!site) throw new NotFoundError("site", next.siteId);
     checkLocalizedNode("page", site, next);
+    // RFC-0042 §4: a changed field query holds only against the site it was checked with.
+    const siteGuard = checkPageQueries(site, next, stored)
+      ? hashIs(site.id, await nodeHash(site))
+      : undefined;
     await checkTranslationLinks(this.#ctx, { kind: "page", site, node: next, stored });
     const sameLocale = stored.locale === next.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
@@ -115,7 +122,7 @@ export class PageEngine {
           "page",
           next,
           page.rev,
-          and(pageGuard(this.#ctx, next), refs.guard),
+          and(pageGuard(this.#ctx, next), refs.guard, siteGuard),
         ),
         "page",
         key,
@@ -132,7 +139,12 @@ export class PageEngine {
       return next;
     }
     const batch = new OpBatch(this.#ctx.newId(ID_PREFIX.operation), site.id, ts);
-    await batch.update("page", stored, next, and(pageGuard(this.#ctx, next), refs.guard));
+    await batch.update(
+      "page",
+      stored,
+      next,
+      and(pageGuard(this.#ctx, next), refs.guard, siteGuard),
+    );
     batch.append(...extra);
     await plan.emit(batch);
     await runOpBatch(this.#ctx.sql, batch, {

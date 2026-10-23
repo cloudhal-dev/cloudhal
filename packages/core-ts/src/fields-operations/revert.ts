@@ -15,7 +15,9 @@ import type { ContentEntry, FieldDefinition, FieldMigration, Site } from "@cloud
 import { InvariantError } from "../errors.ts";
 import { convertContext, rewriteFields } from "../fields/migration.ts";
 import { sameJson } from "../fields/types.ts";
+import { renameSettingsReferences } from "../store/collection-settings.ts";
 import { markedField, markerGuard, pendingCondition, phaseCSite, withFields } from "./plan.ts";
+import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
 import { type Decision, loadEntries, type Row, rewritePass } from "./rewrite.ts";
 import { beforeSiteOf } from "./run.ts";
 import {
@@ -67,7 +69,53 @@ function restoredSite(site: Site, op: FieldOperation, beforeSite: Site, id: stri
   const def = (marker ? { ...earlier, migration: marker } : earlier) as FieldDefinition;
   if (at >= 0) defs[at] = def;
   else defs.splice(Math.min(index, defs.length), 0, def);
-  return withFields(site, op.collection, defs);
+  const restored = withFields(site, op.collection, defs);
+  // RFC-0042 §4: a rename's references in the stage 3 settings follow the key back.
+  return op.op === "rename_field"
+    ? renameSettingsReferences(restored, op.collection, op.to, op.from)
+    : restored;
+}
+
+/** The operation that undoes `op` as far as references are concerned (RFC-0042 §4). */
+function inverseOf(op: FieldOperation, beforeSite: Site): FieldOperation | undefined {
+  if (op.op === "rename_field") return { ...op, from: op.to, to: op.from };
+  if (op.op !== "change_field_type") return undefined;
+  const was = beforeSite.collections?.[op.collection]?.fields?.find((d) => d.key === op.key);
+  if (!was) return undefined;
+  return {
+    op: "change_field_type",
+    collection: op.collection,
+    key: op.key,
+    type: was.type,
+    ...(was.type === "select" ? { options: was.options, multiple: was.multiple === true } : {}),
+  };
+}
+
+/** Step 1's site write, with a rename's sections renamed back in the same batch. */
+async function restoreDefinition(
+  ctx: OperationContext,
+  record: { op: FieldOperation; beforeSite: Site; id: string },
+): Promise<void> {
+  const { op, beforeSite, id } = record;
+  const site = await requireSite(ctx, beforeSite.id);
+  const inverse = inverseOf(op, beforeSite);
+  const current = site.collections?.[op.collection]?.fields?.some(
+    (d) => inverse && d.key === operationKey(inverse),
+  );
+  if (inverse && current) {
+    await checkSectionReferences(ctx, site, inverse);
+    checkSettingsReferences(site, inverse);
+  }
+  const sections =
+    inverse?.op === "rename_field"
+      ? (s: Site) =>
+          renamedPages(ctx, s, {
+            collection: op.collection,
+            from: inverse.from,
+            to: inverse.to,
+          })
+      : undefined;
+  await writeSite(ctx, site.id, (s) => restoredSite(s, op, beforeSite, id), { pages: sections });
 }
 
 /** The entry without what an operation writes: values, the source it points at, stamps. */
@@ -134,7 +182,7 @@ export async function revertFieldOperation(
   if (!restoredDef) {
     const running = (site.collections?.[op.collection]?.fields ?? []).find((d) => d.migration);
     if (running?.migration) refuseRunning(op.collection, running.migration.id);
-    await writeSite(ctx, siteId, (s) => restoredSite(s, op, beforeSite, operationId));
+    await restoreDefinition(ctx, { op, beforeSite, id: operationId });
   }
   const snaps: Snapshots = {
     before: new Map(before.nodes.map((n) => [n.id, n.hash])),
@@ -180,12 +228,9 @@ export async function revertFieldOperation(
   const marked = markedField(site, op.collection, operationId);
   if (marked) {
     const pending = pendingCondition(siteId, op.collection, marked.def);
-    const wrote = await writeSite(
-      ctx,
-      siteId,
-      (s) => phaseCSite(s, op.collection, operationId),
-      nothingPending(pending),
-    );
+    const wrote = await writeSite(ctx, siteId, (s) => phaseCSite(s, op.collection, operationId), {
+      guard: nothingPending(pending),
+    });
     if (wrote === "guarded") return out;
   }
   const snapshot = await store.createSnapshot(siteId, {

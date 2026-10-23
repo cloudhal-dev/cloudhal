@@ -201,7 +201,16 @@ export type InvariantCode =
   /** RFC-0041 §6: values a type change cannot convert, without `onInvalid: "clear"` (`details.report`). */
   | "field_values_unconvertible"
   /** RFC-0041 §6: the field operation has not finished (revert waits for it), or was already reverted. */
-  | "field_operation_incomplete";
+  | "field_operation_incomplete"
+  // ── RFC-0042 (collections stage 3); `details.issues` lists every problem with its path ──
+  /** §4: a listing's `where`/`orderBy` names an unlisted field, an operator or value its type does not take. */
+  | "invalid_query"
+  /** §4: a field `contentList` sections or the collection's settings filter, sort, expire or map by would be dropped, unlisted or retyped (`details.pages`). */
+  | "list_field_in_use"
+  /** §2: a structured-data preset that does not fit the type's table or the collection's fields. */
+  | "structured_data_invalid"
+  /** §3: `expiry.field` is not a date or datetime field of the collection. */
+  | "invalid_expiry";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";
