@@ -48,16 +48,53 @@ export const CONTENT_CHECKS = `  // empty-section
   // chart-empty: a chart whose data has no rows.
   for (const el of document.querySelectorAll("[data-ch-chart-empty]")) add("chart-empty", el, "no rows in its data");
 
-  // long-line: paragraphs averaging more than 90 characters a line.
+  // long-line: text columns whose full lines hold more than 90 characters on average. Counted on
+  // the rendered lines (each paragraph's last, partly filled one left out) and pooled over every
+  // paragraph of the same width and font, so paragraphs of one column get one verdict.
+  const range = document.createRange();
+  const columns = new Map();
+  let measured = 0;
   for (const p of document.querySelectorAll("p,li,dd,blockquote")) {
-    if (!visible(p) || p.querySelector("p,li")) continue;
-    const text = (p.innerText || "").trim();
-    if (text.length < 180) continue;
+    if (measured >= 80 || !visible(p) || p.querySelector("p,li")) continue;
+    if ((p.innerText || "").trim().length < 180) continue;
+    measured++;
+    // Characters by the line they are drawn on, in reading order: a character more than half a
+    // line below the current line starts the next (inline code in another size stays on its line).
+    // A run of spaces counts once, as it is shown.
     const s = getComputedStyle(p);
-    const lh = s.lineHeight === "normal" ? parseFloat(s.fontSize) * 1.2 : parseFloat(s.lineHeight);
-    const lines = Math.round(p.getBoundingClientRect().height / lh);
-    if (lines < 3) continue;
-    const per = Math.round(text.length / lines);
-    if (per > 90) add("long-line", p, "about " + per + " characters a line");
+    const half = (s.lineHeight === "normal" ? parseFloat(s.fontSize) * 1.2 : parseFloat(s.lineHeight)) / 2;
+    const rows = [];
+    let top = -Infinity, seen = 0, space = true;
+    const tw = document.createTreeWalker(p, NodeFilter.SHOW_TEXT);
+    while (tw.nextNode() && seen < 800) {
+      const n = tw.currentNode;
+      for (let i = 0; i < n.length && seen < 800; i++) {
+        const blank = /\s/.test(n.data[i]);
+        if (blank && space) continue;
+        space = blank;
+        seen++;
+        range.setStart(n, i);
+        range.setEnd(n, i + 1);
+        const b = range.getClientRects()[0];
+        if (!b) continue;
+        if (b.top > top + half) { rows.push(0); top = b.top; }
+        rows[rows.length - 1]++;
+      }
+    }
+    // The last line seen may be partly filled (the paragraph's end, or where counting stopped).
+    const full = rows.slice(0, -1);
+    if (full.length < 2) continue;
+    const width = Math.round(p.getBoundingClientRect().width);
+    const key = width + "|" + s.fontSize + "|" + s.fontFamily;
+    const col = columns.get(key) || { width, first: p, paragraphs: 0, lines: 0, chars: 0 };
+    col.paragraphs++;
+    col.lines += full.length;
+    col.chars += full.reduce((a, b) => a + b, 0);
+    columns.set(key, col);
+  }
+  for (const col of columns.values()) {
+    const per = Math.round(col.chars / col.lines);
+    if (per > 90)
+      add("long-line", col.first, "about " + per + " characters a line in this " + col.width + " px column" + (col.paragraphs > 1 ? " (" + col.paragraphs + " paragraphs)" : ""));
   }
 `;

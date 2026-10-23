@@ -79,6 +79,9 @@ export async function listEntries(
   const orderBy = a.orderBy as FieldOrder | undefined;
   const limit = a.limit as number | undefined;
   if (a.cursor !== undefined && limit === undefined) refuse("cursor", "a cursor needs limit");
+  // List fields belong to one collection; without it they would be silently ignored.
+  if (base.collection === undefined && (where !== undefined || orderBy !== undefined))
+    refuse("collection", "where and orderBy need the collection whose list fields they use");
   const offset = a.cursor === undefined ? 0 : decodeCursor(a.cursor as string);
   const { entries } = await queryContentEntries(ctx.store, siteId, {
     ...base,
