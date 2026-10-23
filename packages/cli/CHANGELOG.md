@@ -1,5 +1,35 @@
 # @cloudhal/cli
 
+## 0.6.1
+
+### Patch Changes
+
+- 40dbfcb: Gaps an agent hit building a site through MCP:
+  
+  - **Section-only theme blocks in article bodies are refused.** A theme block type with `where: ["section"]` (say `link-cards`) has no component in an article, and drew "unknown component" there. `create_entry`/`update_entry` now refuse it inside a body ```` ```surface ```` fence (`invalid_surface`, with the component's path); primitives, built-in blocks and theme blocks that allow `body` stay. `get_catalog`'s "In article bodies" lists which blocks a body may use and which are page sections only.
+  - **`list_entries` lists every collection by default**, not only `posts`: a site whose articles live in `blog` got `[]`. `where`/`orderBy` need the collection whose list fields they use; without one they are refused (`invalid_query` at `collection`) instead of ignored.
+  - **`long-line` gives a text column one verdict.** It counted characters over a rounded line count, so how full a paragraph's last line was decided whether it passed, and identical paragraphs in one column disagreed. It now counts the characters on each rendered line, leaves each paragraph's last line out, and pools the paragraphs of one width and font: one example per column, with its width and how many paragraphs it holds.
+  - **Blog starter:** a primary surface `Button` in an article body keeps its `on-brand` text; the body's link colour no longer applies to buttons (it failed contrast at 2.5:1 light, 1.3:1 dark).
+- 4103a32: Studio on a playground (RFC-0036): the Build page no longer says "This deployment can't reach Workers AI". It says Build with AI is available in your own install, since the playground leaves AI out, and links to deploying Cloudhal. Translations of the new sentence are AI drafts awaiting review.
+- 92c3867: Theme scripts work on deployed sites, and `render_page` says when they would not.
+  
+  - The `cloudhal()` integration no longer lets Astro inline a component's `<script>` (under 4 KB) into the page, where the Site Worker's `script-src 'self'` blocked it: script chunks always ship as files (`build.assetsInlineLimit`), other assets keep the project's own limit. A theme that set `vite.build.assetsInlineLimit` itself for this can drop it.
+  - `cloudhal dev` sends the Site Worker's policy as `Content-Security-Policy-Report-Only` on pages without their own, so the browser console shows what a deploy would block without breaking Vite's dev client.
+  - `render_page` and `cloudhal render` gain two checks: `surface-broken` (a body ```` ```surface ```` fence the preview cannot draw, or a component with an unknown block type or props that do not fit, named with the problem) and `script-blocked` (a script the page's CSP refused, inline or by URL; under `cloudhal dev`'s report-only policy, what a deploy would block).
+- Updated dependencies [40dbfcb]
+- Updated dependencies [028f396]
+- Updated dependencies [92c3867]
+  - @cloudhal/core-ts@0.6.1
+  - @cloudhal/mcp-server@0.6.1
+  - @cloudhal/api@0.6.1
+  - @cloudhal/cloudflare@0.6.1
+  - @cloudhal/comments@0.6.1
+  - @cloudhal/agent-runtime@0.6.1
+  - @cloudhal/analytics@0.6.1
+  - @cloudhal/core-contracts@0.6.1
+  - @cloudhal/schedules@0.6.1
+  - @cloudhal/storage@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes

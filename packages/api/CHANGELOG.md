@@ -1,5 +1,22 @@
 # @cloudhal/api
 
+## 0.6.1
+
+### Patch Changes
+
+- Updated dependencies [40dbfcb]
+- Updated dependencies [028f396]
+- Updated dependencies [92c3867]
+  - @cloudhal/core-ts@0.6.1
+  - @cloudhal/mcp-server@0.6.1
+  - @cloudhal/astro-renderer@0.6.1
+  - @cloudhal/comments@0.6.1
+  - @cloudhal/agent-runtime@0.6.1
+  - @cloudhal/analytics@0.6.1
+  - @cloudhal/core-contracts@0.6.1
+  - @cloudhal/schedules@0.6.1
+  - @cloudhal/storage@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes
