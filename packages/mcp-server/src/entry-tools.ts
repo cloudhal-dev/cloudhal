@@ -26,6 +26,13 @@ import {
   unknownBlocks,
   unknownBlocksOf,
 } from "./content-shared.ts";
+import {
+  checkEntryFields,
+  describeFieldPatch,
+  FIELDS_INPUT,
+  FIELDS_PATCH,
+  mergeFields,
+} from "./entry-fields.ts";
 import { entryTerms, reportDeltas } from "./entry-terms.ts";
 import { menuHint, menuItemsHiddenBy } from "./menu-tools.ts";
 import { assignmentDeltas, describeDeltas, TAGS_INPUT, TERMS_INPUT, termLookup } from "./terms.ts";
@@ -110,7 +117,7 @@ const createEntryTool: ToolDefinition = {
   name: "create_entry",
   title: "Create article",
   description:
-    "Create a draft content entry (markdown body) in an existing collection (list_collections; a new one needs create_collection first), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Snapshots afterwards.",
+    "Create a draft content entry (markdown body) in an existing collection (list_collections; a new one needs create_collection first), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Typed custom fields go in `fields`, following the collection's fieldsSchema from list_collections; invalid values are refused with their paths. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -125,7 +132,7 @@ const createEntryTool: ToolDefinition = {
       terms: TERMS_INPUT,
       tags: TAGS_INPUT,
       coverImage: COVER_INPUT,
-      fields: { type: "object", description: "Collection-specific fields" },
+      fields: FIELDS_INPUT,
     },
     ["siteId", "slug", "title", "body"],
   ),
@@ -141,9 +148,24 @@ const createEntryTool: ToolDefinition = {
   },
   scopes: ["content:write"],
   own: "entry",
-  // RFC-0040 §5: only collections of the registry (a new one goes through create_collection).
-  precheck: (a, ctx) =>
-    requireRegistered(ctx, a.siteId as string, (a.collection as string | undefined) ?? "posts"),
+  // RFC-0040 §5: only collections of the registry (a new one goes through create_collection);
+  // RFC-0041 §8: field values are checked before anyone is asked.
+  precheck: async (a, ctx) => {
+    const collection = (a.collection as string | undefined) ?? "posts";
+    await requireRegistered(ctx, a.siteId as string, collection);
+    const site = await ctx.store.getSite(a.siteId as string);
+    if (!site) return;
+    await checkEntryFields(ctx, {
+      site,
+      next: {
+        id: "",
+        siteId: site.id,
+        collection,
+        status: "draft",
+        fields: (a.fields as Record<string, unknown> | undefined) ?? {},
+      },
+    });
+  },
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
     await entryLimitCheck(ctx, "create", undefined, {
@@ -189,7 +211,7 @@ const updateEntryTool: ToolDefinition = {
   name: "update_entry",
   title: "Update article",
   description:
-    "Update title, summary, body, slug, status (draft → review → published) or terms (`terms`: add, remove or set categories and tags by id, slug or name) of an entry. Review and published articles need a primary term in every required taxonomy. Requires the current `rev`. Changing a published article's slug leaves a redirect. Snapshots afterwards.",
+    "Update title, summary, body, slug, status (draft → review → published), terms (`terms`: add, remove or set categories and tags by id, slug or name) or typed custom fields (`fields`, a merge patch: null removes a key; see the collection's fieldsSchema in list_collections) of an entry. Review and published articles need a primary term in every required taxonomy and every field marked needed to publish. Requires the current `rev`. Changing a published article's slug leaves a redirect. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -207,6 +229,7 @@ const updateEntryTool: ToolDefinition = {
         description: "Cover image; null removes it",
       },
       status: { type: "string", enum: ["draft", "review", "published", "archived"] },
+      fields: FIELDS_PATCH,
     },
     ["siteId", "entryId", "rev"],
   ),
@@ -219,15 +242,18 @@ const updateEntryTool: ToolDefinition = {
   },
   scopes: ["content:write"],
   own: "entry",
-  // Own-limited callers (Authors, Contributors and their agents) only touch their own articles.
+  // Own-limited callers (Authors, Contributors and their agents) only touch their own articles;
+  // field values (RFC-0041 §8) are checked before anyone is asked.
   precheck: async (a, ctx) => {
-    if (!ctx.limit) return;
     const entry = await ctx.store.getContentEntry(a.entryId as string);
     if (!entry || entry.siteId !== a.siteId) return;
-    await entryLimitCheck(ctx, "update", entry, {
-      author: entry.author,
-      status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
-    });
+    const status = (a.status as ContentEntry["status"] | undefined) ?? entry.status;
+    if (ctx.limit) await entryLimitCheck(ctx, "update", entry, { author: entry.author, status });
+    if (a.fields === undefined && status === entry.status) return;
+    const site = await ctx.store.getSite(entry.siteId);
+    if (!site) return;
+    const fields = mergeFields(entry.fields, (a.fields as Record<string, unknown>) ?? {});
+    await checkEntryFields(ctx, { site, next: { ...entry, status, fields }, stored: entry });
   },
   approvalPrompt: async (a, ctx) => {
     const entry = await ctx.store.getContentEntry(a.entryId as string);
@@ -247,6 +273,10 @@ const updateEntryTool: ToolDefinition = {
           : "cover image"
         : "",
     ].filter(Boolean);
+    if (a.fields && site && Object.keys(a.fields).length)
+      changes.push(
+        `fields: ${describeFieldPatch(site, entry.collection, a.fields as Record<string, unknown>)}`,
+      );
     if (a.terms || a.tags) {
       try {
         const { terms } = await entryTerms(ctx, site as Site, entry, a);
@@ -295,6 +325,9 @@ const updateEntryTool: ToolDefinition = {
       ...(a.title ? { title: a.title as string } : {}),
       ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
       ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
+      ...(a.fields !== undefined
+        ? { fields: mergeFields(entry.fields, a.fields as Record<string, unknown>) }
+        : {}),
       ...(a.slug ? { slug: a.slug as string } : {}),
       tags,
       ...(terms ? { terms } : {}),

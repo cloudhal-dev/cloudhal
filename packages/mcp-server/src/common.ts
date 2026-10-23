@@ -31,6 +31,7 @@ import type { BodyDiff } from "@cloudhal/core-ts/body-blocks";
 import type { FetchTransport } from "@cloudhal/core-ts/media";
 import { ScheduleConflictError, ScheduleError } from "@cloudhal/schedules";
 import type { CommentsDeps } from "./comments.ts";
+import { fieldHint } from "./field-hints.ts";
 import type { PageRenderer, RenderLimiter } from "./render.ts";
 import { type RunContext, ScheduleRequestError, type SchedulesDeps } from "./schedules.ts";
 
@@ -374,6 +375,8 @@ export async function autoSnapshot(
 
 /** What to do next, per invariant (RFC-0002 §3). */
 function invariantHint(e: InvariantError): string | undefined {
+  const field = fieldHint(e.code, e.details);
+  if (field) return field;
   const key = typeof e.details.taxonomy === "string" ? e.details.taxonomy : undefined;
   switch (e.code) {
     case "required_term":
