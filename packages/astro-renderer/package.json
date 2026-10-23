@@ -50,6 +50,7 @@
     "./comments": "./src/comments-view.ts",
     "./comments-middleware": "./src/comments-middleware.ts",
     "./embed-middleware": "./src/embed-middleware.ts",
+    "./csp-middleware": "./src/csp-middleware.ts",
     "./embeds": "./src/embed-client.ts",
     "./theme-settings": "./src/theme-settings.ts",
     "./kit": "./src/kit.ts",
@@ -243,6 +244,10 @@
       "./embed-middleware": {
         "types": "./dist/src/embed-middleware.d.ts",
         "default": "./dist/src/embed-middleware.js"
+      },
+      "./csp-middleware": {
+        "types": "./dist/src/csp-middleware.d.ts",
+        "default": "./dist/src/csp-middleware.js"
       },
       "./embeds": {
         "types": "./dist/src/embed-client.d.ts",

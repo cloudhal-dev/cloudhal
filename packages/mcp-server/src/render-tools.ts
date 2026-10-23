@@ -73,6 +73,8 @@ const WHAT: Record<(typeof RENDER_CHECK_IDS)[number], string> = {
   "carousel-autoplay": "carousel autoplay",
   "image-fit": "image crops",
   "font-fallback": "font swap shift",
+  "surface-broken": "interactive blocks that cannot be shown",
+  "script-blocked": "scripts blocked by the CSP",
 };
 
 function summary(r: RenderPageResult): string {
@@ -130,7 +132,7 @@ export function renderTools(previewDoc: PreviewDoc): ToolDefinition[] {
       name: "render_page",
       title: "Render a page in a browser",
       description:
-        "Look at a page's draft as people will see it: renders it in a real browser at desktop (1440), tablet (768) and phone (390) widths and returns screenshots plus automatic checks (sideways scrolling, alt text, broken images, heading order, text contrast, empty sections, tap targets, line length, motion under reduced motion, layout shift) that name the section and component behind each problem. Use it after building or changing a page and before asking a person to publish; fix what it finds and render again. Read-only. Rate-limited (about 10 a minute); when no browser is available, use preview_page.",
+        "Look at a page's draft as people will see it: renders it in a real browser at desktop (1440), tablet (768) and phone (390) widths and returns screenshots plus automatic checks (sideways scrolling, alt text, broken images, heading order, text contrast, empty sections, tap targets, line length, motion under reduced motion, layout shift, interactive blocks that cannot be shown, scripts the site's Content-Security-Policy blocks) that name the section and component behind each problem. Use it after building or changing a page and before asking a person to publish; fix what it finds and render again. Read-only. Rate-limited (about 10 a minute); when no browser is available, use preview_page.",
       inputSchema: obj(
         {
           siteId: id,

@@ -15,6 +15,7 @@ import { LAYOUT_CHECKS } from "./layout.ts";
 import { MOTION_CHECKS } from "./motion.ts";
 import { NAVIGATION_CHECKS } from "./navigation.ts";
 import { PRELUDE } from "./prelude.ts";
+import { SCRIPT_CHECKS } from "./scripts.ts";
 
 export const RENDER_CHECK_SCRIPT = [
   "(async () => {",
@@ -23,6 +24,7 @@ export const RENDER_CHECK_SCRIPT = [
   CONTRAST_CHECKS,
   CONTENT_CHECKS,
   FONT_CHECKS,
+  SCRIPT_CHECKS,
   MOTION_CHECKS,
   NAVIGATION_CHECKS,
   COMPONENT_CHECKS,

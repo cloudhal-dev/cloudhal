@@ -1,6 +1,7 @@
 import type { AstroIntegration } from "astro";
 import type { AnalyticsClient } from "./analytics-client.ts";
 import type { CommentsClient } from "./comments-client.ts";
+import { scriptsNotInlined } from "./csp.ts";
 
 /** Options for the `cloudhal()` integration; made available to pages via `virtual:cloudhal/config`. */
 export interface CloudhalRendererConfig {
@@ -81,6 +82,17 @@ function configPlugin(modules: { config: unknown; client: unknown; comments: unk
   };
 }
 
+/**
+ * What only `cloudhal dev` runs as middleware (the Site Worker's entry and builds do these jobs):
+ * the analytics beacon (RFC-0006 §5.1); the click-to-load video player (RFC-0015 §4) and the
+ * interaction runtime (RFC-0020 §4), which builds write as files; and the Site Worker's CSP sent
+ * report-only, so the console shows what a deploy would block.
+ */
+const DEV_MIDDLEWARE = ["analytics-middleware", "embed-middleware", "csp-middleware"].map((m) => ({
+  entrypoint: `@cloudhal/astro-renderer/${m}`,
+  order: "pre" as const,
+}));
+
 export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
   let resolved: CloudhalRendererConfig = config;
   let client: AnalyticsClient | undefined;
@@ -115,15 +127,7 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
           client = await buildAnalyticsClient();
           resolved = { ...resolved, analyticsScript: client.script.path };
         }
-        if (!cloudflare && command === "dev")
-          addMiddleware({
-            entrypoint: "@cloudhal/astro-renderer/analytics-middleware",
-            order: "pre",
-          });
-        // The click-to-load video player (RFC-0015 §4) and the interaction runtime (RFC-0020 §4):
-        // served here in dev, written by builds.
-        if (!cloudflare && command === "dev")
-          addMiddleware({ entrypoint: "@cloudhal/astro-renderer/embed-middleware", order: "pre" });
+        if (!cloudflare && command === "dev") for (const m of DEV_MIDDLEWARE) addMiddleware(m);
         // Reader comments (RFC-0007 §8.2, §15.2), on the same targets: the Site Worker build ships
         // the module and its proof-of-work worker as hashed static assets and its entry answers the
         // endpoints; `cloudhal dev` serves both and answers them from a middleware on SQLite.
@@ -154,6 +158,10 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
                 comments: cloudflare ? null : (comments ?? null),
               }),
             ],
+            // `SITE_CSP` allows no inline script, so theme `<script>`s ship as files (any size).
+            build: {
+              assetsInlineLimit: scriptsNotInlined(astroConfig.vite?.build?.assetsInlineLimit),
+            },
             // Native module must stay external in Node SSR; workerd never loads it.
             ...(cloudflare ? {} : { ssr: { external: ["better-sqlite3"] } }),
           },
