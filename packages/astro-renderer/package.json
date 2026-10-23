@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/astro-renderer",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Render a Cloudhal Site Graph with Astro: data sources (live/snapshot), section components and the cloudhal() integration",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",

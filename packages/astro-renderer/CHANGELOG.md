@@ -1,5 +1,33 @@
 # @cloudhal/astro-renderer
 
+## 0.6.0
+
+### Minor Changes
+
+- 5aced9a: Per-collection feeds (RFC-0042 step 6, ADR-0044). Each collection with a permalink prefix has an RSS feed at `<prefix>/rss.xml` (and `/<locale><prefix>/rss.xml` or the locale's domain): its newest listed entries, so expiry and time gates apply as in the site feed, with the same cache tag and edge-cache cap; `feed: false` answers 404. The `cloudhal()` integration serves it from a middleware on every target, only where the theme's own routes answered 404, so a theme's own route wins and old theme copies gain the feeds; static builds write them because `staticPaths().feeds` now lists every collection feed path for the starter's `[...path]/rss.xml` route. New theme API `collectionFeedLink(site, collection, origin, locale?)` (`./seo`, `./collection-feeds`) gives the `<link rel="alternate">`; the blog starter adds it on entry pages and on pages that list a collection. Previews now list `contentList` sections with `where`/`orderBy` through the same evaluator as the site (`renderSectionHtml`'s new optional `listing` argument, passed by `renderPagePreview`), so an entry without the field's value no longer shows under "upcoming". New guide: `docs/guides/structured-data.md`.
+- 3e93878: Collections stage 3 in the renderer (RFC-0042 step 3, ADR-0044). A collection's `expiry` gives every entry a derived gate (`min(availability.until, field date + grace)`; a date ends at the next day's start in the site's zone), applied by both published sources at render time: `unlist` keeps the entry's page but leaves `entries()`, `allEntries()`, term filters and archives, related posts, feeds, the sitemap, `llms.txt` and search (search rows' `gateUntil`); `hide` answers 404 like an expired `availability`. The gate index adds every derived instant and every value instant of date/datetime list fields, so the edge cache expires there without a purge; previews ignore derived gates and say "Ended on …". New theme APIs: `GraphSource.queryEntries` and `queryEntries(source, q)` (`./queries`) list a collection by its list fields (`where`, `orderBy`, `sort`, `filter`, `limit`, `offset`, `includeExpired`) with one evaluator on live and snapshot sources; `contentListEntries`; `GraphSource.routableEntries` (entries with a public URL, unlisted included); `withStructuredData` and `entryStructuredData` (`./seo`) replace the generic `BlogPosting` with the collection's JSON-LD preset when the entry has every required value. `ContentList.astro` honours `where`/`orderBy`, also for theme copies that pass a source's list. `entryHead` is unchanged, so old themes keep today's output; the blog starter calls `withStructuredData` and `contentListEntries`. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2 }`, and writers (store, API, MCP, bundle import) refuse a new or changed `expiry` with `409 gates_unsupported` until it does (`GateSupport.enforced(siteId, version)`, `EXPIRY_GATES_VERSION`). A live entry whose published change adds a derived gate or moves it earlier is never low risk in `auto` mode (`expiringEntries`, auto-check code `expires`, for publishes and releases). Sites without the new settings render as before.
+
+### Patch Changes
+
+- 4f3f520: Collections stage 3, step 4 (RFC-0042 §7 / ADR-0044): MCP.
+  
+  - **`list_collections`** returns, per collection, its `listFields` with each field's type, operators (`ops`) and whether it sorts, and, for a collection with a JSON-LD preset, `structuredData`: the type, every path it offers (required ones, "at least one of" groups, defaults, the field types, entry and site properties, constants and vocabulary each takes) and the preset's warnings.
+  - **`update_collection`** takes `listFields`, `expiry` and `structuredData` (`null` removes one). The store's dry run checks them in `precheck`, so `unknown_field`, `invalid_expiry`, `structured_data_invalid`, `list_field_in_use` and `gates_unsupported` refuse the call, with paths, before a person is asked. The approval says what changes in words ("Events leave listings, feeds, the sitemap and search (their pages stay) 1 hour after "Ends at" (endsAt); 2 published entries are already past it", "structured data: Event, maps startDate ← field startsAt, …", vocabulary warnings), and the answer lists the preset's warnings. Policy is unchanged (`site:write`, a person holding `site:settings` approves in every mode).
+  - **`list_entries`** takes `where`, `orderBy`, `limit` and `cursor`, run by core-ts's shared evaluator (`queryContentEntries`); with `limit` it answers `total` and `nextCursor`. Invalid queries are refused as `invalid_query` with their paths.
+  - **`create_page` / `update_page`** check a changed `contentList` section's `where`/`orderBy` in `precheck` (`invalid_query`, `sections/0/where/1/value`).
+  - **New read-only tool `preview_structured_data`** (`content:read`): the JSON-LD an entry's page emits under its collection's preset, built by the renderer's `entryStructuredData`, with the issues (no preset, a required value missing, over 32 KB) and the preset's warnings. 109 → 110 tools.
+  - Hints for `invalid_query`, `structured_data_invalid`, `invalid_expiry`, `list_field_in_use` and `gates_unsupported` (expiry and `availability` alike), and a "Listings, expiry and structured data" paragraph in the server instructions.
+  - `@cloudhal/astro-renderer`: new subpath `./structured-data` (`entryStructuredData`, `withStructuredData`), so tools use it without the package root.
+- Updated dependencies [321e8be]
+- Updated dependencies [3e93878]
+- Updated dependencies [90d0828]
+- Updated dependencies [84c6d94]
+  - @cloudhal/core-contracts@0.6.0
+  - @cloudhal/core-ts@0.6.0
+  - @cloudhal/analytics@0.6.0
+  - @cloudhal/comments@0.6.0
+  - @cloudhal/storage@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes

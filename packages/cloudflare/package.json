@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/cloudflare",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Cloudhal on Cloudflare: the admin Worker (API, auth, MCP, Studio) over D1 + R2",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
