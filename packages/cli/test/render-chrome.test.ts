@@ -3,6 +3,8 @@
  * Skipped where this machine has no Chrome (set CHROME_PATH).
  */
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -272,6 +274,63 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     expect(fonts("font-fallback")?.examples).toEqual([
       expect.stringMatching(/p "Jumps" — "bare" has no metric-matched fallback/),
     ]);
+  }, 90_000);
+
+  it("names a body surface that cannot be shown and a script the CSP blocked", async () => {
+    dir ??= await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-test-"));
+    const render = async (name: string, html: string) => {
+      const file = path.join(dir, name);
+      await writeFile(file, html);
+      const r = await renderPage(
+        chromeRenderer(chrome as string, { idleMs: 10 }),
+        pathToFileURL(file).href,
+        { widths: [1440], fullPage: false, timeoutMs: 50_000 },
+      );
+      return (id: string) => r.checks.find((c) => c.id === id);
+    };
+    await writeFile(path.join(dir, "theme.js"), "document.body.dataset.ran = '1';");
+    // The Site Worker's policy, as a meta tag (a file:// page has no headers); the markup is what
+    // a preview draws for a broken ```surface fence and for an unknown component in one.
+    const head = (csp: string) =>
+      `<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"><meta http-equiv="${csp}" content="script-src 'self'"></head><body><main><h1>S</h1>`;
+    const page = (csp: string) =>
+      `${head(csp)}<section data-section-id="sec_body"><div class="ch-surface-problem" role="note"><p><strong>This interactive block cannot be shown.</strong> Fix it in Markdown mode:</p><ul><li><code>srf_cards/components/c1 unknown component</code></li></ul></div>
+<div class="ch-block ch-block--missing" data-component-id="c2"><p>link-cards: unknown block type</p></div>
+<div class="ch-block ch-block--missing" data-component-id="c3"><p>lens-hero: shown by the theme on the site</p></div></section>
+<script>document.body.dataset.inline = "1";</script><script src="theme.js"></script></main></body></html>`;
+    const blocked = await render("csp.html", page("content-security-policy"));
+    expect(blocked("surface-broken")?.examples).toEqual([
+      expect.stringMatching(
+        /section sec_body div\.ch-surface-problem .* — srf_cards\/components\/c1 unknown component$/,
+      ),
+      expect.stringMatching(/component c2 .* — link-cards: unknown block type$/),
+    ]);
+    expect(blocked("script-blocked")?.examples).toEqual([
+      expect.stringMatching(
+        /^script .* — an inline script .*was blocked by script-src-elem; ship it as a file/,
+      ),
+    ]);
+    // `cloudhal dev` sends the policy report-only, a header only (a meta tag cannot): the same
+    // script, named as what a deploy blocks.
+    const server = createServer((_req, res) => {
+      res.setHeader("content-type", "text/html");
+      res.setHeader("content-security-policy-report-only", "script-src 'self'");
+      res.end(page("x-none").replace('<script src="theme.js"></script>', ""));
+    });
+    await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+    try {
+      const { port } = server.address() as AddressInfo;
+      const r = await renderPage(
+        chromeRenderer(chrome as string, { idleMs: 10 }),
+        `http://127.0.0.1:${port}/`,
+        { widths: [1440], fullPage: false, timeoutMs: 50_000 },
+      );
+      expect(r.checks.find((c) => c.id === "script-blocked")?.examples).toEqual([
+        expect.stringMatching(/an inline script .*would be blocked on the site by script-src-elem/),
+      ]);
+    } finally {
+      server.close();
+    }
   }, 90_000);
 });
 

@@ -174,6 +174,8 @@ The site's Markdown reaches agents as **owner-written data**, between `<site-des
 | `empty-section` | A `[data-section-id]` renders under 8 px high |
 | `tap-target` | At 390 px, a link or button is smaller than 24×24 px (WCAG 2.5.8) |
 | `long-line` | Body text lines are longer than 90 characters at 1440 px |
+| `surface-broken` | A body ```` ```surface ```` fence the preview cannot draw, or a component in one with an unknown block type or props that do not fit (added later) |
+| `script-blocked` | The page's Content-Security-Policy refused a script, an inline `<script>` under the Site Worker's `script-src 'self'` say; `cloudhal dev` sends that policy report-only, so the check names what a deploy would block (added later) |
 
 **Runtimes:**
 - **Cloudflare.**
