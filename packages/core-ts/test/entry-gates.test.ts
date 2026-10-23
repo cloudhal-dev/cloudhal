@@ -21,7 +21,7 @@ import { advancesDerivedGate, SiteGraphStore, searchRowOf, seedStarterSite } fro
 import { exportSite, importSite } from "../src/sync.ts";
 
 const L = { en: { label: "x" } };
-const FIELDS: FieldDefinition[] = [
+const FIELDS: [FieldDefinition, ...FieldDefinition[]] = [
   { key: "endsAt", type: "datetime", labels: L, localized: false },
   { key: "day", type: "date", labels: L, localized: false },
   { key: "price", type: "number", labels: L, localized: false },
@@ -161,9 +161,10 @@ describe("the writer guard (RFC-0042 §3.6)", () => {
     ).rejects.toMatchObject({ code: "gates_unsupported" });
     expect(asked).toContain(2);
     // other collection settings save; removing an expiry is always allowed
+    const { expiry: _removed, ...withoutExpiry } = events;
     const plain = await store.updateSite({
       ...seeded,
-      collections: { ...seeded.collections, events: { ...events, expiry: undefined } },
+      collections: { ...seeded.collections, events: withoutExpiry },
     });
     expect(plain.collections?.events?.expiry).toBeUndefined();
     const enforced = await open(GATES_ENFORCED);
