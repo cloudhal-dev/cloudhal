@@ -21,7 +21,7 @@ import {
 import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { ArticleCorrectionsCard } from "../components/ArticleCorrections.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { ArticleReachCards } from "../components/article-editor/ArticleAside.tsx";
@@ -69,6 +69,11 @@ import { missingPrimaries } from "../lib/taxonomy.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
+// RFC-0041 §7: the typed fields form loads only for collections that define fields.
+const EntryFieldsCard = lazy(() =>
+  import("../components/fields/EntryFieldsCard.tsx").then((m) => ({ default: m.EntryFieldsCard })),
+);
+
 /** A copy of the article as a new draft with a free slug. */
 function duplicateOf(entry: ContentEntry, title: string): NewEntry {
   const suffix = `-copy-${Date.now().toString(36).slice(-4)}`;
@@ -93,6 +98,46 @@ const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
 /** What is sent: the cover image's fields trimmed. */
 function forSave(entry: ContentEntry): ContentEntry {
   return entry.coverImage ? { ...entry, coverImage: cleanImageRef(entry.coverImage) } : entry;
+}
+
+/** The Details card's rows: id, collection, language, author, revision and dates. */
+function detailRows(t: ReturnType<typeof useT>, draft: ContentEntry): DetailRow[] {
+  return [
+    { label: t("editor.id"), value: <InlineCopyText>{draft.id}</InlineCopyText> },
+    {
+      label: t("editor.collection"),
+      value: (
+        <Text variant="mono-secondary" as="span">
+          {draft.collection}
+        </Text>
+      ),
+    },
+    {
+      label: t("editor.locale"),
+      value: <Text as="span">{draft.locale}</Text>,
+    },
+    {
+      label: t("editor.author"),
+      value: (
+        <Text as="span" truncate>
+          {draft.author.name ?? draft.author.id}
+        </Text>
+      ),
+    },
+    {
+      label: t("editor.revision"),
+      value: <Text as="span">{draft.rev}</Text>,
+    },
+    ...(draft.publishedAt
+      ? [
+          {
+            label: t("editor.publishedAt"),
+            value: <RelativeTime iso={draft.publishedAt} size="base" />,
+          },
+        ]
+      : []),
+    { label: t("editor.updatedAt"), value: <RelativeTime iso={draft.updatedAt} size="base" /> },
+  ];
 }
 
 /** Why the form is read-only for someone who may not change this article (§2s). */
@@ -236,42 +281,7 @@ export function ArticleEditorPage() {
     : ["draft", "review"];
   const title = draft.title || t("articles.untitled");
   const words = wordCount(draft.body.value);
-  const details: DetailRow[] = [
-    { label: t("editor.id"), value: <InlineCopyText>{draft.id}</InlineCopyText> },
-    {
-      label: t("editor.collection"),
-      value: (
-        <Text variant="mono-secondary" as="span">
-          {draft.collection}
-        </Text>
-      ),
-    },
-    {
-      label: t("editor.locale"),
-      value: <Text as="span">{draft.locale}</Text>,
-    },
-    {
-      label: t("editor.author"),
-      value: (
-        <Text as="span" truncate>
-          {draft.author.name ?? draft.author.id}
-        </Text>
-      ),
-    },
-    {
-      label: t("editor.revision"),
-      value: <Text as="span">{draft.rev}</Text>,
-    },
-    ...(draft.publishedAt
-      ? [
-          {
-            label: t("editor.publishedAt"),
-            value: <RelativeTime iso={draft.publishedAt} size="base" />,
-          },
-        ]
-      : []),
-    { label: t("editor.updatedAt"), value: <RelativeTime iso={draft.updatedAt} size="base" /> },
-  ];
+  const details = detailRows(t, draft);
 
   return (
     <PageLayout
@@ -437,6 +447,18 @@ export function ArticleEditorPage() {
                 className="w-full"
               />
             </SectionCard>
+            {site.data?.collections?.[draft.collection]?.fields && (
+              <Suspense fallback={null}>
+                <EntryFieldsCard
+                  siteId={siteId}
+                  site={site.data}
+                  entry={draft}
+                  onChange={(fields) => setDraft({ ...draft, fields })}
+                  error={save.error}
+                  disabled={readOnlyReason !== undefined || locked}
+                />
+              </Suspense>
+            )}
             <ArticleTermsCard
               entry={draft}
               onChange={(next) => {

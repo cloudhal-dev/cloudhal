@@ -56,6 +56,8 @@ export interface DateTimeFieldProps {
   /** Today in the site zone, marked in the calendar. */
   today?: string;
   disabled?: boolean;
+  /** A calendar day only (a typed `date` field, RFC-0041 §2): no time and no zone. */
+  dateOnly?: boolean;
   className?: string;
 }
 
@@ -140,6 +142,7 @@ export function DateTimeField({
   max,
   today,
   disabled,
+  dateOnly = false,
   className,
 }: DateTimeFieldProps) {
   const cycle = hourCycle ?? hourCycleOf(locale);
@@ -213,23 +216,25 @@ export function DateTimeField({
               </Suspense>
             </Popover.Content>
           </Popover>
-          <InputGroup
-            className="w-auto min-w-0 flex-1 basis-56 whitespace-nowrap"
-            disabled={disabled}
-            data-datetime-zone={timeZone}
-          >
-            <InputGroup.Input
-              {...time.inputProps}
-              aria-invalid={message ? true : undefined}
-              className="tabular-nums"
-              data-datetime-time=""
-            />
-            <InputGroup.Addon align="end">
-              <span className="whitespace-nowrap" data-datetime-zone={timeZone}>
-                {zoneLabel}
-              </span>
-            </InputGroup.Addon>
-          </InputGroup>
+          {!dateOnly && (
+            <InputGroup
+              className="w-auto min-w-0 flex-1 basis-56 whitespace-nowrap"
+              disabled={disabled}
+              data-datetime-zone={timeZone}
+            >
+              <InputGroup.Input
+                {...time.inputProps}
+                aria-invalid={message ? true : undefined}
+                className="tabular-nums"
+                data-datetime-time=""
+              />
+              <InputGroup.Addon align="end">
+                <span className="whitespace-nowrap" data-datetime-zone={timeZone}>
+                  {zoneLabel}
+                </span>
+              </InputGroup.Addon>
+            </InputGroup>
+          )}
         </div>
       </Field>
     </div>

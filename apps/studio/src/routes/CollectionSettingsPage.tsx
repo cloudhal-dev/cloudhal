@@ -1,10 +1,19 @@
 import type { CollectionSettings, Site, Taxonomy } from "@cloudhal/core-contracts";
 import { collectionSettings } from "@cloudhal/core-ts/collections";
 import { collectionPermalink, permalinkPrefix } from "@cloudhal/core-ts/permalinks";
-import { Button, Checkbox, Input, Link, PageLayout, Select, Text } from "@cloudhal/ui";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Link,
+  PageLayout,
+  Select,
+  SkeletonLine,
+  Text,
+} from "@cloudhal/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import {
   COLLECTION_COMMENTS_SECTION,
   CollectionCommentsSection,
@@ -21,6 +30,11 @@ import { useI18n } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { COLLECTION_ICON_NAMES, collectionName, useCollections } from "../lib/collections.ts";
 import { languageOption } from "../lib/languages.ts";
+
+// RFC-0041 §7: the fields builder and its operation dialogs load with this screen's section only.
+const FieldsSection = lazy(() =>
+  import("../components/fields/FieldsSection.tsx").then((m) => ({ default: m.FieldsSection })),
+);
 
 type Sort = NonNullable<CollectionSettings["sort"]>;
 type LabelForm = Record<string, { singular: string; plural: string; description: string }>;
@@ -78,7 +92,7 @@ export function withForm(
  * stays in Site settings › Collections.
  */
 export function CollectionSettingsPage() {
-  const { t, locale } = useI18n("collections");
+  const { t, locale } = useI18n("collections", "fields");
   const { siteId, collection } = useParams({
     from: "/sites/$siteId/collections/$collection/settings",
   });
@@ -108,6 +122,7 @@ export function CollectionSettingsPage() {
         sections={[
           { id: "names", label: t("collections.settings.names") },
           { id: "listing", label: t("collections.settings.listing") },
+          { id: "fields", label: t("fields.builder.title") },
           { id: "taxonomies", label: t("collections.settings.taxonomies") },
           { id: COLLECTION_COMMENTS_SECTION, label: t("collections.settings.comments") },
           { id: "address", label: t("collections.settings.address") },
@@ -120,6 +135,16 @@ export function CollectionSettingsPage() {
               collection={collection}
               settings={info?.settings ?? site.data.collections?.[collection] ?? {}}
             />
+          )}
+          {site.data && (
+            <Suspense fallback={<FieldsSkeleton />}>
+              <FieldsSection
+                site={site.data}
+                collection={collection}
+                settings={site.data.collections?.[collection] ?? {}}
+                readOnlyReason={gate.reason}
+              />
+            </Suspense>
           )}
           <TaxonomiesSection siteId={siteId} collection={collection} />
           <CollectionCommentsSection siteId={siteId} collection={collection} />
@@ -276,6 +301,20 @@ function SettingsForm({
         </div>
       </SettingsSection>
     </>
+  );
+}
+
+/** The Fields section while its code loads. */
+function FieldsSkeleton() {
+  const { t } = useI18n("fields");
+  return (
+    <SettingsSection id="fields" title={t("fields.builder.title")}>
+      <div className="grid gap-3" role="status">
+        <span className="sr-only">{t("common.loading")}</span>
+        <SkeletonLine minWidth={30} maxWidth={45} />
+        <SkeletonLine minWidth={60} maxWidth={85} />
+      </div>
+    </SettingsSection>
   );
 }
 

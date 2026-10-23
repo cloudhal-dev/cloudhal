@@ -43,6 +43,7 @@ const ArticleEditorPage = lazyRouteComponent(
       "bodyEditor",
       "media",
       "menus",
+      "fields",
     ]),
   "ArticleEditorPage",
 );
@@ -59,6 +60,7 @@ const CollectionSettingsPage = lazyRouteComponent(
     withMessages(import("./routes/CollectionSettingsPage.tsx"), [
       "collections",
       "commentsSettings",
+      "fields",
     ]),
   "CollectionSettingsPage",
 );
