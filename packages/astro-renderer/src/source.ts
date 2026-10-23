@@ -11,13 +11,7 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SearchKind, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import {
-  matchRedirect,
-  redirectLocale,
-  searchDocuments,
-  searchRows,
-  termName,
-} from "@cloudhal/core-ts";
+import { matchRedirect, redirectLocale, searchDocuments, searchRows } from "@cloudhal/core-ts";
 import {
   gateInstants,
   hasGates,
@@ -25,9 +19,11 @@ import {
   isAvailable,
   nextInstant,
 } from "@cloudhal/core-ts/availability";
-import { matches, parseFilter, resolveFilter } from "@cloudhal/core-ts/filter";
+import { matches } from "@cloudhal/core-ts/filter";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
+import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
+import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
 
 /**
  * What a renderer needs from a site, independent of whether it reads live nodes (dev) or a
@@ -112,6 +108,14 @@ export interface GraphSource {
    * entries it shows, drafts included. Optional for sources that predate search.
    */
   search?(query: string, options?: SourceSearchOptions): Promise<SearchResults>;
+  /**
+   * RFC-0041 §9: an entry's typed fields as a theme draws them: resolved (a translation reads the
+   * original's values where §5 says so), labelled in `options.locale` (default: the entry's), rich
+   * text as sanitized HTML, URLs through `safeHref`, images as `<img>` attributes. `{}` when the
+   * collection has no definitions. Optional for sources that predate fields; any source works
+   * with the standalone `entryFields(source, entry)`.
+   */
+  entryFields?(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields>;
 }
 
 export interface SourceSearchOptions {
@@ -121,47 +125,6 @@ export interface SourceSearchOptions {
   locale?: string;
   /** RFC-0029: only these kinds (default: all). */
   kinds?: readonly SearchKind[];
-}
-
-function byNewest(a: ContentEntry, b: ContentEntry): number {
-  return (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt);
-}
-
-function byPosition(locale: string) {
-  return (a: Term, b: Term) =>
-    (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER) ||
-    termName(a, locale).localeCompare(termName(b, locale)) ||
-    a.slug.localeCompare(b.slug);
-}
-
-function shown(term: Term, includeDrafts: boolean): boolean {
-  return includeDrafts
-    ? term.status !== "retired"
-    : term.status === "active" && term.visibility === "public";
-}
-
-function termFilter(key: string, slug: string, descendants: boolean): string {
-  return `${key}:${slug}${descendants ? ">*" : ""}`;
-}
-
-/** Resolves a filter against a vocabulary; unknown terms match nothing and are logged. */
-function compile(filter: string, taxonomies: Taxonomy[], terms: Term[]) {
-  const resolved = resolveFilter(
-    parseFilter(filter),
-    { taxonomies, terms },
-    { unknown: "match-nothing" },
-  );
-  if (resolved.unknown.length > 0)
-    console.warn(
-      `cloudhal: filter "${filter}" names unknown terms: ${resolved.unknown.join(", ")}`,
-    );
-  return resolved;
-}
-
-function visible<T extends { status: Page["status"] }>(nodes: T[], includeDrafts: boolean): T[] {
-  return includeDrafts
-    ? nodes.filter((n) => n.status !== "archived")
-    : nodes.filter((n) => n.status === "published");
 }
 
 /**
@@ -270,6 +233,10 @@ export class LiveSource implements GraphSource {
     return entry && entry.siteId === this.#siteId && this.#visible([entry]).length
       ? entry
       : undefined;
+  }
+
+  entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
+    return entryFields(this, entry, options);
   }
 
   taxonomies(): Promise<Taxonomy[]> {
@@ -696,6 +663,10 @@ export class SnapshotSource implements GraphSource {
   /** A published entry of this snapshot by id (any locale), if its gates are open. */
   async entryById(id: string): Promise<ContentEntry | undefined> {
     return (await this.#current()).entries.find((e) => e.id === id);
+  }
+
+  entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
+    return entryFields(this, entry, options);
   }
 
   async taxonomies(): Promise<Taxonomy[]> {

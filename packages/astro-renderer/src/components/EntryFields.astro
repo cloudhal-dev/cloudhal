@@ -1,0 +1,43 @@
+---
+/**
+ * An entry's typed fields (RFC-0041 §9) as a plain definition list: one `dt`/`dd` pair per field
+ * with something to show, in definition order; nothing at all when no field has a value. Pass what
+ * `source.entryFields(entry, { locale, media })` (or `entryFields(source, entry, …)`) returns.
+ *
+ * Values are escaped text, except rich text (the body's markdown pipeline: raw HTML escaped, links
+ * through `safeHref`) and images (`imageAttributes`, the asset's alt in the page's language). No
+ * styles of its own: themes style `.ch-fields`, `.ch-field[data-type]` and `[data-field="<key>"]`.
+ */
+import type { RenderedFields } from "../fields.ts";
+
+interface Props {
+  fields: RenderedFields;
+  /** An accessible name for the list (e.g. "Details" in the page's language). */
+  label?: string;
+  /** Extra classes on the `dl`. */
+  class?: string;
+}
+const { fields, label, class: className } = Astro.props;
+const shown = Object.values(fields).filter((f) => !f.empty);
+const multiline = (f: (typeof shown)[number]) => f.def.type === "text" && f.def.multiline === true;
+---
+{shown.length > 0 && (
+  <dl class:list={["ch-fields", className]} aria-label={label}>
+    {shown.map((f) => (
+      <div class="ch-field" data-field={f.key} data-type={f.def.type} data-multiline={multiline(f) ? "" : undefined} data-from-original={f.fromOriginal ? "" : undefined}>
+        <dt>{f.label}</dt>
+        {f.html !== undefined ? (
+          <dd set:html={f.html} />
+        ) : f.href !== undefined ? (
+          <dd><a href={f.href}>{f.text}</a></dd>
+        ) : f.image ? (
+          <dd><img src={f.image.src} srcset={f.image.srcset} sizes={f.image.sizes} alt={f.image.alt} width={f.image.width || undefined} height={f.image.height || undefined} loading={f.image.loading} decoding={f.image.decoding} style={f.image.style} /></dd>
+        ) : f.datetime !== undefined ? (
+          <dd><time datetime={f.datetime}>{f.text}</time></dd>
+        ) : (
+          <dd>{f.text}</dd>
+        )}
+      </div>
+    ))}
+  </dl>
+)}

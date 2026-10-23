@@ -1,0 +1,108 @@
+---
+/**
+ * A category or tag archive page (RFC-0002 §7): breadcrumb through the parent categories, the
+ * term's name, and on page 1 its image and intro (markdown through the safe renderer); then the
+ * page's posts and real `<a>` pagination links (every page is its own canonical URL).
+ */
+import { type ArchiveView, viewPagePath } from "@cloudhal/astro-renderer/archive";
+import { renderMarkdown, safeHref, safeSrc } from "@cloudhal/astro-renderer/markdown";
+import { imageAttributes, type MediaContext } from "@cloudhal/astro-renderer/media";
+import type { ThemeStrings } from "../theme.ts";
+import Breadcrumbs from "./Breadcrumbs.astro";
+import EntryList from "./EntryList.astro";
+
+interface Props {
+  archive: ArchiveView;
+  t: ThemeStrings;
+  /** Resolves the term image and `asset:` links in the intro (RFC-0004). */
+  media?: MediaContext;
+}
+const { archive, t, media } = Astro.props;
+const label = archive.term.labels[archive.locale];
+const kind =
+  archive.taxonomy.labels[archive.locale]?.singular ??
+  Object.values(archive.taxonomy.labels)[0]?.singular;
+const first = archive.page === 1;
+const intro = first && label?.description ? renderMarkdown(label.description, media) : undefined;
+const image = first && archive.term.image ? archive.term.image : undefined;
+const asset = image?.assetId ? media?.assets?.get(image.assetId) : undefined;
+const attrs =
+  asset && image
+    ? imageAttributes(asset, image, {
+        locale: archive.locale,
+        defaultLocale: media?.defaultLocale ?? archive.locale,
+        transform: media?.transform ?? "none",
+        ...(media?.budget ? { budget: media.budget } : {}),
+        sizes: "(min-width: 48rem) 48rem, 100vw",
+        priority: true,
+        ...(media?.preview ? { preview: true } : {}),
+      })
+    : undefined;
+const imageSrc = image && !attrs ? safeSrc(image.src) : undefined;
+// An author's page (RFC-0019 §1): their role and profile links (safe schemes only).
+const role = label?.role;
+const links = (archive.term.links ?? []).flatMap((l) => {
+  const href = safeHref(l.href);
+  return href ? [{ ...l, href }] : [];
+});
+const crumbs = [
+  { name: t.home, href: "/" },
+  ...archive.trail.map((s) => ({ name: s.name, href: s.href })),
+  { name: archive.shown.name },
+];
+---
+<section class="ch-archive" data-term-id={archive.term.id} data-taxonomy={archive.taxonomy.key}>
+  <Breadcrumbs label={t.breadcrumb} items={crumbs} />
+  <header class="ch-archive-header">
+    {kind && <p class="ch-archive-kind">{kind}</p>}
+    <h1>{archive.shown.name}</h1>
+    {role && <p class="ch-archive-role">{role}</p>}
+    {links.length > 0 && (
+      <ul class="ch-archive-links">
+        {links.map((l) => (
+          <li><a href={l.href} rel={l.external ? "me noopener noreferrer" : "me"}>{l.label}</a></li>
+        ))}
+      </ul>
+    )}
+    <p class="ch-archive-meta">
+      <span>{t.posts(archive.total)}</span>
+      {archive.feedPath && <a href={archive.feedPath}>{t.feed}</a>}
+    </p>
+    {attrs && (
+      <img
+        class="ch-archive-image"
+        src={attrs.src}
+        srcset={attrs.srcset}
+        sizes={attrs.sizes}
+        alt={attrs.alt}
+        width={attrs.width || undefined}
+        height={attrs.height || undefined}
+        decoding="async"
+        style={attrs.style}
+      />
+    )}
+    {image && imageSrc && (
+      <img
+        class="ch-archive-image"
+        src={imageSrc}
+        alt={image.alt}
+        width={image.width}
+        height={image.height}
+        decoding="async"
+      />
+    )}
+    {intro && <div class="ch-richtext" set:html={intro} />}
+  </header>
+  <EntryList entries={archive.entries} locale={archive.locale} media={media} />
+  {archive.pages > 1 && (
+    <nav aria-label={t.pagination} class="ch-pagination">
+      {archive.page > 1 ? (
+        <a href={viewPagePath(archive, archive.page - 1)} rel="prev">{t.newer}</a>
+      ) : <span />}
+      <span>{t.pageOf(archive.page, archive.pages)}</span>
+      {archive.page < archive.pages ? (
+        <a href={viewPagePath(archive, archive.page + 1)} rel="next">{t.older}</a>
+      ) : <span />}
+    </nav>
+  )}
+</section>

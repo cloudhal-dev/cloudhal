@@ -1,0 +1,46 @@
+---
+/**
+ * The search modal (RFC-0029 §6): markup and words only; `/_cloudhal/search.1.js` wires it. Without
+ * the script the dialog never opens and the header form goes to `/search`. Inside, a form still
+ * goes to `/search` on Enter when no result is chosen.
+ */
+import { SEARCH_JSON_PATH, SEARCH_PATH } from "@cloudhal/astro-renderer/search";
+import type { ThemeStrings } from "../theme.ts";
+
+interface Props {
+  label: string;
+  placeholder: string;
+  words: ThemeStrings["searchModal"];
+}
+const { label, placeholder, words } = Astro.props;
+const data = {
+  kinds: words.kinds,
+  all: words.all,
+  none: words.none,
+  recent: words.recent,
+  clear: words.clear,
+  limited: words.limited,
+  error: words.error,
+  updating: words.updating,
+  count: words.count,
+};
+---
+<dialog id="ch-search" class="ch-search-dialog" aria-label={label} data-ch-search data-endpoint={SEARCH_JSON_PATH} data-page={SEARCH_PATH} data-words={JSON.stringify(data)}>
+  <div class="ch-search-dialog__panel">
+    <form class="ch-search-dialog__bar" method="get" action={SEARCH_PATH} role="search">
+      <label for="ch-search-dialog-q" class="sr-only">{label}</label>
+      <input id="ch-search-dialog-q" type="search" name="q" maxlength="200" autocomplete="off" spellcheck="false" placeholder={placeholder} data-ch-search-input />
+      <button type="button" class="ch-search-dialog__close" data-ch-search-close>{words.close}</button>
+    </form>
+    <div class="ch-search-dialog__body">
+      <div id="ch-search-list" class="ch-search-dialog__list" role="listbox" aria-label={label} data-ch-search-list></div>
+      <p class="ch-search-dialog__note" data-ch-search-note hidden></p>
+    </div>
+    <p class="ch-search-dialog__keys" aria-hidden="true">
+      <span><kbd>↑</kbd><kbd>↓</kbd> {words.keys.move}</span>
+      <span><kbd>↵</kbd> {words.keys.open}</span>
+      <span><kbd>esc</kbd> {words.keys.close}</span>
+    </p>
+    <p class="sr-only" role="status" aria-live="polite" data-ch-search-status></p>
+  </div>
+</dialog>

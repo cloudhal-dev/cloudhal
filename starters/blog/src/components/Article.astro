@@ -3,9 +3,11 @@
  * An article (RFC-0018 §3, the article view): kicker (the primary category), title, dek, byline
  * (author, published, updated, reading time), cover, an "On this page" table of contents for
  * longer pieces (headings carry ids; no JavaScript), then the body with the theme's own blocks and
- * the corrections, newest first (RFC-0019 §2; the latest one is the "Updated" date).
+ * the corrections, newest first (RFC-0019 §2; the latest one is the "Updated" date). Collections
+ * with typed fields (RFC-0041 §9) show their values as a "Details" list under the cover.
  */
-import { Body } from "@cloudhal/astro-renderer/components";
+import { Body, EntryFields } from "@cloudhal/astro-renderer/components";
+import type { RenderedFields } from "@cloudhal/astro-renderer/fields";
 import { articleCorrections, articleOutline } from "@cloudhal/astro-renderer/kit";
 import { entryArticleParts } from "@cloudhal/astro-renderer/markdown";
 import type { MediaContext } from "@cloudhal/astro-renderer/media";
@@ -22,8 +24,10 @@ interface Props {
   media?: MediaContext;
   blocks?: Record<string, unknown>;
   blockTypes?: readonly BlockType[];
+  /** The entry's typed fields (`source.entryFields`); absent or empty draws nothing. */
+  fields?: RenderedFields;
 }
-const { entry, terms, locale, t, media, blocks, blockTypes } = Astro.props;
+const { entry, terms, locale, t, media, blocks, blockTypes, fields } = Astro.props;
 const parts = entryArticleParts(entry, locale, media);
 const outline = articleOutline(entry);
 const date = (iso: string) =>
@@ -73,6 +77,7 @@ const author =
     </p>
   </header>
   <Fragment set:html={parts.cover} />
+  {fields && <EntryFields fields={fields} label={t.details} />}
   {outline.toc.length >= 3 && (
     <details class="ch-toc" open>
       <summary>{t.onThisPage}</summary>

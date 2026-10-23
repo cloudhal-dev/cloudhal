@@ -20,6 +20,7 @@ export {
   type FieldDefinitionChange,
   fieldDefinitionChanges,
 } from "./definitions.ts";
+export { type FormatFieldOptions, formatFieldValue } from "./format.ts";
 export {
   fieldJsonSchema,
   fieldsJsonSchema,

@@ -1,0 +1,27 @@
+---
+/**
+ * The built-in not-found page (404), in the reader's language: drawn when the site has no page at
+ * `/404` in that language (`@cloudhal/astro-renderer/not-found`). A link home, and the search form
+ * where the deployment answers searches; the middleware keeps both in the page's locale.
+ */
+import type { ThemeStrings } from "../theme.ts";
+
+interface Props {
+  t: ThemeStrings;
+  /** Show the search form (the deployment answers `/search`). */
+  search: boolean;
+}
+const { t, search } = Astro.props;
+---
+<section class="ch-not-found ch-search" aria-labelledby="ch-not-found-title">
+  <h1 id="ch-not-found-title">{t.notFoundTitle}</h1>
+  <p class="ch-not-found-text">{t.notFoundText}</p>
+  {search && (
+    <form class="ch-search-form" method="get" action="/search" role="search">
+      <label for="ch-not-found-q" class="ch-not-found-prompt">{t.notFoundSearch}</label>
+      <input id="ch-not-found-q" type="search" name="q" maxlength="200" placeholder={t.searchPlaceholder} autocomplete="off" />
+      <button type="submit">{t.search}</button>
+    </form>
+  )}
+  <p class="ch-not-found-home"><a href="/">{t.notFoundHome}</a></p>
+</section>

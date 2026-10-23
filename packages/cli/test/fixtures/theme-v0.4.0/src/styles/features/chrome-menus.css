@@ -1,0 +1,264 @@
+/*
+ * RFC-0025 25b: the phone menu, submenus, hiding, shrinking and the transparent header.
+ * `--ch-header-h` is the chrome module's measure of the header (a close guess until it runs).
+ */
+:root {
+  --ch-header-h: 4.75rem;
+}
+.ch-menu-slot {
+  display: none;
+}
+@media (max-width: 639.98px) {
+  .ch-header[data-collapse="sm"] :is(.ch-header__nav, .ch-header__utility, .ch-header-search) {
+    display: none;
+  }
+  .ch-header[data-collapse="sm"] .ch-menu-slot {
+    display: block;
+  }
+  .ch-header[data-collapse="sm"] .ch-header__brand {
+    margin-inline-end: auto;
+  }
+}
+@media (max-width: 767.98px) {
+  .ch-header[data-collapse="md"] :is(.ch-header__nav, .ch-header__utility, .ch-header-search) {
+    display: none;
+  }
+  .ch-header[data-collapse="md"] .ch-menu-slot {
+    display: block;
+  }
+  .ch-header[data-collapse="md"] .ch-header__brand {
+    margin-inline-end: auto;
+  }
+}
+@media (max-width: 1023.98px) {
+  .ch-header[data-collapse="lg"] :is(.ch-header__nav, .ch-header__utility, .ch-header-search) {
+    display: none;
+  }
+  .ch-header[data-collapse="lg"] .ch-menu-slot {
+    display: block;
+  }
+  .ch-header[data-collapse="lg"] .ch-header__brand {
+    margin-inline-end: auto;
+  }
+}
+.ch-header[data-collapse="always"] :is(.ch-header__nav, .ch-header__utility, .ch-header-search) {
+  display: none;
+}
+.ch-header[data-collapse="always"] .ch-menu-slot {
+  display: block;
+}
+.ch-header[data-collapse="always"] .ch-header__brand {
+  margin-inline-end: auto;
+}
+.ch-menu__open {
+  @apply inline-flex cursor-pointer list-none items-center gap-2 rounded border border-current/25 px-3 py-1.5 text-sm font-medium;
+}
+.ch-menu__open::-webkit-details-marker {
+  display: none;
+}
+/* What opens over the page reads like the page, whatever the header stands on. */
+:is(.ch-menu__panel, .ch-nav-menu__pop, .ch-menu__dialog) {
+  background: var(--ch-color-surface);
+  color: var(--ch-color-text);
+}
+.ch-menu[open] > .ch-menu__panel {
+  @apply absolute inset-x-4 top-full z-40 overflow-auto rounded-lg border border-zinc-200 p-4 shadow-lg;
+  max-height: calc(100dvh - var(--ch-header-h) - 1rem);
+}
+.ch-menu__panel {
+  @apply grid gap-4;
+}
+.ch-menu__nav ul {
+  @apply grid gap-1;
+}
+.ch-menu__nav a,
+.ch-menu__nav summary,
+.ch-menu__nav li > span {
+  @apply block rounded px-2 py-2 text-base;
+}
+.ch-menu__nav a:hover {
+  background: var(--ch-color-surface-muted);
+}
+/* A group's line: its link (or name) and the caret, side by side. */
+.ch-menu__nav summary {
+  @apply flex items-center justify-between gap-2;
+}
+.ch-menu__nav summary > a {
+  @apply p-0;
+}
+.ch-menu__nav--small a {
+  @apply py-1.5 text-sm;
+}
+.ch-menu__current {
+  @apply font-semibold;
+}
+.ch-menu__panel .ch-nav-menu > ul {
+  @apply static mt-0 border-0 p-0 pl-3 shadow-none;
+}
+.ch-menu__search input {
+  @apply w-full rounded-md border border-zinc-300 px-3 py-2;
+}
+/* Drawers and the full-screen menu: a modal dialog (the browser traps focus, Escape closes it). */
+.ch-menu__dialog {
+  @apply m-0 content-start gap-4 p-4;
+  max-width: none;
+  max-height: none;
+  height: 100dvh;
+  width: min(22rem, calc(100vw - 3rem));
+  border: 0;
+}
+/* Only an open dialog is laid out: a display of its own would show a closed one. */
+.ch-menu__dialog[open] {
+  display: grid;
+}
+.ch-menu__dialog[data-style="drawer-end"] {
+  margin-inline-start: auto;
+}
+.ch-menu__dialog[data-style="fullscreen"] {
+  width: 100vw;
+}
+.ch-menu__dialog::backdrop {
+  background: rgb(0 0 0 / 0.45);
+}
+.ch-menu__bar {
+  @apply flex items-center justify-between gap-3;
+}
+.ch-menu__close {
+  @apply rounded border border-zinc-300 px-3 py-1.5 text-sm font-medium;
+}
+.ch-menu__dialog[open] {
+  transition:
+    translate var(--ch-dur-2, 0.25s) var(--ch-ease-out, ease-out),
+    opacity var(--ch-dur-2, 0.25s) ease-out;
+}
+@starting-style {
+  .ch-menu__dialog[data-style="drawer-start"][open] {
+    translate: -100% 0;
+  }
+  .ch-menu__dialog[data-style="drawer-end"][open] {
+    translate: 100% 0;
+  }
+  .ch-menu__dialog[data-style="fullscreen"][open] {
+    opacity: 0;
+  }
+}
+/* Submenus in the bar: popovers under their button (anchor positioning; the module otherwise). */
+.ch-nav-menu[data-popover] {
+  @apply inline-flex items-center gap-1;
+}
+.ch-nav-menu__btn {
+  @apply inline-flex cursor-pointer items-center gap-1 rounded px-1 py-0.5;
+}
+/* From the text's own color, so it reads on the page and on a transparent header alike. */
+.ch-nav-menu__btn:hover,
+.ch-nav-menu__btn:has(+ :popover-open) {
+  background: color-mix(in oklab, currentColor 12%, transparent);
+}
+.ch-nav-menu__pop {
+  @apply min-w-48 rounded-lg border border-zinc-200 p-2 text-sm shadow-lg;
+  margin: 0;
+  inset: auto;
+  position-area: bottom span-right;
+  margin-block-start: 6px;
+}
+.ch-nav-menu__pop ul {
+  @apply grid gap-0.5;
+}
+.ch-nav-menu__pop a,
+.ch-nav-menu__pop li > span {
+  @apply block rounded px-2 py-1.5;
+}
+.ch-nav-menu__pop a:hover {
+  background: var(--ch-color-surface-muted);
+}
+/* Hiding and shrinking move the header, never its box, so nothing below it shifts. */
+.ch-header[data-behavior="hide-on-scroll"],
+.ch-header[data-shrink],
+.ch-header[data-shrink] .ch-header__inner {
+  transition: translate var(--ch-dur-2, 0.25s) var(--ch-ease-out, ease-out);
+}
+.ch-header[data-shrink][data-ch-scrolled] {
+  translate: 0 -0.75rem;
+}
+.ch-header[data-shrink][data-ch-scrolled] .ch-header__inner {
+  translate: 0 0.375rem;
+}
+.ch-header[data-behavior="hide-on-scroll"][data-ch-hidden] {
+  translate: 0 -100%;
+}
+/* Transparent over a loud first band: that surface's text role, its own fill once scrolled. */
+.ch-header[data-transparent] {
+  margin-block-end: calc(-1 * var(--ch-header-h));
+}
+.ch-header[data-transparent]:not([data-ch-scrolled]) {
+  background: transparent;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+.ch-header[data-transparent][data-over="inverse"]:not([data-ch-scrolled]) {
+  color: var(--ch-color-text-inverse);
+}
+.ch-header[data-transparent]:is([data-over="brand"], [data-over="gradient"]):not(
+  [data-ch-scrolled]
+) {
+  color: var(--ch-color-on-brand);
+}
+.ch-header[data-transparent][data-over="accent"]:not([data-ch-scrolled]) {
+  color: var(--ch-color-on-accent);
+}
+.ch-header[data-transparent]:not([data-ch-scrolled])
+  :is(.ch-header__nav, .ch-header__utility, .ch-header__bar-link) {
+  color: inherit;
+}
+.ch-header[data-transparent]:not([data-ch-scrolled]) :is(.ch-header__nav, .ch-header__utility) > a,
+.ch-header[data-transparent]:not([data-ch-scrolled]) .ch-nav-menu[data-popover] > :is(a, button) {
+  color: inherit;
+}
+/* On a brand hero the primary button would vanish into it: its colors swap until the fill. */
+.ch-header[data-transparent]:is([data-over="brand"], [data-over="gradient"]):not([data-ch-scrolled])
+.ch-button--primary {
+  background: var(--ch-color-on-brand);
+  color: var(--ch-color-brand);
+}
+.ch-header[data-transparent][data-ch-scrolled] {
+  background: var(--ch-color-surface);
+  transition: background-color var(--ch-dur-2, 0.25s) ease-out;
+}
+/* Under a transparent header the page starts at the very top (the band makes its own room). */
+.ch-header[data-transparent] ~ main > .ch-surface:first-child {
+  padding-block-start: 0;
+}
+/* The first band (the root or its first child, three levels at most, like `heroSurface`) starts
+   under the header: it keeps its own room above the content. */
+.ch-header[data-transparent] ~ main > .ch-surface:first-child > .ch-band:first-child,
+.ch-header[data-transparent] ~ main > .ch-surface:first-child > :first-child > .ch-band:first-child,
+.ch-header[data-transparent]
+  ~ main
+  > .ch-surface:first-child
+  > :first-child
+  > :first-child
+  > .ch-band:first-child,
+.ch-header[data-transparent]
+  ~ main
+  > .ch-surface:first-child
+  .ch-carousel[data-variant="hero"]
+  > .ch-carousel__track
+  > .ch-carousel__slide
+  > .ch-band:first-child {
+  padding-block-start: calc(var(--ch-header-h) + 3rem);
+}
+:root[data-ch-motion="none"] :is(.ch-header, .ch-header__inner, .ch-menu__dialog) {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.ch-header, .ch-header__inner, .ch-menu__dialog) {
+    transition: none;
+  }
+}
+/* The `/menu` page: the phone menu, for readers without the dialog. */
+.ch-menu-page {
+  @apply py-8;
+}
+.ch-menu-page h1 {
+  @apply mb-6 text-3xl font-bold;
+}

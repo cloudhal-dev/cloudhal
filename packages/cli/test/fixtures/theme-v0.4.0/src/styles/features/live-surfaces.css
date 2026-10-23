@@ -1,0 +1,238 @@
+/* Live surfaces (RFC-0020 §4): conditional components, inputs and action buttons. */
+.ch-node {
+  display: contents;
+}
+.ch-node[hidden] {
+  display: none;
+}
+/* An action button starts from the browser's button: reset it, then give each style its own look. */
+button.ch-button {
+  @apply cursor-pointer border-0 bg-transparent font-medium;
+  font-family: inherit;
+}
+button.ch-button--primary {
+  @apply text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
+}
+button.ch-button--secondary {
+  @apply border border-zinc-300 text-zinc-900;
+}
+.ch-toggle {
+  @apply inline-flex w-fit flex-wrap gap-1 rounded-lg bg-zinc-100 p-1;
+}
+.ch-toggle__option input {
+  @apply sr-only;
+}
+.ch-toggle__option span {
+  @apply block cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600;
+}
+.ch-toggle__option input:checked + span {
+  @apply bg-white text-zinc-900 shadow-sm;
+}
+.ch-toggle__option input:focus-visible + span {
+  @apply outline-2 outline-offset-2;
+}
+.ch-field {
+  @apply grid content-start gap-1.5;
+}
+.ch-field__label {
+  @apply text-sm font-medium;
+}
+.ch-select {
+  @apply w-full max-w-xs rounded-md border border-zinc-300 bg-white px-3 py-2;
+}
+.ch-slider {
+  @apply flex items-center gap-3;
+}
+.ch-slider input {
+  @apply w-full max-w-sm;
+  accent-color: var(--ch-color-brand);
+}
+.ch-slider__value {
+  @apply min-w-12 text-right font-medium tabular-nums;
+}
+/* RFC-0022 §2: local inputs. */
+.ch-input-wrap {
+  @apply flex w-full max-w-xs items-center gap-2;
+}
+.ch-input {
+  @apply w-full max-w-xs rounded-md border border-zinc-300 bg-white px-3 py-2 tabular-nums;
+}
+.ch-input[aria-invalid="true"] {
+  @apply border-red-600;
+}
+.ch-input__unit {
+  @apply shrink-0 text-sm text-zinc-600;
+}
+.ch-field__help {
+  @apply text-sm text-zinc-600;
+}
+[aria-invalid="true"] ~ .ch-field__help,
+.ch-input-wrap:has([aria-invalid="true"]) ~ .ch-field__help {
+  @apply text-red-700;
+}
+.ch-check {
+  @apply flex w-fit cursor-pointer items-center gap-2;
+}
+.ch-check input {
+  @apply size-4;
+  accent-color: var(--ch-color-brand);
+}
+.ch-radio {
+  @apply m-0 grid min-w-0 gap-1.5 border-0 p-0;
+}
+.ch-radio__options {
+  @apply flex flex-col gap-1.5;
+}
+.ch-radio__option {
+  @apply flex w-fit cursor-pointer items-center gap-2;
+}
+.ch-radio__option input {
+  accent-color: var(--ch-color-brand);
+}
+.ch-radio[data-variant="buttons"] .ch-radio__options {
+  @apply inline-flex w-fit flex-row flex-wrap gap-1 rounded-lg bg-zinc-100 p-1;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input {
+  @apply sr-only;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option span {
+  @apply block min-h-9 rounded-md px-3 py-1.5 text-sm font-medium text-zinc-600;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input:checked + span {
+  @apply bg-white text-zinc-900 shadow-sm;
+}
+.ch-radio[data-variant="buttons"] .ch-radio__option input:focus-visible + span {
+  @apply outline-2 outline-offset-2;
+}
+.ch-noscript {
+  @apply text-sm text-zinc-600;
+}
+
+/* RFC-0022 §3: charts. Six series colors from the brand color, each distinct at 3:1 on white. */
+:root {
+  --ch-chart-1: var(--ch-color-brand);
+  --ch-chart-2: #2563eb;
+  --ch-chart-3: #d97706;
+  --ch-chart-4: #059669;
+  --ch-chart-5: #db2777;
+  --ch-chart-6: #7c3aed;
+}
+.ch-chart {
+  @apply m-0 grid gap-3;
+}
+.ch-chart__title {
+  @apply text-base font-semibold;
+}
+.ch-chart__svg {
+  @apply block h-auto w-full;
+}
+.ch-chart__grid {
+  stroke: var(--ch-color-border);
+  stroke-width: 1;
+}
+.ch-chart__tick {
+  fill: var(--ch-color-text-muted);
+  font-size: 12px;
+}
+.ch-chart__total {
+  fill: currentColor;
+  font-size: 22px;
+  font-weight: 600;
+}
+.ch-chart__legend {
+  @apply m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-sm;
+}
+.ch-chart__legend li {
+  @apply flex items-center gap-1.5;
+}
+.ch-chart__swatch {
+  @apply inline-block size-3 rounded-sm;
+}
+.ch-chart__caption,
+.ch-chart__empty {
+  @apply text-sm text-zinc-600;
+}
+.ch-chart__data summary {
+  @apply cursor-pointer text-sm text-zinc-600;
+}
+.ch-chart__data table {
+  @apply mt-2 w-full border-collapse text-sm tabular-nums;
+}
+.ch-chart__data th,
+.ch-chart__data td {
+  @apply border-b border-zinc-200 px-2 py-1 text-left;
+}
+
+/* RFC-0022 §4: tables. Below 480 px each row is a card whose cells carry their column's label. */
+.ch-table-wrap {
+  @apply w-full;
+}
+.ch-table {
+  @apply w-full border-collapse text-sm tabular-nums;
+}
+.ch-table caption {
+  @apply pb-2 text-left text-base font-semibold;
+}
+.ch-table th,
+.ch-table td {
+  @apply border-b border-zinc-200 px-3 py-2 text-left align-top;
+}
+.ch-table th {
+  @apply font-semibold text-zinc-600;
+}
+.ch-table [data-align="end"] {
+  @apply text-right;
+}
+.ch-table[data-striped="yes"] tbody tr:nth-child(even) {
+  @apply bg-zinc-50;
+}
+.ch-table tr[data-highlight="yes"] {
+  background: color-mix(in srgb, var(--ch-color-brand) 8%, transparent);
+}
+.ch-table tr[data-highlight="yes"] td:first-child {
+  box-shadow: inset 3px 0 0 var(--ch-color-brand);
+}
+@media (max-width: 480px) {
+  .ch-table thead {
+    @apply sr-only;
+  }
+  .ch-table caption {
+    @apply block w-full;
+  }
+  .ch-table,
+  .ch-table tbody,
+  .ch-table tr,
+  .ch-table td {
+    @apply block w-full;
+  }
+  .ch-table tr {
+    @apply mb-3 rounded-lg border border-zinc-200 px-3 py-1;
+  }
+  .ch-table td {
+    @apply flex justify-between gap-4 border-b border-zinc-100 px-0 text-right last:border-b-0;
+  }
+  .ch-table td::before {
+    @apply text-left font-medium text-zinc-600;
+    content: attr(data-label);
+  }
+  .ch-table td[data-phone="hide"] {
+    @apply hidden;
+  }
+  .ch-table tr[data-highlight="yes"] td:first-child {
+    box-shadow: none;
+  }
+}
+
+/*
+ * Corners of controls (src/settings.ts `radius`, RFC-0023 §3): buttons and single-line fields
+ * take `--ch-radius-control`, a pill at `full`; cards and bands keep the smaller radii. After
+ * the base rules, so they win.
+ */
+.ch-button,
+.ch-hero__cta,
+.ch-body
+  :is(input[type="text"], input[type="search"], input[type="number"], input[type="email"], select),
+.ch-body form button[type="submit"]:not(.sr-only) {
+  border-radius: var(--ch-radius-control, 0.25rem);
+}

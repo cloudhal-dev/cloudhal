@@ -1,0 +1,57 @@
+---
+/**
+ * The search page (RFC-0019 §3, RFC-0029 §2): an ordinary `<form method="get">` (no JavaScript),
+ * the results with their snippets (escaped text, matches in `<mark>`), and real links between
+ * result pages.
+ * Pages, topics and authors are found too; a topic or author shows its taxonomy ("Category").
+ * Rendered only by deployments that answer searches; the page is never cached and never indexed.
+ */
+import { type SearchView, searchPageHref, snippetHtml } from "@cloudhal/astro-renderer/search";
+import type { ThemeStrings } from "../theme.ts";
+
+interface Props {
+  search: SearchView;
+  locale: string;
+  t: ThemeStrings;
+}
+const { search, locale, t } = Astro.props;
+const date = (iso: string) =>
+  new Date(iso).toLocaleDateString(locale, { year: "numeric", month: "long", day: "numeric" });
+---
+<section class="ch-search" aria-labelledby="ch-search-title">
+  <h1 id="ch-search-title">{t.search}</h1>
+  <form class="ch-search-form" method="get" action="/search" role="search">
+    <label for="ch-search-q" class="sr-only">{t.searchLabel}</label>
+    <input id="ch-search-q" type="search" name="q" value={search.query} maxlength="200" placeholder={t.searchPlaceholder} autocomplete="off" />
+    <button type="submit">{t.search}</button>
+  </form>
+  {search.stale && <p class="ch-search-note" role="status">{t.searchUpdating}</p>}
+  {search.query && (
+    <p class="ch-search-summary" role="status">
+      {search.total > 0 ? t.searchResults(search.total, search.query) : t.searchNone(search.query)}
+    </p>
+  )}
+  {search.hits.length > 0 && (
+    <ol class="ch-search-results">
+      {search.hits.map((hit) => (
+        <li data-entry-id={hit.nodeId} data-kind={hit.kind ?? "article"}>
+          {hit.context && <p class="ch-search-context">{hit.context}</p>}
+          <h2><a href={hit.href}>{hit.title}</a></h2>
+          {hit.snippet && <p class="ch-search-snippet" set:html={snippetHtml(hit.snippet)} />}
+          {hit.publishedAt && <time datetime={hit.publishedAt}>{date(hit.publishedAt)}</time>}
+        </li>
+      ))}
+    </ol>
+  )}
+  {search.pages > 1 && (
+    <nav aria-label={t.pagination} class="ch-pagination">
+      {search.page > 1 ? (
+        <a href={searchPageHref(search.query, search.page - 1)} rel="prev">{t.previous}</a>
+      ) : <span />}
+      <span>{t.pageOf(search.page, search.pages)}</span>
+      {search.page < search.pages ? (
+        <a href={searchPageHref(search.query, search.page + 1)} rel="next">{t.next}</a>
+      ) : <span />}
+    </nav>
+  )}
+</section>

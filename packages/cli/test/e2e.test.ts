@@ -668,4 +668,144 @@ describe("cloudhal init → dev → snapshot → build", () => {
       await new Promise((r) => server.child.once("exit", r));
     }
   });
+
+  it("build shows typed fields on entries of collections that define them, and nothing else changes (RFC-0041 §9)", async () => {
+    const cfg = await readProjectConfig(projectDir);
+    const outDir = path.join(projectDir, "dist");
+    const read = (...p: string[]) => readFile(path.join(outDir, ...p), "utf8");
+    const article = (html: string) => html.match(/<article[\s\S]*?<\/article>/)?.[0] ?? "";
+    await snapshot({ projectDir, label: "before-fields", publish: true });
+    await spawnBuild(projectDir);
+    const before = article(await read("posts", "hello-world", "index.html"));
+    expect(before).toContain("Hello, world");
+
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    let site = await local.store.getSite(cfg.siteId);
+    if (!site) throw new Error("no site");
+    const label = (en: string, tr: string) => ({ en: { label: en }, tr: { label: tr } });
+    // the seed's required category applies to every collection: reuse hello-world's terms
+    const hello = (await local.store.listContentEntries(cfg.siteId, "posts")).find(
+      (e) => e.slug === "hello-world" && e.locale === "en",
+    );
+    const terms = hello?.terms ? { terms: hello.terms } : {};
+    site = await local.store.updateSite({
+      ...site,
+      collections: {
+        ...site.collections,
+        events: {
+          labels: { en: { singular: "Event", plural: "Events" } },
+          fields: [
+            { key: "venue", type: "text", labels: label("Venue", "Mekan"), localized: true },
+            { key: "price", type: "number", labels: label("Price", "Fiyat"), localized: false },
+            {
+              key: "startsAt",
+              type: "datetime",
+              labels: label("Starts", "Başlangıç"),
+              localized: false,
+            },
+            {
+              key: "deadline",
+              type: "date",
+              labels: label("Deadline", "Son gün"),
+              localized: false,
+            },
+            {
+              key: "online",
+              type: "boolean",
+              labels: label("Online", "Çevrim içi"),
+              localized: false,
+            },
+            { key: "tickets", type: "url", labels: label("Tickets", "Biletler"), localized: true },
+            {
+              key: "agenda",
+              type: "richText",
+              labels: label("Agenda", "Program"),
+              localized: true,
+            },
+            { key: "notes", type: "text", labels: label("Notes", "Notlar"), localized: true },
+          ],
+        },
+      },
+    });
+    const event = await local.store.createContentEntry({
+      siteId: cfg.siteId,
+      collection: "events",
+      slug: "launch",
+      locale: "en",
+      status: "published",
+      title: "Launch party",
+      body: { format: "markdown", value: "Join us for the launch of the new site." },
+      fields: {
+        venue: "<b>Kadıköy</b> Hall",
+        price: 1234.5,
+        startsAt: { at: "2026-11-05T16:30:00Z", timeZone: "Europe/Istanbul" },
+        deadline: "2026-02-28",
+        online: true,
+        tickets: "https://example.com/tickets",
+        agenda: "<script>alert(1)</script>\n\n- Talks\n- **Lunch**",
+      },
+      tags: [],
+      ...terms,
+      author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
+      translation: { group: "entry_01HZX8K4N0EV", method: "original" },
+      id: "entry_01HZX8K4N0EV",
+    } as never);
+    const group = await local.store.translationGroup(site, event.id);
+    await local.store.createContentEntry({
+      siteId: cfg.siteId,
+      collection: "events",
+      slug: "launch",
+      locale: "tr",
+      status: "published",
+      title: "Açılış partisi",
+      body: { format: "markdown", value: "Yeni sitenin açılışına bekleriz." },
+      fields: { venue: "Kadıköy Salonu" },
+      tags: [],
+      ...terms,
+      author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
+      translation: {
+        group: event.id,
+        method: "human",
+        source: {
+          id: event.id,
+          locale: "en",
+          rev: event.rev,
+          hash: group.members[0]?.hash as string,
+        },
+      },
+    } as never);
+    await local.close();
+    await snapshot({ projectDir, label: "fields", publish: true });
+    await spawnBuild(projectDir);
+
+    const en = await read("events", "launch", "index.html");
+    const list = en.match(/<dl class="ch-fields"[\s\S]*?<\/dl>/)?.[0] ?? "";
+    expect(list).toMatch(/^<dl class="ch-fields" aria-label="Details">/);
+    expect(list).toContain(
+      '<div class="ch-field" data-field="venue" data-type="text"><dt>Venue</dt><dd>&lt;b&gt;Kadıköy&lt;/b&gt; Hall</dd></div>',
+    );
+    expect(list).toContain("<dt>Price</dt><dd>1,234.5</dd>");
+    expect(list).toMatch(
+      /<time datetime="2026-11-05T16:30:00Z">November 5, 2026.* 7:30\sPM GMT\+3<\/time>/,
+    );
+    expect(list).toContain('<time datetime="2026-02-28">February 28, 2026</time>');
+    expect(list).toContain("<dt>Online</dt><dd>Yes</dd>");
+    expect(list).toContain(
+      '<dd><a href="https://example.com/tickets">https://example.com/tickets</a></dd>',
+    );
+    expect(list).toContain("<strong>Lunch</strong>");
+    expect(list).not.toContain('data-field="notes"'); // empty values are skipped
+    expect(en).not.toContain("<script>alert(1)");
+    // The translation: its own venue, the original's shared values, labels in Turkish.
+    const tr = await read("tr", "events", "launch", "index.html");
+    expect(tr).toContain('aria-label="Ayrıntılar"');
+    expect(tr).toContain("<dt>Mekan</dt><dd>Kadıköy Salonu</dd>");
+    expect(tr).toContain("<dt>Fiyat</dt><dd>1.234,5</dd>");
+    expect(tr).toContain("<dt>Çevrim içi</dt><dd>Evet</dd>");
+    expect(tr).toContain('data-field="tickets" data-type="url" data-from-original');
+    // An entry of a collection without definitions renders exactly as before.
+    const after = article(await read("posts", "hello-world", "index.html"));
+    expect(after).not.toContain("ch-fields");
+    expect(after).toBe(before);
+  });
 });
