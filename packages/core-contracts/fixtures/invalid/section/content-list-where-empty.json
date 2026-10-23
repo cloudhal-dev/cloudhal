@@ -1,0 +1,15 @@
+{
+  "reason": "where is absent rather than empty",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "reason": "a condition's field is a field key",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "fields.startsAt",
+        "op": "gte",
+        "value": "now"
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": ["scheduled"]
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc"
+    }
+  }
+}

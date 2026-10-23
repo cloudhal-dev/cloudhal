@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9T1",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Events",
+  "slug": "events",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [],
+  "pageIds": [],
+  "theme": {
+    "name": "blog"
+  },
+  "rev": 0,
+  "createdAt": "2026-10-23T20:00:00Z",
+  "updatedAt": "2026-10-23T20:00:00Z",
+  "collections": {
+    "jobs": {
+      "fields": [
+        {
+          "key": "closes",
+          "type": "date",
+          "labels": {
+            "en": {
+              "label": "closes"
+            }
+          },
+          "localized": false
+        },
+        {
+          "key": "remote",
+          "type": "boolean",
+          "labels": {
+            "en": {
+              "label": "remote"
+            }
+          },
+          "localized": false
+        }
+      ],
+      "expiry": {
+        "field": "closes",
+        "action": "hide"
+      },
+      "structuredData": {
+        "type": "JobPosting",
+        "properties": {
+          "title": {
+            "kind": "entry",
+            "property": "title"
+          },
+          "description": {
+            "kind": "entry",
+            "property": "body"
+          },
+          "datePosted": {
+            "kind": "entry",
+            "property": "publishedAt"
+          },
+          "validThrough": {
+            "kind": "field",
+            "field": "closes"
+          },
+          "hiringOrganization.name": {
+            "kind": "site",
+            "property": "name"
+          },
+          "hiringOrganization.logo": {
+            "kind": "site",
+            "property": "logo"
+          },
+          "jobLocationType": {
+            "kind": "field",
+            "field": "remote"
+          },
+          "applicantLocationRequirements.name": {
+            "kind": "constant",
+            "value": "Türkiye"
+          },
+          "employmentType": {
+            "kind": "constant",
+            "value": "FULL_TIME"
+          }
+        }
+      }
+    },
+    "products": {
+      "structuredData": {
+        "type": "Product",
+        "properties": {
+          "offers.price": {
+            "kind": "field",
+            "field": "price"
+          },
+          "image": {
+            "kind": "entry",
+            "property": "coverImage"
+          },
+          "description": {
+            "kind": "entry",
+            "property": "summary"
+          },
+          "offers.priceValidUntil": {
+            "kind": "entry",
+            "property": "updatedAt"
+          },
+          "offers.priceCurrency": {
+            "kind": "constant",
+            "value": "EUR"
+          }
+        }
+      },
+      "fields": [
+        {
+          "key": "price",
+          "type": "number",
+          "labels": {
+            "en": {
+              "label": "price"
+            }
+          },
+          "localized": false
+        }
+      ]
+    },
+    "recipes": {
+      "listFields": ["minutes"],
+      "fields": [
+        {
+          "key": "minutes",
+          "type": "number",
+          "labels": {
+            "en": {
+              "label": "minutes"
+            }
+          },
+          "localized": false,
+          "integer": true
+        }
+      ],
+      "structuredData": {
+        "type": "Recipe",
+        "properties": {
+          "totalTime": {
+            "kind": "field",
+            "field": "minutes"
+          }
+        }
+      }
+    }
+  }
+}

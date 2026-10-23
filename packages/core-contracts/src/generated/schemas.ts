@@ -559,6 +559,34 @@ export const SiteSchema = {
         }
       }
     },
+    "CollectionExpiry": {
+      "type": "object",
+      "description": "RFC-0042: a time gate every entry derives from one of its date or datetime fields, checked at render time like Availability.until. A date ends at the start of the next day in the site's time zone.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "action"
+      ],
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/FieldKey"
+        },
+        "action": {
+          "type": "string",
+          "description": "unlist: the page stays, the entry leaves listings, feeds, the sitemap and search. hide: every public route answers 404.",
+          "enum": [
+            "unlist",
+            "hide"
+          ]
+        },
+        "afterMinutes": {
+          "type": "integer",
+          "description": "Grace after the field's instant. Absent: 0.",
+          "minimum": 0,
+          "maximum": 10080
+        }
+      }
+    },
     "CollectionLabel": {
       "type": "object",
       "additionalProperties": false,
@@ -634,6 +662,22 @@ export const SiteSchema = {
           "items": {
             "$ref": "#/$defs/FieldDefinition"
           }
+        },
+        "listFields": {
+          "type": "array",
+          "description": "RFC-0042: fields that listings, queries, Studio columns and MCP may filter and sort by, in column order. Keys of this collection's fields (checked in code).",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/FieldKey"
+          }
+        },
+        "expiry": {
+          "$ref": "#/$defs/CollectionExpiry"
+        },
+        "structuredData": {
+          "$ref": "#/$defs/StructuredDataPreset"
         }
       }
     },
@@ -687,6 +731,65 @@ export const SiteSchema = {
         },
         "primary": {
           "type": "boolean"
+        }
+      }
+    },
+    "EntryValueProperty": {
+      "type": "string",
+      "description": "RFC-0042: entry properties a structured-data property may read.",
+      "enum": [
+        "title",
+        "summary",
+        "body",
+        "coverImage",
+        "url",
+        "publishedAt",
+        "updatedAt"
+      ]
+    },
+    "FieldCondition": {
+      "type": "object",
+      "description": "RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "op"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "in",
+            "set",
+            "unset"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
         }
       }
     },
@@ -1160,6 +1263,29 @@ export const SiteSchema = {
         }
       }
     },
+    "FieldOrder": {
+      "type": "object",
+      "description": "RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
     "FooterColumn": {
       "type": "object",
       "additionalProperties": false,
@@ -1516,6 +1642,18 @@ export const SiteSchema = {
               "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
               "minLength": 1,
               "maxLength": 512
+            },
+            "where": {
+              "type": "array",
+              "description": "RFC-0042: conditions on the collection's list fields, ANDed.",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/FieldCondition"
+              }
+            },
+            "orderBy": {
+              "$ref": "#/$defs/FieldOrder"
             }
           }
         },
@@ -1594,6 +1732,15 @@ export const SiteSchema = {
         }
       ]
     },
+    "SiteValueProperty": {
+      "type": "string",
+      "description": "RFC-0042: site properties a structured-data property may read.",
+      "enum": [
+        "name",
+        "url",
+        "logo"
+      ]
+    },
     "Slug": {
       "type": "string",
       "description": "Lower-case URL segment.",
@@ -1632,6 +1779,131 @@ export const SiteSchema = {
           "maxLength": 2048
         }
       }
+    },
+    "StructuredDataPreset": {
+      "type": "object",
+      "description": "RFC-0042: the JSON-LD type an entry page emits in place of BlogPosting, with its properties mapped to value sources. Paths, fitting field types and required properties are a closed table in code (@cloudhal/core-ts/structured-data).",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "properties"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "Event",
+            "JobPosting",
+            "Product",
+            "Recipe"
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Keyed by property path, e.g. startDate or location.address.addressLocality.",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][A-Za-z]{0,39}(\\.[a-z][A-Za-z]{0,39}){0,2}$"
+          },
+          "minProperties": 1,
+          "maxProperties": 40,
+          "additionalProperties": {
+            "$ref": "#/$defs/StructuredDataSource"
+          }
+        }
+      }
+    },
+    "StructuredDataSource": {
+      "description": "RFC-0042: where one JSON-LD property's value comes from, discriminated by `kind`.",
+      "oneOf": [
+        {
+          "title": "FieldValueSource",
+          "type": "object",
+          "description": "A typed field of this collection, converted by its type.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "field"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "field"
+              ]
+            },
+            "field": {
+              "$ref": "#/$defs/FieldKey"
+            }
+          }
+        },
+        {
+          "title": "EntryValueSource",
+          "type": "object",
+          "description": "A built-in property of the entry.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "entry"
+              ]
+            },
+            "property": {
+              "$ref": "#/$defs/EntryValueProperty"
+            }
+          }
+        },
+        {
+          "title": "SiteValueSource",
+          "type": "object",
+          "description": "A property of the site.",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "property"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "site"
+              ]
+            },
+            "property": {
+              "$ref": "#/$defs/SiteValueProperty"
+            }
+          }
+        },
+        {
+          "title": "ConstantValueSource",
+          "type": "object",
+          "description": "A plain-text constant: no control characters, no markup meaning; vocabulary-checked on enum paths (in code).",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "constant"
+              ]
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+            }
+          }
+        }
+      ]
     },
     "SurfaceComponent": {
       "type": "object",
@@ -1913,6 +2185,75 @@ export const PageSchema = {
       ],
       "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
     },
+    "FieldCondition": {
+      "type": "object",
+      "description": "RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "op"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "in",
+            "set",
+            "unset"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "FieldOrder": {
+      "type": "object",
+      "description": "RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
+    },
     "Id": {
       "type": "string",
       "description": "Prefixed, URL-safe identifier, e.g. site_01HZX8K3Q9. The prefix names the entity kind; agents and the MCP server pass these as opaque handles.",
@@ -2169,6 +2510,18 @@ export const PageSchema = {
               "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
               "minLength": 1,
               "maxLength": 512
+            },
+            "where": {
+              "type": "array",
+              "description": "RFC-0042: conditions on the collection's list fields, ANDed.",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/FieldCondition"
+              }
+            },
+            "orderBy": {
+              "$ref": "#/$defs/FieldOrder"
             }
           }
         },
@@ -2604,6 +2957,18 @@ export const SectionSchema = {
           "description": "Filter expression over term assignments (RFC-0002), e.g. 'category:news+tag:ai' or 'category:news>*'.",
           "minLength": 1,
           "maxLength": 512
+        },
+        "where": {
+          "type": "array",
+          "description": "RFC-0042: conditions on the collection's list fields, ANDed.",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/FieldCondition"
+          }
+        },
+        "orderBy": {
+          "$ref": "#/$defs/FieldOrder"
         }
       }
     },
@@ -2764,6 +3129,75 @@ export const SectionSchema = {
         1
       ],
       "description": "The markdown dialect a body follows (RFC-0014 §1): 1 = Cloudhal Markdown v1 (CommonMark + GFM + `asset:` + directives; raw HTML escaped). Set by the store on markdown bodies."
+    },
+    "FieldCondition": {
+      "type": "object",
+      "description": "RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "op"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "eq",
+            "ne",
+            "lt",
+            "lte",
+            "gt",
+            "gte",
+            "in",
+            "set",
+            "unset"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        }
+      }
+    },
+    "FieldOrder": {
+      "type": "object",
+      "description": "RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last.",
+      "additionalProperties": false,
+      "required": [
+        "field",
+        "direction"
+      ],
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "A field key (site.schema.json FieldKey's pattern, repeated).",
+          "pattern": "^[a-z][A-Za-z0-9]{0,39}$"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "asc",
+            "desc"
+          ]
+        }
+      }
     },
     "Id": {
       "type": "string",

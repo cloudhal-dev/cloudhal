@@ -522,6 +522,370 @@ impl ::std::convert::TryFrom<::std::string::String> for ContentListSectionSort {
         value.parse()
     }
 }
+#[doc = "RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldCondition {
+    #[doc = "A field key (site.schema.json FieldKey's pattern, repeated)."]
+    pub field: FieldConditionField,
+    pub op: FieldConditionOp,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub value: ::std::option::Option<FieldConditionValue>,
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub values: ::std::option::Option<::std::vec::Vec<FieldConditionValuesItem>>,
+}
+#[doc = "A field key (site.schema.json FieldKey's pattern, repeated)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldConditionField(::std::string::String);
+impl ::std::ops::Deref for FieldConditionField {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldConditionField> for ::std::string::String {
+    fn from(value: FieldConditionField) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldConditionField {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^[a-z][A-Za-z0-9]{0,39}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][A-Za-z0-9]{0,39}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldConditionField {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldConditionField {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldConditionField {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`FieldConditionOp`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum FieldConditionOp {
+    #[serde(rename = "eq")]
+    Eq,
+    #[serde(rename = "ne")]
+    Ne,
+    #[serde(rename = "lt")]
+    Lt,
+    #[serde(rename = "lte")]
+    Lte,
+    #[serde(rename = "gt")]
+    Gt,
+    #[serde(rename = "gte")]
+    Gte,
+    #[serde(rename = "in")]
+    In,
+    #[serde(rename = "set")]
+    Set,
+    #[serde(rename = "unset")]
+    Unset,
+}
+impl ::std::fmt::Display for FieldConditionOp {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Eq => f.write_str("eq"),
+            Self::Ne => f.write_str("ne"),
+            Self::Lt => f.write_str("lt"),
+            Self::Lte => f.write_str("lte"),
+            Self::Gt => f.write_str("gt"),
+            Self::Gte => f.write_str("gte"),
+            Self::In => f.write_str("in"),
+            Self::Set => f.write_str("set"),
+            Self::Unset => f.write_str("unset"),
+        }
+    }
+}
+impl ::std::str::FromStr for FieldConditionOp {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "eq" => Ok(Self::Eq),
+            "ne" => Ok(Self::Ne),
+            "lt" => Ok(Self::Lt),
+            "lte" => Ok(Self::Lte),
+            "gt" => Ok(Self::Gt),
+            "gte" => Ok(Self::Gte),
+            "in" => Ok(Self::In),
+            "set" => Ok(Self::Set),
+            "unset" => Ok(Self::Unset),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldConditionOp {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldConditionOp {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "`FieldConditionValue`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldConditionValue(::std::string::String);
+impl ::std::ops::Deref for FieldConditionValue {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldConditionValue> for ::std::string::String {
+    fn from(value: FieldConditionValue) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldConditionValue {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldConditionValue {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldConditionValue {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldConditionValue {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "`FieldConditionValuesItem`"]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldConditionValuesItem(::std::string::String);
+impl ::std::ops::Deref for FieldConditionValuesItem {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldConditionValuesItem> for ::std::string::String {
+    fn from(value: FieldConditionValuesItem) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldConditionValuesItem {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        if value.chars().count() > 100usize {
+            return Err("longer than 100 characters".into());
+        }
+        if value.chars().count() < 1usize {
+            return Err("shorter than 1 characters".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldConditionValuesItem {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldConditionValuesItem {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldConditionValuesItem {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
+#[doc = "RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FieldOrder {
+    pub direction: FieldOrderDirection,
+    #[doc = "A field key (site.schema.json FieldKey's pattern, repeated)."]
+    pub field: FieldOrderField,
+}
+#[doc = "`FieldOrderDirection`"]
+#[derive(
+    :: serde :: Deserialize,
+    :: serde :: Serialize,
+    Clone,
+    Copy,
+    Debug,
+    Eq,
+    Hash,
+    Ord,
+    PartialEq,
+    PartialOrd,
+)]
+pub enum FieldOrderDirection {
+    #[serde(rename = "asc")]
+    Asc,
+    #[serde(rename = "desc")]
+    Desc,
+}
+impl ::std::fmt::Display for FieldOrderDirection {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+        match *self {
+            Self::Asc => f.write_str("asc"),
+            Self::Desc => f.write_str("desc"),
+        }
+    }
+}
+impl ::std::str::FromStr for FieldOrderDirection {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        match value {
+            "asc" => Ok(Self::Asc),
+            "desc" => Ok(Self::Desc),
+            _ => Err("invalid value".into()),
+        }
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldOrderDirection {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldOrderDirection {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+#[doc = "A field key (site.schema.json FieldKey's pattern, repeated)."]
+#[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[serde(transparent)]
+pub struct FieldOrderField(::std::string::String);
+impl ::std::ops::Deref for FieldOrderField {
+    type Target = ::std::string::String;
+    fn deref(&self) -> &::std::string::String {
+        &self.0
+    }
+}
+impl ::std::convert::From<FieldOrderField> for ::std::string::String {
+    fn from(value: FieldOrderField) -> Self {
+        value.0
+    }
+}
+impl ::std::str::FromStr for FieldOrderField {
+    type Err = self::error::ConversionError;
+    fn from_str(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        static PATTERN: ::std::sync::LazyLock<::regress::Regex> =
+            ::std::sync::LazyLock::new(|| {
+                ::regress::Regex::new("^[a-z][A-Za-z0-9]{0,39}$").unwrap()
+            });
+        if PATTERN.find(value).is_none() {
+            return Err("doesn't match pattern \"^[a-z][A-Za-z0-9]{0,39}$\"".into());
+        }
+        Ok(Self(value.to_string()))
+    }
+}
+impl ::std::convert::TryFrom<&str> for FieldOrderField {
+    type Error = self::error::ConversionError;
+    fn try_from(value: &str) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl ::std::convert::TryFrom<::std::string::String> for FieldOrderField {
+    type Error = self::error::ConversionError;
+    fn try_from(
+        value: ::std::string::String,
+    ) -> ::std::result::Result<Self, self::error::ConversionError> {
+        value.parse()
+    }
+}
+impl<'de> ::serde::Deserialize<'de> for FieldOrderField {
+    fn deserialize<D>(deserializer: D) -> ::std::result::Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        ::std::string::String::deserialize(deserializer)?
+            .parse()
+            .map_err(|e: self::error::ConversionError| {
+                <D::Error as ::serde::de::Error>::custom(e.to_string())
+            })
+    }
+}
 #[doc = "`HeroSectionHeading`"]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[serde(transparent)]
@@ -1115,7 +1479,19 @@ pub enum Section {
         filter: ::std::option::Option<ContentListSectionFilter>,
         id: Id,
         limit: ::std::num::NonZeroU64,
+        #[serde(
+            rename = "orderBy",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        order_by: ::std::option::Option<FieldOrder>,
         sort: ContentListSectionSort,
+        #[doc = "RFC-0042: conditions on the collection's list fields, ANDed."]
+        #[serde(
+            rename = "where",
+            default,
+            skip_serializing_if = "::std::vec::Vec::is_empty"
+        )]
+        where_: ::std::vec::Vec<FieldCondition>,
     },
     #[doc = "ComponentSection\n\nA typed block from the block registry (RFC-0015): `type` names a registered block type (one global namespace of English names), `props` follow that type's props schema, which the store validates."]
     #[serde(rename = "component")]

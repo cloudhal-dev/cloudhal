@@ -1,0 +1,322 @@
+{
+  "reason": "a preset maps at most 40 properties",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "timeZone": "Europe/Istanbul",
+    "rev": 0,
+    "createdAt": "2026-10-23T20:00:00Z",
+    "updatedAt": "2026-10-23T20:00:00Z",
+    "collections": {
+      "events": {
+        "labels": {
+          "en": {
+            "singular": "Event",
+            "plural": "Events"
+          }
+        },
+        "fields": [
+          {
+            "key": "startsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "startsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "endsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "endsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "day",
+            "type": "date",
+            "labels": {
+              "en": {
+                "label": "day"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "venue",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "venue"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "city",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "city"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "price",
+            "type": "number",
+            "labels": {
+              "en": {
+                "label": "price"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "eventStatus",
+            "type": "select",
+            "labels": {
+              "en": {
+                "label": "eventStatus"
+              }
+            },
+            "localized": false,
+            "options": [
+              {
+                "value": "scheduled",
+                "labels": {
+                  "en": "Scheduled"
+                }
+              },
+              {
+                "value": "cancelled",
+                "labels": {
+                  "en": "Cancelled"
+                }
+              }
+            ]
+          },
+          {
+            "key": "poster",
+            "type": "image",
+            "labels": {
+              "en": {
+                "label": "poster"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "tickets",
+            "type": "url",
+            "labels": {
+              "en": {
+                "label": "tickets"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "notes",
+            "type": "richText",
+            "labels": {
+              "en": {
+                "label": "notes"
+              }
+            },
+            "localized": false
+          }
+        ],
+        "listFields": ["startsAt", "eventStatus", "price", "day"],
+        "expiry": {
+          "field": "endsAt",
+          "action": "unlist",
+          "afterMinutes": 60
+        },
+        "structuredData": {
+          "type": "Event",
+          "properties": {
+            "pa": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pb": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pc": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pd": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pe": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pf": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pg": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "ph": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pi": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pj": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pk": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pl": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pm": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pn": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "po": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pp": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pq": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pr": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "ps": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pt": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pu": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pv": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pw": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "px": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "py": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pz": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pA": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pB": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pC": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pD": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pE": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pF": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pG": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pH": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pI": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pJ": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pK": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pL": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pM": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pN": {
+              "kind": "constant",
+              "value": "x"
+            },
+            "pO": {
+              "kind": "constant",
+              "value": "x"
+            }
+          }
+        }
+      }
+    }
+  }
+}

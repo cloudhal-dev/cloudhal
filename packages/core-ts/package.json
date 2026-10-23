@@ -40,7 +40,8 @@
     "./directives": "./src/directives.ts",
     "./tokens": "./src/tokens.ts",
     "./chrome": "./src/chrome.ts",
-    "./icons": "./src/icons.ts"
+    "./icons": "./src/icons.ts",
+    "./structured-data": "./src/structured-data/index.ts"
   },
   "files": [
     "dist",
@@ -189,6 +190,10 @@
       "./icons": {
         "types": "./dist/src/icons.d.ts",
         "default": "./dist/src/icons.js"
+      },
+      "./structured-data": {
+        "types": "./dist/src/structured-data/index.d.ts",
+        "default": "./dist/src/structured-data/index.js"
       }
     }
   },

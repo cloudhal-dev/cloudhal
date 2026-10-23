@@ -1,0 +1,214 @@
+{
+  "reason": "a property path segment is letters only",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "timeZone": "Europe/Istanbul",
+    "rev": 0,
+    "createdAt": "2026-10-23T20:00:00Z",
+    "updatedAt": "2026-10-23T20:00:00Z",
+    "collections": {
+      "events": {
+        "labels": {
+          "en": {
+            "singular": "Event",
+            "plural": "Events"
+          }
+        },
+        "fields": [
+          {
+            "key": "startsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "startsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "endsAt",
+            "type": "datetime",
+            "labels": {
+              "en": {
+                "label": "endsAt"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "day",
+            "type": "date",
+            "labels": {
+              "en": {
+                "label": "day"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "venue",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "venue"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "city",
+            "type": "text",
+            "labels": {
+              "en": {
+                "label": "city"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "price",
+            "type": "number",
+            "labels": {
+              "en": {
+                "label": "price"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "eventStatus",
+            "type": "select",
+            "labels": {
+              "en": {
+                "label": "eventStatus"
+              }
+            },
+            "localized": false,
+            "options": [
+              {
+                "value": "scheduled",
+                "labels": {
+                  "en": "Scheduled"
+                }
+              },
+              {
+                "value": "cancelled",
+                "labels": {
+                  "en": "Cancelled"
+                }
+              }
+            ]
+          },
+          {
+            "key": "poster",
+            "type": "image",
+            "labels": {
+              "en": {
+                "label": "poster"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "tickets",
+            "type": "url",
+            "labels": {
+              "en": {
+                "label": "tickets"
+              }
+            },
+            "localized": false
+          },
+          {
+            "key": "notes",
+            "type": "richText",
+            "labels": {
+              "en": {
+                "label": "notes"
+              }
+            },
+            "localized": false
+          }
+        ],
+        "listFields": ["startsAt", "eventStatus", "price", "day"],
+        "expiry": {
+          "field": "endsAt",
+          "action": "unlist",
+          "afterMinutes": 60
+        },
+        "structuredData": {
+          "type": "Event",
+          "properties": {
+            "name": {
+              "kind": "entry",
+              "property": "title"
+            },
+            "startDate": {
+              "kind": "field",
+              "field": "startsAt"
+            },
+            "endDate": {
+              "kind": "field",
+              "field": "endsAt"
+            },
+            "location.name": {
+              "kind": "field",
+              "field": "venue"
+            },
+            "location.address.addressLocality": {
+              "kind": "field",
+              "field": "city"
+            },
+            "location.address.addressCountry": {
+              "kind": "constant",
+              "value": "TR"
+            },
+            "eventStatus": {
+              "kind": "field",
+              "field": "eventStatus"
+            },
+            "organizer.name": {
+              "kind": "site",
+              "property": "name"
+            },
+            "organizer.url": {
+              "kind": "site",
+              "property": "url"
+            },
+            "offers.price": {
+              "kind": "field",
+              "field": "price"
+            },
+            "offers.priceCurrency": {
+              "kind": "constant",
+              "value": "TRY"
+            },
+            "offers.url": {
+              "kind": "field",
+              "field": "tickets"
+            },
+            "image": {
+              "kind": "field",
+              "field": "poster"
+            },
+            "offers2.price": {
+              "kind": "constant",
+              "value": "1"
+            }
+          }
+        }
+      }
+    }
+  }
+}

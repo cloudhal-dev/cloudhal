@@ -1,0 +1,27 @@
+{
+  "reason": "an order has only field and direction",
+  "data": {
+    "id": "sec_01HZX8K3Q9WH",
+    "kind": "contentList",
+    "collection": "events",
+    "limit": 12,
+    "sort": "newest",
+    "where": [
+      {
+        "field": "startsAt",
+        "op": "gte",
+        "value": "now"
+      },
+      {
+        "field": "eventStatus",
+        "op": "in",
+        "values": ["scheduled"]
+      }
+    ],
+    "orderBy": {
+      "field": "startsAt",
+      "direction": "asc",
+      "nulls": "first"
+    }
+  }
+}
