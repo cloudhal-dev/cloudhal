@@ -87,6 +87,7 @@ const docsIndex: SitePage = {
 
 - [Search](/docs/guides/search), [schedules](/docs/guides/schedules), [comments](/docs/guides/comments)
 - [Typed custom fields](/docs/guides/fields): definitions, operations, languages and themes
+- [Structured data, expiry and listings](/docs/guides/structured-data): JSON-LD presets, entries that end on a date, listings by field and collection feeds
 - [Several sites in one deployment](/docs/guides/multi-site)
 - [Analytics and privacy](/docs/guides/analytics-privacy)
 - [Translations with Weblate](/docs/guides/translations-weblate)

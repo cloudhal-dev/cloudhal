@@ -1,5 +1,6 @@
 import type {
   ContentEntry,
+  ContentListSection,
   ImageRef,
   Page,
   Section,
@@ -18,6 +19,7 @@ import {
   viewPagePath,
 } from "./archive.ts";
 import { renderComponentSection } from "./blocks.ts";
+import { evaluateEntryQuery, listsByField, sectionQuery } from "./entry-query.ts";
 import { formatGateTime, gateNotice } from "./gates.ts";
 import { renderBody, renderEntryArticle, renderMarkdown, safeHref, safeSrc } from "./markdown.ts";
 import { assetCaption, imageAttributes, imgHtml, type MediaContext } from "./media.ts";
@@ -83,10 +85,55 @@ export function previewCollections(sections: readonly Section[]): string[] {
  * (`.ch-*` classes, `data-section-id`), so agents can preview a change without a build and the
  * markup matches what the site will render.
  */
+/**
+ * What a preview needs to list a `contentList` section by field (RFC-0042 §4): the site (field
+ * definitions, list fields, time zone) and the instant `now` compares with (default: the clock).
+ */
+export interface PreviewListing {
+  readonly site: Site;
+  readonly now?: number | undefined;
+}
+
+/**
+ * A `contentList` section's entries in a preview: with `where`/`orderBy` (and `listing`), through
+ * the live renderer's evaluator (`evaluateEntryQuery`); otherwise the collection by the section's
+ * `sort`. A term `filter` is applied on the site only; a preview ignores it.
+ */
+function previewList(
+  section: ContentListSection,
+  entries: Record<string, ContentEntry[]>,
+  listing: PreviewListing | undefined,
+): ContentEntry[] {
+  const all = entries[section.collection] ?? [];
+  if (listing && listsByField(section)) {
+    const { filter: _ignored, ...query } = sectionQuery(section);
+    return evaluateEntryQuery({
+      site: listing.site,
+      candidates: all,
+      published: all,
+      taxonomies: [],
+      terms: [],
+      query,
+      now: listing.now ?? Date.now(),
+    }).entries;
+  }
+  return [...all]
+    .sort((a, b) =>
+      section.sort === "title"
+        ? a.title.localeCompare(b.title)
+        : section.sort === "oldest"
+          ? (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt)
+          : (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt),
+    )
+    .slice(0, section.limit);
+}
+
 export function renderSectionHtml(
   section: Section,
   entries: Record<string, ContentEntry[]> = {},
   media?: MediaContext,
+  /** RFC-0042: lets a `contentList` with `where`/`orderBy` list as the site does. */
+  listing?: PreviewListing,
 ): string {
   switch (section.kind) {
     case "hero":
@@ -115,15 +162,7 @@ export function renderSectionHtml(
       }</figure>`;
     }
     case "contentList": {
-      const list = [...(entries[section.collection] ?? [])]
-        .sort((a, b) =>
-          section.sort === "title"
-            ? a.title.localeCompare(b.title)
-            : section.sort === "oldest"
-              ? (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt)
-              : (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt),
-        )
-        .slice(0, section.limit);
+      const list = previewList(section, entries, listing);
       const items = list
         .map(
           (e) =>
@@ -242,7 +281,7 @@ export function renderPagePreview(
   const ctx = previewMedia(site, media);
   const body =
     gateNoticeHtml(site, page, now) +
-    page.sections.map((s) => renderSectionHtml(s, entries, ctx)).join("\n");
+    page.sections.map((s) => renderSectionHtml(s, entries, ctx, { site, now })).join("\n");
   const title = page.seo?.title ?? page.title;
   return { title, path: page.path, html: document(site, title, page.seo?.description, body) };
 }

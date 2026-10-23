@@ -41,6 +41,7 @@ import { getSource, peerEditions } from "@cloudhal/astro-renderer/runtime";
 import { searchAvailable } from "@cloudhal/astro-renderer/search";
 import {
   archiveHead,
+  collectionFeedLink,
   entryHead,
   pageHead,
   searchHead,
@@ -359,7 +360,23 @@ const localized = localizeHead(head, site, {
   alternates,
   ...(gated?.translation ? { translation: gated.translation } : {}),
 });
-const meta = fallback || notFound ? { ...localized, robots: "noindex,follow" } : localized;
+// RFC-0042 §5: the feed of the entry's collection, or of each collection a page lists.
+const listed = notFound
+  ? []
+  : route.kind === "entry"
+    ? [route.entry.collection]
+    : route.kind === "page"
+      ? route.page.sections.flatMap((s) => (s.kind === "contentList" ? [s.collection] : []))
+      : [];
+const feeds = [
+  ...localized.feeds,
+  ...[...new Set(listed)].flatMap((c) => collectionFeedLink(site, c, origin, locale) ?? []),
+];
+const meta = {
+  ...localized,
+  feeds,
+  ...(fallback || notFound ? { robots: "noindex,follow" } : {}),
+};
 Astro.response.headers.set("content-language", shownIn);
 // The pairing's fonts as a Link header too (Early Hints), not only as <link rel=preload> in <head>.
 const pairing = themeVariables(site, themeSettings).attributes["data-ch-type-pairing"];

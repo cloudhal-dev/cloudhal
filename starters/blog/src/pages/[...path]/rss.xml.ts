@@ -19,7 +19,9 @@ const SUFFIX = "/rss.xml";
 
 /**
  * Static builds: one feed per served archive of a taxonomy with `feed: true`, in every locale on
- * this host, and each other locale's site feed (`/<locale>/rss.xml`, RFC-0033).
+ * this host, and each other locale's site feed (`/<locale>/rss.xml`, RFC-0033). The paths include
+ * each collection's feed (`<prefix>/rss.xml`, RFC-0042 §5): this route answers 404 for it and the
+ * renderer's middleware answers with the feed.
  */
 export async function getStaticPaths() {
   const source = await getSource(config);

@@ -10,6 +10,8 @@ import { inlineMarkdownText, markdownText, safeSrc } from "./markdown.ts";
 import { assetAlt, imageObject, type MediaContext, socialImageUrl } from "./media.ts";
 import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
 
+/** RFC-0042 §5: the `<link rel="alternate">` of a collection's feed. */
+export { collectionFeedLink, type FeedLink } from "./collection-feeds.ts";
 /** RFC-0042 §2: a collection's JSON-LD preset in place of the generic `BlogPosting`. */
 export {
   entryStructuredData,

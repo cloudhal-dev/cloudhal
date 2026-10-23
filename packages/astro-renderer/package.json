@@ -22,6 +22,9 @@
     "./search": "./src/search.ts",
     "./seo": "./src/seo.ts",
     "./feeds": "./src/feeds.ts",
+    "./collection-feeds": "./src/collection-feeds.ts",
+    "./collection-feed-route": "./src/collection-feed-route.ts",
+    "./collection-feed-middleware": "./src/collection-feed-middleware.ts",
     "./taxonomy": "./src/taxonomy.ts",
     "./archive": "./src/archive.ts",
     "./cache-tags": "./src/cache-tags.ts",
@@ -137,6 +140,18 @@
       "./feeds": {
         "types": "./dist/src/feeds.d.ts",
         "default": "./dist/src/feeds.js"
+      },
+      "./collection-feeds": {
+        "types": "./dist/src/collection-feeds.d.ts",
+        "default": "./dist/src/collection-feeds.js"
+      },
+      "./collection-feed-route": {
+        "types": "./dist/src/collection-feed-route.d.ts",
+        "default": "./dist/src/collection-feed-route.js"
+      },
+      "./collection-feed-middleware": {
+        "types": "./dist/src/collection-feed-middleware.d.ts",
+        "default": "./dist/src/collection-feed-middleware.js"
       },
       "./taxonomy": {
         "types": "./dist/src/taxonomy.d.ts",

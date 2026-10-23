@@ -3,7 +3,7 @@
  * stage 3 fixture published once, swept at every derived instant −1 ms, exactly and +1 ms through
  * every route the blog starter serves. An entry past a `hide` expiry must not appear in any public
  * output (id, path, title); an entry past an `unlist` expiry keeps its own page but must not
- * appear on any other route, list, feed or the sitemap.
+ * appear on any other route, list, feed (the collections' own feeds included) or the sitemap.
  */
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { entryPath } from "@cloudhal/core-ts";
@@ -63,6 +63,9 @@ describe("route sweep: derived gates (RFC-0042 §3)", () => {
       const label = `${new Date(now).toISOString()}`;
       const source = published.at(now);
       const swept = await sweep(source, candidates, [], fx.store);
+      // RFC-0042 §5: the collections' own feeds are swept too
+      for (const feed of ["/events/rss.xml", "/offers/rss.xml"])
+        expect(swept.routes.get(feed), `${label}: ${feed}`).toBe("collection-feed");
       for (const w of watched) {
         const past = !(now < w.at);
         const route = swept.routes.get(w.path);

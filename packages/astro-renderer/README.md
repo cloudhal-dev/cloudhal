@@ -57,6 +57,15 @@ Additive. `entryHead`, `entries()`, `allEntries()` and every existing export kee
 | `GraphSource.routableEntries?` | `(locale?) => Promise<ContentEntry[]>`: every entry with a public URL, unlisted ones included (routes, static builds, alternates); `allEntries` stays the listed ones |
 | `withStructuredData` (`./seo`, `.`) | `(head: HeadMeta, source, entry, { origin, media? }) => Promise<HeadMeta>`: call after `entryHead`; replaces the `BlogPosting` with the collection's preset (`Event`, `JobPosting`, `Product`, `Recipe`) when the entry has every required value, keeps the `BreadcrumbList`, returns `head` unchanged otherwise |
 | `entryStructuredData` (`./seo`, `.`) | `(source, entry, { origin, media? }) => Promise<{ doc?, issues }>`: the preset document and why there is none |
+| `collectionFeedLink` (`./seo`, `./collection-feeds`, `.`) | `(site, collection, origin, locale?) => FeedLink \| undefined`: `{ title, href }` of the collection's feed (`<prefix>/rss.xml`) on the locale's URL, `undefined` with `feed: false` or a permalink without a prefix; add it to `head.feeds` after `localizeHead` |
+| `collectionFeedPath`, `feedCollections`, `collectionFeedPaths`, `collectionForFeedPath` (`./collection-feeds`) | which collections have a feed and where; `staticPaths().feeds` now includes every collection feed path |
+| `collectionFeedXml`, `serveCollectionFeed` (`./collection-feed-route`) | a collection's RSS in a locale; the middleware's decision (a theme's 404 for a feed path becomes the feed) |
+
+Collection feeds: the `cloudhal()` integration adds a middleware (`collection-feed-middleware`) on every target that serves `<prefix>/rss.xml` (and `/<locale><prefix>/rss.xml`) only where the theme's own routes answered 404, so a theme's own route wins and old copies gain the feeds; static builds write them through the starter's `[...path]/rss.xml` route, whose paths come from `staticPaths().feeds`. Same rules and cache tag as `rss.xml`.
+
+Previews: `renderSectionHtml(section, entries, media?, listing?)` takes `{ site, now? }` as a fourth argument, and `renderPagePreview` passes it, so `contentList` sections with `where`/`orderBy` preview through `evaluateEntryQuery` like the site (a term `filter` is still applied on the site only).
+
+Guide: [`docs/guides/structured-data.md`](../../docs/guides/structured-data.md).
 
 Derived gates: `unlist` keeps an entry's page (200), comments and menu links but leaves `entries()`, `allEntries()`, `entriesByFilter`/`entriesByTerm` (archives, related), feeds, the sitemap and search; `hide` is a 404 like an expired `availability`. Both sources apply them, the gate index caps the edge cache at every derived instant and at every value instant of date/datetime list fields (for `now` conditions), and previews ignore them with an "Ended on …" notice. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2 }`; writers refuse `expiry` until it does.
 
