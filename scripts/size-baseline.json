@@ -67,7 +67,7 @@
       "lines": 214
     },
     "apps/studio/src/components/BuildChat.tsx::BuildChat": {
-      "lines": 209
+      "lines": 200
     },
     "apps/studio/src/components/ChangeAgentModeDialog.tsx::ChangeAgentModeDialog": {
       "lines": 178
