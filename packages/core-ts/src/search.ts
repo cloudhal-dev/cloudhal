@@ -19,6 +19,7 @@
  */
 import type { ContentEntry, NodeRef, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
+import { sameJson } from "./fields/types.ts";
 import { changedPermalinks } from "./permalinks.ts";
 import { CJK_TABLE, SEARCH_TABLES, searchTable, trigramQuery } from "./search-cjk.ts";
 import {
@@ -242,10 +243,24 @@ async function permalinksMoved(
   const before = base?.nodes.find((n) => n.kind === "site");
   if (!after || !before || after.hash === before.hash) return false;
   const [a, b] = [(await read(after)) as Site, (await read(before)) as Site];
-  return changedPermalinks(b, a).length > 0 || searchableChanged(b, a);
+  return changedPermalinks(b, a).length > 0 || searchableChanged(b, a) || expiryChanged(b, a);
 }
 
-/** A translation's original in `target`, read only when its collection has searchable fields. */
+/**
+ * RFC-0042 §3.4: a changed expiry rule, its field's definition or the site's zone moves every
+ * derived gate, so entry rows get their new `gateUntil` with this publish.
+ */
+function expiryChanged(before: Site, after: Site): boolean {
+  const rules = (site: Site) =>
+    Object.entries(site.collections ?? {})
+      .filter(([, c]) => c?.expiry)
+      .map(([key, c]) => [key, c?.expiry, c?.fields?.find((d) => d.key === c?.expiry?.field)]);
+  const [b, a] = [rules(before), rules(after)];
+  if (b.length === 0 && a.length === 0) return false;
+  return !sameJson(b, a) || before.timeZone !== after.timeZone;
+}
+
+/** A translation's original in `target`, read when its collection has searchable fields or expiry. */
 async function originalFor(
   entry: ContentEntry,
   site: Site | undefined,
@@ -253,8 +268,10 @@ async function originalFor(
   read: (ref: NodeRef) => Promise<unknown>,
 ): Promise<ContentEntry | undefined> {
   const group = entry.translation?.group;
-  if (!group || group === entry.id || searchableFields(site, entry.collection).length === 0)
-    return undefined;
+  const reads =
+    searchableFields(site, entry.collection).length > 0 ||
+    site?.collections?.[entry.collection]?.expiry !== undefined;
+  if (!group || group === entry.id || !reads) return undefined;
   const ref = target.nodes.find((n) => n.id === group && n.kind === "contentEntry");
   return ref ? ((await read(ref)) as ContentEntry) : undefined;
 }

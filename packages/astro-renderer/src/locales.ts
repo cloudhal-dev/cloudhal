@@ -9,6 +9,7 @@
 import type { ContentEntry, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { entryPath, type PermalinkSite, termSlug } from "@cloudhal/core-ts";
 import { localeRouting, localeUrl, localizedPath } from "@cloudhal/core-ts/locale-paths";
+import { routableEntries } from "./entry-views.ts";
 import type { HeadMeta } from "./seo.ts";
 import type { GraphSource } from "./source.ts";
 
@@ -110,7 +111,7 @@ async function groupMembers(
 ): Promise<Localized[]> {
   const inGroup = (n: Localized) => n.id === group || n.translation?.group === group;
   if (pages) return (await source.pages()).filter(inGroup);
-  const all = await Promise.all(site.locales.map((l) => source.allEntries(l)));
+  const all = await Promise.all(site.locales.map((l) => routableEntries(source, l)));
   return all.flat().filter(inGroup);
 }
 
@@ -195,8 +196,8 @@ export async function linkLocalizer(
   const home = (p: string) => (own ? localeUrl(site, def, p, origin) : localizedPath(site, def, p));
   const [pages, entries, translated, taxonomies, terms] = await Promise.all([
     source.pages(),
-    source.allEntries(def),
-    source.allEntries(locale),
+    routableEntries(source, def),
+    routableEntries(source, locale),
     source.taxonomies(),
     source.vocabulary(),
   ]);

@@ -21,6 +21,18 @@ export {
   type FieldDefinitionChange,
   fieldDefinitionChanges,
 } from "./definitions.ts";
+export {
+  type DerivedGate,
+  derivedGate,
+  derivedGates,
+  type EntryVisibility,
+  type ExpiryAction,
+  entryVisibility,
+  type GatedEntry,
+  hasExpiryRules,
+  listFieldInstants,
+  originalsOf,
+} from "./entry-gates.ts";
 export { type FormatFieldOptions, formatFieldValue } from "./format.ts";
 export { dayStartIn, effectiveUntil, expiryInstant, fieldGateInstant, nextDay } from "./gate.ts";
 export {

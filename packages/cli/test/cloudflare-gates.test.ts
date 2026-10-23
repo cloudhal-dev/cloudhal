@@ -10,7 +10,7 @@
  *   node. Previews (live and snapshot links) show them, with the notice.
  * - **Cache cap (S10).** Published responses carry `max-age` up to the next gate; a gate a few
  *   seconds ahead opens on its own, with no purge and no scheduler.
- * - **Features handshake (§7.7).** `GET /__cloudhal/features` answers `{ "gates": 1 }` to the admin
+ * - **Features handshake (§7.7).** `GET /__cloudhal/features` answers `{ "gates": 2 }` to the admin
  *   only, and the admin Worker accepts `availability` over REST once it has asked.
  * - **Writer guard (S15).** Against an "old" site Worker (no features endpoint), the admin Worker
  *   refuses `availability` in REST writes and bundle pushes with `409 gates_unsupported`.
@@ -326,7 +326,7 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     const auth = { authorization: `Bearer ${secrets.CLOUDHAL_PURGE_TOKEN}` };
     const ok = await siteFetch("/__cloudhal/features", { headers: auth });
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toEqual({ gates: 1 });
+    expect(await ok.json()).toEqual({ gates: 2 });
     expect(ok.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
     // Workers Cache caches responses without cache headers: every answer here says no-store
     const anonymous = await siteFetch("/__cloudhal/features");

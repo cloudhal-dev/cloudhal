@@ -8,6 +8,7 @@
  */
 export * from "./archive.ts";
 export * from "./cache-tags.ts";
+export * from "./entry-query.ts";
 export * from "./fields.ts";
 export * from "./gates.ts";
 export { type CloudhalRendererConfig, cloudhal } from "./integration.ts";
@@ -16,4 +17,9 @@ export * from "./navigation.ts";
 export * from "./preview.ts";
 export { getSource, resetSource } from "./runtime.ts";
 export * from "./source.ts";
+export {
+  entryStructuredData,
+  type StructuredDataOptions,
+  withStructuredData,
+} from "./structured-data.ts";
 export * from "./taxonomy.ts";

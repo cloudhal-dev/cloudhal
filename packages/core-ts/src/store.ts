@@ -217,10 +217,10 @@ export class SiteGraphStore {
 
   /**
    * Whether `availability` may be written for this site (S15): the renderer serving it has
-   * confirmed it enforces gates. Imports ask it too (`importSite`'s `gates`).
+   * confirmed it enforces gates (`version` 2: derived gates, RFC-0042 §3.6). Imports ask it too.
    */
-  async gatesEnforced(siteId: string): Promise<boolean> {
-    return (await this.#gates?.enforced(siteId)) === true;
+  async gatesEnforced(siteId: string, version = 1): Promise<boolean> {
+    return (await this.#gates?.enforced(siteId, version)) === true;
   }
 
   /**

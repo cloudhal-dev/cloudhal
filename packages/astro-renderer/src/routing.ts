@@ -18,6 +18,7 @@ import {
   parseArchivePath,
   termForSlug,
 } from "./archive.ts";
+import { routableEntries } from "./entry-views.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { type SearchView, searchRequest } from "./search.ts";
 import type { GraphSource } from "./source.ts";
@@ -71,7 +72,8 @@ export async function routablePaths(source: GraphSource, locale?: string): Promi
   const loc = locale ?? site.defaultLocale;
   const pagePaths = pages.filter((p) => p.locale === loc).map((p) => p.path);
   const taken = new Set(pagePaths);
-  const entryPaths = (await source.allEntries(loc))
+  // RFC-0042 §3: an unlisted entry keeps its URL (static builds write it), only lists drop it.
+  const entryPaths = (await routableEntries(source, loc))
     .map((e) => entryPath(site, e))
     .filter((p) => !taken.has(p));
   return [...pagePaths, ...entryPaths];

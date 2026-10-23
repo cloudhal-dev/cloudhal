@@ -182,6 +182,13 @@ describe("agent modes", () => {
     );
     expect(corrected).toMatchObject({ code: "correction", lowRisk: false, changes: 2 });
     expect(describeAutoCheck(corrected)).toBe("it adds a correction to a published article");
+    // RFC-0042 §3.5: a live article that would expire sooner is classed like schedule_unpublish
+    const expiring = checkAutoPublish(
+      { added: [], changed: [{ after: entry("e2") }], removed: [] },
+      { expiries: new Set(["e2"]) },
+    );
+    expect(expiring).toMatchObject({ code: "expires", lowRisk: false, changes: 1 });
+    expect(describeAutoCheck(expiring)).toContain("expire sooner");
   });
 
   it("media rides along with its article only when the store says so (RFC-0004 §6.3)", () => {

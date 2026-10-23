@@ -1,8 +1,9 @@
 /**
  * The admin side of the features handshake (RFC-0008 §7.7, S15): `availability` is allowed only
- * once the site Worker answers `GET /__cloudhal/features` with `{ "gates": 1 }`; a confirmation is
- * kept as a plain value, a refusal is asked again. The site Worker's side, and an "old" site Worker
- * without the endpoint, run on workerd in packages/cli/test/cloudflare-gates.test.ts.
+ * once the site Worker answers `GET /__cloudhal/features` with `{ "gates": 1 }`, a collection's
+ * `expiry` once it answers 2; a confirmation is kept as a plain value, a refusal is asked again.
+ * The site Worker's side, and an "old" site Worker without the endpoint, run on workerd in
+ * packages/cli/test/cloudflare-gates.test.ts.
  */
 import { describe, expect, it } from "vitest";
 import { siteFeatures, siteGateSupport } from "../src/features.ts";
@@ -71,5 +72,33 @@ describe("features handshake (admin side)", () => {
       remember: () => {},
     });
     expect(await unbound.enforced("site_a")).toBe(false);
+  });
+
+  it("asks for gates 2 before a collection expiry (RFC-0042 §3.6) and remembers the version", async () => {
+    let confirmed: boolean | number = false;
+    let answer = () => Response.json({ gates: 1 });
+    const s = site(() => answer());
+    const gates = siteGateSupport({
+      fetch: s.fetch,
+      token: "tok",
+      confirmed: () => confirmed,
+      remember: (v) => {
+        confirmed = v;
+      },
+    });
+    // an RFC-0008 site Worker: availability yes, expiry no
+    expect(await gates.enforced("site_a", 2)).toBe(false);
+    expect(confirmed).toBe(1);
+    expect(await gates.enforced("site_a")).toBe(true);
+    const asked = s.calls.length;
+    expect(await gates.enforced("site_a", 2)).toBe(false);
+    expect(s.calls.length).toBe(asked + 1);
+    answer = () => Response.json({ gates: 2 });
+    expect(await gates.enforced("site_a", 2)).toBe(true);
+    expect(confirmed).toBe(2);
+    const after = s.calls.length;
+    expect(await gates.enforced("site_a", 2)).toBe(true);
+    expect(await gates.enforced("site_a")).toBe(true);
+    expect(s.calls).toHaveLength(after);
   });
 });

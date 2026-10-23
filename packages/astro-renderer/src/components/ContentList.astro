@@ -1,6 +1,13 @@
 ---
+/**
+ * A `contentList` section. Without `where`/`orderBy` it draws `entries` by the section's `sort`
+ * and `limit`, as it always has. With them (RFC-0042 §4) it lists by field: a list `queryEntries`
+ * made is drawn as it is; the collection's list a source returned (what theme copies from before
+ * RFC-0042 pass) is queried on that source here, so those themes get field listings on upgrade.
+ */
 import type { ContentEntry, ContentListSection } from "@cloudhal/core-contracts";
 import { entryPath } from "@cloudhal/core-ts";
+import { listOrigin, listsByField, queryEntries, sectionQuery } from "../entry-query.ts";
 import type { MediaContext } from "../media.ts";
 
 interface Props {
@@ -10,15 +17,25 @@ interface Props {
   hrefFor?: (entry: ContentEntry) => string;
 }
 const { section, entries, media, hrefFor = (e) => entryPath(media?.permalinks, e) } = Astro.props;
-const sorted = [...entries]
-  .sort((a, b) =>
-    section.sort === "title"
-      ? a.title.localeCompare(b.title)
-      : section.sort === "oldest"
-        ? (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt)
-        : (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt),
-  )
-  .slice(0, section.limit);
+const origin = listsByField(section) ? listOrigin(entries) : undefined;
+if (listsByField(section) && origin === undefined)
+  console.warn(
+    `cloudhal: section ${section.id} lists by field, but its entries came from elsewhere`,
+  );
+const sorted =
+  origin === "queried"
+    ? entries.slice(0, section.limit)
+    : origin
+      ? (await queryEntries(origin.source, sectionQuery(section, origin.locale))).entries
+      : [...entries]
+          .sort((a, b) =>
+            section.sort === "title"
+              ? a.title.localeCompare(b.title)
+              : section.sort === "oldest"
+                ? (a.publishedAt ?? a.createdAt).localeCompare(b.publishedAt ?? b.createdAt)
+                : (b.publishedAt ?? b.createdAt).localeCompare(a.publishedAt ?? a.createdAt),
+          )
+          .slice(0, section.limit);
 ---
 <section class="ch-contentlist" data-section-id={section.id} data-kind="contentList" data-collection={section.collection}>
   {sorted.length === 0 ? <p class="ch-contentlist__empty">Nothing published yet.</p> : (

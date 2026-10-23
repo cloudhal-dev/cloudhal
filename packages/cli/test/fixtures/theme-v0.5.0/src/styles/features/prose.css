@@ -1,0 +1,140 @@
+/* Section defaults; a theme overrides these or swaps components. */
+.ch-hero {
+  @apply py-12;
+}
+.ch-hero h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-hero__sub {
+  @apply mt-3 text-lg text-zinc-600;
+}
+.ch-hero__cta {
+  @apply mt-6 inline-block rounded px-4 py-2 text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
+}
+.ch-article-header {
+  @apply space-y-2 border-b border-zinc-200 pt-8 pb-6;
+}
+.ch-article-header h1 {
+  @apply text-4xl font-bold tracking-tight;
+}
+.ch-summary {
+  @apply text-lg text-zinc-600;
+}
+.ch-article-header time {
+  @apply text-sm text-zinc-500;
+}
+.ch-richtext {
+  @apply space-y-4 py-6 leading-relaxed;
+}
+.ch-richtext h1 {
+  @apply text-3xl font-bold;
+}
+.ch-richtext h2 {
+  @apply text-2xl font-semibold;
+}
+.ch-richtext h3 {
+  @apply pt-2 text-xl font-semibold;
+}
+.ch-richtext h2 {
+  @apply pt-4;
+}
+/* The body's own markdown (no class: surface components inside a body keep their styles). The
+   reset clears lists, tables, quotes and code; these bring them back in the theme's roles. */
+.ch-richtext :is(ul, ol):not([class]) {
+  padding-inline-start: 1.5em;
+}
+.ch-richtext ul:not([class]) {
+  list-style: disc;
+}
+.ch-richtext ol:not([class]) {
+  list-style: decimal;
+}
+.ch-richtext :is(ul, ol):not([class]) :is(ul, ol):not([class]) {
+  margin-block-start: 0.35em;
+}
+.ch-richtext ul:not([class]) ul:not([class]) {
+  list-style: circle;
+}
+.ch-richtext li:not([class]) + li:not([class]) {
+  margin-block-start: 0.35em;
+}
+.ch-richtext li::marker {
+  color: var(--ch-color-text-muted);
+}
+/* Task lists: the checkbox is the marker. */
+.ch-richtext ul:not([class]):has(> li > input[type="checkbox"]) {
+  list-style: none;
+  padding-inline-start: 0.25em;
+}
+.ch-richtext li > input[type="checkbox"] {
+  inline-size: 1em;
+  block-size: 1em;
+  margin-inline-end: 0.5em;
+  vertical-align: -0.125em;
+  accent-color: var(--ch-color-brand);
+}
+.ch-richtext blockquote:not([class]) {
+  border-inline-start: 3px solid var(--ch-color-border-strong);
+  padding-inline-start: 1em;
+  color: var(--ch-color-text-muted);
+  font-style: italic;
+}
+.ch-richtext :not(pre) > code {
+  @apply rounded px-1.5 py-0.5;
+  font-size: 0.9em;
+  background: var(--ch-color-surface-muted);
+}
+.ch-richtext pre:not([class]) {
+  @apply overflow-x-auto rounded-lg px-4 py-3 text-sm leading-relaxed;
+  background: var(--ch-color-surface-muted);
+  border: 1px solid var(--ch-color-border);
+}
+.ch-richtext hr:not([class]) {
+  border: 0;
+  border-block-start: 1px solid var(--ch-color-border);
+  margin-block: 2rem;
+}
+/* Tables: ruled rows, a header, the column alignment markdown asked for; wide ones scroll on
+   their own (the page never scrolls sideways). */
+.ch-richtext table:not([class]) {
+  display: block;
+  inline-size: max-content;
+  max-inline-size: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.95em;
+  font-variant-numeric: tabular-nums;
+}
+.ch-richtext table:not([class]) :is(th, td) {
+  padding: 0.45em 0.8em;
+  border-block-end: 1px solid var(--ch-color-border);
+  text-align: start;
+  vertical-align: top;
+}
+.ch-richtext table:not([class]) th {
+  font-weight: 600;
+  border-block-end-color: var(--ch-color-border-strong);
+}
+.ch-richtext table:not([class]) :is(th, td)[align="center"] {
+  text-align: center;
+}
+.ch-richtext table:not([class]) :is(th, td)[align="right"] {
+  text-align: end;
+}
+/* Footnotes: small raised numbers, the notes listed at the end under a rule. */
+.ch-fnref a {
+  @apply px-0.5 text-xs no-underline;
+  color: var(--ch-color-link);
+}
+.ch-footnotes {
+  @apply mt-10 pt-4 text-sm;
+  border-block-start: 1px solid var(--ch-color-border);
+  color: var(--ch-color-text-muted);
+}
+.ch-footnotes ol {
+  @apply list-decimal space-y-1 ps-5;
+}
+.ch-fnback {
+  @apply no-underline;
+}

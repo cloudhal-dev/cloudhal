@@ -16,6 +16,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./source": "./src/source.ts",
+    "./queries": "./src/entry-query.ts",
     "./fields": "./src/fields.ts",
     "./routing": "./src/routing.ts",
     "./search": "./src/search.ts",
@@ -65,6 +66,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "bench:lists": "vitest run -c bench/vitest.config.ts",
     "check": "pnpm typecheck && pnpm test"
   },
   "dependencies": {
@@ -110,6 +112,10 @@
       "./source": {
         "types": "./dist/src/source.d.ts",
         "default": "./dist/src/source.js"
+      },
+      "./queries": {
+        "types": "./dist/src/entry-query.d.ts",
+        "default": "./dist/src/entry-query.js"
       },
       "./fields": {
         "types": "./dist/src/fields.d.ts",

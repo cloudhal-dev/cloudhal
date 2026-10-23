@@ -10,6 +10,13 @@ import { inlineMarkdownText, markdownText, safeSrc } from "./markdown.ts";
 import { assetAlt, imageObject, type MediaContext, socialImageUrl } from "./media.ts";
 import { type EntryTaxonomy, entryTaxonomy, type ShownTerm } from "./taxonomy.ts";
 
+/** RFC-0042 §2: a collection's JSON-LD preset in place of the generic `BlogPosting`. */
+export {
+  entryStructuredData,
+  type StructuredDataOptions,
+  withStructuredData,
+} from "./structured-data.ts";
+
 export interface HeadMeta {
   /** `<title>`. */
   title: string;

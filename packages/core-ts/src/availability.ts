@@ -228,13 +228,25 @@ export function checkTimeZone(zone: string | undefined, previous?: string): void
  * gates are refused (`gates_unsupported`) until the renderer that serves the site confirms it
  * enforces them: the admin Worker asks the site Worker's `GET /__cloudhal/features`; on Node the
  * renderer and the writer are one process (`GATES_ENFORCED`).
+ *
+ * `version` is the gates feature a write needs (RFC-0042 §3.6): `1` (absent) for `availability`,
+ * `EXPIRY_GATES_VERSION` for a collection's `expiry` (derived gates).
  */
 export interface GateSupport {
-  enforced(siteId: string): boolean | Promise<boolean>;
+  enforced(siteId: string, version?: number): boolean | Promise<boolean>;
 }
 
 /** The renderer in this process enforces gates (Node: `cloudhal dev`, `studio`, self-host). */
 export const GATES_ENFORCED: GateSupport = { enforced: () => true };
 
-/** The value `GET /__cloudhal/features` answers with (and the admin side checks). */
-export const GATES_FEATURE_VERSION = 1;
+/**
+ * The value `GET /__cloudhal/features` answers with: `1` time gates (RFC-0008), `2` also derived
+ * gates from a collection's `expiry` (RFC-0042 §3.6).
+ */
+export const GATES_FEATURE_VERSION = 2;
+
+/** The gates feature `availability` needs (RFC-0008 §7.7). */
+export const AVAILABILITY_GATES_VERSION = 1;
+
+/** The gates feature a collection's `expiry` needs (RFC-0042 §3.6). */
+export const EXPIRY_GATES_VERSION = 2;

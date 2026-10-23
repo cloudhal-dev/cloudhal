@@ -1,0 +1,46 @@
+---
+/**
+ * The phone menu's content (RFC-0025 §2), in the header's disclosure, its drawer or full-screen
+ * dialog, and the `/menu` page: the header's menu with its groups as disclosures, the second menu,
+ * and the search form where the deployment answers searches.
+ */
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import NavLink from "./NavLink.astro";
+import NavMenu from "./NavMenu.astro";
+
+interface Props {
+  nav: ActiveNavItem[];
+  utility: ActiveNavItem[];
+  search?: { label: string; placeholder: string; button: string; query?: string } | undefined;
+  words: { main: string; secondary: string };
+  /** Keeps ids unique when the panel shows twice on a page. */
+  idSuffix: string;
+  /** RFC-0026 26c: the site's icon weight. */
+  iconWeight?: string | undefined;
+}
+const { nav, utility, search, words, idSuffix, iconWeight } = Astro.props;
+const link = { on: "ch-menu__current", off: "" };
+---
+<div class="ch-menu__panel">
+  {search && (
+    <form class="ch-menu__search" method="get" action="/search" role="search">
+      <label for={`ch-q-${idSuffix}`} class="sr-only">{search.label}</label>
+      <input id={`ch-q-${idSuffix}`} type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
+      <button type="submit" class="sr-only">{search.button}</button>
+    </form>
+  )}
+  {nav.length > 0 && (
+    <nav aria-label={words.main} class="ch-menu__nav">
+      <ul>
+        {nav.map((item) => <li>{item.children.length > 0 ? <NavMenu item={item} {...link} iconWeight={iconWeight} /> : <NavLink item={item} {...link} />}</li>)}
+      </ul>
+    </nav>
+  )}
+  {utility.length > 0 && (
+    <nav aria-label={words.secondary} class="ch-menu__nav ch-menu__nav--small">
+      <ul>
+        {utility.map((item) => <li><NavLink item={item} {...link} /></li>)}
+      </ul>
+    </nav>
+  )}
+</div>

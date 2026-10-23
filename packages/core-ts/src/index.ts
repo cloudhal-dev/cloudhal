@@ -40,6 +40,7 @@ export {
   queryContentEntries,
 } from "./entry-query.ts";
 export * from "./errors.ts";
+export { advancesDerivedGate, expiringEntries, type GateSide } from "./expiring-entries.ts";
 export * from "./fields-operations/index.ts";
 export * from "./filter.ts";
 export * from "./hash.ts";

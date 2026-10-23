@@ -11,19 +11,23 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SearchKind, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import { matchRedirect, redirectLocale, searchDocuments, searchRows } from "@cloudhal/core-ts";
-import {
-  gateInstants,
-  hasGates,
-  inheritedGate,
-  isAvailable,
-  nextInstant,
-} from "@cloudhal/core-ts/availability";
+import { matchRedirect, redirectLocale } from "@cloudhal/core-ts";
+import { hasGates, inheritedGate, isAvailable, nextInstant } from "@cloudhal/core-ts/availability";
+import { type DerivedGate, derivedGates, type ResolvedFields } from "@cloudhal/core-ts/fields";
 import { matches } from "@cloudhal/core-ts/filter";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
+import {
+  evaluateEntryQuery,
+  type FieldEntryQuery,
+  type FieldEntryResult,
+  rememberList,
+} from "./entry-query.ts";
+import { gateIndex, splitEntries } from "./entry-views.ts";
 import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
 import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
+
+export { LiveSource } from "./live-source.ts";
 
 /**
  * What a renderer needs from a site, independent of whether it reads live nodes (dev) or a
@@ -34,10 +38,22 @@ export interface GraphSource {
   site(): Promise<Site>;
   pages(): Promise<Page[]>;
   pageByPath(path: string, locale?: string): Promise<Page | undefined>;
+  /** Listed entries of a collection, newest first (RFC-0042: unlisted ones left out). */
   entries(collection: string, locale?: string): Promise<ContentEntry[]>;
+  /** An entry with a public URL by slug: listed, or unlisted past its collection's expiry. */
   entryBySlug(collection: string, slug: string, locale?: string): Promise<ContentEntry | undefined>;
-  /** Every visible entry of a locale, newest first, across collections (feeds, sitemaps). */
+  /** Every listed entry of a locale, newest first, across collections (feeds, sitemaps). */
   allEntries(locale?: string): Promise<ContentEntry[]>;
+  /**
+   * RFC-0042 §3: every entry of a locale with a public URL, newest first — `allEntries` plus the
+   * unlisted ones (routes, static builds, language alternates). Optional for older sources.
+   */
+  routableEntries?(locale?: string): Promise<ContentEntry[]>;
+  /**
+   * RFC-0042 §4: a collection filtered and ordered by its list fields, paged (`queryEntries`).
+   * Optional for older sources; the standalone `queryEntries(source, q)` works with any.
+   */
+  queryEntries?(q: FieldEntryQuery): Promise<FieldEntryResult>;
   /**
    * A visible entry by id, any locale (reader comments name the entry by id, RFC-0007 §6.2).
    * Optional for sources that predate comments.
@@ -127,234 +143,20 @@ export interface SourceSearchOptions {
   kinds?: readonly SearchKind[];
 }
 
-/**
- * Reads the current nodes on every call. Drafts are included so authors can preview them in dev,
- * and so are gated nodes (a preview shows embargoed and expired content, RFC-0008 §7.3). Without
- * drafts it serves what the public would see: published nodes whose gates are open at `now`.
- */
-export class LiveSource implements GraphSource {
-  readonly mode = "live";
-  readonly #store: SiteGraphStore;
-  readonly #siteId: string;
-  readonly #includeDrafts: boolean;
-  readonly #now: () => number;
-
-  constructor(
-    store: SiteGraphStore,
-    siteId: string,
-    options: { includeDrafts?: boolean; now?: () => number } = {},
-  ) {
-    this.#store = store;
-    this.#siteId = siteId;
-    this.#includeDrafts = options.includeDrafts ?? true;
-    this.#now = options.now ?? Date.now;
-  }
-
-  /** Drafts and gated nodes, or what the public sees now. */
-  #visible<T extends Page | ContentEntry>(nodes: T[]): T[] {
-    if (this.#includeDrafts) return visible(nodes, true);
-    const now = this.#now();
-    return nodes.filter((n) => isAvailable(n, now));
-  }
-
-  async nextGate(): Promise<number | undefined> {
-    if (this.#includeDrafts) return undefined;
-    const [pages, entries] = await Promise.all([
-      this.#store.listPages(this.#siteId),
-      this.#store.listContentEntries(this.#siteId),
-    ]);
-    const published = [...pages, ...entries].filter((n) => n.status === "published");
-    return nextInstant(gateInstants(published), this.#now());
-  }
-
-  async site(): Promise<Site> {
-    const site = await this.#store.getSite(this.#siteId);
-    if (!site) throw new Error(`site ${this.#siteId} not found`);
-    return site;
-  }
-
-  async pages(): Promise<Page[]> {
-    const site = await this.site();
-    const pages = this.#visible(await this.#store.listPages(this.#siteId));
-    const order = new Map(site.pageIds.map((id, i) => [id, i]));
-    return pages.sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9));
-  }
-
-  async pageByPath(path: string, locale?: string): Promise<Page | undefined> {
-    const loc = locale ?? (await this.site()).defaultLocale;
-    return (await this.pages()).find((p) => p.path === path && p.locale === loc);
-  }
-
-  async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
-    const loc = locale ?? (await this.site()).defaultLocale;
-    const all = this.#visible(await this.#store.listContentEntries(this.#siteId, collection));
-    return all.filter((e) => e.locale === loc).sort(byNewest);
-  }
-
-  async entryBySlug(
-    collection: string,
-    slug: string,
-    locale?: string,
-  ): Promise<ContentEntry | undefined> {
-    return (await this.entries(collection, locale)).find((e) => e.slug === slug);
-  }
-  async allEntries(locale?: string): Promise<ContentEntry[]> {
-    const loc = locale ?? (await this.site()).defaultLocale;
-    return this.#visible(await this.#store.listContentEntries(this.#siteId))
-      .filter((e) => e.locale === loc)
-      .sort(byNewest);
-  }
-
-  async search(query: string, options: SourceSearchOptions = {}): Promise<SearchResults> {
-    const site = await this.site();
-    const locale = options.locale ?? site.defaultLocale;
-    // What this source shows decided visibility and gates already (drafts included).
-    const [entries, pages, taxonomies, terms] = await Promise.all([
-      this.allEntries(locale),
-      this.pages(),
-      this.taxonomies(),
-      this.vocabulary(),
-    ]);
-    const rows = searchDocuments({
-      locales: [locale],
-      defaultLocale: site.defaultLocale,
-      site,
-      entries,
-      pages: pages.filter((p) => p.locale === locale),
-      taxonomies,
-      terms,
-      drafts: true,
-    }).map((r) => ({ ...r, gateFrom: undefined, gateUntil: undefined }));
-    return searchRows(rows, query, { ...options, locale, now: this.#now() });
-  }
-
-  async entryById(id: string): Promise<ContentEntry | undefined> {
-    const entry = await this.#store.getContentEntry(id);
-    return entry && entry.siteId === this.#siteId && this.#visible([entry]).length
-      ? entry
-      : undefined;
-  }
-
-  entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
-    return entryFields(this, entry, options);
-  }
-
-  taxonomies(): Promise<Taxonomy[]> {
-    return this.#store.listTaxonomies(this.#siteId);
-  }
-
-  async terms(key: string): Promise<Term[]> {
-    const loc = (await this.site()).defaultLocale;
-    return (await this.#store.listTerms(this.#siteId, { taxonomy: key }))
-      .filter((t) => shown(t, this.#includeDrafts))
-      .sort(byPosition(loc));
-  }
-
-  async termBySlug(key: string, slug: string): Promise<Term | undefined> {
-    return (await this.terms(key)).find((t) => t.slug === slug);
-  }
-
-  vocabulary(key?: string): Promise<Term[]> {
-    return this.#store.listTerms(this.#siteId, key === undefined ? {} : { taxonomy: key });
-  }
-
-  async entriesByFilter(
-    filter: string,
-    options: { locale?: string; limit?: number } = {},
-  ): Promise<ContentEntry[]> {
-    const loc = options.locale ?? (await this.site()).defaultLocale;
-    const [taxonomies, terms, entries] = await Promise.all([
-      this.#store.listTaxonomies(this.#siteId),
-      this.#store.listTerms(this.#siteId),
-      this.#store.listContentEntries(this.#siteId, { locale: loc }),
-    ]);
-    const f = compile(filter, taxonomies, terms);
-    const out = this.#visible(entries)
-      .filter((e) => matches(f, e))
-      .sort(byNewest);
-    return options.limit === undefined ? out : out.slice(0, options.limit);
-  }
-
-  entriesByTerm(
-    key: string,
-    slug: string,
-    options: { locale?: string; limit?: number; descendants?: boolean } = {},
-  ): Promise<ContentEntry[]> {
-    return this.entriesByFilter(termFilter(key, slug, options.descendants === true), options);
-  }
-
-  redirectFor(path: string, locale?: string): Promise<RedirectMatch | undefined> {
-    return this.#store.redirectFor(this.#siteId, path, locale);
-  }
-
-  redirects(): Promise<Redirect[]> {
-    return this.#store.listRedirects(this.#siteId);
-  }
-
-  menu(key: string): Promise<Menu | undefined> {
-    return this.#store.getMenuByKey(this.#siteId, key);
-  }
-
-  async navigation(
-    key: string,
-    locale?: string,
-    options: NavigationOptions = {},
-  ): Promise<Navigation | undefined> {
-    const menu = await this.menu(key);
-    if (!menu) return undefined;
-    const site = await this.site();
-    const [pages, entries, taxonomies, terms] = await Promise.all([
-      this.#store.listPages(this.#siteId),
-      this.#store.listContentEntries(this.#siteId),
-      this.#store.listTaxonomies(this.#siteId),
-      this.#store.listTerms(this.#siteId),
-    ]);
-    return navigationFor(
-      menu,
-      {
-        site,
-        // drafts: everything but archived (the lookup decides); public: what is available now
-        pages: this.#includeDrafts ? pages : this.#visible(pages),
-        entries: this.#includeDrafts ? entries : this.#visible(entries),
-        taxonomies,
-        terms,
-        includeDrafts: this.#includeDrafts,
-        ...(options.collectionIndex ? { collectionIndex: options.collectionIndex } : {}),
-      },
-      locale ?? site.defaultLocale,
-    );
-  }
-
-  async assets(): Promise<Asset[]> {
-    const out: Asset[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await this.#store.listAssets(this.#siteId, {
-        limit: 200,
-        ...(cursor ? { cursor } : {}),
-      });
-      out.push(...page.assets);
-      cursor = page.nextCursor;
-    } while (cursor);
-    return out;
-  }
-
-  async asset(id: string): Promise<Asset | undefined> {
-    const a = await this.#store.getAsset(id);
-    return a?.siteId === this.#siteId ? a : undefined;
-  }
-
-  assetByPrefix(prefix16: string): Promise<Asset | undefined> {
-    return this.#store.getAssetByPrefix(this.#siteId, prefix16);
-  }
-}
-
 /** Everything a snapshot shows before gates are applied; built once per snapshot and isolate. */
 interface Loaded {
   site: Site;
   /** Published pages in `Site.pageIds` order and published entries, gates not yet applied. */
   pages: Page[];
   entries: ContentEntry[];
+  /** The same published entries (a view keeps them for originals; RFC-0042). */
+  published: ContentEntry[];
+  /** Published entries with a public URL (unlisted ones too); `entries` holds the listed. */
+  reachable: ContentEntry[];
+  /** Every published entry's derived gate (RFC-0042 §3), computed once per snapshot. */
+  derived: ReadonlyMap<string, DerivedGate>;
+  /** Resolved field values by entry id, filled as queries need them (the snapshot is immutable). */
+  resolved: Map<string, ResolvedFields>;
   taxonomies: Taxonomy[];
   terms: Term[];
   redirects: Redirect[];
@@ -364,7 +166,8 @@ interface Loaded {
   assetIndex: Map<string, Asset>;
   /**
    * The gate index (RFC-0008 §7.4): every instant at which a published page's or entry's gate
-   * changes, sorted. Empty for a site that schedules nothing — then nothing is filtered at all.
+   * changes — derived gates and list-field instants included (RFC-0042) — sorted. Empty for a
+   * site that schedules nothing — then nothing is filtered at all.
    */
   gates: number[];
 }
@@ -373,7 +176,14 @@ interface Loaded {
 interface View {
   site: Site;
   pages: Page[];
+  /** Listed entries. */
   entries: ContentEntry[];
+  /** Listed and unlisted entries (public URLs). */
+  reachable: ContentEntry[];
+  /** Every published entry of the snapshot, gates aside (originals of translations). */
+  published: ContentEntry[];
+  /** The snapshot's cache of resolved field values (shared by every view). */
+  resolved: Map<string, ResolvedFields>;
   taxonomies: Taxonomy[];
   terms: Term[];
   redirects: Redirect[];
@@ -540,18 +350,23 @@ export class SnapshotSource implements GraphSource {
         (a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9),
       );
       const shownEntries = visible(entries, false);
+      const derived = derivedGates(site as Site, shownEntries);
       if (fetched) this.#shared.fetched = fetched;
       return {
         site: site as Site,
         pages: shownPages,
         entries: shownEntries,
+        published: shownEntries,
+        reachable: shownEntries,
+        derived,
+        resolved: new Map(),
         taxonomies,
         terms,
         redirects,
         menus,
         assets,
         assetIndex,
-        gates: gateInstants([...shownPages, ...shownEntries]),
+        gates: gateIndex(site as Site, shownPages, shownEntries, derived),
       };
     })();
     this.#shared.loaded.catch(() => {
@@ -605,10 +420,12 @@ export class SnapshotSource implements GraphSource {
         hidden.size === 0
           ? loaded.assetIndex
           : new Map([...loaded.assetIndex].filter(([, a]) => !hidden.has(a.id)));
+      const split = splitEntries(loaded.entries, now, loaded.derived);
       return {
         ...loaded,
         pages: loaded.pages.filter((p) => isAvailable(p, now)),
-        entries: loaded.entries.filter((e) => isAvailable(e, now)),
+        entries: split.listed,
+        reachable: split.reachable,
         assets,
         assetIndex,
       };
@@ -634,7 +451,8 @@ export class SnapshotSource implements GraphSource {
   async entries(collection: string, locale?: string): Promise<ContentEntry[]> {
     const { site, entries } = await this.#current();
     const loc = locale ?? site.defaultLocale;
-    return entries.filter((e) => e.collection === collection && e.locale === loc).sort(byNewest);
+    const out = entries.filter((e) => e.collection === collection && e.locale === loc);
+    return rememberList(out.sort(byNewest), { source: this, locale: loc });
   }
 
   async entryBySlug(
@@ -642,12 +460,41 @@ export class SnapshotSource implements GraphSource {
     slug: string,
     locale?: string,
   ): Promise<ContentEntry | undefined> {
-    return (await this.entries(collection, locale)).find((e) => e.slug === slug);
+    const { site, reachable } = await this.#current();
+    const loc = locale ?? site.defaultLocale;
+    return reachable.find(
+      (e) => e.collection === collection && e.slug === slug && e.locale === loc,
+    );
   }
+
   async allEntries(locale?: string): Promise<ContentEntry[]> {
     const { site, entries } = await this.#current();
     const loc = locale ?? site.defaultLocale;
     return entries.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  /** Every entry of a locale with a public URL, unlisted ones included (RFC-0042 §3). */
+  async routableEntries(locale?: string): Promise<ContentEntry[]> {
+    const { site, reachable } = await this.#current();
+    const loc = locale ?? site.defaultLocale;
+    return reachable.filter((e) => e.locale === loc).sort(byNewest);
+  }
+
+  /** RFC-0042 §4: a collection by its list fields, `now` at this view's instant. */
+  async queryEntries(q: FieldEntryQuery): Promise<FieldEntryResult> {
+    const view = await this.#current();
+    const loc = q.locale ?? view.site.defaultLocale;
+    const shownHere = q.includeExpired ? view.reachable : view.entries;
+    return evaluateEntryQuery({
+      site: view.site,
+      candidates: shownHere.filter((e) => e.collection === q.collection && e.locale === loc),
+      published: view.published,
+      taxonomies: view.taxonomies,
+      terms: view.terms,
+      query: q,
+      now: this.#clock?.() ?? Date.now(),
+      cache: view.resolved,
+    });
   }
 
   async search(query: string, options: SourceSearchOptions = {}): Promise<SearchResults> {
@@ -662,7 +509,7 @@ export class SnapshotSource implements GraphSource {
 
   /** A published entry of this snapshot by id (any locale), if its gates are open. */
   async entryById(id: string): Promise<ContentEntry | undefined> {
-    return (await this.#current()).entries.find((e) => e.id === id);
+    return (await this.#current()).reachable.find((e) => e.id === id);
   }
 
   entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
@@ -702,7 +549,10 @@ export class SnapshotSource implements GraphSource {
     const loc = options.locale ?? site.defaultLocale;
     const f = compile(filter, taxonomies, terms);
     const out = entries.filter((e) => e.locale === loc && matches(f, e)).sort(byNewest);
-    return options.limit === undefined ? out : out.slice(0, options.limit);
+    return rememberList(options.limit === undefined ? out : out.slice(0, options.limit), {
+      source: this,
+      locale: loc,
+    });
   }
 
   entriesByTerm(
@@ -741,7 +591,7 @@ export class SnapshotSource implements GraphSource {
       {
         site: view.site,
         pages: view.pages,
-        entries: view.entries,
+        entries: view.reachable,
         taxonomies: view.taxonomies,
         terms: view.terms,
         ...(options.collectionIndex ? { collectionIndex: options.collectionIndex } : {}),

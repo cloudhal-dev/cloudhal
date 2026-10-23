@@ -12,7 +12,13 @@
 import { type Asset, assertValid, type Site } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { mediaBlobKey } from "./assets.ts";
-import { checkAvailability, checkTimeZone, type GateSupport, isTimeZone } from "./availability.ts";
+import {
+  checkAvailability,
+  checkTimeZone,
+  EXPIRY_GATES_VERSION,
+  type GateSupport,
+  isTimeZone,
+} from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { canonicalJson, nodeHash, sha256Hex } from "./hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "./hosts.ts";
@@ -40,6 +46,18 @@ async function assertGates(
     throw new InvariantError(
       "gates_unsupported",
       "the bundle has time gates (availability) and this site's renderer has not confirmed it enforces them",
+      { siteId },
+    );
+  // RFC-0042 §3.6: a collection's `expiry` needs a renderer with derived gates.
+  const site = bundle.nodes.find((r) => r.kind === "site");
+  const collections = site
+    ? (JSON.parse(site.body) as { collections?: Record<string, { expiry?: unknown }> }).collections
+    : undefined;
+  const expiring = Object.values(collections ?? {}).some((c) => c?.expiry !== undefined);
+  if (expiring && gates && !(await gates.enforced(siteId, EXPIRY_GATES_VERSION)))
+    throw new InvariantError(
+      "gates_unsupported",
+      "the bundle has a collection expiry and this site's renderer has not confirmed it enforces derived gates",
       { siteId },
     );
 }
