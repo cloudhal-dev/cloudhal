@@ -5,7 +5,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BuildChat } from "../src/components/BuildChat.tsx";
-import { wrap } from "./roles-fixtures.tsx";
+import { INSTANCE, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
   cleanup();
@@ -32,9 +32,25 @@ function ndjson(events: unknown[]): Response {
   );
 }
 
-function serve(build: () => Response, enabled = true, transport = "binding") {
+const PLAYGROUND = {
+  ...INSTANCE,
+  features: {
+    ...INSTANCE.features,
+    playground: {
+      expiresAt: "2099-01-01T00:00:00Z",
+      resetUrl: "/_playground/reset",
+      deployUrl: "https://example.test/deploy",
+    },
+  },
+};
+
+function serve(build: () => Response, enabled = true, transport = "binding", instance = INSTANCE) {
   const fn = vi.fn(async (url: string, _init?: RequestInit) =>
-    url.endsWith("/ai/settings") ? settings(enabled, transport) : build(),
+    url.endsWith("/ai/settings")
+      ? settings(enabled, transport)
+      : url.endsWith("/api/instance")
+        ? Response.json(instance)
+        : build(),
   );
   vi.stubGlobal("fetch", fn);
   return fn;
@@ -55,6 +71,20 @@ describe("Build chat", () => {
     serve(() => new Response(null, { status: 404 }), true, "none");
     render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
     expect(await screen.findByText("This deployment can't reach Workers AI")).toBeInTheDocument();
+  });
+
+  it("on a playground, says AI is left out and links to deploying (RFC-0036 §5)", async () => {
+    serve(() => new Response(null, { status: 404 }), false, "none", PLAYGROUND);
+    render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
+    expect(await screen.findByText("Available in your own install")).toBeInTheDocument();
+    expect(
+      screen.getByText(/runs on Workers AI, which the playground leaves out/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("This deployment can't reach Workers AI")).toBeNull();
+    expect(screen.getByRole("link", { name: /Deploy to Cloudflare/ })).toHaveAttribute(
+      "href",
+      "https://example.test/deploy",
+    );
   });
 
   it("sends the brief and shows the model's notes and the outcome", async () => {
@@ -174,12 +204,19 @@ describe("Build chat", () => {
     unmount();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        Response.json({
-          settings: { enabled: true, model: "@cf/openai/gpt-oss-120b", dailyLimit: 100, rev: 1 },
-          usage: { requests: 0 },
-          transport: "binding",
-        }),
+      vi.fn(async (url: string) =>
+        url.endsWith("/api/instance")
+          ? Response.json(INSTANCE)
+          : Response.json({
+              settings: {
+                enabled: true,
+                model: "@cf/openai/gpt-oss-120b",
+                dailyLimit: 100,
+                rev: 1,
+              },
+              usage: { requests: 0 },
+              transport: "binding",
+            }),
       ),
     );
     render(wrap(<BuildChat siteId="site_1" pageId="page_1" />));
