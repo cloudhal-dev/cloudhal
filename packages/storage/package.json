@@ -36,10 +36,18 @@
     "@cloudhal/core-contracts": "workspace:*"
   },
   "peerDependencies": {
-    "better-sqlite3": "^13.0.0"
+    "better-sqlite3": "^13.0.0",
+    "miniflare": "*",
+    "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
+      "optional": true
+    },
+    "miniflare": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

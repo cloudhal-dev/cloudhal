@@ -12,7 +12,7 @@ Everything here is **Worker-safe** (AGENTS.md rule 5): SQLite is reached only th
 | `@cloudhal/analytics/rollup` | `runRollups`, `RollupReader`, `collectDailyRows`, `writeDailyRows` |
 | `@cloudhal/analytics/reader` | `CompositeReader` (rollups for complete days, the rest live), `mergeResults` |
 | `@cloudhal/analytics/service` | `AnalyticsService` (one per deployment: composite reads, settings with the salt and purge rules, rollups, status, CSV export of rollups), `presetRange`, `rangeFromParams`, `parseFilterParam`, `ANALYTICS_OFF` |
-| `@cloudhal/analytics/testing` | conformance, bot-traffic, state and rollup suites; `FIXTURE_EVENTS`, `CONFORMANCE_CASES` |
+| `@cloudhal/analytics/testing` | conformance, bot-traffic, state and rollup suites; `FIXTURE_EVENTS`, `CONFORMANCE_CASES` (vitest 3 or later, an optional peer) |
 | `@cloudhal/analytics/client` | the browser sources (`pageview.browser.js`, `vitals.browser.js` with `web-vitals`) and their names; build input for the `cloudhal()` integration, which ships them as `/_cloudhal/p.<hash>.js` (≤ `PAGEVIEW_GZIP_BUDGET`, 1 KB gzipped) and `/_cloudhal/v.<hash>.js`. Node only (build time) |
 
 The site side (`POST /__cloudhal/e`, the script tag, render events) lives in `@cloudhal/astro-renderer` (`SiteAnalytics` in `./analytics`, used by the Site Worker entry and the `cloudhal dev` middleware).

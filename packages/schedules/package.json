@@ -35,6 +35,14 @@
     "@cloudhal/storage": "workspace:*",
     "temporal-polyfill": "catalog:"
   },
+  "peerDependencies": {
+    "vitest": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@types/better-sqlite3": "catalog:",

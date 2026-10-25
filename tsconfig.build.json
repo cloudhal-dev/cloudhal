@@ -13,6 +13,14 @@
     "typeRoots": ["packages/cli/node_modules/@types", "packages/cli/node_modules"],
     "types": ["node", "@cloudflare/workers-types"]
   },
+  // The test-support entries these packages export as ./testing (they ship). `exclude` below does
+  // not apply to `files`, so the other packages' testing.ts stay out of the program.
+  "files": [
+    "packages/storage/src/testing.ts",
+    "packages/analytics/src/testing.ts",
+    "packages/comments/src/testing.ts",
+    "packages/schedules/src/testing.ts"
+  ],
   "include": [
     "packages/core-contracts/src",
     "packages/core-contracts/scripts",

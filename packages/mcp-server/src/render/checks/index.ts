@@ -6,6 +6,10 @@
  * prelude defines the helpers (`add`, `describe`, `visible`, `imgs`, `W`, `H`); the motion part
  * scrolls the page once and defines `frame`, which the navigation and component parts use; the
  * component part ends back at the top. Keep the order.
+ *
+ * Every part is a `String.raw` template, so a backslash in the page's code (`/\s/`) reaches the
+ * page as written: in a plain template `\s` arrives as `s` and `\b` as a control character, and
+ * Biome's useless-escape fix deleted the backslash (test/render-script.test.ts checks this).
  */
 import { COMPONENT_CHECKS } from "./components.ts";
 import { CONTENT_CHECKS } from "./content.ts";

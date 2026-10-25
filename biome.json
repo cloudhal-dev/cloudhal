@@ -74,6 +74,12 @@
             "max": 4
           }
         }
+      },
+      "suspicious": {
+        "noUselessEscapeInString": {
+          "level": "error",
+          "fix": "none"
+        }
       }
     }
   },

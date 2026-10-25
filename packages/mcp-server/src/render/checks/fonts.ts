@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: font-fallback.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const FONT_CHECKS = `  // font-fallback (RFC-0023 §2): text set in a web font whose stack has no metric-matched fallback
+export const FONT_CHECKS = String.raw`  // font-fallback (RFC-0023 §2): text set in a web font whose stack has no metric-matched fallback
   // right after it (a face with size-adjust or ascent-override). Without one, the text is first
   // drawn in a system font of another size and moves when the web font arrives.
   if (document.fonts) {
