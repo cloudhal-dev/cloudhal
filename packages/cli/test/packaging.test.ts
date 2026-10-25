@@ -1,14 +1,18 @@
 /** What makes the published packages installable (ADR-0013). */
-import { readFile, realpath } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  exportedSources,
   PACKAGES,
   publishConfigFor,
   publishExports,
   rewriteSpecifiers,
+  shipsFile,
 } from "../../../scripts/build-packages.ts";
+import { verifyPublishTargets } from "../../../scripts/verify-exports.ts";
 import {
   assetDir,
   materializeDependencies,
@@ -73,6 +77,54 @@ describe("build: specifiers and exports", () => {
       expect(pkg.publishConfig, name).toEqual(publishConfigFor(pkg));
       expect(pkg.files, name).toContain("dist");
       expect(pkg.private, name).toBeUndefined();
+    }
+  });
+
+  it("ships every source a package exports; tests and unexported testing.ts stay out", async () => {
+    for (const name of PACKAGES) {
+      const pkg = JSON.parse(
+        await readFile(path.join(ROOT, "packages", name, "package.json"), "utf8"),
+      );
+      const exported = exportedSources(pkg);
+      for (const rel of exported) {
+        if (rel.includes("*") || !/\.tsx?$/.test(rel)) continue;
+        expect(shipsFile(name, rel, exported), `${name}/${rel}`).toBe(true);
+      }
+    }
+    expect(shipsFile("core-ts", "src/testing.ts", new Set())).toBe(false);
+    expect(shipsFile("storage", "src/a.test.ts", new Set(["src/a.test.ts"]))).toBe(false);
+    expect(shipsFile("core-ts", "scripts/gen-icons.ts", new Set(["scripts/gen-icons.ts"]))).toBe(
+      false,
+    );
+  });
+
+  it("reports published exports/bin targets outside files or missing from dist", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "cloudhal-exports-"));
+    try {
+      await mkdir(path.join(dir, "dist/src/c"), { recursive: true });
+      for (const file of ["dist/src/index.js", "dist/src/index.d.ts", "dist/src/c/a.js"])
+        await writeFile(path.join(dir, file), "");
+      const pkg = {
+        name: "fixture",
+        files: ["dist"],
+        publishConfig: {
+          exports: {
+            ".": { types: "./dist/src/index.d.ts", default: "./dist/src/index.js" },
+            "./testing": { types: "./dist/src/testing.d.ts", default: "./dist/src/testing.js" },
+            "./c/*": "./dist/src/c/*",
+            "./schemas/*": "./schemas/*",
+          },
+          bin: { y: "./dist/bin/y.js" },
+        },
+      };
+      expect(await verifyPublishTargets(dir, pkg)).toEqual([
+        "fixture: ./testing (types) → ./dist/src/testing.d.ts: missing",
+        "fixture: ./testing (default) → ./dist/src/testing.js: missing",
+        "fixture: ./schemas/* → ./schemas/*: outside files",
+        "fixture: bin (y) → ./dist/bin/y.js: missing",
+      ]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
     }
   });
 });

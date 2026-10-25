@@ -34,6 +34,14 @@
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/storage": "workspace:*"
   },
+  "peerDependencies": {
+    "vitest": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",
     "@types/better-sqlite3": "catalog:",

@@ -10,7 +10,7 @@ Storage interfaces and adapters for Cloudhal. The interface is shaped by the mos
 | `@cloudhal/storage/do-sqlite` | `DoSqliteDriver` — a SQLite-backed Durable Object's `ctx.storage` (RFC-0036); `batch` runs in `transactionSync` |
 | `@cloudhal/storage/fs` | `FsBlobStore` — directory on disk |
 | `@cloudhal/storage/r2` | `R2BlobStore` — Cloudflare R2 binding |
-| `@cloudhal/storage/testing` | conformance suites + Miniflare helpers (`createMiniflareD1`, `createMiniflareR2`, `createMiniflareDoSqlite`) |
+| `@cloudhal/storage/testing` | conformance suites + Miniflare helpers (`createMiniflareD1`, `createMiniflareR2`, `createMiniflareDoSqlite`); needs vitest 3 or later, and miniflare for the helpers (optional peers) |
 
 ```ts
 import { migrate, migrations } from "@cloudhal/storage";
