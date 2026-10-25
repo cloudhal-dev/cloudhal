@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { configure } from "@testing-library/react";
-import { beforeAll } from "vitest";
+import { cleanup, configure } from "@testing-library/react";
+import { afterAll, afterEach, beforeAll, vi } from "vitest";
 import { LOCALE_LIST, loadLocale, loadNamespace, NAMESPACES } from "../src/i18n/index.tsx";
 
 // Lazy message namespaces (src/i18n/namespaces.ts) arrive with their routes in the app. Screens
@@ -19,6 +19,20 @@ beforeAll(() =>
 // findBy*/waitFor default to 1 s; with the whole monorepo testing in parallel (turbo) a screen can
 // take longer to settle. The test timeout (vitest.config.ts) stays the upper bound.
 configure({ asyncUtilTimeout: 5000 });
+
+// Vitest runs without globals, so Testing Library never registers its own cleanup: trees stayed
+// mounted, Base UI / Floating UI work committed outside act after the file ended, and React's
+// passive flush (setImmediate) read `window` after happy-dom's teardown ("window is not defined",
+// CI run 39959905949). cleanup() is idempotent, so files that call it themselves are unaffected.
+// Real timers come back first so the drain below is never faked; setImmediate is FIFO, so three
+// rounds also cover a scheduler that yields and posts again.
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+afterAll(async () => {
+  for (let i = 0; i < 3; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+});
 
 // Base UI / Kumo touch these at module level in some chunks.
 globalThis.ResizeObserver ??= class {
