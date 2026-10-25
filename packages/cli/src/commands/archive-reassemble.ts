@@ -6,14 +6,17 @@
  * Every row is checked against the field tables of `archive-bundle.ts` (the exact keys, strings,
  * non-negative integers), belongs to the manifest's site and appears once; every snapshot ref has
  * its body in the archive. Every asset body `bundleMedia` reads (asset nodes, the bodies of
- * snapshots' asset refs) is a JSON object and, for a blob asset, has a hex SHA-256, a size and a
- * media type, so the media rule never throws or quotes. The media files must match the graph:
+ * snapshots' asset refs) is a JSON object with a `storage` kind and, for a blob asset, has a hex
+ * SHA-256, a size and a media type, so the media rule never throws or quotes; `importSite` then
+ * validates every body against its contract. The media files must match the graph:
  * none that no asset needs, none taken down by the archive's own ledger (invariant 5), each with
  * its asset's size, and, unless the manifest says `mediaOmitted`, none missing.
  *
  * The ledger comes after the media in the layout, so a media file for taken-down content is
- * refused only at the end, after `onMedia` saw it: a caller stages media and removes them when
- * this throws. Nothing is returned before `readArchive` has verified the whole archive.
+ * refused only at the end, after `onMedia` saw it. `cloudhal import` therefore reads the file
+ * twice: a first pass verifies everything (no `onMedia`), so the second writes only verified media;
+ * if a later step fails, media already written stay unreferenced (content-addressed). Nothing is
+ * returned before `readArchive` has verified the whole archive.
  *
  * Errors name the archive path, the line, our own field names and validated hex hashes; never ids,
  * keys, bodies or JSON.parse messages, which can quote untrusted input.
@@ -154,8 +157,9 @@ function ownSite(draft: Draft, siteId: string, at: string): void {
 }
 
 /**
- * An asset body as `bundleMedia` reads it: a JSON object and, when its bytes are in the blob
- * store, a hex `sha256`, a non-negative `bytes` and a string `mediaType`. Never quotes the body.
+ * An asset body as `bundleMedia` and the media ledger read it: a JSON object with a `storage`
+ * object naming its kind and, when its bytes are in the blob store, a hex `sha256`, a non-negative
+ * `bytes` and a string `mediaType`. Never quotes the body.
  */
 function checkAssetBody(body: string, at: string, what: string): void {
   let asset: unknown;
@@ -165,7 +169,9 @@ function checkAssetBody(body: string, at: string, what: string): void {
     throw new Error(`${at}: ${what} is not JSON`);
   }
   if (!isRecord(asset)) throw new Error(`${at}: ${what} is not a JSON object`);
-  if (!isRecord(asset.storage) || asset.storage.kind !== "blob") return;
+  if (!isRecord(asset.storage) || typeof asset.storage.kind !== "string")
+    throw new Error(`${at}: ${what} needs storage, an object with a kind`);
+  if (asset.storage.kind !== "blob") return;
   if (typeof asset.sha256 !== "string" || !SHA256.test(asset.sha256))
     throw new Error(`${at}: ${what} needs a sha256 of 64 lowercase hex digits`);
   if (!FIELD_CHECKS.integer(asset.bytes))

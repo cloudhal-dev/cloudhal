@@ -9,21 +9,16 @@
  * path).
  */
 import { createReadStream } from "node:fs";
-import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
-import type { Actor, ContentEntry, Page, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import {
   continueFieldOperation,
-  exportSite,
   importSite,
   runFieldOperation,
   type SiteBundle,
-  seedStarterSite,
 } from "@cloudhal/core-ts";
-import { openLocalStore } from "@cloudhal/core-ts/local";
-import { makePng, PNG_1X1 } from "@cloudhal/core-ts/media/fixtures";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ArchiveError, archiveStream, readArchive } from "../src/archive/index.ts";
 import { HELP } from "../src/cli/help.ts";
@@ -37,117 +32,27 @@ import {
   NEVER_IN_ARCHIVE,
 } from "../src/commands/export.ts";
 import { writeProjectConfig } from "../src/config.ts";
-
-const person: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
-const robot: Actor = { kind: "agent", id: "agent_01HZX8K3Q9YZ", name: "Newsroom Agent" };
-
-interface Fixture {
-  projectDir: string;
-  siteId: string;
-  trId: string;
-  /** A: the entry's cover; B: taken down; C: deleted, kept by the first snapshot only. */
-  sha: { a: string; b: string; c: string };
-  snapshots: { s1: string; s2: string; s3: string };
-}
-
-const dirs: string[] = [];
-async function tempDir(prefix: string): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), prefix));
-  dirs.push(dir);
-  return dir;
-}
-
-async function seed(projectDir: string): Promise<Omit<Fixture, "projectDir">> {
-  const local = await openLocalStore(path.join(projectDir, ".cloudhal"));
-  const { store } = local;
-  const site = await seedStarterSite(store, { name: "English", slug: "english" });
-  const upload = (bytes: Uint8Array, filename: string) =>
-    store.ingestAsset({
-      siteId: site.id,
-      bytes,
-      filename,
-      uploadedBy: robot,
-      source: { kind: "upload" },
-    });
-  const a = await upload(PNG_1X1, "pixel.png");
-  const entry = (await store.listContentEntries(site.id))[0] as ContentEntry;
-  await store.updateContentEntry({
-    ...entry,
-    coverImage: { assetId: a.asset.id, alt: "" } as never,
-  });
-  const b = await upload(makePng({ width: 3, height: 3 }), "b.png");
-  const c = await upload(makePng({ width: 5, height: 4 }), "c.png");
-  const s1 = await store.createSnapshot(site.id, { actor: person, reason: "manual" });
-  await store.deleteAsset(c.asset);
-  await store.purgeBlob(site.id, b.asset.sha256, person, { text: "personal data", legal: false });
-  const s2 = await store.createSnapshot(site.id, { actor: person, reason: "publish" });
-  await store.publish((await store.getSite(site.id)) as Site, s2.id);
-  const about = (await store.listPages(site.id)).find((p) => p.path === "/about") as Page;
-  await store.updatePage({ ...about, title: "About us" });
-  const s3 = await store.createSnapshot(site.id, { actor: person, reason: "manual" });
-  const tr = await seedStarterSite(store, {
-    name: "Türkçe",
-    slug: "turkce",
-    locale: "tr",
-    projectId: site.projectId,
-  });
-  await local.close();
-  await writeProjectConfig(projectDir, {
-    siteId: site.id,
-    dataDir: ".cloudhal",
-    sites: [site.id, tr.id],
-  });
-  return {
-    siteId: site.id,
-    trId: tr.id,
-    sha: { a: a.asset.sha256, b: b.asset.sha256, c: c.asset.sha256 },
-    snapshots: { s1: s1.id, s2: s2.id, s3: s3.id },
-  };
-}
-
-/** The fixture's rows are written on this day, so a file name dated by the clock would show. */
-const SEEDED_AT = new Date("2026-01-02T03:04:05.000Z");
-const SEEDED_DAY = "20260102";
+import {
+  bundleOf,
+  copyProject,
+  type Fixture,
+  mediaFile,
+  person,
+  removeTempDirs,
+  SEEDED_DAY,
+  seedFixture,
+  tempDir,
+  withStore,
+} from "./site-fixture.ts";
 
 let fx: Fixture;
 beforeAll(async () => {
-  const projectDir = await tempDir("cloudhal-export-");
-  vi.useFakeTimers({ toFake: ["Date"], now: SEEDED_AT, shouldAdvanceTime: true });
-  try {
-    fx = { projectDir, ...(await seed(projectDir)) };
-  } finally {
-    vi.useRealTimers();
-  }
+  fx = await seedFixture("cloudhal-export-");
 });
-afterAll(async () => {
-  for (const d of dirs.splice(0)) await rm(d, { recursive: true, force: true });
-});
+afterAll(removeTempDirs);
 afterEach(() => vi.restoreAllMocks());
 
-/** A copy of the fixture project (without the archives other tests wrote), for tests that change it. */
-async function freshProject(): Promise<string> {
-  const dir = await tempDir("cloudhal-export-copy-");
-  await cp(fx.projectDir, dir, { recursive: true });
-  for (const f of await readdir(dir))
-    if (f !== ".cloudhal" && f.endsWith(".cloudhal")) await rm(path.join(dir, f));
-  return dir;
-}
-
-/** The local store of `projectDir`, open for `fn` only. */
-async function withStore<T>(
-  projectDir: string,
-  fn: (local: Awaited<ReturnType<typeof openLocalStore>>) => Promise<T>,
-): Promise<T> {
-  const local = await openLocalStore(path.join(projectDir, ".cloudhal"));
-  try {
-    return await fn(local);
-  } finally {
-    await local.close();
-  }
-}
-
-const bundleOf = (projectDir: string, siteId: string): Promise<SiteBundle> =>
-  withStore(projectDir, (local) => exportSite(local, siteId));
+const freshProject = (): Promise<string> => copyProject(fx);
 
 const latestId = (projectDir: string, siteId: string): Promise<string> =>
   withStore(
@@ -331,7 +236,9 @@ describe("cloudhal export --latest-only and the store's history", () => {
   it("keeps the snapshot latestSnapshot picks when two share a created_at", async () => {
     const projectDir = await freshProject();
     // The newest snapshot (by insertion) ties with an earlier one whose id sorts after it, so the
-    // bundle's last row (created_at, id) is not the store's latest (created_at, rowid).
+    // bundle's last row (created_at, id) is not the store's latest (created_at, rowid). The
+    // earlier one is the largest such id: other rows may already share newest's created_at (the
+    // seed's clock moves in 20 ms steps), and it must still sort last among them.
     const tie = await withStore(projectDir, async ({ store, sql }) => {
       for (let i = 0; i < 40; i++) {
         const rows = await sql.all<{ id: string; created_at: string }>(
@@ -339,7 +246,14 @@ describe("cloudhal export --latest-only and the store's history", () => {
           [fx.siteId],
         );
         const newest = rows.at(-1) as { id: string; created_at: string };
-        const earlier = rows.slice(0, -1).find((r) => r.id > newest.id);
+        const earlier = rows
+          .slice(0, -1)
+          .filter((r) => r.id > newest.id)
+          // Code-unit order, as SQLite's BINARY collation sorts ids.
+          .reduce<{ id: string } | undefined>(
+            (max, r) => (max && max.id > r.id ? max : r),
+            undefined,
+          );
         if (earlier) {
           await sql.run("UPDATE snapshots SET created_at = ? WHERE id = ?", [
             newest.created_at,
@@ -468,9 +382,6 @@ describe("importSite and a crafted project row (the step 3 path)", () => {
 });
 
 describe("cloudhal export and damaged local media (invariant 3)", () => {
-  const mediaFile = (projectDir: string, sha: string) =>
-    path.join(projectDir, ".cloudhal", "blobs", "media", fx.siteId, sha);
-
   async function expectNoPartial(projectDir: string): Promise<void> {
     expect((await readdir(projectDir)).filter((f) => f.includes(".partial-"))).toEqual([]);
   }
@@ -479,7 +390,7 @@ describe("cloudhal export and damaged local media (invariant 3)", () => {
     const projectDir = await freshProject();
     const out = path.join(projectDir, "keep.cloudhal");
     await writeFile(out, "an older archive");
-    const file = mediaFile(projectDir, fx.sha.a);
+    const file = mediaFile(projectDir, fx.siteId, fx.sha.a);
     const bytes = await readFile(file);
     bytes[bytes.length - 1] = (bytes[bytes.length - 1] as number) ^ 0xff;
     await writeFile(file, bytes);
@@ -502,7 +413,7 @@ describe("cloudhal export and damaged local media (invariant 3)", () => {
 
   it("refuses a missing media file before writing anything", async () => {
     const projectDir = await freshProject();
-    await rm(mediaFile(projectDir, fx.sha.c));
+    await rm(mediaFile(projectDir, fx.siteId, fx.sha.c));
     await expect(exportArchive({ projectDir, out: "new.cloudhal" })).rejects.toThrow(
       new RegExp(`local media ${fx.sha.c} is missing; run \`cloudhal media verify\``),
     );

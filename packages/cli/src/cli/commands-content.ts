@@ -6,13 +6,18 @@ import {
 } from "../commands/comments.ts";
 import { describeExport, exportArchive } from "../commands/export.ts";
 import { fieldsCommand } from "../commands/fields.ts";
+import { ImportInterruptedError, importArchive } from "../commands/import.ts";
+import { describeImport } from "../commands/import-describe.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "../commands/media.ts";
 import { describePlaceholders, mediaPlaceholders } from "../commands/media-placeholders.ts";
 import { describeMigration, migrateTags } from "../commands/migrate.ts";
 import { describeReindex, searchReindex } from "../commands/search.ts";
 import { abortOnSignal, type CliCommand, remoteFlags, subcommands } from "./types.ts";
 
-/** `cloudhal migrate`, `fields`, `media`, `search`, `comments`, `export`: the site's content and its stores. */
+/**
+ * `cloudhal migrate`, `fields`, `media`, `search`, `comments`, `export`, `import`: the site's
+ * content and its stores.
+ */
 
 const migrateCommand: CliCommand = async (rest, values, { projectDir }) => {
   const [what] = rest;
@@ -166,6 +171,39 @@ const exportCommand: CliCommand = async (rest, values, { projectDir }) => {
   }
 };
 
+/**
+ * `cloudhal import <file> [--dry-run]` (bootstrap only; `--replace` is RFC-0039 step 4). Ctrl-C or
+ * SIGTERM before the graph is written stops it (exit 130/143); a dry run that would be refused
+ * exits 1.
+ */
+const importCommand: CliCommand = async (rest, values, { projectDir }) => {
+  const [file] = rest;
+  if (file === undefined || rest.length !== 1)
+    throw new Error("usage: cloudhal import <file> [--dry-run]");
+  if (values.replace)
+    throw new Error(
+      "cloudhal import --replace is not available yet; this version imports in bootstrap mode only",
+    );
+  const interrupt = abortOnSignal();
+  try {
+    const result = await importArchive({
+      projectDir,
+      file,
+      dryRun: values["dry-run"] === true,
+      signal: interrupt.signal,
+      log: (l) => process.stderr.write(`${l}\n`),
+    });
+    for (const line of describeImport(result)) console.log(line);
+    return result.refusals.length > 0 ? 1 : 0;
+  } catch (e) {
+    if (!(e instanceof ImportInterruptedError)) throw e;
+    console.error(`cloudhal: ${e.message}`);
+    return interrupt.exitCode();
+  } finally {
+    interrupt.dispose();
+  }
+};
+
 export const CONTENT_COMMANDS = {
   migrate: migrateCommand,
   fields: fieldsCommand,
@@ -173,4 +211,5 @@ export const CONTENT_COMMANDS = {
   search: searchCommand,
   comments: commentsCommand,
   export: exportCommand,
+  import: importCommand,
 } satisfies Record<string, CliCommand>;

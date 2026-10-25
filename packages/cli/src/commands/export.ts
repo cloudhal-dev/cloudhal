@@ -295,8 +295,8 @@ export async function exportArchive(options: ExportArchiveOptions): Promise<Expo
   }
 }
 
-/** 1536 → `1.5 KiB`. */
-function size(bytes: number): string {
+/** 1536 → `1.5 KiB` (also `cloudhal import`'s sizes). */
+export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KiB", "MiB", "GiB", "TiB"];
   let value = bytes / 1024;
@@ -322,9 +322,9 @@ export function describeExport(result: ExportArchiveResult, projectDir: string):
       : result.file;
   const media = manifest.mediaOmitted
     ? ""
-    : `, ${counts.media} media file(s) (${size(counts.mediaBytes)})`;
+    : `, ${counts.media} media file(s) (${formatBytes(counts.mediaBytes)})`;
   const lines = [
-    `wrote ${shown} (${size(result.bytes)}${result.replaced ? "; replaced the existing file" : ""})`,
+    `wrote ${shown} (${formatBytes(result.bytes)}${result.replaced ? "; replaced the existing file" : ""})`,
     `site ${manifest.siteId} (${result.slug}): ${counts.nodes} node(s), ${counts.snapshots} snapshot(s), ${counts.blobs} blob(s)${media}${result.purged > 0 ? `, ${result.purged} taken down` : ""}`,
   ];
   if (manifest.mediaOmitted)

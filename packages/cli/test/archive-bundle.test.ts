@@ -467,6 +467,9 @@ describe("bundleFromArchive refuses", () => {
     for (const [body, message] of [
       [evil, `${line} is not JSON`],
       ["null", `${line} is not a JSON object`],
+      // The media ledger reads `storage.kind` of every asset body.
+      [blobAsset({ storage: undefined }), `${line} needs storage, an object with a kind`],
+      [blobAsset({ storage: { kind: 7 } }), `${line} needs storage, an object with a kind`],
       [blobAsset({ sha256: evil }), `${line} needs a sha256 of 64 lowercase hex digits`],
       [blobAsset({ bytes: evil }), `${line} needs bytes, a non-negative integer`],
       [blobAsset({ bytes: -1 }), `${line} needs bytes, a non-negative integer`],
