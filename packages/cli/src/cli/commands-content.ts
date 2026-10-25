@@ -4,14 +4,15 @@ import {
   commentsStatusCli,
   describeCommentsStatus,
 } from "../commands/comments.ts";
+import { describeExport, exportArchive } from "../commands/export.ts";
 import { fieldsCommand } from "../commands/fields.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "../commands/media.ts";
 import { describePlaceholders, mediaPlaceholders } from "../commands/media-placeholders.ts";
 import { describeMigration, migrateTags } from "../commands/migrate.ts";
 import { describeReindex, searchReindex } from "../commands/search.ts";
-import { type CliCommand, remoteFlags, subcommands } from "./types.ts";
+import { abortOnSignal, type CliCommand, remoteFlags, subcommands } from "./types.ts";
 
-/** `cloudhal migrate`, `media`, `search`, `comments`: the site's content and its stores. */
+/** `cloudhal migrate`, `fields`, `media`, `search`, `comments`, `export`: the site's content and its stores. */
 
 const migrateCommand: CliCommand = async (rest, values, { projectDir }) => {
   const [what] = rest;
@@ -138,10 +139,38 @@ const commentsCommand = subcommands(
   "usage: cloudhal comments status|export|import",
 );
 
+/** Ctrl-C or SIGTERM stops the export: no file is written, an existing one stays (exit 130/143). */
+const exportCommand: CliCommand = async (rest, values, { projectDir }) => {
+  if (rest.length > 0)
+    throw new Error(
+      "usage: cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]",
+    );
+  const interrupt = abortOnSignal();
+  try {
+    const result = await exportArchive({
+      projectDir,
+      ...(values.out !== undefined ? { out: values.out } : {}),
+      ...(values.site !== undefined ? { siteId: values.site } : {}),
+      ...(values["no-media"] ? { noMedia: true } : {}),
+      ...(values["latest-only"] ? { latestOnly: true } : {}),
+      signal: interrupt.signal,
+    });
+    for (const line of describeExport(result, projectDir)) console.log(line);
+    return 0;
+  } catch (e) {
+    if (!interrupt.signal.aborted) throw e;
+    console.error("cloudhal: export interrupted; no file written, an existing one left as it was");
+    return interrupt.exitCode();
+  } finally {
+    interrupt.dispose();
+  }
+};
+
 export const CONTENT_COMMANDS = {
   migrate: migrateCommand,
   fields: fieldsCommand,
   media: mediaCommand,
   search: searchCommand,
   comments: commentsCommand,
+  export: exportCommand,
 } satisfies Record<string, CliCommand>;

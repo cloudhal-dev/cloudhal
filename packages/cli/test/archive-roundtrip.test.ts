@@ -283,6 +283,27 @@ describe("media verified while writing", () => {
     await expectArchiveError(readAll(cut), "truncated");
   });
 
+  it("stops on an abort, removing its temporary file and leaving an existing file as it was", async () => {
+    await writeFile(target(), "old");
+    const m = MEDIA[0] as Uint8Array;
+    const controller = new AbortController();
+    async function* interrupted() {
+      yield m.subarray(0, 100);
+      controller.abort();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      yield m.subarray(100);
+    }
+    const write = writeArchiveFile(target(), withMedia(interrupted), { signal: controller.signal });
+    await expect(write).rejects.toMatchObject({ name: "AbortError" });
+    expect(await readdir(dir)).toEqual(["site.cloudhal"]);
+    expect(await readFile(target(), "utf8")).toBe("old");
+    await rm(target());
+    // Aborted before it starts: no file is opened.
+    const early = writeArchiveFile(target(), sampleContent(), { signal: AbortSignal.abort() });
+    await expect(early).rejects.toMatchObject({ name: "AbortError" });
+    expect(await readdir(dir)).toEqual([]);
+  });
+
   it("writes a file that reads back from disk", async () => {
     const manifest = await writeArchiveFile(target(), sampleContent());
     let read: unknown;

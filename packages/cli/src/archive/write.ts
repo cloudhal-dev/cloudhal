@@ -33,6 +33,14 @@ export interface WriteArchiveOptions {
   limits?: Partial<ArchiveLimits>;
 }
 
+export interface WriteArchiveFileOptions extends WriteArchiveOptions {
+  /**
+   * Stops the write (`cloudhal export` aborts it on Ctrl-C and SIGTERM): the temporary file is
+   * removed, an existing `file` stays as it was, and the promise rejects.
+   */
+  signal?: AbortSignal | undefined;
+}
+
 /** A media body as it is written: no more than `bytes`, then the SHA-256. */
 async function* verifiedMedia(
   file: string,
@@ -96,13 +104,16 @@ export function archiveStream(
 
 /**
  * Writes the archive of `content` to `file`: to a temporary file next to it first, synced and then
- * renamed over `file`, so a failure leaves no file behind and an existing `file` unchanged.
+ * renamed over `file`, so a failure or an abort leaves no file behind and an existing `file`
+ * unchanged. Only a killed process (SIGKILL, power loss) can leave the `.<name>.partial-…` file.
  */
 export async function writeArchiveFile(
   file: string,
   content: ArchiveContent,
-  options: WriteArchiveOptions = {},
+  options: WriteArchiveFileOptions = {},
 ): Promise<SiteArchiveManifest> {
+  const { signal } = options;
+  signal?.throwIfAborted();
   const { manifest, bytes } = archiveStream(content, options);
   const temp = path.join(
     path.dirname(file),
@@ -112,7 +123,7 @@ export async function writeArchiveFile(
   try {
     handle = await open(temp, "wx");
     // The stream owns the handle: it fsyncs (flush) and closes it, on errors too.
-    await pipeline(bytes, handle.createWriteStream({ flush: true }));
+    await pipeline(bytes, handle.createWriteStream({ flush: true }), signal ? { signal } : {});
     await rename(temp, file);
     return manifest;
   } catch (e) {
