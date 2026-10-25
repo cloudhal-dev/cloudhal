@@ -497,6 +497,7 @@ export {
   TimezoneNote,
   type TimezoneNoteProps,
 } from "./blocks/TimezoneNote.tsx";
+export { ToggletipBadge, type ToggletipBadgeProps } from "./blocks/ToggletipBadge.tsx";
 export {
   type ChartColors,
   mixHex,
