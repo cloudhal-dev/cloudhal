@@ -119,6 +119,35 @@ for (const backend of backends) {
         ).status,
       ).toBe(401);
     });
+
+    it("change-password with revokeOtherSessions ends the other sessions (Better Auth runs it in a transaction on SQLite since 1.7.8)", async () => {
+      const token = (res: Response) =>
+        (res.headers.get("set-cookie") ?? "").match(/better-auth\.session_token=[^;]+/)?.[0] ?? "";
+      const signIn = (password: string) =>
+        app.request("/api/auth/sign-in/email", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: "halil@example.com", password }),
+        });
+      const here = token(await signIn("correct horse battery"));
+      const other = token(await signIn("correct horse battery"));
+      const changed = await app.request("/api/auth/change-password", {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: here },
+        body: JSON.stringify({
+          currentPassword: "correct horse battery",
+          newPassword: "a brand new passphrase",
+          revokeOtherSessions: true,
+        }),
+      });
+      expect(changed.status, await changed.clone().text()).toBe(200);
+      const fresh = token(changed);
+      expect(fresh).not.toBe("");
+      expect((await app.request("/api/me", { headers: { cookie: fresh } })).status).toBe(200);
+      expect((await app.request("/api/me", { headers: { cookie: other } })).status).toBe(401);
+      expect((await signIn("correct horse battery")).status).toBe(401);
+      expect((await signIn("a brand new passphrase")).status).toBe(200);
+    });
   });
 }
 
