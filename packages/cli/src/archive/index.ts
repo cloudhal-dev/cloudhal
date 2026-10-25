@@ -14,4 +14,9 @@ export {
 export { encodeNdjson, type NdjsonSplitOptions, splitNdjson } from "./parts.ts";
 export type { ArchiveContent, ArchiveMediaSource } from "./plan.ts";
 export { type ArchiveItem, type ReadArchiveOptions, readArchive } from "./read.ts";
-export { archiveStream, type WriteArchiveOptions, writeArchiveFile } from "./write.ts";
+export {
+  archiveStream,
+  type WriteArchiveFileOptions,
+  type WriteArchiveOptions,
+  writeArchiveFile,
+} from "./write.ts";

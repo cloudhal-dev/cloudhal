@@ -6,7 +6,7 @@
  */
 import type { Site } from "@cloudhal/core-contracts";
 import { canonicalJson, nodeHash } from "./hash.ts";
-import type { NodeRow } from "./sync.ts";
+import type { NodeRow } from "./sync-bundle.ts";
 
 const VOLATILE = new Set(["rev", "updatedAt"]);
 

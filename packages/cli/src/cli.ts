@@ -38,6 +38,9 @@ export const OPTIONS = {
   views: { type: "string" },
   from: { type: "string" },
   out: { type: "string" },
+  site: { type: "string" },
+  "no-media": { type: "boolean" },
+  "latest-only": { type: "boolean" },
   jurisdiction: { type: "string" },
   in: { type: "string" },
   file: { type: "string" },
@@ -70,6 +73,26 @@ export const OPTIONS = {
   clear: { type: "boolean" },
 } as const;
 
+/**
+ * Flags only some commands take. `OPTIONS` is one table for every command, so without this a
+ * `cloudhal push --replace --site <other>` would parse and act on cloudhal.json's `siteId`.
+ */
+const ONLY_FOR: Readonly<
+  Partial<Record<keyof typeof OPTIONS, { commands: readonly string[]; note?: string }>>
+> = {
+  site: { commands: ["export"], note: "; every other command acts on cloudhal.json's siteId" },
+  "no-media": { commands: ["export"] },
+  "latest-only": { commands: ["export"] },
+};
+
+function refuseForeignFlags(command: string, values: Record<string, unknown>): void {
+  for (const [flag, only] of Object.entries(ONLY_FOR))
+    if (values[flag] !== undefined && !only.commands.includes(command))
+      throw new Error(
+        `cloudhal ${command} does not take --${flag} (only cloudhal ${only.commands.join(", ")} does)${only.note ?? ""}`,
+      );
+}
+
 /** `cloudhal <command>` → its handler. */
 export const COMMANDS: Record<string, CliCommand> = {
   ...LOCAL_COMMANDS,
@@ -95,5 +118,6 @@ export async function main(argv: string[]): Promise<number> {
     process.stderr.write(`unknown command "${command}"\n\n${HELP}`);
     return 1;
   }
+  refuseForeignFlags(command, values);
   return run(rest, values, { projectDir: process.cwd() });
 }

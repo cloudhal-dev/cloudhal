@@ -224,6 +224,18 @@ export function archiveOf(
   return gzipSync(rawTar([head, ...entries], options));
 }
 
+/** The offset of the body of `path` in a tar stream. */
+export function bodyOffset(tar: Buffer, path: string): number {
+  for (let at = 0; at < tar.length; at += 512)
+    if (
+      Buffer.from(tar.subarray(at, at + 100))
+        .toString("latin1")
+        .split("\0")[0] === path
+    )
+      return at + 512;
+  throw new Error(`no ${path}`);
+}
+
 /** A valid archive's tar, edited, compressed again. */
 export function retar(archive: Uint8Array, edit: (tar: Buffer) => Buffer | undefined): Buffer {
   const tar = gunzipSync(archive);

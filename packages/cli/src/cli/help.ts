@@ -27,6 +27,24 @@ Usage:
                                                           local site → deployment (refused while releases are
                                                           open unless --cancel-schedules cancels them)
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
+  cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
+                                                          one site as a .cloudhal file (RFC-0039): its graph,
+                                                          snapshots and media; never user accounts, comments,
+                                                          analytics or secrets (its history names who made each
+                                                          change). Default <site-slug>-<YYYYMMDD>.cloudhal, dated
+                                                          by the newest row it holds (a deletion alone does not
+                                                          move it); a file there is replaced only by the same
+                                                          archive, --out <file> replaces any;
+                                                          --site: a site listed in cloudhal.json sites;
+                                                          --no-media: the graph only; --latest-only: only the
+                                                          published and the latest snapshot
+  cloudhal import <file> [--dry-run]                      a .cloudhal file into this project (RFC-0039), its
+                                                          site id kept: the archive's site must be cloudhal.json's
+                                                          siteId or listed in sites, and absent here or holding
+                                                          exactly the archive's nodes (missing snapshots and media
+                                                          are added); every file is verified before anything is
+                                                          written; --dry-run prints the manifest and the difference
+                                                          and writes nothing
   cloudhal owner transfer --to <email> [--admin-url <url>]
                                                           make a member the deployment's Owner
                                                           (lockout recovery; uses the deployment token)

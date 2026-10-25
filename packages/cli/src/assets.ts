@@ -33,6 +33,14 @@ async function packageRoot(): Promise<string> {
   throw new Error("could not locate the @cloudhal/cli package root");
 }
 
+/** The `@cloudhal/cli` version (its package.json's), from either layout. */
+export async function cliVersion(): Promise<string> {
+  const pkg = path.join(await packageRoot(), "package.json");
+  const version = (JSON.parse(await readFile(pkg, "utf8")) as { version?: unknown }).version;
+  if (typeof version !== "string") throw new Error(`${pkg} has no version`);
+  return version;
+}
+
 export type AssetKind = "studio" | "starters" | "skills";
 
 const MONOREPO: Record<AssetKind, string> = {

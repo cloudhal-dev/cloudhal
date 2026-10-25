@@ -15,6 +15,7 @@ import { tarLength } from "../src/archive/tar.ts";
 import {
   archiveOf,
   baseFiles,
+  bodyOffset,
   chunked,
   collect,
   expectArchiveError,
@@ -41,18 +42,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await rm(dir, { recursive: true, force: true });
 });
-
-/** The offset of the body of `path` in a tar stream. */
-function bodyOffset(tar: Buffer, path: string): number {
-  for (let at = 0; at < tar.length; at += 512)
-    if (
-      Buffer.from(tar.subarray(at, at + 100))
-        .toString("latin1")
-        .split("\0")[0] === path
-    )
-      return at + 512;
-  throw new Error(`no ${path}`);
-}
 
 /** Items read until the first error, which is returned with them. */
 async function readUntilError(archive: Uint8Array, drainMedia = true) {
