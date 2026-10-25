@@ -331,7 +331,9 @@ describe("cloudhal export --latest-only and the store's history", () => {
   it("keeps the snapshot latestSnapshot picks when two share a created_at", async () => {
     const projectDir = await freshProject();
     // The newest snapshot (by insertion) ties with an earlier one whose id sorts after it, so the
-    // bundle's last row (created_at, id) is not the store's latest (created_at, rowid).
+    // bundle's last row (created_at, id) is not the store's latest (created_at, rowid). The
+    // earlier one is the largest such id: other rows may already share newest's created_at (the
+    // seed's clock moves in 20 ms steps), and it must still sort last among them.
     const tie = await withStore(projectDir, async ({ store, sql }) => {
       for (let i = 0; i < 40; i++) {
         const rows = await sql.all<{ id: string; created_at: string }>(
@@ -339,7 +341,14 @@ describe("cloudhal export --latest-only and the store's history", () => {
           [fx.siteId],
         );
         const newest = rows.at(-1) as { id: string; created_at: string };
-        const earlier = rows.slice(0, -1).find((r) => r.id > newest.id);
+        const earlier = rows
+          .slice(0, -1)
+          .filter((r) => r.id > newest.id)
+          // Code-unit order, as SQLite's BINARY collation sorts ids.
+          .reduce<{ id: string } | undefined>(
+            (max, r) => (max && max.id > r.id ? max : r),
+            undefined,
+          );
         if (earlier) {
           await sql.run("UPDATE snapshots SET created_at = ? WHERE id = ?", [
             newest.created_at,
