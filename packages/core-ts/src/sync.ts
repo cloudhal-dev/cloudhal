@@ -81,10 +81,38 @@ async function assertTimeZone(to: StoragePair, siteId: string, bundle: SiteBundl
 }
 
 /**
+ * The project row is inserted as given when the target lacks it, so it must be the site node's
+ * project (`projectId`), a valid Project whose `id` and `rev` agree with its columns. Its id is
+ * echoed only once it equals the validated site node's.
+ */
+function assertProjectRow(siteId: string, bundle: SiteBundle): void {
+  const p = bundle.project;
+  if (!p) return;
+  const siteRow = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId);
+  const projectId = siteRow
+    ? (JSON.parse(siteRow.body) as { projectId?: unknown }).projectId
+    : undefined;
+  if (p.id !== projectId) throw new Error("the bundle's project is not its site's project");
+  let body: { id?: unknown; rev?: unknown };
+  try {
+    body = JSON.parse(p.body) as { id?: unknown; rev?: unknown };
+  } catch {
+    throw new Error(`project ${p.id}: body is not JSON`);
+  }
+  try {
+    assertValid("project", body);
+  } catch {
+    throw new Error(`project ${p.id}: not a valid project`);
+  }
+  if (body.id !== p.id || body.rev !== p.rev)
+    throw new Error(`project ${p.id}: columns do not match its body`);
+}
+
+/**
  * A bundle is untrusted input (whoever holds the deployment token): every row must be a valid
  * contract document of the kind its `kind` column declares (RFC-0002 §4.1: the node schemas are
  * mutually exclusive, so a body cannot pass as another kind), whose columns agree with its body,
- * for this site only.
+ * for this site only; the project row too (`assertProjectRow`).
  */
 async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void> {
   for (const row of bundle.nodes) {
@@ -146,6 +174,7 @@ async function assertValidRows(siteId: string, bundle: SiteBundle): Promise<void
     if (body.id !== row.id || body.siteId !== siteId || row.site_id !== siteId)
       throw new Error(`snapshot ${row.id}: columns do not match its body`);
   }
+  assertProjectRow(siteId, bundle);
 }
 
 export interface StoragePair {
@@ -306,6 +335,8 @@ export async function exportSite(
     [siteId],
   );
   const purged = new Set(purgedRows.map((r) => r.sha256));
+  // packages/cli/src/commands/archive-bundle.ts bundleMedia rebuilds this from an archive; keep
+  // the two in step (export-cli.test.ts compares them).
   const media = new Map<string, BundleMedia>();
   const addAsset = (body: string) => {
     const a = JSON.parse(body) as Asset;
