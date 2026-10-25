@@ -1,5 +1,5 @@
 import type { Snapshot } from "@cloudhal/core-contracts";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   ActorBadge,
@@ -11,6 +11,7 @@ import {
   SnapshotTimeline,
   type SnapshotTimelineLabels,
   StatusBadge,
+  ToggletipBadge,
 } from "../src/index.ts";
 
 const labels: SnapshotTimelineLabels = {
@@ -49,6 +50,39 @@ describe("StatusBadge", () => {
       "data-status",
       "review",
     );
+  });
+});
+
+describe("ToggletipBadge", () => {
+  it("is a keyboard toggletip whose name carries the reason", () => {
+    render(
+      <ToggletipBadge
+        label="Label"
+        reason="Reason"
+        icon={<svg data-testid="badge-icon" aria-hidden />}
+      />,
+    );
+    const button = screen.getByRole("button", { name: /Label\s?\.\s?Reason/ });
+    expect(button).toHaveAttribute("type", "button");
+    expect(button).toHaveAttribute("data-base-ui-tooltip-trigger");
+    expect(within(button).getByTestId("badge-icon")).toBeInTheDocument();
+  });
+
+  it("opens its reason on a press too (tooltips never open on touch) and closes on the next", async () => {
+    // This file renders without cleanup between tests, so the words are this test's own.
+    render(<ToggletipBadge label="Pressed" reason="Why it is pressed" />);
+    const button = screen.getByRole("button", { name: /Pressed/ });
+    // Only the screen-reader copy, never a bare reason, before the press.
+    expect(screen.queryByText("Why it is pressed")).toBeNull();
+    fireEvent.click(button);
+    const shown = await screen.findByText("Why it is pressed");
+    expect(button).not.toContainElement(shown);
+    expect(shown).toHaveClass("max-w-72");
+    // Leaving with the pointer keeps a pressed-open toggletip; a second press closes it.
+    fireEvent.mouseLeave(button);
+    expect(screen.getByText("Why it is pressed")).toBeInTheDocument();
+    fireEvent.click(button);
+    await waitFor(() => expect(screen.queryByText("Why it is pressed")).toBeNull());
   });
 });
 
