@@ -1,6 +1,7 @@
 # RFC-0039: Site archives: `cloudhal export` and `cloudhal import`
 
 - Status: Accepted (2026-10-22, by Halil; ADR-0041). Open questions decided as recommended. Revised before acceptance after a comparison with Sanity, Strapi, Contentful, Ghost, WordPress, Directus and Webflow (see Prior art): NDJSON parts instead of one JSON file, per-file checksums, contract versions in the manifest, and a snapshot before `--replace`.
+- Amendment (2026-10-25, rollout step 1): identical `.cloudhal` bytes need the same Node/zlib build; the tar stream inside, and so every SHA-256 in the manifest, is identical on every platform. See invariant 7.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - #47 (found while building cloudhal.com: no way to keep or move a site's content without a deployment, so it was written as code).
@@ -88,7 +89,7 @@ cloudhal import <file> [--replace] [--dry-run]
 4. An archive written by a newer format or a newer contracts `schemaVersion` is refused with the CLI version needed. Older ones are read, and migrated forward if a later schema version requires it.
 5. Taken-down content stays taken down: the `purged` ledger travels and the import never restores those bytes.
 6. Import writes the graph in atomic batches (no interactive transactions, AGENTS.md rule 4), guarded like `importSite` today. A failure leaves the project as it was, and `--replace` can always be undone through its `before import` snapshot.
-7. Same content, same file: rows and files are written in a fixed order, with zero timestamps and fixed modes in the tar headers, so exporting an unchanged site twice gives identical bytes (good for git and for diffing).
+7. Same content, same file: rows and files are written in a fixed order, with zero timestamps and fixed modes in the tar headers, so exporting an unchanged site twice gives identical bytes (good for git and for diffing). *Amended 2026-10-25:* identical bytes hold for the same Node/zlib build. gzip output differs between zlib builds (Homebrew's zlib and the Chromium zlib that official Node binaries ship compress the same input differently), and only a dependency or uncompressed output would avoid that. The tar stream inside the gzip, and so every SHA-256 in the manifest, is identical on every platform. A committed archive (step 5's demo) is regenerated on one pinned Node in CI, or compared through its decompressed tar.
 
 ### 4. What is not in an archive
 
@@ -125,7 +126,7 @@ The manifest says so, and `export` prints it. People and personal data never lea
   2. `export`.
   3. `import` with `--dry-run`.
   4. `--replace`, the `before import` snapshot, and the site id switch.
-  5. Docs and a starter demo archive.
+  5. Docs and a starter demo archive (regenerated on one pinned Node, or compared through its decompressed tar: invariant 7).
 
 ## Security & policy impact
 

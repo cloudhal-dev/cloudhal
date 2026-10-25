@@ -1,6 +1,7 @@
 # ADR-0041: Site archives: a streaming `.cloudhal` tar of NDJSON parts and media, ids kept, graph only
 - Status: Accepted
 - Date: 2026-10-22 (decided by Halil)
+- Amendment (2026-10-25, RFC-0039 rollout step 1): deterministic bytes hold for the same Node/zlib build; the tar stream and the manifest's SHA-256s on every platform. See rule 6.
 - Related: RFC-0039, RFC-0004, RFC-0010, ADR-0002, #47
 - Sources: [Sanity datasets](https://www.sanity.io/docs/cli-reference/dataset) · [Strapi data management](https://docs.strapi.io/cms/data-management/export) · [Contentful CLI export](https://github.com/contentful/contentful-cli/tree/main/docs/space/export) · [Ghost migration](https://docs.ghost.org/migration/ghost) · [WordPress export](https://wordpress.org/documentation/article/tools-export-screen/)
 
@@ -18,7 +19,7 @@ A site's content can only leave a project through a deployment (`push`, `pull`),
 
    Never erase-then-import.
 5. **Graph only.** No users, sessions, roles, agent keys, comments, readers, analytics, audit log, automations, secrets or webhook credentials. That is why there is no built-in encryption; people can pipe the file through `age` or `gpg`.
-6. **Deterministic bytes:** a fixed order, zero timestamps and fixed modes, so an unchanged site exports identically.
+6. **Deterministic bytes:** a fixed order, zero timestamps and fixed modes, so an unchanged site exports identically (amended: byte for byte with the same Node/zlib build, since gzip output differs between zlib builds; the tar stream inside, and every SHA-256 in the manifest, on every platform).
 7. **Untrusted input:** the layout is a closed list of paths (no traversal, links or devices); sizes are capped; rows go through the precompiled validators and gates, as for `push`.
 8. **Later, already decided:** `init --from`, `--new-ids` for templates, partial export, `--from <admin-url>`, Studio download, and signed archives.
 
