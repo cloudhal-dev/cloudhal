@@ -8,7 +8,7 @@
  * keeps the Content-Security-Policy violations the page raises while it loads, which the
  * `script-blocked` check reads. Report-only ones (`cloudhal dev`) are kept too.
  */
-export const CSP_LISTENER = `(() => {
+export const CSP_LISTENER = String.raw`(() => {
   const seen = (window.__chCsp = []);
   window.addEventListener("securitypolicyviolation", (e) => {
     if (seen.length < 50)
@@ -16,7 +16,7 @@ export const CSP_LISTENER = `(() => {
   }, true);
 })();`;
 
-export const SCRIPT_CHECKS = `  // surface-broken: a body surface the preview could not draw (RFC-0020 §5), or a component in one
+export const SCRIPT_CHECKS = String.raw`  // surface-broken: a body surface the preview could not draw (RFC-0020 §5), or a component in one
   // with an unknown block type or props that do not fit it. Theme blocks the preview leaves to the
   // site are fine.
   for (const el of document.querySelectorAll(".ch-surface-problem")) {

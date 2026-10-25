@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: empty-section, tap-target, input-label, chart-empty, long-line.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const CONTENT_CHECKS = `  // empty-section
+export const CONTENT_CHECKS = String.raw`  // empty-section
   for (const s of document.querySelectorAll("[data-section-id]")) {
     if (getComputedStyle(s).display === "none") continue;
     const text = (s.innerText || "").trim();
@@ -41,7 +41,7 @@ export const CONTENT_CHECKS = `  // empty-section
     if (!visible(el) && !(el.type === "radio" || el.type === "checkbox")) continue;
     const named = [...(el.labels || [])].some((l) => (l.innerText || l.textContent || "").trim()) ||
       (el.getAttribute("aria-label") || "").trim() ||
-      (el.getAttribute("aria-labelledby") || "").split(/s+/).some((id) => id && (document.getElementById(id)?.textContent || "").trim());
+      (el.getAttribute("aria-labelledby") || "").split(/\s+/).some((id) => id && (document.getElementById(id)?.textContent || "").trim());
     if (!named) add("input-label", el, "no label a screen reader can announce");
   }
 

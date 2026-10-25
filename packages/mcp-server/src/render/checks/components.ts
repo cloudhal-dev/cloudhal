@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: carousel-label / -lcp / -focus / -autoplay, image-fit, overlay-open; ends at the top of the page.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const COMPONENT_CHECKS = `  // A static preview runs no scripts (its CSP), so checks of what a module does wait for the site.
+export const COMPONENT_CHECKS = String.raw`  // A static preview runs no scripts (its CSP), so checks of what a module does wait for the site.
   const staticPreview = !!document.querySelector('meta[name="generator"][content="Cloudhal preview"]');
   // carousel-label and carousel-lcp: named carousels and slides; a hero's first slide not lazy.
   for (const c of document.querySelectorAll('[aria-roledescription="carousel"], [aria-roledescription="kaydırmalı alan"]')) {

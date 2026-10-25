@@ -4,7 +4,7 @@
  */
 import { RENDER_CHECK_IDS } from "../types.ts";
 
-export const PRELUDE = `  const W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight, MAX = 5;
+export const PRELUDE = String.raw`  const W = document.documentElement.clientWidth || window.innerWidth, H = window.innerHeight, MAX = 5;
   const ids = ${JSON.stringify(RENDER_CHECK_IDS)};
   const out = Object.fromEntries(ids.map((id) => [id, { id, count: 0, examples: [] }]));
   const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
@@ -22,9 +22,9 @@ export const PRELUDE = `  const W = document.documentElement.clientWidth || wind
     let tag = el.tagName.toLowerCase();
     if (el.id) tag += "#" + el.id;
     else if (typeof el.className === "string" && el.className.trim())
-      tag += "." + el.className.trim().split(/\\s+/).slice(0, 2).join(".");
+      tag += "." + el.className.trim().split(/\s+/).slice(0, 2).join(".");
     parts.push(tag);
-    const text = ((el.innerText || "").trim() || el.getAttribute("alt") || el.getAttribute("src") || "").replace(/\\s+/g, " ");
+    const text = ((el.innerText || "").trim() || el.getAttribute("alt") || el.getAttribute("src") || "").replace(/\s+/g, " ");
     if (text) parts.push(JSON.stringify(clip(text, 48)));
     return parts.join(" ");
   };

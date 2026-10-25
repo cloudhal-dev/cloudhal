@@ -51,7 +51,7 @@ ${linkRule}</style></head><body><main><h1>Post</h1><div class="ch-richtext"><p>R
     dir ??= await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-test-"));
     // A monospace font: every character is as wide as the next, so a column's measure is exact.
     const para = (chars: number) =>
-      `<p>${"abcd "
+      `<p>${"miss "
         .repeat(Math.ceil(chars / 5))
         .slice(0, chars)
         .trim()}</p>`;
