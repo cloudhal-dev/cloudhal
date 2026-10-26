@@ -3,6 +3,7 @@
 - Date: 2026-10-22 (decided by Halil)
 - Amendment (2026-10-25, RFC-0039 rollout step 1): deterministic bytes hold for the same Node/zlib build; the tar stream and the manifest's SHA-256s on every platform. See rule 6.
 - Amendment (2026-10-26, RFC-0039 rollout step 4): `--replace` takes the archive's published snapshot (a deployment keeps its own on `push`) and is undone with `cloudhal import --revert <snapshot-id>`, which restores the `before import` snapshot. See decision 4.
+- Amendment (2026-10-26, RFC-0039 rollout step 5): the committed demo archive is checked through its manifest without `createdBy`. The graph rows are held in memory, and import writes the node set in one batch of at most 1000 statements, as `push` and `pull`; only the container and the media stream. This corrects the risk below that says memory stays flat. Both are in RFC-0039's Later. Decision 5's list also leaves out scheduled releases, pending approvals and open edit suggestions, which live outside the graph like automations.
 - Related: RFC-0039, RFC-0004, RFC-0010, ADR-0002, #47
 - Sources: [Sanity datasets](https://www.sanity.io/docs/cli-reference/dataset) · [Strapi data management](https://docs.strapi.io/cms/data-management/export) · [Contentful CLI export](https://github.com/contentful/contentful-cli/tree/main/docs/space/export) · [Ghost migration](https://docs.ghost.org/migration/ghost) · [WordPress export](https://wordpress.org/documentation/article/tools-export-screen/)
 
@@ -34,4 +35,4 @@ A site's content can only leave a project through a deployment (`push`, `pull`),
   - The format is versioned and must be read forever.
 - Risks:
   - A file is as trustworthy as its source until archives are signed.
-  - Large media sets make big files; `--no-media` and the parts limit keep memory flat, not size small.
+  - Large media sets make big files; `--no-media` and the parts limit keep memory flat, not size small (amended: flat for the media; the graph rows are held in memory).

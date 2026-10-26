@@ -29,7 +29,7 @@ Collections without definitions keep `fields` as free-form JSON, exactly as befo
 - **Studio:** open the collection's settings, then **Fields**. Add fields (the key follows the label until you save), reorder them, and edit labels, help, limits and options. Only people who may change site settings can edit fields. Entries of that collection then get a **Fields** card in the editor, one control per type.
 - **Agents (MCP):** `list_collections` returns each collection's `fields` and `fieldsSchema` (the JSON Schema of the values, with labels and help in the caller's language). `update_collection` changes definitions, and `create_entry` / `update_entry` take `fields` (`null` removes a value). Definition changes always wait for a person who may change site settings, in every mode.
 - **API:** `PUT /api/sites/:siteId/collections/:key` with `fields` in the settings; entry routes take `fields` like any other property. Invalid values answer `422 invalid_fields` with one issue per problem (`fields/startsAt/at`).
-- **Files:** definitions travel in the site node, values in entries, so `cloudhal push`/`pull` and archives carry them unchanged.
+- **Files:** definitions travel in the site node, values in entries, so `cloudhal push`/`pull` and [site archives](site-archives.md) carry them unchanged.
 
 ### Changes that touch values: field operations
 

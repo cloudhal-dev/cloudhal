@@ -9,6 +9,7 @@ cloudhal studio                              API + Studio UI (+ /mcp) for this p
 cloudhal mcp [--mode plan|manual|edits|auto] MCP server over stdio for this project
 cloudhal deploy                              site + admin Workers on Cloudflare
 cloudhal push / cloudhal pull                local site ↔ deployment
+cloudhal export / cloudhal import            one site ↔ a .cloudhal file
 ```
 
 **Studio build.** The published CLI ships Studio prebuilt. Run from the monorepo, `cloudhal deploy` uploads `apps/studio/dist` and first checks that it is current: when it is missing, or its `index.html` is older than the newest file in `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, it runs `pnpm --filter @cloudhal/studio build`. With `--no-build-studio` it never builds and fails on a missing or stale build instead.
@@ -152,6 +153,18 @@ cloudhal fields revert events <operationId>
 ```
 
 Each run snapshots the site first (`before rename_field events.speaker`; its id is the operation id), writes the new definition with a `migration` marker so every reader stays consistent, rewrites entries in guarded batches of 200, drops the marker and snapshots again. Translations that were up to date stay up to date. An interrupted run resumes with `cloudhal fields continue <collection> <id>`; one operation per collection runs at a time. `--remote` runs it on the deployment with the deployment token. Only the draft graph changes: nothing goes live until you publish.
+
+### Site archives (RFC-0039)
+
+Backups, moving a site without a deployment, content kept in git, templates, the file's layout and its security checks: [site archives](../../docs/guides/site-archives.md).
+
+```bash
+cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]   # one site as a .cloudhal file
+cloudhal import <file> [--replace] [--dry-run]                             # verified in full before anything is written
+cloudhal import --revert <snapshot-id> [--dry-run]                         # undo a --replace
+```
+
+An archive holds the site's graph, snapshots, media and takedown ledger, never user accounts, comments, analytics or secrets; its history names who made each change. Import keeps the site's id. When `--replace` changes a site the project holds, it saves that site first as a `before import <file>` snapshot and prints the `cloudhal import --revert <id>` that brings it back. For an archive of another site it switches `cloudhal.json`'s `siteId`, leaving the old site in the store.
 
 ### Deploying to Cloudflare (ADR-0012)
 

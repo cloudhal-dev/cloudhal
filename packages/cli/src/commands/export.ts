@@ -23,11 +23,11 @@
  *   field operation is unfinished: it needs its `before` snapshot.
  * - **`--no-media`:** the graph only; the manifest says `mediaOmitted`.
  * - **Never in an archive (§4):** user accounts, sessions, roles, agent keys, comments, readers,
- *   analytics, the audit log, automations, schedule runs, deployment secrets and webhook
- *   credentials. None of their tables or files are read. The graph does name who made each change,
- *   as its contracts require: snapshots, uploads, block edits, reviews, term proposals and
- *   takedowns carry user and agent ids (most with display names), entries their authors and the
- *   project its owner's id.
+ *   analytics, the audit log, scheduled releases, automations, schedule runs, pending approvals,
+ *   open edit suggestions, deployment secrets and webhook credentials. None of their tables or
+ *   files are read. The graph does name who made each change, as its contracts require:
+ *   snapshots, uploads, block edits, reviews, term proposals and takedowns carry user and agent
+ *   ids (most with display names), entries their authors and the project its owner's id.
  *
  * A media file whose local bytes are missing, or differ from its asset's size and SHA-256, stops
  * the export (`cloudhal media verify` finds them). Known limitation: the graph rows are held in
@@ -88,8 +88,11 @@ export const NEVER_IN_ARCHIVE: readonly string[] = [
   "readers",
   "analytics",
   "the audit log",
+  "scheduled releases",
   "automations",
   "schedule runs",
+  "pending approvals",
+  "open edit suggestions",
   "deployment secrets",
   "webhook credentials",
 ];
