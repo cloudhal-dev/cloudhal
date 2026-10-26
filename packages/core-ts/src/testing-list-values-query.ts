@@ -53,6 +53,8 @@ const TRANSLATIONS = 14;
 const ROUNDS = 3;
 const MUTATIONS = 12;
 const QUERIES = 50;
+/** A seed takes ~5 s locally and over 30 s on a 4-vCPU CI runner with other packages testing. */
+const SEED_TIMEOUT = 180_000;
 const STATUSES = ["draft", "review", "published", "archived"] as const;
 const TITLES = ["Alpha", "alpha", "Été", "𝒜lpha", "x", "￿z", "Zeta", "Ａ", "b"];
 const PUBLISHED = ["2026-10-01T00:00:00.000Z", "2026-10-02T00:00:00.000Z", undefined];
@@ -298,7 +300,7 @@ export function listValuesQuerySuite(label: string, factory: ListValuesFactory):
             matched += await check(world, randomQuery(g, world, entries));
         }
         expect(matched).toBeGreaterThan(0);
-      });
+      }, SEED_TIMEOUT);
 
     it("falls back while a collection is not ready, and when a read races a write", async () => {
       const fields: [FieldDefinition, ...FieldDefinition[]] = [
