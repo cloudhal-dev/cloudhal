@@ -173,3 +173,8 @@ export const operationKey = (op: FieldOperation): string =>
 
 /** The field key once the operation is done. */
 export const finalKey = (op: FieldOperation): string => (op.op === "rename_field" ? op.to : op.key);
+
+/** Every field key the operation rewrites in entries (a rename's both). */
+export const operationKeys = (op: FieldOperation): string[] => [
+  ...new Set([operationKey(op), finalKey(op)]),
+];

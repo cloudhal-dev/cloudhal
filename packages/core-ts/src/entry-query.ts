@@ -1,12 +1,17 @@
 /**
  * RFC-0042 §4 "API and MCP": a collection's entries filtered and sorted by its list fields, over
  * the store's collection prefilter (`listContentEntries`: collection, locale, status, the RFC-0002
- * term filter). Field conditions run in memory with the shared evaluator (`fields/query.ts`) on
- * resolved values (a translation reads its original's non-localized ones), so SQL and memory
- * cannot drift. Ties fall back to the collection's `sort`, then `id`; entries without a value sort
- * last. `now` is injected (epoch ms), never read from a clock here.
+ * term filter). The shared evaluator (`fields/query.ts`) defines the answer, on resolved values (a
+ * translation reads its original's non-localized ones): ties fall back to the collection's
+ * `sort`, then `id`; entries without a value sort last. `now` is injected (epoch ms), never read
+ * from a clock here.
+ *
+ * #110: while the collection's `entry_list_values` rows are ready, the query runs in SQL
+ * (`list-values/query.ts`): where, orderBy, status, locale, limit and offset. It falls back to
+ * the in-memory scan (`scanFieldQuery`, the oracle a property suite compares it with) for a term
+ * filter, a collection that is not ready, or an operand SQL cannot compare exactly.
  */
-import type { ContentEntry, FieldCondition, FieldOrder } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldCondition, FieldOrder, Site } from "@cloudhal/core-contracts";
 import { InvariantError, NotFoundError } from "./errors.ts";
 import {
   compareByField,
@@ -18,6 +23,7 @@ import {
   type ResolvedFields,
   resolveFields,
 } from "./fields/index.ts";
+import { queryListValues } from "./list-values/query.ts";
 import type { SiteGraphStore } from "./store.ts";
 import type { EntryQuery } from "./taxonomy.ts";
 
@@ -108,6 +114,44 @@ export function applyFieldQuery(
     .map((e) => e.entry);
 }
 
+const slicePage = (entries: ContentEntry[], q: FieldEntryListQuery): FieldEntryList => {
+  const start = q.offset ?? 0;
+  const end = q.limit === undefined ? undefined : start + q.limit;
+  return { entries: entries.slice(start, end), total: entries.length };
+};
+
+/** The prefiltered `entries` resolved (originals read as the store holds them) and evaluated. */
+async function evaluate(
+  store: SiteGraphStore,
+  site: Site,
+  entries: readonly ContentEntry[],
+  q: { collection: string; query: ParsedFieldQuery; now: number },
+): Promise<ContentEntry[]> {
+  const byId = await originals(store, entries);
+  const rows = entries.map((entry) => {
+    const group = entry.translation?.group;
+    const original = group && group !== entry.id ? byId.get(group) : undefined;
+    return { entry, resolved: resolveFields(site, entry, original) };
+  });
+  const sort = site.collections?.[q.collection]?.sort ?? "newest";
+  return applyFieldQuery(rows, q.query, { now: q.now, sort });
+}
+
+/**
+ * The in-memory answer: the store's prefilter, then the evaluator over every entry it returns.
+ * The definition `queryContentEntries` answers by, and the pushdown's oracle in tests.
+ */
+export async function scanFieldQuery(
+  store: SiteGraphStore,
+  site: Site,
+  query: ParsedFieldQuery,
+  q: FieldEntryListQuery & { collection: string },
+): Promise<FieldEntryList> {
+  const { where: _w, orderBy: _o, limit: _l, offset: _f, now, ...prefilter } = q;
+  const entries = await store.listContentEntries(site.id, prefilter);
+  return slicePage(await evaluate(store, site, entries, { ...q, query, now }), q);
+}
+
 /**
  * The entries of `q.collection` matching `q.where`, ordered by `q.orderBy` (else the store's
  * order), paged by `limit`/`offset`. Refuses as `invalid_query` (with paths) when the query does
@@ -120,23 +164,19 @@ export async function queryContentEntries(
 ): Promise<FieldEntryList> {
   const bounds = checkBounds(q);
   if (bounds.length > 0) refuse(bounds);
-  const { where, orderBy, limit, offset, now, ...prefilter } = q;
-  let entries = await store.listContentEntries(siteId, prefilter);
-  if (q.collection !== undefined && (where !== undefined || orderBy !== undefined)) {
-    const site = await store.getSite(siteId);
-    if (!site) throw new NotFoundError("site", siteId);
-    const parsed = parseFieldQuery(site, q.collection, { where, orderBy });
-    if (!parsed.ok) return refuse(parsed.issues);
-    const byId = await originals(store, entries);
-    const rows = entries.map((entry) => {
-      const group = entry.translation?.group;
-      const original = group && group !== entry.id ? byId.get(group) : undefined;
-      return { entry, resolved: resolveFields(site, entry, original) };
-    });
-    const sort = site.collections?.[q.collection]?.sort ?? "newest";
-    entries = applyFieldQuery(rows, parsed.query, { now, sort });
-  }
-  const start = offset ?? 0;
-  const page = limit === undefined ? entries.slice(start) : entries.slice(start, start + limit);
-  return { entries: page, total: entries.length };
+  const { where, orderBy, limit: _l, offset: _f, now, ...prefilter } = q;
+  const { collection } = q;
+  if (collection === undefined || (where === undefined && orderBy === undefined))
+    return slicePage(await store.listContentEntries(siteId, prefilter), q);
+  // A term filter is compiled by the store's scan, and refused there first, as before.
+  const listed =
+    prefilter.filter === undefined ? undefined : await store.listContentEntries(siteId, prefilter);
+  const site = await store.getSite(siteId);
+  if (!site) throw new NotFoundError("site", siteId);
+  const parsed = parseFieldQuery(site, collection, { where, orderBy });
+  if (!parsed.ok) return refuse(parsed.issues);
+  const query = parsed.query;
+  if (listed) return slicePage(await evaluate(store, site, listed, { collection, query, now }), q);
+  const pushed = await queryListValues(store.sql, site, { ...q, collection, query });
+  return pushed ?? scanFieldQuery(store, site, query, { ...q, collection });
 }

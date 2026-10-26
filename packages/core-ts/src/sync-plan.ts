@@ -15,6 +15,7 @@ import type { GateSupport } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { canonicalJson, sha256Hex } from "./hash.ts";
 import { checkHosts, hostStatements, hostsOf, type SiteHost } from "./hosts.ts";
+import { importListStatements } from "./list-values/site-plan.ts";
 import { refsRebuild } from "./media/refs-rebuild.ts";
 import {
   type BundleMedia,
@@ -281,7 +282,11 @@ function nodeBatch(
   bundle: SiteBundle,
   siteRow: NodeRow,
   changes: NodeChanges,
-  extra: { project: SqlStatement | undefined; hosts: readonly SiteHost[] },
+  extra: {
+    project: SqlStatement | undefined;
+    hosts: readonly SiteHost[];
+    lists: readonly SqlStatement[];
+  },
 ): Pick<ImportWrites, "batch" | "inserted" | "deleted"> {
   const { siteId } = bundle;
   const batch: SqlStatement[] = extra.project ? [extra.project] : [];
@@ -297,6 +302,7 @@ function nodeBatch(
       });
       inserted++;
     }
+    batch.push(...extra.lists);
   }
   // The derived reference index follows the node set in the same batch (RFC-0004 §4.4).
   batch.push(...refsRebuild(siteId, changes.rows));
@@ -345,7 +351,9 @@ export async function prepareImport(
   const snapshots = await snapshotsToAdd(to, bundle);
   const project = await projectToAdd(to, bundle);
   const changes = await nodeChanges(to, bundle, mode, options);
-  const nodes = nodeBatch(bundle, siteRow, changes, { project, hosts });
+  // RFC-0042 §4: the list values start over with the node set (rebuilt after the batch).
+  const lists = await importListStatements(siteId, changes.rows, new Date().toISOString());
+  const nodes = nodeBatch(bundle, siteRow, changes, { project, hosts, lists });
   const ledger = await planLedger(to, bundle, {
     refs,
     written: new Map(blobs.map((b) => [b.hash, b.body])),

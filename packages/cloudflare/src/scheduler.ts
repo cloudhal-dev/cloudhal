@@ -63,6 +63,7 @@ import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { flushCommentPurges, runCommentsHourly } from "./comments.ts";
+import { listValuesJob } from "./list-values-job.ts";
 import { PURGE_MAX_REQUESTS, PURGE_TAGS_PER_REQUEST } from "./purge.ts";
 import { attachedSite, bindingFor, routedSite } from "./site-routes.ts";
 
@@ -270,6 +271,7 @@ export function adminSystemJobs(
           log(`schedules retention: ${r.runs} run(s), ${r.releases} release(s) deleted`);
       },
     },
+    listValuesJob(sql, { paid: env.CLOUDHAL_TICK_BUDGET === "paid", log }),
   ];
   if (o.commentsOn)
     jobs.push({

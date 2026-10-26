@@ -47,6 +47,13 @@ export * from "./hash.ts";
 export type { NodeHold } from "./holds.ts";
 export * from "./hosts.ts";
 export * from "./ids.ts";
+export {
+  type ListValuesBudget,
+  type RebuildListValuesOptions,
+  type RebuildListValuesResult,
+  type RebuiltCollection,
+  rebuildListValues,
+} from "./list-values/backfill.ts";
 export * from "./locale-paths.ts";
 export {
   importMediaUrls,

@@ -1,12 +1,18 @@
 /**
  * RFC-0042 §4 "API and MCP" for `list_entries`: `where` and `orderBy` over a collection's list
- * fields, run by core-ts's shared evaluator (`queryContentEntries`), and `limit`/`cursor` paging.
- * Without `orderBy` the list keeps its order (last updated first); without `limit` it is unpaged,
+ * fields, run by core-ts's shared evaluator (`queryContentEntries`, in SQL while the collection's
+ * list values are ready), and `limit`/`cursor` paging: with `orderBy` the store pages, without it
+ * the list keeps its order (last updated first) and is paged here; without `limit` it is unpaged,
  * as before. Problems are refused as `invalid_query` with their paths (`where/0/value`).
  */
 import type { ContentEntry, FieldCondition, FieldOrder } from "@cloudhal/core-contracts";
 import { SiteSchema } from "@cloudhal/core-contracts";
-import { type EntryQuery, InvariantError, queryContentEntries } from "@cloudhal/core-ts";
+import {
+  ENTRY_PAGE_LIMIT,
+  type EntryQuery,
+  InvariantError,
+  queryContentEntries,
+} from "@cloudhal/core-ts";
 import type { JsonSchema, ToolContext } from "./common.ts";
 
 const DEFS = SiteSchema.$defs as Record<string, JsonSchema>;
@@ -83,19 +89,28 @@ export async function listEntries(
   if (base.collection === undefined && (where !== undefined || orderBy !== undefined))
     refuse("collection", "where and orderBy need the collection whose list fields they use");
   const offset = a.cursor === undefined ? 0 : decodeCursor(a.cursor as string);
-  const { entries } = await queryContentEntries(ctx.store, siteId, {
+  // Ordered by a field, the store pages (in SQL once the collection's list values are ready);
+  // otherwise the list keeps its last-updated order, sorted here.
+  const paged =
+    orderBy !== undefined &&
+    Number.isInteger(limit) &&
+    (limit as number) >= 1 &&
+    (limit as number) <= ENTRY_PAGE_LIMIT;
+  const result = await queryContentEntries(ctx.store, siteId, {
     ...base,
     ...(where ? { where } : {}),
     ...(orderBy ? { orderBy } : {}),
+    ...(paged ? { limit, offset } : {}),
     now: (ctx.now?.() ?? new Date()).getTime(),
   });
-  const ordered = orderBy ? entries : entries.sort(byUpdated);
+  const ordered = orderBy ? result.entries : result.entries.sort(byUpdated);
   if (limit === undefined) return { entries: ordered };
-  const page = ordered.slice(offset, offset + limit);
+  const page = paged ? ordered : ordered.slice(offset, offset + limit);
+  const total = paged ? result.total : ordered.length;
   const next = offset + page.length;
   return {
     entries: page,
-    total: ordered.length,
-    ...(next < ordered.length ? { nextCursor: encodeCursor(next) } : {}),
+    total,
+    ...(next < total ? { nextCursor: encodeCursor(next) } : {}),
   };
 }

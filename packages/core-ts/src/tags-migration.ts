@@ -13,6 +13,7 @@ import {
 } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { NotFoundError } from "./errors.ts";
+import { sameJson } from "./fields/types.ts";
 import { ID_PREFIX } from "./ids.ts";
 import { humanizeSlug } from "./names.ts";
 import { type Cond, casUpdateStatement, OpBatch, runOpBatch } from "./node-sql.ts";
@@ -65,6 +66,16 @@ export interface TagsRevertResult {
   readonly termsDeleted: number;
   readonly taxonomiesDeleted: string[];
   readonly snapshotId: string;
+}
+
+/**
+ * The entry without what the migration writes (`tags`, the tag terms) and the stamps: a body the
+ * migration alone changed has the same rest before and after it.
+ */
+function untagged(entry: ContentEntry) {
+  const { tags: _t, terms, rev: _r, updatedAt: _u, ...rest } = entry;
+  const { tag: _g, ...others } = terms ?? {};
+  return { ...rest, terms: others };
 }
 
 async function migrationSnapshots(store: SiteGraphStore, siteId: string): Promise<Snapshot[]> {
@@ -336,7 +347,9 @@ export async function revertTagsToTerms(
       `migration ${migrationId} did not finish; run it again to complete it, then revert`,
     );
 
-  // 1. Entries still exactly as the migration left them get their earlier body back.
+  // 1. Entries still exactly as the migration left them get their earlier body back. One edited
+  // after the before-snapshot but before its batch (or a resumed run) counts as edited, so the
+  // restore never rolls back fields, status or collection (nor the list rows that follow them).
   const current = new Map((await store.currentNodeRefs(siteId)).map((r) => [r.id, r]));
   const beforeRefs = new Map(before.nodes.map((r) => [r.id, r]));
   const edited: string[] = [];
@@ -351,7 +364,10 @@ export async function revertTagsToTerms(
     if (!prev.tags?.length) continue;
     const now = current.get(ref.id);
     if (!now) continue;
-    if (now.hash !== ref.hash) {
+    if (
+      now.hash !== ref.hash ||
+      !sameJson(untagged(prev), untagged(await store.readSnapshotNode<ContentEntry>(ref)))
+    ) {
       edited.push(ref.id);
       continue;
     }

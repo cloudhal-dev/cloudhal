@@ -30,6 +30,7 @@ import {
   readOperation,
   refuseRunning,
   requireSite,
+  settleLists,
   writeSite,
 } from "./state.ts";
 import {
@@ -42,6 +43,7 @@ import {
   META,
   type OperationContext,
   operationContext,
+  operationKeys,
 } from "./types.ts";
 
 /** Passes per call while concurrent edits keep entries skipped. */
@@ -240,6 +242,7 @@ async function proceed(
       decide: decider(site, marked.def, op, (eid, hash) => hashes.get(eid) === hash),
       guard: markerGuard(siteId, op.collection, id),
       done: rewritten,
+      lists: { collection: op.collection, keys: operationKeys(op) },
     });
     rewritten += r.rewritten;
     skipped = r.skipped;
@@ -260,6 +263,7 @@ async function proceed(
     label: labelOf("", op),
     metadata: { [META.kind]: FIELD_MIGRATION, [META.id]: id, [META.phase]: "after" },
   });
+  await settleLists(ctx, siteId, rewritten);
   return result({ before, after }, report, { rewritten, skipped: [], done: true });
 }
 

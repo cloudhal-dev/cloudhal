@@ -6,9 +6,13 @@
  * writes may set or drop one. They still pass the precompiled validator and the definition rules.
  */
 import { assertValid, type Site, type Snapshot } from "@cloudhal/core-contracts";
+import type { SqlStatement } from "@cloudhal/storage";
 import { ConflictError, InvariantError, NotFoundError } from "../errors.ts";
 import { checkFieldDefinitions, refuseFieldIssues } from "../fields/index.ts";
+import { nodeHash } from "../hash.ts";
 import { ID_PREFIX, newId } from "../ids.ts";
+import { settleListValues } from "../list-values/backfill.ts";
+import { planListState } from "../list-values/site-plan.ts";
 import { type Cond, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import type { PageRewrite } from "./references.ts";
 import {
@@ -89,12 +93,20 @@ export async function writeSite(
     assertValid("site", next);
     refuseFieldIssues(checkFieldDefinitions(next));
     const rewrites = (await pages?.(site)) ?? [];
+    // RFC-0042 §4: a marker on a listed field changes its fingerprint (phases A and C both).
+    const lists = (await planListState(site, next)).statements(
+      await nodeHash(next),
+      next.updatedAt,
+    );
     if (rewrites.length > 0) {
-      if (await writeWithPages(ctx, { site, next, guard, rewrites })) return "written";
+      if (await writeWithPages(ctx, { site, next, guard, rewrites, lists })) return "written";
     } else {
       const s = await casUpdateStatement("site", next, site.rev, guard);
-      const r = await ctx.store.sql.run(s.sql, s.params ?? []);
-      if (r.changes === 1) return "written";
+      const sql = ctx.store.sql;
+      const r = lists.length
+        ? (await sql.batch([s, ...lists]))[0]
+        : await sql.run(s.sql, s.params ?? []);
+      if (r?.changes === 1) return "written";
     }
     rev = (await ctx.store.getSite(siteId))?.rev;
     if (rev === site.rev && rewrites.length === 0) return "guarded";
@@ -108,7 +120,13 @@ export async function writeSite(
  */
 async function writeWithPages(
   ctx: OperationContext,
-  write: { site: Site; next: Site; guard: Cond | undefined; rewrites: readonly PageRewrite[] },
+  write: {
+    site: Site;
+    next: Site;
+    guard: Cond | undefined;
+    rewrites: readonly PageRewrite[];
+    lists: readonly SqlStatement[];
+  },
 ): Promise<boolean> {
   const batch = new OpBatch(newId(ID_PREFIX.operation), write.site.id, write.next.updatedAt);
   await batch.update("site", write.site, write.next, write.guard);
@@ -116,6 +134,7 @@ async function writeWithPages(
     assertValid("page", p.next);
     await batch.update("page", p.prev, p.next);
   }
+  batch.append(...write.lists);
   try {
     await runOpBatch(ctx.store.sql, batch);
     return true;
@@ -138,4 +157,15 @@ export function refuseRunning(collection: string, id: string): never {
     `field operation ${id} is still rewriting ${collection}; continue or revert it first`,
     { operationId: id, collection },
   );
+}
+
+/**
+ * RFC-0042 §4: once an operation is done, the list values it reset are rebuilt with what is left
+ * of its budget (`used` entries so far); the admin job finishes larger collections.
+ */
+export async function settleLists(ctx: OperationContext, siteId: string, used: number) {
+  const ms = ctx.budget.ms - (Date.now() - ctx.started);
+  const entries = ctx.budget.entries - used;
+  if (entries <= 0 || ms <= 0) return;
+  await settleListValues(ctx.store.sql, siteId, { budget: { entries, ms } });
 }
