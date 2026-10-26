@@ -25,6 +25,7 @@ import {
   flushCommentPurges,
   runCommentsHourly,
 } from "../src/comments.ts";
+import { everyFiveMinutes } from "../src/list-values-job.ts";
 import { purgeSiteCache } from "../src/purge.ts";
 
 const T0 = new Date("2026-10-12T12:00:00.000Z");
@@ -344,7 +345,9 @@ describe("availability and the Worker", () => {
       true,
     );
     expect(lines.some((l) => /^analytics rollup \(none\)/.test(l))).toBe(true);
-    expect(lines.some((l) => /^schedules tick \(cron\): 2 ran/.test(l))).toBe(true);
+    // `lists.backfill` (every five minutes, #110) is due too unless the first tick came after :15.
+    const ran = everyFiveMinutes(new Date(first)).getTime() <= Date.parse(at17) ? 3 : 2;
+    expect(lines.some((l) => l.startsWith(`schedules tick (cron): ${ran} ran`))).toBe(true);
     // The watermark moved to the next hour: the next minute does not run it again.
     const n = lines.length;
     await tick(Date.parse(at17) + 64_100);
