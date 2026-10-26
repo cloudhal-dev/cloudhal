@@ -27,6 +27,7 @@ import { migration0025TranslationGroups } from "./0025_translation_groups.ts";
 import { migration0026SearchCjk } from "./0026_search_cjk.ts";
 import { migration0027MultiSite } from "./0027_multi_site.ts";
 import { migration0028SiteMembers } from "./0028_site_members.ts";
+import { migration0029EntryListValues } from "./0029_entry_list_values.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -58,4 +59,5 @@ export const migrations: readonly Migration[] = [
   migration0026SearchCjk,
   migration0027MultiSite,
   migration0028SiteMembers,
+  migration0029EntryListValues,
 ];
