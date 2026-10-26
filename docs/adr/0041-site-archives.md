@@ -2,6 +2,7 @@
 - Status: Accepted
 - Date: 2026-10-22 (decided by Halil)
 - Amendment (2026-10-25, RFC-0039 rollout step 1): deterministic bytes hold for the same Node/zlib build; the tar stream and the manifest's SHA-256s on every platform. See rule 6.
+- Amendment (2026-10-26, RFC-0039 rollout step 4): `--replace` takes the archive's published snapshot (a deployment keeps its own on `push`) and is undone with `cloudhal import --revert <snapshot-id>`, which restores the `before import` snapshot. See decision 4.
 - Related: RFC-0039, RFC-0004, RFC-0010, ADR-0002, #47
 - Sources: [Sanity datasets](https://www.sanity.io/docs/cli-reference/dataset) · [Strapi data management](https://docs.strapi.io/cms/data-management/export) · [Contentful CLI export](https://github.com/contentful/contentful-cli/tree/main/docs/space/export) · [Ghost migration](https://docs.ghost.org/migration/ghost) · [WordPress export](https://wordpress.org/documentation/article/tools-export-screen/)
 
@@ -14,7 +15,7 @@ A site's content can only leave a project through a deployment (`push`, `pull`),
 3. **Ids are kept.** An imported site is the same site.
 4. **Import modes:**
    - bootstrap (default): adds what is missing and refuses differing nodes;
-   - `--replace`: first saves the current graph as a `before import` snapshot, so the import can be undone;
+   - `--replace`: first saves the current graph as a `before import` snapshot, so the import can be undone (amended: with `cloudhal import --revert <snapshot-id>`, a site id switch by writing the old `siteId` back; the published snapshot becomes the archive's);
    - `--dry-run`: shows the difference and writes nothing.
 
    Never erase-then-import.

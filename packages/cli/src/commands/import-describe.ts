@@ -1,7 +1,8 @@
 /**
  * What `cloudhal import` prints (RFC-0039 §2): the manifest, the difference a `--dry-run` finds
- * (nodes added, changed and removed by kind and title; snapshots; media to copy) and the summary of
- * an import. Pure. A title is read from its row's body, with the row id as the fallback, and goes
+ * (nodes added, changed and removed by kind and title; snapshots; media to copy), the summary of
+ * an import, and the same for `--revert` (`--replace`'s own lines: `import-describe-replace.ts`).
+ * Pure. A title is read from its row's body, with the row id as the fallback, and goes
  * through `displayText`; no body is ever printed.
  */
 import type { NodeRef } from "@cloudhal/core-contracts";
@@ -10,6 +11,8 @@ import { isRecord } from "./archive-bundle.ts";
 import { formatBytes } from "./export.ts";
 import type { ImportArchiveResult } from "./import.ts";
 import { displayText } from "./import-checks.ts";
+import { replaceLines } from "./import-describe-replace.ts";
+import type { RevertImportResult } from "./import-revert.ts";
 
 type Kind = NodeRef["kind"];
 
@@ -153,7 +156,15 @@ function capped(lines: string[]): string[] {
   return [...lines.slice(0, MAX_LINES), `  … and ${lines.length - MAX_LINES} more`];
 }
 
-function nodeLines(plan: ImportPlan, locale: string | undefined): string[] {
+/**
+ * The plan's nodes by kind and title; `source` names where the incoming revs are (a revert's are
+ * its own: they move forward).
+ */
+export function nodeLines(
+  plan: ImportPlan,
+  locale: string | undefined,
+  source = "in the archive",
+): string[] {
   const { added, changed, removed } = plan.nodes;
   if (plan.unchanged) return ["nodes: unchanged"];
   const line = (sign: string, r: NodeRow) => `  ${sign} ${label(r.kind)} ${nodeTitle(r, locale)}`;
@@ -162,7 +173,7 @@ function nodeLines(plan: ImportPlan, locale: string | undefined): string[] {
     ...capped(sorted(added, (r) => r).map((r) => line("+", r))),
     ...capped(
       sorted(changed, (c) => c.to).map(
-        (c) => `${line("~", c.to)}, rev ${c.from.rev} here, ${c.to.rev} in the archive`,
+        (c) => `${line("~", c.to)}, rev ${c.from.rev} here, ${c.to.rev} ${source}`,
       ),
     ),
     ...capped(sorted(removed, (r) => r).map((r) => line("-", r))),
@@ -191,7 +202,7 @@ function planMediaLine(result: ImportArchiveResult, plan: ImportPlan): string {
 
 function planLines(result: ImportArchiveResult, plan: ImportPlan): string[] {
   const lines = [
-    `dry run: bootstrap import into site ${result.site.id}, ${plan.fresh ? "which is new to this project" : "which this project already holds"}`,
+    `dry run: ${plan.mode} import into site ${result.site.id}, ${plan.fresh ? "which is new to this project" : "which this project already holds"}`,
   ];
   if (plan.projectAdded)
     lines.push(`project: ${plain(result.site.projectId ?? "its project")} is new to this project`);
@@ -236,8 +247,12 @@ function importedLines(
 ): string[] {
   const file = displayText(result.file);
   const { id, slug } = result.site;
-  // Recording a takedown or deleting a local copy of taken-down content is a change too.
+  const replaced = result.replace;
+  // Recording a takedown or deleting a local copy of taken-down content is a change too, and so
+  // are a snapshot a stopped replace still owed and a cloudhal.json switch.
   const nothing =
+    replaced?.snapshot === undefined &&
+    replaced?.switch?.written !== true &&
     done.nodes.unchanged &&
     done.snapshots === 0 &&
     done.blobs === 0 &&
@@ -249,9 +264,10 @@ function importedLines(
     return [
       `nothing to import: this project already holds ${file} (site ${id}${slug ? `, ${plain(slug)}` : ""})`,
     ];
+  const overwrote = result.mode === "replace" && done.nodes.deleted > 0;
   const lines = [
-    `imported ${file}: site ${id}${slug ? ` (${plain(slug)})` : ""} is in this project`,
-    `nodes: ${done.nodes.unchanged ? "unchanged" : `${done.nodes.inserted} written`}; snapshots: ${done.snapshots} added; node bodies: ${done.blobs} added`,
+    `imported ${file}: site ${id}${slug ? ` (${plain(slug)})` : ""} is in this project${overwrote ? ", its nodes replaced by the archive's" : ""}`,
+    `nodes: ${done.nodes.unchanged ? "unchanged" : `${done.nodes.inserted} written${overwrote ? ` (${done.nodes.deleted} replaced)` : ""}`}; snapshots: ${done.snapshots} added; node bodies: ${done.blobs} added`,
   ];
   const media = [
     ...(result.mediaNeeded.files > 0
@@ -266,10 +282,12 @@ function importedLines(
       : []),
   ];
   if (media.length > 0) lines.push(`media: ${media.join("; ")}`);
-  if (!done.searchRefreshed)
-    lines.push("search index not refreshed; run `cloudhal search reindex`");
+  lines.push(...replaceLines(replaced, { dryRun: false, plan, from: "the archive" }));
+  if (!done.searchRefreshed) lines.push(SEARCH_BEHIND);
   return lines;
 }
+
+const SEARCH_BEHIND = "search index not refreshed; run `cloudhal search reindex`";
 
 /** The lines `cloudhal import` prints to stdout: the dry run's report, or the import's summary. */
 export function describeImport(result: ImportArchiveResult): string[] {
@@ -278,6 +296,33 @@ export function describeImport(result: ImportArchiveResult): string[] {
   return [
     ...manifestLines(result),
     ...(plan ? planLines(result, plan) : []),
+    ...replaceLines(result.replace, { dryRun: true, plan, from: "the archive" }),
+    ...result.refusals.map((r) => `would refuse: ${r}`),
+    "nothing written (dry run)",
+  ];
+}
+
+/** The lines `cloudhal import --revert` prints: the dry run's report, or the revert's summary. */
+export function describeRevert(result: RevertImportResult): string[] {
+  const { snapshot: s, plan, outcome, reverted } = result;
+  const what = `snapshot ${s.id} "${displayText(s.label ?? "", 200)}" (site ${s.siteId}, ${s.createdAt})`;
+  const options = { plan, from: "the snapshot" };
+  if (reverted) {
+    if (reverted.nodes.unchanged && outcome?.snapshot === undefined)
+      return [`nothing to revert: the site already holds the nodes of ${what}`];
+    return [
+      `reverted to ${what}`,
+      `nodes: ${reverted.nodes.unchanged ? "unchanged" : `${reverted.nodes.inserted} written (${reverted.nodes.deleted} replaced)`}`,
+      ...replaceLines(outcome, { ...options, dryRun: false }),
+      ...(reverted.searchRefreshed ? [] : [SEARCH_BEHIND]),
+    ];
+  }
+  return [
+    `revert to ${what}`,
+    ...(plan
+      ? [`dry run: replace the site's nodes`, ...nodeLines(plan, undefined, "after the revert")]
+      : []),
+    ...replaceLines(outcome, { ...options, dryRun: true }),
     ...result.refusals.map((r) => `would refuse: ${r}`),
     "nothing written (dry run)",
   ];

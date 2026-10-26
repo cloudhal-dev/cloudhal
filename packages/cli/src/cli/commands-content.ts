@@ -7,7 +7,8 @@ import {
 import { describeExport, exportArchive } from "../commands/export.ts";
 import { fieldsCommand } from "../commands/fields.ts";
 import { ImportInterruptedError, importArchive } from "../commands/import.ts";
-import { describeImport } from "../commands/import-describe.ts";
+import { describeImport, describeRevert } from "../commands/import-describe.ts";
+import { revertImport } from "../commands/import-revert.ts";
 import { describeMediaImport, mediaGc, mediaImportUrls, mediaVerify } from "../commands/media.ts";
 import { describePlaceholders, mediaPlaceholders } from "../commands/media-placeholders.ts";
 import { describeMigration, migrateTags } from "../commands/migrate.ts";
@@ -171,25 +172,37 @@ const exportCommand: CliCommand = async (rest, values, { projectDir }) => {
   }
 };
 
+const IMPORT_USAGE =
+  "usage: cloudhal import <file> [--replace] [--dry-run] | --revert <snapshot-id> [--dry-run]";
+
+/** `cloudhal import --revert <snapshot-id> [--dry-run]`; a dry run that would be refused exits 1. */
+const revertCommand: CliCommand = async (rest, values, { projectDir }) => {
+  if (rest.length > 0 || values.replace || !values.revert) throw new Error(IMPORT_USAGE);
+  const result = await revertImport({
+    projectDir,
+    snapshotId: values.revert,
+    dryRun: values["dry-run"] === true,
+  });
+  for (const line of describeRevert(result)) console.log(line);
+  return result.refusals.length > 0 ? 1 : 0;
+};
+
 /**
- * `cloudhal import <file> [--dry-run]` (bootstrap only; `--replace` is RFC-0039 step 4). Ctrl-C or
+ * `cloudhal import <file> [--replace] [--dry-run]` (RFC-0039 §2), or `--revert <id>`. Ctrl-C or
  * SIGTERM before the graph is written stops it (exit 130/143); a dry run that would be refused
  * exits 1.
  */
-const importCommand: CliCommand = async (rest, values, { projectDir }) => {
+const importCommand: CliCommand = async (rest, values, context) => {
+  if (values.revert !== undefined) return revertCommand(rest, values, context);
   const [file] = rest;
-  if (file === undefined || rest.length !== 1)
-    throw new Error("usage: cloudhal import <file> [--dry-run]");
-  if (values.replace)
-    throw new Error(
-      "cloudhal import --replace is not available yet; this version imports in bootstrap mode only",
-    );
+  if (file === undefined || rest.length !== 1) throw new Error(IMPORT_USAGE);
   const interrupt = abortOnSignal();
   try {
     const result = await importArchive({
-      projectDir,
+      projectDir: context.projectDir,
       file,
       dryRun: values["dry-run"] === true,
+      replace: values.replace === true,
       signal: interrupt.signal,
       log: (l) => process.stderr.write(`${l}\n`),
     });

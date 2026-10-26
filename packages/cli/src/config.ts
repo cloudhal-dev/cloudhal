@@ -298,6 +298,11 @@ export function analyticsDefaultsOf(cfg: Pick<ProjectConfig, "analytics">): {
 
 const SITE_ID = /^site_[A-Za-z0-9]{6,32}$/;
 
+/** A site id `sites` accepts (`site_` and 6 to 32 letters or digits). */
+export function isSiteId(id: string): boolean {
+  return SITE_ID.test(id);
+}
+
 /** `sites`: valid ids, each once, the project's site first; undefined unless it adds a site. */
 export function parseSites(siteId: string, input: unknown): string[] | undefined {
   if (input === undefined) return undefined;

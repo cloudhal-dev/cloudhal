@@ -10,10 +10,13 @@ import type { NodeRow } from "./sync-bundle.ts";
 
 const VOLATILE = new Set(["rev", "updatedAt"]);
 
-/** The body without the fields a write always changes, for "same content" comparisons. */
-function stable(site: Site): string {
+/**
+ * A node body without the fields a write always changes, for "same content" comparisons (also
+ * `restoreBundle`'s).
+ */
+export function stableJson(node: object): string {
   return canonicalJson(
-    Object.fromEntries(Object.entries(site).filter(([key]) => !VOLATILE.has(key))),
+    Object.fromEntries(Object.entries(node).filter(([key]) => !VOLATILE.has(key))),
   );
 }
 
@@ -38,7 +41,7 @@ export async function keepTargetPublished(
     return [...rows];
   const merged: Site = { ...srcSite, publishedSnapshotId: dstSite.publishedSnapshotId };
   let row: NodeRow = dst;
-  if (stable(merged) !== stable(dstSite)) {
+  if (stableJson(merged) !== stableJson(dstSite)) {
     const next: Site = { ...merged, rev: Math.max(src.rev, dst.rev) + 1 };
     row = { ...src, rev: next.rev, hash: await nodeHash(next), body: canonicalJson(next) };
   }

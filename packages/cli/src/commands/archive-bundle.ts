@@ -187,21 +187,29 @@ export function contentCreatedAt(bundle: SiteBundle): string {
  * RFC-0041 §6: a field operation whose marker (`migration`) is still on a field of the site node
  * needs its `before` snapshot (the marker's id) to be continued or reverted, and blocks any other
  * operation on its collection until then. Dropping that snapshot would leave the collection stuck
- * after an import, so `--latest-only` is refused until the operation is finished or reverted.
+ * after an import, so `--latest-only` is refused until the operation is finished or reverted;
+ * `import --replace` and `--revert`, which would drop the marker itself, are refused too. This is
+ * the first such operation of a site node's body, if any.
  */
-function refuseUnfinishedOperations(bundle: SiteBundle): void {
-  const row = bundle.nodes.find((n) => n.kind === "site" && n.id === bundle.siteId);
-  const site: unknown = row ? JSON.parse(row.body) : undefined;
+export function unfinishedOperation(
+  site: unknown,
+): { readonly collection: string; readonly id: string } | undefined {
   const collections = isRecord(site) && isRecord(site.collections) ? site.collections : {};
   for (const [collection, c] of Object.entries(collections)) {
     const fields: unknown[] = isRecord(c) && Array.isArray(c.fields) ? c.fields : [];
     const migration = fields.map((f) => (isRecord(f) ? f.migration : undefined)).find(isRecord);
-    if (!migration) continue;
-    const id = String(migration.id);
-    throw new Error(
-      `field operation ${id} on ${collection} has not finished, and --latest-only would drop the snapshot it needs; finish or revert it first (\`cloudhal fields continue|revert ${collection} ${id}\`), or export the full history`,
-    );
+    if (migration) return { collection, id: String(migration.id) };
   }
+  return undefined;
+}
+
+function refuseUnfinishedOperations(bundle: SiteBundle): void {
+  const row = bundle.nodes.find((n) => n.kind === "site" && n.id === bundle.siteId);
+  const op = unfinishedOperation(row ? JSON.parse(row.body) : undefined);
+  if (op)
+    throw new Error(
+      `field operation ${op.id} on ${op.collection} has not finished, and --latest-only would drop the snapshot it needs; finish or revert it first (\`cloudhal fields continue|revert ${op.collection} ${op.id}\`), or export the full history`,
+    );
 }
 
 /**

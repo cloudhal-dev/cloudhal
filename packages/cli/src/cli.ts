@@ -83,6 +83,7 @@ const ONLY_FOR: Readonly<
   site: { commands: ["export"], note: "; every other command acts on cloudhal.json's siteId" },
   "no-media": { commands: ["export"] },
   "latest-only": { commands: ["export"] },
+  "cancel-schedules": { commands: ["push"] },
 };
 
 function refuseForeignFlags(command: string, values: Record<string, unknown>): void {
