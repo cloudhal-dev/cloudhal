@@ -275,32 +275,36 @@ export function listValuesQuerySuite(label: string, factory: ListValuesFactory):
     }
 
     for (const seed of SEEDS)
-      it(`seed ${seed}: random data and queries`, async () => {
-        const g = mulberry32(seed);
-        const zone = pick(g, ["UTC", "Europe/Istanbul", "Pacific/Kiritimati"]);
-        const proto: World = { seed, site: undefined as never, slugs: 0, image: "", now: NOW };
-        const site = await setup(randomCollections(g, proto, {}), zone);
-        const { asset: image } = await store.ingestAsset({
-          siteId: site.id,
-          bytes: makeJpeg({ width: 8, height: 8 }),
-          filename: "p.jpg",
-          uploadedBy: person,
-          source: { kind: "upload" },
-        });
-        const world: World = { ...proto, site, image: image.id };
-        await populate(world, g);
-        let matched = 0;
-        for (let round = 0; round < ROUNDS; round++) {
-          for (let i = 0; i < MUTATIONS; i++) await mutate(world, g).catch(() => undefined);
-          if (round > 0) await reshape(world, g);
-          await expectReady(site.id);
-          world.site = await fresh(site.id);
-          const entries = await store.listContentEntries(site.id);
-          for (let i = 0; i < QUERIES; i++)
-            matched += await check(world, randomQuery(g, world, entries));
-        }
-        expect(matched).toBeGreaterThan(0);
-      }, SEED_TIMEOUT);
+      it(
+        `seed ${seed}: random data and queries`,
+        async () => {
+          const g = mulberry32(seed);
+          const zone = pick(g, ["UTC", "Europe/Istanbul", "Pacific/Kiritimati"]);
+          const proto: World = { seed, site: undefined as never, slugs: 0, image: "", now: NOW };
+          const site = await setup(randomCollections(g, proto, {}), zone);
+          const { asset: image } = await store.ingestAsset({
+            siteId: site.id,
+            bytes: makeJpeg({ width: 8, height: 8 }),
+            filename: "p.jpg",
+            uploadedBy: person,
+            source: { kind: "upload" },
+          });
+          const world: World = { ...proto, site, image: image.id };
+          await populate(world, g);
+          let matched = 0;
+          for (let round = 0; round < ROUNDS; round++) {
+            for (let i = 0; i < MUTATIONS; i++) await mutate(world, g).catch(() => undefined);
+            if (round > 0) await reshape(world, g);
+            await expectReady(site.id);
+            world.site = await fresh(site.id);
+            const entries = await store.listContentEntries(site.id);
+            for (let i = 0; i < QUERIES; i++)
+              matched += await check(world, randomQuery(g, world, entries));
+          }
+          expect(matched).toBeGreaterThan(0);
+        },
+        SEED_TIMEOUT,
+      );
 
     it("falls back while a collection is not ready, and when a read races a write", async () => {
       const fields: [FieldDefinition, ...FieldDefinition[]] = [
