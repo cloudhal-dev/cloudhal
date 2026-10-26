@@ -1,8 +1,9 @@
 /**
  * What a CI release publishes (ADR-0013; the fixed changesets group): the one version all
  * publishable packages share, which of them npm does not have yet, and the release notes for the
- * single `v<version>` tag and GitHub Release. Pure functions over package files, used by
- * `scripts/publish-ci.ts` and its tests.
+ * single `v<version>` tag and GitHub Release. Functions over package files and the npm registry,
+ * used by `scripts/publish-ci.ts`, `scripts/template-sync.ts` and their tests. Node built-ins only:
+ * the release workflow runs them without a pnpm install.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -32,6 +33,12 @@ export function sharedVersion(pkgs: readonly Pkg[]): string {
     throw new Error(`publishable packages must share one version (fixed group): ${list}`);
   }
   return [...versions][0] as string;
+}
+
+/** Whether the npm registry serves `name@version`. */
+export async function onNpm(name: string, version: string): Promise<boolean> {
+  const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/${version}`);
+  return res.ok;
 }
 
 /** The packages whose current version npm does not have, in dependency (publish) order. */

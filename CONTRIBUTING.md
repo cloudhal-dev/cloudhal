@@ -38,6 +38,7 @@ Commit the regenerated files; CI fails on drift. Add a valid and an invalid fixt
 - **Conventional commits**: `feat(contracts): add Redirect node`, `fix(cli): …`, `docs: …`, `chore: …`.
 - **DCO sign-off**: every commit needs `Signed-off-by:` — use `git commit -s`. This certifies the [Developer Certificate of Origin](https://developercertificate.org/); there is no CLA.
 - Add a changeset (`pnpm changeset`) when a published package changes behaviour.
+- A PR that changes what the renderer gives themes freezes the last released starter in the same PR: copy it under `packages/cli/test/fixtures/theme-v<last release>/` and add that version to `FROZEN` in `packages/cli/test/old-theme-compat.test.ts` (see `theme-v0.5.0/README.md` there), so the release that ships the change is already tested against the theme existing sites have.
 - Keep modules small and single-purpose: [`docs/engineering/code-structure.md`](docs/engineering/code-structure.md) sets file/function limits that `pnpm size:check` enforces with a shrink-only baseline.
 - CI must be green: lint, size check, typecheck, tests (TS + Rust), contract drift.
 
@@ -49,10 +50,14 @@ All publishable packages (`@cloudhal/*` and `create-cloudhal`) share one version
 2. **Release PR.** On each push to `main`, the Changesets action opens or updates `chore(release): version packages` with the version bump and changelogs. GitHub does not run CI on PRs opened by Actions; the publish job runs the full checks instead. Merging it is the decision to release.
 3. **Approval.** The merge starts the `publish` job, which waits for the `npm-publish` environment's approval (the maintainer, with 2FA). Approve it in the run's page on GitHub.
 4. **Publish.** `scripts/publish-ci.ts` checks the build, packs every package and installs the tarballs from scratch with npm (`scripts/smoke-pack.ts`), publishes exactly those tarballs with npm trusted publishing (OIDC, with provenance), waits until npm serves all of them, then creates the `vX.Y.Z` tag and the GitHub Release from the changelogs.
+5. **After the release.** Bring the rest along:
+   - **cloudhal-template** (the Deploy to Cloudflare button): the workflow's `template` job (`.github/workflows/template-sync.yml`) opens `chore: Cloudhal X.Y.Z and the X.Y.Z starter theme` from `cloudhal/vX.Y.Z`, with `src/`, `public/`, `astro.config.mjs` and `tsconfig.json` from the published starter, `@cloudhal/*` at `^X.Y.Z` and a lockfile that installs exactly `X.Y.Z`. Merge it once its `cloudhal/template-check` status is green: the same run installs a copy of the synced template with `npm ci` and runs `cloudhal deploy --dry-run` with `WORKERS_CI=1`. To sync again, run Actions › Template sync › Run workflow. Without the `TEMPLATE_SYNC_APP_CLIENT_ID` variable and the `TEMPLATE_SYNC_APP_PRIVATE_KEY` secret (a GitHub App installed on cloudhal-template only, with Contents, Pull requests and Commit statuses write) the job only logs a notice; Dependabot's `@cloudhal/*` PR on the template is the fallback, and it brings dependencies only, no theme.
+   - **cloudhal.com**: Dependabot opens the `@cloudhal/*` PR the next morning (06:00 Europe/Istanbul). A patch release merges itself after its check; a minor bump waits for a person.
+   - **try.cloudhal.com** (`cloudhal-dev/try`): by hand. Bump its exact `@cloudhal/*` pins, then `pnpm install` and `pnpm run deploy`.
 
-**If something fails:** re-run the workflow (Actions › Release › Run workflow). The script skips packages npm already has and an existing tag or release, so a re-run finishes a half-done release. npm's trusted-publisher entry for each package names `release.yml` and the `npm-publish` environment: renaming either breaks publishing.
+**If something fails:** use **Re-run failed jobs** on the failed run. The script skips packages npm already has and an existing tag or release, so it finishes a half-done release. A new run (Actions › Release › Run workflow) does not: once npm has every package, `plan` skips `publish`, so a missing tag or GitHub Release stays missing. To redo only the template PR, run Actions › Template sync › Run workflow. npm's trusted-publisher entry for each package names `release.yml` and the `npm-publish` environment: renaming either breaks publishing.
 
-**Turning it off:** the repository variable `RELEASE_ENABLED` gates the workflow. Without it, release by hand: `pnpm changeset version` in a PR, merge, then `pnpm release` from an up-to-date `main` and push one `vX.Y.Z` tag.
+**Turning it off:** the repository variable `RELEASE_ENABLED` gates the workflow. Without it, release by hand: `pnpm changeset version` in a PR, merge, then `pnpm release` from an up-to-date `main` and push one `vX.Y.Z` tag. Nothing then opens the cloudhal-template PR: run Actions › Template sync › Run workflow with `X.Y.Z` (it needs the GitHub App, not `RELEASE_ENABLED`), and bring cloudhal.com and try.cloudhal.com along as in step 5.
 
 ## Where to start
 

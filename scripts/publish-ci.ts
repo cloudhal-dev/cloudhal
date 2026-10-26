@@ -14,16 +14,11 @@ import { appendFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync }
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { readPackages, releaseNotes, sharedVersion, unpublished } from "./release-plan.ts";
+import { onNpm, readPackages, releaseNotes, sharedVersion, unpublished } from "./release-plan.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const sh = (cmd: string, args: string[], quiet = false) =>
   execFileSync(cmd, args, { cwd: ROOT, encoding: "utf8", stdio: quiet ? "pipe" : "inherit" });
-
-async function onNpm(name: string, version: string): Promise<boolean> {
-  const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/${version}`);
-  return res.ok;
-}
 
 const pkgs = readPackages(ROOT);
 const version = sharedVersion(pkgs);
