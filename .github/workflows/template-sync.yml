@@ -1,0 +1,216 @@
+name: Template sync
+
+# Keeps cloudhal-dev/cloudhal-template, the repository the Deploy to Cloudflare button copies
+# (docs/guides/deploy-button.md), on the latest release (issue #111). release.yml calls this after
+# a successful npm publish; to re-sync by hand, run Actions › Template sync › Run workflow with a
+# version npm has.
+# scripts/template-sync.ts copies src/, public/, astro.config.mjs and tsconfig.json from the blog
+# starter `@cloudhal/cli@<version>` ships and moves @cloudhal/* to ^<version>; the lockfile is
+# refreshed with every @cloudhal/* at exactly <version>, without running package code; then one PR
+# is opened or updated from cloudhal/v<version>, and older cloudhal/v* PRs the App opened are
+# closed as superseded. Only PRs from cloudhal-template's own branches count: anyone can open a
+# PR from a fork branch of the same name. Before any write token exists, a copy of the synced
+# template is installed (npm ci) and deployed dry (`cloudhal deploy --dry-run`, WORKERS_CI=1); the
+# result is the PR's `cloudhal/template-check` commit status, and a person merges it. The template
+# holds no workflow files of its own: the button copies it with a GitHub App, and whether that
+# copy may contain .github/workflows/ is not documented.
+# Needs the TEMPLATE_SYNC_APP_CLIENT_ID variable and the TEMPLATE_SYNC_APP_PRIVATE_KEY secret, a
+# GitHub App installed on cloudhal-template only (CONTRIBUTING.md "Releasing"). Without them the
+# job logs a notice and does nothing. The App token is created only after the npm steps, and only
+# the last step sees it.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Cloudhal version on npm, x.y.z
+        type: string
+        required: true
+    secrets:
+      TEMPLATE_SYNC_APP_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Cloudhal version on npm, x.y.z
+        type: string
+        required: true
+
+permissions: {}
+
+jobs:
+  sync:
+    name: Open the cloudhal-template PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    # Job level: a workflow-level group could wait on the calling release run forever.
+    concurrency:
+      group: template-sync
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ inputs.version }}
+      TEMPLATE: cloudhal-dev/cloudhal-template
+      BRANCH: cloudhal/v${{ inputs.version }}
+    steps:
+      - id: gate
+        name: Is the GitHub App set up?
+        env:
+          CLIENT_ID: ${{ vars.TEMPLATE_SYNC_APP_CLIENT_ID }}
+          HAS_KEY: ${{ secrets.TEMPLATE_SYNC_APP_PRIVATE_KEY != '' }}
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The version must be x.y.z, not '$VERSION'"
+            exit 1
+          fi
+          if [ -n "$CLIENT_ID" ] && [ "$HAS_KEY" = "true" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=cloudhal-template not synced::Set the TEMPLATE_SYNC_APP_CLIENT_ID variable and the TEMPLATE_SYNC_APP_PRIVATE_KEY secret (CONTRIBUTING.md, Releasing)"
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Public, so the job's read-only token is enough; the App token comes later.
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: cloudhal-dev/cloudhal-template
+          path: template
+          persist-credentials: false
+
+      - if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      - name: Copy the starter, move @cloudhal/* to ^${{ inputs.version }}
+        if: steps.gate.outputs.enabled == 'true'
+        run: node scripts/template-sync.ts --template template --version "$VERSION" --wait 900 --summary "$RUNNER_TEMP/pr-body.md"
+
+      # A plain refresh keeps (or picks) the newest @cloudhal/* in range, not this version: pin it,
+      # then fail unless the lock holds it everywhere. Retries while npm catches up.
+      - name: Refresh package-lock.json at ${{ inputs.version }} (no install scripts)
+        if: steps.gate.outputs.enabled == 'true'
+        run: node scripts/template-sync.ts --template template --version "$VERSION" --lock --wait 300
+
+      - id: diff
+        name: Anything to change?
+        if: steps.gate.outputs.enabled == 'true'
+        working-directory: template
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::notice title=cloudhal-template is current::main already matches $VERSION"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git status --short
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Package code runs here (install scripts, the CLI): in a copy, so nothing it writes reaches
+      # the commit, and before any write token exists. A failure still opens the PR, marked failed.
+      - id: check
+        name: Install and dry-run deploy a copy (WORKERS_CI=1)
+        if: steps.diff.outputs.changed == 'true'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          CHECK="$RUNNER_TEMP/template-check"
+          rsync -a --exclude .git template/ "$CHECK/"
+          cd "$CHECK"
+          npm ci --no-audit --no-fund
+          WORKERS_CI=1 npx --no-install cloudhal deploy --dry-run
+
+      - id: app
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.TEMPLATE_SYNC_APP_CLIENT_ID }}
+          private-key: ${{ secrets.TEMPLATE_SYNC_APP_PRIVATE_KEY }}
+          owner: cloudhal-dev
+          repositories: cloudhal-template
+          permission-contents: write
+          permission-pull-requests: write
+          permission-statuses: write
+
+      - name: Push cloudhal/v${{ inputs.version }} and open or update the PR
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: template
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+          BODY: ${{ runner.temp }}/pr-body.md
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+        run: |
+          set -euo pipefail
+          TITLE="chore: Cloudhal $VERSION and the $VERSION starter theme"
+          gh auth setup-git
+          ID=$(gh api "/users/${SLUG}%5Bbot%5D" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${ID}+${SLUG}[bot]@users.noreply.github.com"
+
+          # The branch is rebuilt from main on every run, so nobody pushes to it by hand.
+          BASE=$(git rev-parse HEAD)
+          git switch -c "$BRANCH"
+          git add -A
+          git commit -q -s -m "$TITLE" \
+            -m "src/, public/, astro.config.mjs and tsconfig.json from the blog starter in @cloudhal/cli@$VERSION; @cloudhal/* at ^$VERSION and a package-lock.json that installs exactly $VERSION." \
+            -m "Opened by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if git fetch -q origin "$BRANCH" 2>/dev/null \
+            && [ "$(git rev-parse 'FETCH_HEAD^{tree}')" = "$(git rev-parse 'HEAD^{tree}')" ] \
+            && [ "$(git rev-parse 'FETCH_HEAD^')" = "$BASE" ]; then
+            echo "origin/$BRANCH already has this change on the same main"
+            SHA=$(git rev-parse FETCH_HEAD)
+          else
+            git push -q --force origin "HEAD:refs/heads/$BRANCH"
+            SHA=$(git rev-parse HEAD)
+          fi
+
+          # REST with owner:branch, not `gh pr list --head`, which matches fork PRs from a branch
+          # of the same name too; the select drops anything else.
+          PR=$(gh api "repos/$TEMPLATE/pulls?state=open&head=${TEMPLATE%%/*}:$BRANCH" \
+            --jq '[.[] | select(.head.repo.full_name == env.TEMPLATE)][0].number // empty')
+          if [ -n "$PR" ]; then
+            # REST, not `gh pr edit`: that one also queries projects over GraphQL.
+            gh api -X PATCH "repos/$TEMPLATE/pulls/$PR" -f title="$TITLE" -F "body=@$BODY" > /dev/null
+            echo "Updated $GITHUB_SERVER_URL/$TEMPLATE/pull/$PR"
+          else
+            URL=$(gh pr create --repo "$TEMPLATE" --base main --head "$BRANCH" --title "$TITLE" --body-file "$BODY")
+            PR=${URL##*/}
+            echo "Opened $URL"
+          fi
+
+          if [ "$CHECK_OUTCOME" = "success" ]; then
+            STATE=success DESC="npm ci and cloudhal deploy --dry-run (WORKERS_CI=1) passed"
+          else
+            STATE=failure DESC="npm ci or cloudhal deploy --dry-run (WORKERS_CI=1) failed"
+          fi
+          gh api -X POST "repos/$TEMPLATE/statuses/$SHA" -f state="$STATE" \
+            -f context=cloudhal/template-check -f description="$DESC" \
+            -f target_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" > /dev/null
+
+          # Older cloudhal/v* PRs this App opened from this repository are superseded; newer ones,
+          # fork PRs and everyone else's are left alone.
+          gh api --paginate "repos/$TEMPLATE/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.repo.full_name == env.TEMPLATE
+                and .user.login == "\(env.SLUG)[bot]"
+                and (.head.ref | startswith("cloudhal/v")))
+              | "\(.number) \(.head.ref)"' |
+            while read -r NUM HEAD; do
+              OLD=${HEAD#cloudhal/v}
+              if [ "$NUM" = "$PR" ]; then continue; fi
+              if [ "$(printf '%s\n%s\n' "$OLD" "$VERSION" | sort -V | tail -n 1)" = "$VERSION" ]; then
+                gh pr close "$NUM" --repo "$TEMPLATE" --delete-branch --comment "Superseded by #$PR (Cloudhal $VERSION)."
+              fi
+            done
+
+      - name: Fail when the dry-run deploy failed
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "::error title=cloudhal-template check failed::npm ci or cloudhal deploy --dry-run failed on the synced template; its PR carries a failing cloudhal/template-check status"
+          exit 1

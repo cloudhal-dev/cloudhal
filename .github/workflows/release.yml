@@ -7,6 +7,8 @@ name: Release
 # 3. `publish`: waits for the `npm-publish` environment's approval (one click, the maintainer's
 #    2FA), then scripts/publish-ci.ts builds, smoke-tests the packed tarballs, publishes them with
 #    npm trusted publishing (OIDC, provenance), and creates one `v<version>` tag and GitHub Release.
+# 4. `template`: after publishing, template-sync.yml opens or updates the cloudhal-template PR
+#    (the Deploy to Cloudflare button's repository; CONTRIBUTING.md "Releasing").
 # npm's trusted-publisher entry for each package names this file and the `npm-publish`
 # environment: renaming either breaks publishing.
 
@@ -96,4 +98,16 @@ jobs:
       - run: node scripts/publish-ci.ts
         env:
           GH_TOKEN: ${{ github.token }}
+
+  template:
+    name: cloudhal-template PR for ${{ needs.plan.outputs.version }}
+    needs: [plan, publish]
+    if: needs.publish.result == 'success'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/template-sync.yml
+    with:
+      version: ${{ needs.plan.outputs.version }}
+    secrets:
+      TEMPLATE_SYNC_APP_PRIVATE_KEY: ${{ secrets.TEMPLATE_SYNC_APP_PRIVATE_KEY }}
   # crates.io publishing is added once cloudhal-schema reaches 0.1 (see docs/adr/0006).
