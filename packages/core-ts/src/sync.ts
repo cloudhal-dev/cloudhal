@@ -11,8 +11,9 @@
  * the first write (`sync-plan.ts`), so a refused bundle leaves the target as it was.
  *
  * The bundle format lives in `sync-bundle.ts`, its checks in `sync-checks.ts`, the plan of an
- * import in `sync-plan.ts` (its media ledger in `sync-ledger.ts`); this module re-exports the
- * public parts.
+ * import in `sync-plan.ts` (its media ledger in `sync-ledger.ts`), and `restoreBundle` (a
+ * snapshot's nodes as a bundle, for `cloudhal import --revert`) in `sync-restore.ts`; this module
+ * re-exports the public parts.
  */
 
 import type { Asset } from "@cloudhal/core-contracts";
@@ -31,9 +32,11 @@ import {
   type StoragePair,
 } from "./sync-bundle.ts";
 import { prepareImport } from "./sync-plan.ts";
+import { blobMedia, siteTakedowns } from "./sync-restore.ts";
 
 export * from "./sync-bundle.ts";
 export { type ImportPlan, type ImportPlanOptions, planImport } from "./sync-plan.ts";
+export { restoreBundle } from "./sync-restore.ts";
 
 /** Splits statements into batches that respect D1's per-batch limit. */
 async function runBatches(sql: SqlDriver, statements: SqlStatement[], size = 500): Promise<void> {
@@ -73,24 +76,14 @@ export async function exportSite(
     blobs[hash] = decoder.decode(data);
   }
   // Media: blob assets of the current nodes and of every snapshot, minus taken-down content.
-  const purgedRows = await from.sql.all<{
-    sha256: string;
-    purge_reason: string | null;
-    purge_legal: number | null;
-    purged_by: string | null;
-    purged_at: string | null;
-  }>(
-    "SELECT sha256, purge_reason, purge_legal, purged_by, purged_at FROM media_blobs WHERE site_id = ? AND state = 'purged' ORDER BY sha256",
-    [siteId],
-  );
+  const purgedRows = await siteTakedowns(from.sql, siteId);
   const purged = new Set(purgedRows.map((r) => r.sha256));
   // packages/cli/src/commands/archive-bundle.ts bundleMedia rebuilds this from an archive; keep
-  // the two in step (export-cli.test.ts compares them).
+  // the two in step (export-cli.test.ts compares them). `restoreBundle` shares `blobMedia`.
   const media = new Map<string, BundleMedia>();
   const addAsset = (body: string) => {
-    const a = JSON.parse(body) as Asset;
-    if (a.storage?.kind === "blob" && !purged.has(a.sha256))
-      media.set(a.sha256, { sha256: a.sha256, bytes: a.bytes, mediaType: a.mediaType });
+    const m = blobMedia(JSON.parse(body) as Asset);
+    if (m && !purged.has(m.sha256)) media.set(m.sha256, m);
   };
   for (const n of nodes) if (n.kind === "asset") addAsset(n.body);
   for (const snap of snapshots)
@@ -111,17 +104,7 @@ export async function exportSite(
     ...(media.size > 0
       ? { media: [...media.values()].sort((a, b) => a.sha256.localeCompare(b.sha256)) }
       : {}),
-    ...(purgedRows.length > 0
-      ? {
-          purged: purgedRows.map((r) => ({
-            sha256: r.sha256,
-            reason: r.purge_reason ?? "",
-            legal: r.purge_legal === 1,
-            by: r.purged_by ?? "",
-            at: r.purged_at ?? "",
-          })),
-        }
-      : {}),
+    ...(purgedRows.length > 0 ? { purged: purgedRows } : {}),
   };
 }
 
