@@ -89,6 +89,7 @@ const docsIndex: SitePage = {
 - [Typed custom fields](/docs/guides/fields): definitions, operations, languages and themes
 - [Structured data, expiry and listings](/docs/guides/structured-data): JSON-LD presets, entries that end on a date, listings by field and collection feeds
 - [Several sites in one deployment](/docs/guides/multi-site)
+- [Site archives](/docs/guides/site-archives): backups, moving a site, templates; \`cloudhal export\` and \`import\`
 - [Analytics and privacy](/docs/guides/analytics-privacy)
 - [Translations with Weblate](/docs/guides/translations-weblate)
 

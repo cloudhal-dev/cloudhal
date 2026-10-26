@@ -20,6 +20,8 @@ packages/core-contracts/schemas/.bundled/
 
 # The starters' own local site (a project created from a starter commits its cloudhal.json)
 starters/*/cloudhal.json
+# and its site archives (`cloudhal export` in a starter; a user project may commit its own)
+starters/**/*.cloudhal
 
 # Package build output
 .build/

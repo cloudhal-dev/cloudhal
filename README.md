@@ -82,7 +82,7 @@ packages/astro-renderer   Astro 7 integration, live/snapshot data sources, secti
 packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
 packages/comments         reader comments (RFC-0007): rules, proof of work, submission pipeline, SQLite/D1 store
 packages/schedules        schedules (RFC-0008): time model, RRULE subset, releases, automations, taint, budgets, runDue, SQLite/D1 store
-packages/cli              the cloudhal CLI: init, dev, studio, mcp, deploy, push, pull, … (all commands: cloudhal --help, https://cloudhal.dev/docs/reference/cli)
+packages/cli              the cloudhal CLI: init, dev, studio, mcp, deploy, push, pull, export, import, … (all commands: cloudhal --help, https://cloudhal.dev/docs/reference/cli)
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
 packages/mcp-server       MCP server: over 100 tools (README tool reference), approval gate, agent modes, skills as resources; stdio + HTTP

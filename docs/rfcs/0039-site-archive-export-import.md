@@ -1,8 +1,16 @@
 # RFC-0039: Site archives: `cloudhal export` and `cloudhal import`
 
-- Status: Accepted (2026-10-22, by Halil; ADR-0041). Open questions decided as recommended. Revised before acceptance after a comparison with Sanity, Strapi, Contentful, Ghost, WordPress, Directus and Webflow (see Prior art): NDJSON parts instead of one JSON file, per-file checksums, contract versions in the manifest, and a snapshot before `--replace`.
+- Status: Accepted (2026-10-22, by Halil; ADR-0041). Open questions decided as recommended. Revised before acceptance after a comparison with Sanity, Strapi, Contentful, Ghost, WordPress, Directus and Webflow (see Prior art): NDJSON parts instead of one JSON file, per-file checksums, contract versions in the manifest, and a snapshot before `--replace`. Implemented: rollout steps 1–5 (#47).
 - Amendment (2026-10-25, rollout step 1): identical `.cloudhal` bytes need the same Node/zlib build; the tar stream inside, and so every SHA-256 in the manifest, is identical on every platform. See invariant 7.
 - Amendment (2026-10-26, rollout step 4): `--replace` takes the archive's published snapshot (the site node carries it, as `pull --replace`; `push` keeps a deployment's own); it saves `before import <file>` and the result as `import <file>`; the "rollback" that undoes it is `cloudhal import --revert <snapshot-id>`, since Studio's rollback moves only the published pointer, to an ancestor; and `cloudhal site delete` already deletes a local site. See §2 and invariant 6.
+- Amendment (2026-10-26, rollout step 5):
+  - The demo archive is `packages/cli/test/fixtures/site-archives/starter-blog.cloudhal`, the site `cloudhal init` seeds with fixed ids and a fixed clock, published once. `scripts/demo-archive.ts` regenerates it, and its `--check` (in `pnpm check` and CI) compares the manifests of the committed and a fresh export without `createdBy`: the manifest pins every other file's SHA-256, so this compares the decompressed tar's content (invariant 7) without failing on every CLI version bump.
+  - §1's "neither export nor import has to hold the whole site in memory" holds for the container and the media; the graph rows are held in memory, since `exportSite` and `importSite` take whole bundles.
+  - Invariant 6's atomic batches are one batch of at most 1000 statements, the same limit as `push` and `pull`; a larger site is refused before anything is written. Every refusal comes before the first write, and the node set is one atomic batch, but node bodies, snapshots and the media ledger are written in batches of their own. A storage failure between them can leave part of an import; running the same import again completes it, as for `pull`, and the message says so.
+  - §4's list also names scheduled releases (with their pinned versions), pending approvals and agents' open edit suggestions (RFC-0014 proposals). Like automations they live outside the graph, so an archive never held them; `export` now prints them, and the guide says to schedule releases again after a move or restore.
+  - §4's "the manifest says so" is the manifest's `bundle` (`cloudhal.site-bundle@1`, the graph only) together with the list `export` prints and the guide documents; `@1`'s closed key set gets no field of its own.
+  - Invariant 4's forward migration applies once a contracts `schemaVersion` 2 exists; the demo archive can then serve as its `@1` test fixture.
+  - The guide is [docs/guides/site-archives.md](../guides/site-archives.md).
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - #47 (found while building cloudhal.com: no way to keep or move a site's content without a deployment, so it was written as code).
@@ -108,6 +116,7 @@ The content graph only, as with push/pull. Excluded:
 - analytics;
 - the audit log;
 - automations and schedule runs;
+- scheduled releases, pending approvals and open edit suggestions (*added 2026-10-26, rollout step 5*);
 - deployment secrets and webhook credentials.
 
 The manifest says so, and `export` prints it. People and personal data never leave in a file by accident, which is also why the format needs no encryption of its own (see Alternatives).
@@ -151,6 +160,8 @@ The manifest says so, and `export` prints it. People and personal data never lea
 - **Export from a deployment:** `--from <admin-url>`, through the bundle route push and pull already use. All the headless CMS CLIs export from the remote service directly.
 - **Studio "Download site archive":** the same route, from the browser.
 - **Signed archives:** for example with Sigstore, like the npm provenance releases carry, so templates can be verified.
+- **A `--dir` layout:** the same files, unpacked (Alternatives). *Added 2026-10-26.*
+- **Streaming graph rows, and imports larger than one batch:** today the rows are held in memory and the node set is one atomic batch of at most 1000 statements (rollout step 5 amendment). *Added 2026-10-26.*
 
 ## Open questions (decided as recommended)
 
