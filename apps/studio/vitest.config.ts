@@ -13,6 +13,9 @@ export default defineConfig({
     // Dialog/menu flows take ~0.5 s alone but several seconds when the whole monorepo tests in
     // parallel (turbo); 5 s made them flaky.
     testTimeout: 20_000,
+    // setup.ts's beforeAll compiles every language's catalogs and lazy namespaces; on a CI runner
+    // busy with other packages it passed the default 10 s (#134).
+    hookTimeout: 60_000,
     // Vitest ≥5.0.4 caches transformed modules on disk by default. Its key does not cover the
     // catalogs() plugin's code (packages/messages), so a compiler change could test stale catalogs.
     fsModuleCache: false,
