@@ -1,12 +1,23 @@
 /**
- * `cloudhal import <file> [--dry-run]` (RFC-0039 §2, rollout step 3): a `.cloudhal` file written by
- * `cloudhal export` into this project, in bootstrap mode, the site's id kept (invariant 1).
+ * `cloudhal import <file> [--replace] [--dry-run]` (RFC-0039 §2, rollout steps 3 and 4): a file
+ * written by `cloudhal export` into this project, the site's id kept (invariant 1).
  *
- * - **Site:** the archive's must be `cloudhal.json`'s `siteId` or listed in `sites`, checked as soon
- *   as the manifest is read. Another id is refused, naming both: importing another site (and
- *   switching `siteId`) belongs to `--replace`, not available yet.
- * - **Bootstrap:** the project must not hold the site yet, or hold exactly the archive's nodes; the
+ * - **Bootstrap** (default): the archive's site must be `cloudhal.json`'s `siteId` or listed in
+ *   `sites`, checked as soon as the manifest is read; another id is refused, naming both and
+ *   `--replace`. The project must not hold the site yet, or hold exactly the archive's nodes; the
  *   snapshots, node bodies and media it lacks are added. A site whose nodes differ is refused.
+ * - **`--replace`:** the local nodes become the archive's, its published snapshot included (the
+ *   site node carries it; `published: "source"`, as `cloudhal pull --replace`). A deployment keeps
+ *   its own: `cloudhal push` applies with `published: "target"`, so a local replace never moves
+ *   production. Snapshots are only ever added. When the project holds the site and its nodes would
+ *   change, the current graph is saved first as `before import <file>` (`cloudhal import --revert
+ *   <id>` brings it back) and the result as `import <file>` (`import-apply.ts`). Refused, before
+ *   anything is written, while the site has open releases or an unfinished field operation, or
+ *   when another local site serves one of its hostnames (`import-replace.ts`).
+ * - **Another site:** `--replace` of an archive whose site `cloudhal.json` does not list imports it
+ *   and switches `siteId` (and the old id in `sites`) to it, editing only those values, once the
+ *   import has landed (`config-site.ts`). The old site stays in the local store, unlisted and
+ *   untouched: setting `siteId` back by hand undoes the switch (`--revert` restores nodes only).
  * - **Two passes over the file** (invariants 3 and 6). The first reads and verifies the whole
  *   archive (every file's size and SHA-256, every row; media bodies are hashed, not kept) and plans
  *   the import against the local store (`planImport`), so every refusal comes before any write: a
@@ -14,16 +25,16 @@
  *   conflict, media this project has taken down (invariant 5), media a `--no-media` archive lacks.
  *   The second runs only when media must be copied: it reads the file again, requires the same
  *   manifest (which pins every file's SHA-256, so the bundle is the one planned) and writes only
- *   the planned media into the blob store, which verifies them again. Then `importSite` applies the
- *   graph, keeping the archive's published snapshot as `cloudhal pull` does, and the search index
- *   is refreshed. A local media file of another size counts as damaged: a full archive replaces
- *   it, a `--no-media` one is refused. Local copies of content the archive's ledger took down are
- *   deleted, and the summary says so.
+ *   the planned media into the blob store, which verifies them again. Then the graph is written
+ *   (`import-apply.ts`). A local media file of another size counts as damaged: a full archive
+ *   replaces it, a `--no-media` one is refused. Local copies of content the archive's ledger took
+ *   down are deleted, and the summary says so.
  * - **No store yet:** planning runs on an empty store in memory, so a refusal or a dry run creates
  *   no `.cloudhal/`; media are copied before `data.db` exists.
- * - **`--dry-run`:** prints the manifest and the plan and writes nothing: no blobs, rows, config or
- *   search index. Opening an existing store applies pending migrations, as every command does.
- * - **Ctrl-C, SIGTERM** stop the import before `importSite` runs (between the passes or between
+ * - **`--dry-run`:** prints the manifest and the plan (with `--replace`, the snapshots, the
+ *   published snapshot and the switch too) and writes nothing: no blobs, rows, config or search
+ *   index. Opening an existing store applies pending migrations, as every command does.
+ * - **Ctrl-C, SIGTERM** stop the import before its writes start (between the passes or between
  *   media files); from there it finishes, its node set being one atomic batch. Media already
  *   copied stay in the blob store, unreferenced: content-addressed, the next import reuses them
  *   (`cloudhal media gc` only sees media with a ledger row). A hard kill can leave a temporary
@@ -32,17 +43,17 @@
  * Known limitations: the graph rows are held in memory (one bundle at a time, as for export); a
  * disk error while `importSite` writes can leave node bodies, snapshots or the media ledger
  * without the rest, as for `pull`: the message then says the import stopped partway, and running
- * it again completes it (and refreshes a search index left behind the live snapshot).
+ * it again completes it (and refreshes a search index left behind the live snapshot). As for
+ * `pull --replace`, an edit another process makes between the `before` snapshot (or the recheck
+ * of an unchanged site) and the node batch is replaced and not in that snapshot, and the archive's
+ * nodes keep their revs: a Studio tab or agent still holding a node at the rev the archive gives
+ * it saves over it without a conflict, so the summary counts those nodes and says to reload.
  */
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
 import path from "node:path";
-import { addAbortSignal } from "node:stream";
 import { isDeepStrictEqual } from "node:util";
 import {
   type CopySiteResult,
   type ImportPlan,
-  importSite,
   planImport,
   type SiteBundle,
 } from "@cloudhal/core-ts";
@@ -50,21 +61,33 @@ import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { migrate, migrations } from "@cloudhal/storage";
 import { FsBlobStore } from "@cloudhal/storage/fs";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
-import { type ArchiveItem, readArchive, type SiteArchiveManifest } from "../archive/index.ts";
+import type { SiteArchiveManifest } from "../archive/index.ts";
 import { type ProjectConfig, readProjectConfig } from "../config.ts";
-import { isRecord } from "./archive-bundle.ts";
-import { type ArchiveMediaItem, bundleFromArchive } from "./archive-reassemble.ts";
+import { readConfigText, type SiteIdSwitch, writeSiteIdSwitch } from "../config-site.ts";
 import { formatBytes } from "./export.ts";
+import { type AppliedImport, applyImport } from "./import-apply.ts";
 import {
-  bootstrapRefusals,
-  copiedNote,
   displayText,
+  ImportInterruptedError,
   ImportRefusal,
   importFailure,
+  importRefusals,
   mediaFolder,
   siteRefusal,
 } from "./import-checks.ts";
 import { writeMedia } from "./import-media.ts";
+import { archiveSize, readPass, siteSummary, statOrUndefined } from "./import-read.ts";
+import {
+  hostRefusal,
+  importBracket,
+  type ReplaceOutcome,
+  replaceOutcome,
+  replaceRefusals,
+  settledOutcome,
+  switchFor,
+} from "./import-replace.ts";
+
+export { ImportInterruptedError } from "./import-checks.ts";
 
 export interface ImportArchiveOptions {
   readonly projectDir: string;
@@ -72,6 +95,8 @@ export interface ImportArchiveOptions {
   readonly file: string;
   /** Verify and plan only; write nothing. */
   readonly dryRun?: boolean | undefined;
+  /** `--replace`: the local nodes become the archive's (see the module doc). */
+  readonly replace?: boolean | undefined;
   /** Stops the import before the graph is written (the command's Ctrl-C and SIGTERM). */
   readonly signal?: AbortSignal | undefined;
   /** Progress lines (the command writes them to stderr). */
@@ -83,12 +108,15 @@ export interface ImportArchiveResult {
   readonly file: string;
   readonly manifest: SiteArchiveManifest;
   readonly dryRun: boolean;
+  readonly mode: ImportPlan["mode"];
   /** The archive's site, as its site node says (untrusted until planned: printed cleaned). */
   readonly site: {
     readonly id: string;
     readonly slug?: string | undefined;
     readonly locale?: string | undefined;
     readonly projectId?: string | undefined;
+    /** Its `publishedSnapshotId`. */
+    readonly published?: string | undefined;
     /** It is `cloudhal.json`'s `siteId` or listed in `sites`. */
     readonly listed: boolean;
   };
@@ -117,20 +145,8 @@ export interface ImportArchiveResult {
         readonly searchRefreshed: boolean;
       }
     | undefined;
-}
-
-/** Ctrl-C or SIGTERM before the graph was written. */
-export class ImportInterruptedError extends Error {
-  override readonly name = "ImportInterruptedError";
-  readonly mediaCopied: number;
-  readonly mediaDir: string;
-  constructor(mediaCopied: number, mediaDir: string) {
-    super(
-      `import interrupted; nothing was imported${mediaCopied > 0 ? `; ${copiedNote(mediaCopied, mediaDir)}` : ""}`,
-    );
-    this.mediaCopied = mediaCopied;
-    this.mediaDir = mediaDir;
-  }
+  /** `--replace`: the snapshots, the published snapshot, the switch (planned, then done). */
+  readonly replace?: ReplaceOutcome | undefined;
 }
 
 /** What one import has done so far, for its messages and its cleanup. */
@@ -139,9 +155,11 @@ interface State {
   mediaDir: string;
   copied: number;
   copiedBytes: number;
-  /** `importSite` has started: the signal is no longer honoured. */
+  /** The writes have started: the signal is no longer honoured. */
   applying: boolean;
   local?: LocalStore | undefined;
+  /** `--replace`: the snapshot of the local graph taken before `importSite`. */
+  snapshotId?: string | undefined;
 }
 
 /** One import: the project, its paths and the options. */
@@ -151,8 +169,14 @@ interface Run {
   readonly cfg: ProjectConfig;
   readonly dataDir: string;
   readonly storeExists: boolean;
+  readonly mode: ImportPlan["mode"];
+  /** `--replace`: `cloudhal.json` as text, read before the archive, for the site id switch. */
+  readonly raw?: string | undefined;
   readonly state: State;
 }
+
+/** How pass 1 judged the archive's site: refused, or (`--replace`) a `siteId` switch. */
+type SiteRule = { refusal?: string | undefined; change?: SiteIdSwitch | undefined };
 
 /** Pass 1's result; its bundle is dropped before pass 2 reads its own. */
 interface FirstPass {
@@ -160,94 +184,33 @@ interface FirstPass {
   bundle: SiteBundle | undefined;
 }
 
-async function statOrUndefined(file: string) {
-  return stat(file).catch((e: NodeJS.ErrnoException) => {
-    if (e.code === "ENOENT" || e.code === "ENOTDIR") return undefined;
-    throw e;
-  });
-}
-
-/** The archive's size; a missing file or a folder is refused before anything is read. */
-async function archiveSize(file: string): Promise<number> {
-  const s = await statOrUndefined(file);
-  if (!s) throw new Error("no such file");
-  if (s.isDirectory()) throw new Error("it is a directory; name a .cloudhal file");
-  return s.size;
-}
-
-/** The first item (the manifest) checked by `check` before the rest is read. */
-async function* checkManifest(
-  items: AsyncIterable<ArchiveItem>,
-  check: (manifest: SiteArchiveManifest) => void,
-): AsyncGenerator<ArchiveItem, void, undefined> {
-  let first = true;
-  for await (const item of items) {
-    if (first && item.type === "manifest") check(item.manifest);
-    first = false;
-    yield item;
-  }
-}
-
-/** One read of the whole file: verified, reassembled, its media handed to `onMedia`. */
-async function readPass(
-  run: Run,
-  check: (manifest: SiteArchiveManifest) => void,
-  onMedia?: (item: ArchiveMediaItem) => Promise<void>,
-): Promise<{ manifest: SiteArchiveManifest; bundle: SiteBundle }> {
-  const stream = createReadStream(run.file);
-  if (run.options.signal) addAbortSignal(run.options.signal, stream);
-  try {
-    const read = await bundleFromArchive(
-      checkManifest(readArchive(stream), check),
-      onMedia ? { onMedia } : {},
-    );
-    return { manifest: read.manifest, bundle: read.bundle };
-  } finally {
-    stream.destroy();
-  }
-}
-
-/** What the result says about the archive's site and media, read from pass 1's bundle. */
-function siteSummary(run: Run, manifest: SiteArchiveManifest, bundle: SiteBundle) {
-  const row = bundle.nodes.find((n) => n.kind === "site" && n.id === manifest.siteId);
-  let site: unknown;
-  try {
-    site = row ? JSON.parse(row.body) : undefined;
-  } catch {
-    site = undefined;
-  }
-  const field = (key: string) =>
-    isRecord(site) && typeof site[key] === "string" ? (site[key] as string) : undefined;
-  const media = bundle.media ?? [];
-  return {
-    site: {
-      id: manifest.siteId,
-      slug: field("slug"),
-      locale: field("defaultLocale"),
-      projectId: field("projectId"),
-      listed: (run.cfg.sites ?? [run.cfg.siteId]).includes(manifest.siteId),
-    },
-    mediaNeeded: { files: media.length, bytes: media.reduce((n, m) => n + m.bytes, 0) },
-  };
-}
-
 /**
  * The plan against the local store, or, when the project has none yet, against an empty store in
  * memory (with the project's blob folder, which may already hold the media), so nothing is created.
+ * A hostname another local site serves is a refusal, so a dry run reports it.
  */
-async function planLocally(run: Run, bundle: SiteBundle): Promise<ImportPlan> {
-  const options = { mode: "bootstrap", report: true } as const;
-  if (run.storeExists) {
-    run.state.local = await openLocalStore(run.dataDir);
-    return planImport(run.state.local, bundle, options);
-  }
-  const sql = await BetterSqlite3Driver.open(":memory:");
+async function planLocally(
+  run: Run,
+  bundle: SiteBundle,
+): Promise<{ plan: ImportPlan } | { refusal: string }> {
+  const options = { mode: run.mode, report: true } as const;
   try {
-    await migrate(sql, migrations);
-    const blobs = new FsBlobStore(path.join(run.dataDir, "blobs"));
-    return await planImport({ sql, blobs }, bundle, options);
-  } finally {
-    await sql.close();
+    if (run.storeExists) {
+      run.state.local = await openLocalStore(run.dataDir);
+      return { plan: await planImport(run.state.local, bundle, options) };
+    }
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    try {
+      await migrate(sql, migrations);
+      const blobs = new FsBlobStore(path.join(run.dataDir, "blobs"));
+      return { plan: await planImport({ sql, blobs }, bundle, options) };
+    } finally {
+      await sql.close();
+    }
+  } catch (e) {
+    const refusal = hostRefusal(e, "the archive's");
+    if (refusal === undefined) throw e;
+    return { refusal };
   }
 }
 
@@ -269,44 +232,42 @@ async function copyMedia(run: Run, first: FirstPass, plan: ImportPlan): Promise<
     if (!isDeepStrictEqual(plain(m), plain(first.manifest)))
       throw new Error("the file changed while it was being imported");
   };
-  const again = await readPass(run, same, async (item) => {
-    const m = copy.get(item.sha256);
-    if (!m) return;
-    run.options.signal?.throwIfAborted();
-    if (!(await writeMedia(blobs, plan.siteId, item, m))) return;
-    state.copied++;
-    state.copiedBytes += m.bytes;
+  const { signal } = run.options;
+  const again = await readPass({
+    file: run.file,
+    signal,
+    check: same,
+    onMedia: async (item) => {
+      const m = copy.get(item.sha256);
+      if (!m) return;
+      signal?.throwIfAborted();
+      if (!(await writeMedia(blobs, plan.siteId, item, m))) return;
+      state.copied++;
+      state.copiedBytes += m.bytes;
+    },
   });
   return again.bundle;
 }
 
-/**
- * The search index is behind the site's live snapshot (an import that stopped after the node set
- * landed never refreshed it).
- */
-async function searchBehind(local: LocalStore, siteId: string): Promise<boolean> {
-  try {
-    const live = (await local.store.getSite(siteId))?.publishedSnapshotId;
-    return live !== undefined && (await local.store.searchStatus(siteId))?.snapshotId !== live;
-  } catch {
-    return true;
-  }
-}
-
-/** `importSite` and the search index; the signal is not honoured from here. */
-async function apply(run: Run, bundle: SiteBundle, plan: ImportPlan) {
+/** The writes (`import-apply.ts`): the signal is not honoured from here. */
+async function apply(run: Run, bundle: SiteBundle, plan: ImportPlan): Promise<AppliedImport> {
   const { state } = run;
   state.applying = true;
   state.local ??= await openLocalStore(run.dataDir);
-  const local = state.local;
-  const result = await importSite(local, bundle, { mode: "bootstrap" });
-  let searchRefreshed = true;
-  if (!result.nodes.unchanged || result.snapshots > 0 || (await searchBehind(local, plan.siteId)))
-    // RFC-0019 §3: an import leaves the index as it was; bring it to the live snapshot.
-    searchRefreshed = await local.store.refreshSearch(plan.siteId, { full: true }).then(
-      () => true,
-      () => false,
-    );
+  const holds = run.mode === "replace" && !plan.fresh;
+  return applyImport(state.local, bundle, {
+    mode: run.mode,
+    ...(holds ? { bracket: importBracket(run.options.file), unchanged: plan.unchanged } : {}),
+    onBefore: (snapshot) => {
+      state.snapshotId = snapshot.id;
+    },
+  });
+}
+
+/** The summary of a written import. */
+function importedOf(run: Run, plan: ImportPlan, applied: AppliedImport) {
+  const { result } = applied;
+  const { state } = run;
   return {
     nodes: result.nodes,
     snapshots: result.snapshots,
@@ -314,25 +275,44 @@ async function apply(run: Run, bundle: SiteBundle, plan: ImportPlan) {
     media: { copied: state.copied, bytes: state.copiedBytes, present: plan.media.present.length },
     takedowns: plan.takedowns.listed,
     takedownsDeleted: plan.takedowns.bytesHere.length,
-    searchRefreshed,
+    searchRefreshed: applied.searchRefreshed,
   };
+}
+
+/** The project and its paths; `cloudhal.json`'s text too for `--replace`. */
+async function startRun(options: ImportArchiveOptions, state: State) {
+  const file = path.resolve(options.projectDir, options.file);
+  const size = await archiveSize(file);
+  const cfg = await readProjectConfig(options.projectDir);
+  const raw = options.replace ? await readConfigText(options.projectDir) : undefined;
+  options.signal?.throwIfAborted();
+  const dataDir = path.resolve(options.projectDir, cfg.dataDir);
+  const storeExists = (await statOrUndefined(path.join(dataDir, "data.db")))?.isFile() === true;
+  const mode: ImportPlan["mode"] = options.replace ? "replace" : "bootstrap";
+  const run: Run = { options, file, cfg, dataDir, storeExists, mode, raw, state };
+  return { run, size };
+}
+
+/** Pass 1's judgement of the archive's site (`siteRefusal`, or `switchFor` with `--replace`). */
+function siteRule(run: Run, manifest: SiteArchiveManifest): SiteRule {
+  if (run.mode === "replace") return switchFor(run.cfg, run.raw ?? "", manifest.siteId);
+  return { refusal: siteRefusal(run.cfg, manifest, run.storeExists) };
 }
 
 /** The project, the file and pass 1, then the plan; on to the writes unless refused or a dry run. */
 async function runImport(options: ImportArchiveOptions, state: State) {
-  const file = path.resolve(options.projectDir, options.file);
-  const size = await archiveSize(file);
-  const cfg = await readProjectConfig(options.projectDir);
-  options.signal?.throwIfAborted();
-  const dataDir = path.resolve(options.projectDir, cfg.dataDir);
-  const storeExists = (await statOrUndefined(path.join(dataDir, "data.db")))?.isFile() === true;
-  const run: Run = { options, file, cfg, dataDir, storeExists, state };
-  const rule: { refusal?: string | undefined } = {};
-  const first: FirstPass = await readPass(run, (manifest) => {
-    state.siteId = manifest.siteId;
-    state.mediaDir = mediaFolder(cfg.dataDir, manifest.siteId);
-    rule.refusal = siteRefusal(cfg, manifest, storeExists);
-    if (rule.refusal && !options.dryRun) throw new ImportRefusal(rule.refusal);
+  const { run, size } = await startRun(options, state);
+  const { cfg } = run;
+  const rule: SiteRule = {};
+  const first: FirstPass = await readPass({
+    file: run.file,
+    signal: options.signal,
+    check: (manifest) => {
+      state.siteId = manifest.siteId;
+      state.mediaDir = mediaFolder(cfg.dataDir, manifest.siteId);
+      Object.assign(rule, siteRule(run, manifest));
+      if (rule.refusal && !options.dryRun) throw new ImportRefusal(rule.refusal);
+    },
   });
   const { manifest } = first;
   options.log?.(
@@ -342,18 +322,49 @@ async function runImport(options: ImportArchiveOptions, state: State) {
     file: options.file,
     manifest,
     dryRun: options.dryRun === true,
-    newStore: !storeExists,
-    ...siteSummary(run, manifest, first.bundle as SiteBundle),
+    mode: run.mode,
+    newStore: !run.storeExists,
+    ...siteSummary(cfg, manifest, first.bundle as SiteBundle),
   };
-  if (rule.refusal) return { ...base, refusals: [rule.refusal] };
-  const plan = await planLocally(run, first.bundle as SiteBundle);
-  const refusals = bootstrapRefusals(plan, manifest, cfg.dataDir);
-  if (options.dryRun) return { ...base, plan, refusals };
+  const planned = rule.refusal
+    ? { refusal: rule.refusal }
+    : await planLocally(run, first.bundle as SiteBundle);
+  if ("refusal" in planned) {
+    if (!options.dryRun) throw new ImportRefusal(planned.refusal);
+    return { ...base, refusals: [planned.refusal] };
+  }
+  const { plan } = planned;
+  const replacing = run.mode === "replace";
+  const refusals = [
+    ...importRefusals(plan, manifest, cfg.dataDir),
+    ...(replacing ? await replaceRefusals(state.local, plan, "--replace") : []),
+  ];
+  const outcome = replacing
+    ? await replaceOutcome({
+        projectDir: options.projectDir,
+        cfg,
+        plan,
+        local: state.local,
+        change: rule.change,
+        bracket: importBracket(options.file),
+        incoming: base.site.published,
+      })
+    : undefined;
+  if (options.dryRun) return { ...base, plan, refusals, replace: outcome };
   if (refusals[0] !== undefined) throw new ImportRefusal(refusals[0]);
   options.signal?.throwIfAborted();
   const bundle = await copyMedia(run, first, plan);
   options.signal?.throwIfAborted();
-  return { ...base, plan, refusals: [], imported: await apply(run, bundle, plan) };
+  const applied = await apply(run, bundle, plan);
+  // Last: a failure before this leaves cloudhal.json naming the old site, which is intact.
+  if (rule.change) await writeSiteIdSwitch(options.projectDir, rule.change);
+  return {
+    ...base,
+    plan,
+    refusals: [],
+    imported: importedOf(run, plan, applied),
+    replace: outcome && settledOutcome(outcome, applied, rule.change !== undefined),
+  };
 }
 
 /** Imports (or, with `dryRun`, plans) the archive; see the module doc for every rule. */
@@ -370,6 +381,7 @@ export async function importArchive(options: ImportArchiveOptions): Promise<Impo
       mediaDir: state.mediaDir,
       siteId: state.siteId,
       applying: state.applying,
+      snapshotId: state.snapshotId,
     });
   } finally {
     await state.local?.close();

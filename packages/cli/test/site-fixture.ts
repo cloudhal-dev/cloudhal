@@ -3,9 +3,10 @@
  * English site with three uploads (A the entry's cover; B taken down; C deleted, kept by the first
  * snapshot only), three snapshots (the second published, the third after an edit of /about) and a
  * second listed site (`tr`), all written on `SEEDED_AT`. Helpers open its store, copy it and list
- * its blobs; every folder they make is removed by `removeTempDirs`.
+ * its blobs, make an empty project and capture what a refused import must leave as it was; every
+ * folder they make is removed by `removeTempDirs`.
  */
-import { cp, mkdtemp, readdir, rm } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Actor, ContentEntry, Page, Site } from "@cloudhal/core-contracts";
@@ -13,7 +14,7 @@ import { exportSite, type SiteBundle, seedStarterSite } from "@cloudhal/core-ts"
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { makePng, PNG_1X1 } from "@cloudhal/core-ts/media/fixtures";
 import { vi } from "vitest";
-import { writeProjectConfig } from "../src/config.ts";
+import { type ProjectConfig, writeProjectConfig } from "../src/config.ts";
 
 export const person: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
 export const robot: Actor = { kind: "agent", id: "agent_01HZX8K3Q9YZ", name: "Newsroom Agent" };
@@ -145,4 +146,38 @@ export async function blobListing(projectDir: string): Promise<string[]> {
     .map((e) => path.relative(root, path.join(e.parentPath, e.name)))
     .filter((f) => f.split(path.sep)[0] !== ".tmp")
     .sort();
+}
+
+/** A project with only its cloudhal.json (no .cloudhal): the fixture's sites unless `cfg` says. */
+export async function emptyProject(
+  fx: Fixture,
+  cfg?: Pick<ProjectConfig, "siteId" | "sites">,
+): Promise<string> {
+  const dir = await tempDir("cloudhal-import-");
+  await writeProjectConfig(dir, {
+    dataDir: ".cloudhal",
+    ...(cfg ?? { siteId: fx.siteId, sites: [fx.siteId, fx.trId] }),
+  });
+  return dir;
+}
+
+export const exists = (file: string) =>
+  stat(file).then(
+    () => true,
+    () => false,
+  );
+
+/** What a refused import must leave as it was (opens the store: call it only where one exists). */
+export async function stateOf(dir: string) {
+  const rows = await withStore(dir, async ({ sql }) => ({
+    nodes: await sql.all("SELECT id, site_id, rev, hash FROM nodes ORDER BY id"),
+    snapshots: await sql.all("SELECT id FROM snapshots ORDER BY id"),
+    projects: await sql.all("SELECT id, rev FROM projects ORDER BY id"),
+    media: await sql.all("SELECT site_id, sha256, state FROM media_blobs ORDER BY site_id, sha256"),
+  }));
+  return {
+    rows,
+    blobs: await blobListing(dir),
+    config: await readFile(path.join(dir, "cloudhal.json"), "utf8"),
+  };
 }

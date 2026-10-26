@@ -2,6 +2,7 @@
 
 - Status: Accepted (2026-10-22, by Halil; ADR-0041). Open questions decided as recommended. Revised before acceptance after a comparison with Sanity, Strapi, Contentful, Ghost, WordPress, Directus and Webflow (see Prior art): NDJSON parts instead of one JSON file, per-file checksums, contract versions in the manifest, and a snapshot before `--replace`.
 - Amendment (2026-10-25, rollout step 1): identical `.cloudhal` bytes need the same Node/zlib build; the tar stream inside, and so every SHA-256 in the manifest, is identical on every platform. See invariant 7.
+- Amendment (2026-10-26, rollout step 4): `--replace` takes the archive's published snapshot (the site node carries it, as `pull --replace`; `push` keeps a deployment's own); it saves `before import <file>` and the result as `import <file>`; the "rollback" that undoes it is `cloudhal import --revert <snapshot-id>`, since Studio's rollback moves only the published pointer, to an ancestor; and `cloudhal site delete` already deletes a local site. See §2 and invariant 6.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-10-21
 - Related:
   - #47 (found while building cloudhal.com: no way to keep or move a site's content without a deployment, so it was written as code).
@@ -69,6 +70,7 @@ interface SiteArchiveManifest {
 ```text
 cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
 cloudhal import <file> [--replace] [--dry-run]
+cloudhal import --revert <snapshot-id> [--dry-run]     (amended 2026-10-26)
 ```
 
 - **export:**
@@ -79,6 +81,13 @@ cloudhal import <file> [--replace] [--dry-run]
 - **import:** checks the manifest and every file's SHA-256 as it streams (media files are named by their hash as well), then calls `importSite`. Three modes:
   - **bootstrap** (default), into a project with no site or one whose site is the archive's (same `siteId`). Like `pull`, it adds what is missing and refuses nodes that differ: never Strapi's "erase the target first".
   - **`--replace`:** the local nodes become the archive's. Snapshots are only ever added. First, the current local graph is saved as a snapshot labelled `before import <file>`, so the import can be undone with a rollback. Into a project whose site has another id, `--replace` switches `cloudhal.json`'s `siteId` to the archive's. The old site stays in the local store, unlisted; there is no command to delete a local site yet.
+    *Amended 2026-10-26 (rollout step 4):*
+    - The published snapshot is the archive's: the site node carries it, so `--replace` takes it as `pull --replace` does. A deployment keeps its own, since `push` applies with the deployment's pointer.
+    - The snapshot is taken only when the project holds the site and its nodes would change (none for a new or unchanged site), with the file's base name; the result is saved as `import <file>` right after, so the latest snapshot is the imported graph.
+    - The undo is `cloudhal import --revert <snapshot-id>`: it restores that snapshot's nodes, the site node and so its published snapshot included, through `importSite`'s replace, saving the current graph first as `before revert import <file>`. Studio's rollback only moves the published pointer to an ancestor of the published snapshot, which a `before import` snapshot is not.
+    - Revs: the store's compare-and-swap checks only a node's rev. `--revert` moves revs forward (a node edited since comes back at the rev after its current one), so a Studio tab or agent holding a rev the node had gets a conflict. `--replace` keeps the archive's revs, as `pull --replace` does, so the local site equals the archive; its summary counts the nodes given a rev no higher than they had, which such an editor could save over, and says to reload.
+    - The switch edits only `siteId` and the old id's entry in `sites`, after the import has landed. It is undone by writing the old id back by hand: the old site is untouched, and `--revert` restores nodes only. `cloudhal site delete <id> --confirm <slug>` deletes the old site for good.
+    - Refused before anything is written: open releases (their pinned versions point into the replaced graph; cancelled in Studio, no `--cancel-schedules` here), an unfinished field operation (RFC-0041; its marker is on the site node), and a hostname another local site serves (never released: that would write the old site).
   - **`--dry-run`:** prints the manifest and the difference the import would make (nodes added, changed and removed by kind and title; snapshots added; media to copy) and writes nothing.
 
 ### 3. Invariants
@@ -88,7 +97,7 @@ cloudhal import <file> [--replace] [--dry-run]
 3. Every file is verified against the manifest (SHA-256 and size), and every media file against its own name, before it is used. A missing or wrong file fails the import before any node is written (the bundle's `missing_media` rule).
 4. An archive written by a newer format or a newer contracts `schemaVersion` is refused with the CLI version needed. Older ones are read, and migrated forward if a later schema version requires it.
 5. Taken-down content stays taken down: the `purged` ledger travels and the import never restores those bytes.
-6. Import writes the graph in atomic batches (no interactive transactions, AGENTS.md rule 4), guarded like `importSite` today. A failure leaves the project as it was, and `--replace` can always be undone through its `before import` snapshot.
+6. Import writes the graph in atomic batches (no interactive transactions, AGENTS.md rule 4), guarded like `importSite` today. A failure leaves the project as it was, and `--replace` can always be undone through its `before import` snapshot. *Amended 2026-10-26:* with `cloudhal import --revert <snapshot-id>` (§2), and a site id switch by writing the old `siteId` back (the old site is untouched); a failure after that snapshot was taken leaves it, holding the graph as it was, and the message names it.
 7. Same content, same file: rows and files are written in a fixed order, with zero timestamps and fixed modes in the tar headers, so exporting an unchanged site twice gives identical bytes (good for git and for diffing). *Amended 2026-10-25:* identical bytes hold for the same Node/zlib build. gzip output differs between zlib builds (Homebrew's zlib and the Chromium zlib that official Node binaries ship compress the same input differently), and only a dependency or uncompressed output would avoid that. The tar stream inside the gzip, and so every SHA-256 in the manifest, is identical on every platform. A committed archive (step 5's demo) is regenerated on one pinned Node in CI, or compared through its decompressed tar.
 
 ### 4. What is not in an archive
@@ -125,7 +134,7 @@ The manifest says so, and `export` prints it. People and personal data never lea
   1. The streaming tar writer and reader, with tests (round trip, damaged file, wrong hash, path traversal, deterministic bytes).
   2. `export`.
   3. `import` with `--dry-run`.
-  4. `--replace`, the `before import` snapshot, and the site id switch.
+  4. `--replace`, the `before import` snapshot, and the site id switch. *Amended 2026-10-26:* with `import --revert` as the undo.
   5. Docs and a starter demo archive (regenerated on one pinned Node, or compared through its decompressed tar: invariant 7).
 
 ## Security & policy impact

@@ -8,7 +8,7 @@
  * so; `--dry-run` shows the difference by kind and title and writes nothing.
  */
 import { writeFileSync } from "node:fs";
-import { cp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { cp, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Page } from "@cloudhal/core-contracts";
 import { type NodeRow, type SiteBundle, SyncConflictError } from "@cloudhal/core-ts";
@@ -33,11 +33,14 @@ import {
   blobListing,
   bundleOf,
   copyProject,
+  emptyProject as emptyProjectOf,
+  exists,
   type Fixture,
   mediaFile,
   person,
   removeTempDirs,
   seedFixture,
+  stateOf,
   tempDir,
   withStore,
 } from "./site-fixture.ts";
@@ -63,38 +66,10 @@ afterAll(removeTempDirs);
 afterEach(() => vi.restoreAllMocks());
 
 /** A project with only its cloudhal.json (no .cloudhal): the fixture's sites unless `cfg` says. */
-async function emptyProject(cfg?: Pick<ProjectConfig, "siteId" | "sites">): Promise<string> {
-  const dir = await tempDir("cloudhal-import-");
-  await writeProjectConfig(dir, {
-    dataDir: ".cloudhal",
-    ...(cfg ?? { siteId: fx.siteId, sites: [fx.siteId, fx.trId] }),
-  });
-  return dir;
-}
-
-const exists = (file: string) =>
-  stat(file).then(
-    () => true,
-    () => false,
-  );
+const emptyProject = (cfg?: Pick<ProjectConfig, "siteId" | "sites">) => emptyProjectOf(fx, cfg);
 
 async function expectNoStore(dir: string): Promise<void> {
   expect(await exists(path.join(dir, ".cloudhal"))).toBe(false);
-}
-
-/** What a refused import must leave as it was (opens the store: call it only where one exists). */
-async function stateOf(dir: string) {
-  const rows = await withStore(dir, async ({ sql }) => ({
-    nodes: await sql.all("SELECT id, site_id, rev, hash FROM nodes ORDER BY id"),
-    snapshots: await sql.all("SELECT id FROM snapshots ORDER BY id"),
-    projects: await sql.all("SELECT id, rev FROM projects ORDER BY id"),
-    media: await sql.all("SELECT site_id, sha256, state FROM media_blobs ORDER BY site_id, sha256"),
-  }));
-  return {
-    rows,
-    blobs: await blobListing(dir),
-    config: await readFile(path.join(dir, "cloudhal.json"), "utf8"),
-  };
 }
 
 const sourceBytes = (sha: string) => readFile(mediaFile(fx.projectDir, fx.siteId, sha));
@@ -508,7 +483,7 @@ describe("cloudhal import: a refused import leaves the project as it was (invari
     )) as Error;
     expect(error.message).toMatch(
       new RegExp(
-        `^cannot import .*moved\\.cloudhal: this project's site ${fx.siteId} differs from the archive in 2 node\\(s\\) \\(.*\\); bootstrap imports only into a project without the site or holding exactly its nodes, and --replace is not available yet; nothing was imported$`,
+        `^cannot import .*moved\\.cloudhal: this project's site ${fx.siteId} differs from the archive in 2 node\\(s\\) \\(.*\\); bootstrap imports only into a project without the site or holding exactly its nodes; --replace makes them the archive's, saving the local ones as a snapshot first; nothing was imported$`,
       ),
     );
     expect(error.message).toContain(page.id);
@@ -626,11 +601,11 @@ describe("cloudhal import: a refused import leaves the project as it was (invari
 });
 
 describe("cloudhal import: which site (the archive's id is kept)", () => {
-  it("refuses another site's archive, naming both ids; the hint works without a store", async () => {
+  it("refuses another site's archive, naming both ids and --replace", async () => {
     const dir = await emptyProject({ siteId: "site_other00001" });
     const config = await readFile(path.join(dir, "cloudhal.json"));
     await expect(importArchive({ projectDir: dir, file: archives.full })).rejects.toThrow(
-      `it holds site ${fx.siteId}, and this project's site is site_other00001 (cloudhal.json siteId); importing another site into a project comes with \`cloudhal import --replace\`, not available yet; this project has no local store yet, so setting cloudhal.json siteId to ${fx.siteId} also works (push and deploy then use ${fx.siteId}); nothing was imported`,
+      `it holds site ${fx.siteId}, and this project's site is site_other00001 (cloudhal.json siteId); \`cloudhal import --replace\` imports it and switches cloudhal.json siteId to ${fx.siteId}; nothing was imported`,
     );
     await expectNoStore(dir);
     expect(Buffer.compare(await readFile(path.join(dir, "cloudhal.json")), config)).toBe(0);
@@ -638,13 +613,13 @@ describe("cloudhal import: which site (the archive's id is kept)", () => {
     const dry = await importArchive({ projectDir: dir, file: archives.full, dryRun: true });
     expect(dry.plan).toBeUndefined();
     expect(describeImport(dry).at(-2)).toMatch(/^would refuse: it holds site /);
-    // As the hint says.
+    // Without a store, setting siteId by hand works too.
     await writeProjectConfig(dir, { siteId: fx.siteId, dataDir: ".cloudhal" });
     await importArchive({ projectDir: dir, file: archives.full });
     expect(await bundleOf(dir, fx.siteId)).toStrictEqual(await bundleOf(fx.projectDir, fx.siteId));
   });
 
-  it("refuses another site's archive into a project with a store, without the hint", async () => {
+  it("refuses another site's archive into a project with a store, which keeps the old site", async () => {
     const dir = await copyProject(fx);
     await writeProjectConfig(dir, { siteId: fx.trId, dataDir: ".cloudhal" });
     const before = await stateOf(dir);
@@ -652,7 +627,7 @@ describe("cloudhal import: which site (the archive's id is kept)", () => {
       (e: unknown) => e,
     )) as Error;
     expect(error.message).toContain(
-      `it holds site ${fx.siteId}, and this project's site is ${fx.trId} (cloudhal.json siteId); importing another site into a project comes with \`cloudhal import --replace\`, not available yet; nothing was imported`,
+      `it holds site ${fx.siteId}, and this project's site is ${fx.trId} (cloudhal.json siteId); \`cloudhal import --replace\` imports it and switches cloudhal.json siteId to ${fx.siteId} (${fx.trId} stays in the local store, unlisted); nothing was imported`,
     );
     expect(await stateOf(dir)).toEqual(before);
   });
@@ -746,12 +721,14 @@ describe("cloudhal import --dry-run", () => {
 
 describe("cloudhal import: the command", () => {
   it("is in --help and checks its arguments and flags", async () => {
-    expect(HELP).toMatch(/^ {2}cloudhal import <file> \[--dry-run\] +a \.cloudhal file/m);
-    for (const argv of [["import"], ["import", "a", "b"]])
-      await expect(main(argv)).rejects.toThrow("usage: cloudhal import <file> [--dry-run]");
-    await expect(main(["import", "x.cloudhal", "--replace"])).rejects.toThrow(
-      "cloudhal import --replace is not available yet; this version imports in bootstrap mode only",
+    expect(HELP).toMatch(
+      /^ {2}cloudhal import <file> \[--replace\] \[--dry-run\] \| --revert <snapshot-id> \[--dry-run\]\n {58}a \.cloudhal file/m,
     );
+    expect(HELP).toContain("--replace: the local");
+    for (const argv of [["import"], ["import", "a", "b"]])
+      await expect(main(argv)).rejects.toThrow(
+        "usage: cloudhal import <file> [--replace] [--dry-run] | --revert <snapshot-id> [--dry-run]",
+      );
     await expect(main(["import", "x.cloudhal", "--site", "site_other00001"])).rejects.toThrow(
       "cloudhal import does not take --site (only cloudhal export does)",
     );
