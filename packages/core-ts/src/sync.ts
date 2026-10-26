@@ -20,6 +20,7 @@ import type { Asset } from "@cloudhal/core-contracts";
 import type { BlobStore, SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { mediaBlobKey } from "./assets.ts";
 import { InvariantError } from "./errors.ts";
+import { rebuildListValues } from "./list-values/backfill.ts";
 import {
   type BundleMedia,
   type CopySiteOptions,
@@ -37,6 +38,9 @@ import { blobMedia, siteTakedowns } from "./sync-restore.ts";
 export * from "./sync-bundle.ts";
 export { type ImportPlan, type ImportPlanOptions, planImport } from "./sync-plan.ts";
 export { restoreBundle } from "./sync-restore.ts";
+
+/** The list-value rebuild an import runs after its batch; the admin job does the rest. */
+const IMPORT_LIST_BUDGET = { entries: 5000, ms: 15_000 };
 
 /** Splits statements into batches that respect D1's per-batch limit. */
 async function runBatches(sql: SqlDriver, statements: SqlStatement[], size = 500): Promise<void> {
@@ -166,6 +170,11 @@ export async function importSite(
   // 4. The media ledger and `snapshot_blobs`; taken-down bytes never survive a copy.
   await runBatches(to.sql, writes.ledger);
   for (const key of writes.takedowns) await to.blobs.delete(key);
+  // 5. RFC-0042 §4: list values of the new node set (until then, listings scan; the job resumes).
+  if (!plan.unchanged)
+    await rebuildListValues(to.sql, { siteId: plan.siteId, budget: IMPORT_LIST_BUDGET }).catch(
+      (e: unknown) => log(`list values: not rebuilt yet (${(e as Error).message})`),
+    );
   log(
     `snapshots: ${writes.snapshots.length} added; nodes: ${plan.unchanged ? "unchanged" : `${writes.inserted} written, ${writes.deleted} replaced`}`,
   );
