@@ -1,5 +1,0 @@
----
-"@cloudhal/cli": patch
----
-
-Studio shows **Ended (collection rule)** beside the status of a published entry whose collection's expiry has passed (RFC-0042 §3.3, #113), in the collection list and in the entry editor's header. Until now such an entry looked plainly published while the site had already left it out of lists, or answered "not found". The badge explains itself on hover, from the keyboard and with a tap on touch screens. It names the date field, when the entry ended in the site's time zone, and what the site does: the page keeps its address but leaves lists, feeds, the sitemap and search, or the page answers "not found". Drafts, embargoed entries and entries whose own "Hide after" has passed get no badge (their own dates show in the editor's Schedule card). A translation reads its original's date only while the original is published, as the site does. The badge and its words load only for collections that have an expiry. Translations of the new words are AI drafts awaiting review.

@@ -1,5 +1,41 @@
 # @cloudhal/core-ts
 
+## 0.6.2
+
+### Patch Changes
+
+- 7223152: `importSite` (behind `cloudhal pull`, the admin bundle route `cloudhal push` uses, and `cloudhal import`) now checks a bundle's project row before inserting it: it must be the site node's project (`projectId`), a valid Project, with its `id` and `rev` columns matching its body. Before, a bundle could plant any projects row.
+- d91ef8f: Dependency patch updates (#115). `@cloudhal/api` depends on Better Auth 1.7.12 and on exactly the versions it uses itself: `@better-auth/core` and `@better-auth/api-key` 1.7.12, `@better-auth/utils` 0.5.0 and `better-call` 1.4.4. `@cloudhal/cloudflare` asks for zod ^4.6.7 (GHSA-mrhx-c7xc-m3w5 is fixed in 4.6.6). `@cloudhal/core-ts` and `@cloudhal/astro-renderer` use marked ^18.1.1. `@cloudhal/core-ts` and `@cloudhal/schedules` use temporal-polyfill 1.0.6. `@cloudhal/astro-renderer` uses vite ^8.3.5. The Studio shipped in `@cloudhal/cli` is built with React 19.3.1, TanStack Router 1.170.46 and TanStack Query 5.104.5. marked 18.1.1 splits a few unusual markdown inputs differently: a blockquote ends before an unquoted line that follows a heading, rule or HTML block, and indented HTML blocks interrupt a paragraph. A stored body like that keeps rendering and shows virtual block ids until its next write.
+- f73d05a: RFC-0042 §4, #110: `queryContentEntries` (the API's `GET /entries?where=…`, Studio's lists, MCP `list_entries`) answers `where`, `orderBy`, status, locale, `limit` and `offset` in SQL from the new `entry_list_values` side table once a collection is ready, instead of reading and evaluating the whole collection; results are the shared evaluator's, which stays the fallback (term filters, collections not ready, operands SQL cannot compare exactly) and the oracle of a seeded property suite on SQLite, D1 and Durable Object SQLite. On the 10,000-entry benchmark the store path drops from 124 ms CPU / 10,001 rows (SQLite) and 176 ms / 10,003 rows read (D1) to 0.6 ms / 22 rows and 5.3 ms / 5,068 rows read; a page at offset 4,980 costs about the same as the first.
+  
+  The store keeps the table exact. Entry creates, updates, moves and deletes write an entry's rows (its `listFields` values as `resolveFields` reads them) in their own batch, and an original's write rewrites its same-site translations' rows; site writes and field operations that change a collection's list definitions reset its readiness in the same batch, and imports reset the site's. A race never refuses a write: it marks the collection not ready. New `rebuildListValues(sql, options)` is the resumable, budgeted backfill (guarded per chunk, safe to run concurrently; `budget.statements` bounds every statement it issues, `start` rotates where a run begins, `tidy` removes rows of unlisted collections); `updateSite`, finished field operations and `importSite` run it for what they reset, and `openLocalStore` runs it on open. A field operation's revert resets every listed collection whose values its restored bodies change. `deleteContentEntry` behaves as before.
+  
+  `revertTagsToTerms` now leaves an entry that was edited after the migration's before-snapshot (by a concurrent write, or before a resumed run) as it is and reports it in `edited`, instead of restoring its earlier fields, status or collection.
+- f669266: `importSite`, used by `cloudhal pull`, by the admin bundle route `cloudhal push` uses, and by `cloudhal import`, now runs every check before it writes anything, the bootstrap conflict and the 1000-statement limit included, and plans the media ledger with them. A refused bundle leaves the target as it was; before, node bodies could land ahead of a conflict and snapshots ahead of the size limit. Only a storage failure can stop it between its writes, and importing the bundle again completes it. New checks, each before the first write:
+  
+  - Every node body the target lacks must be a valid contract document of the kind of each snapshot ref that points to it, with that ref's id and rev, of the bundle's site (precompiled validators). A body no snapshot references is refused. Before, a body was only checked against its hash, so a crafted bundle could put invalid content behind the published snapshot.
+  - Node and snapshot ids may not belong to another site of the target, each appears once, and no two nodes share a kind and key or a translation group and locale (the node batch's unique keys).
+  - Every takedown entry has its fields with their types (`reason`, `legal`, `by`, `at`).
+  - The media ledger (`snapshot_blobs`) reads the target's own asset bodies, never the bundle's text for a body the target already holds.
+  
+  New `planImport(to, bundle, options)` returns what an import would change, without writing:
+  
+  - the nodes added, changed and removed;
+  - the snapshots and node bodies to add;
+  - whether the project row is new;
+  - the listed media that are present, missing, of another size or taken down on the target;
+  - the bundle's takedowns, those whose bytes the target holds (an import deletes them) and those its ledger does not hold yet.
+  
+  With `report: true` it returns a bootstrap conflict and missing media instead of throwing them. A node body that is not JSON is refused as `blob <hash> is not JSON` instead of with the parser's message.
+- 786a455: New `restoreBundle(from, snapshot)`: a site bundle of one snapshot's nodes, rebuilt from the stored node bodies, for `importSite(…, { mode: "replace" })`, which checks it like any bundle. The site's working copy and published pointer become that snapshot's again (`cloudhal import --revert`, RFC-0039). Revs only move forward: a node the site holds at the snapshot's rev or a later one, with other content, comes back at the rev after its current one, so a Studio tab or agent still holding a rev that node had gets a conflict instead of saving over it; a node whose content already is the snapshot's is left as it is. It lists the media those nodes need and carries the store's takedowns among them, so taken-down content stays down; a missing node body, or one that is not the node its snapshot ref names, is refused before anything is written. `exportSite`'s output is unchanged.
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [6cb7945]
+- Updated dependencies [8a30e30]
+  - @cloudhal/schedules@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes

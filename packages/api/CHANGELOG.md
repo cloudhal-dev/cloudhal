@@ -1,5 +1,30 @@
 # @cloudhal/api
 
+## 0.6.2
+
+### Patch Changes
+
+- d91ef8f: Dependency patch updates (#115). `@cloudhal/api` depends on Better Auth 1.7.12 and on exactly the versions it uses itself: `@better-auth/core` and `@better-auth/api-key` 1.7.12, `@better-auth/utils` 0.5.0 and `better-call` 1.4.4. `@cloudhal/cloudflare` asks for zod ^4.6.7 (GHSA-mrhx-c7xc-m3w5 is fixed in 4.6.6). `@cloudhal/core-ts` and `@cloudhal/astro-renderer` use marked ^18.1.1. `@cloudhal/core-ts` and `@cloudhal/schedules` use temporal-polyfill 1.0.6. `@cloudhal/astro-renderer` uses vite ^8.3.5. The Studio shipped in `@cloudhal/cli` is built with React 19.3.1, TanStack Router 1.170.46 and TanStack Query 5.104.5. marked 18.1.1 splits a few unusual markdown inputs differently: a blockquote ends before an unquoted line that follows a heading, rule or HTML block, and indented HTML blocks interrupt a paragraph. A stored body like that keeps rendering and shows virtual block ids until its next write.
+- Updated dependencies [7223152]
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [f73d05a]
+- Updated dependencies [f73d05a]
+- Updated dependencies [6cb7945]
+- Updated dependencies [f669266]
+- Updated dependencies [77fa9e5]
+- Updated dependencies [786a455]
+- Updated dependencies [8a30e30]
+  - @cloudhal/core-ts@0.6.2
+  - @cloudhal/schedules@0.6.2
+  - @cloudhal/astro-renderer@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/mcp-server@0.6.2
+  - @cloudhal/analytics@0.6.2
+  - @cloudhal/comments@0.6.2
+  - @cloudhal/agent-runtime@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes

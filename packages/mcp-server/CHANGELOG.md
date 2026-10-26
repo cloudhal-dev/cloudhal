@@ -1,5 +1,28 @@
 # @cloudhal/mcp-server
 
+## 0.6.2
+
+### Patch Changes
+
+- f73d05a: `list_entries` with `orderBy` and `limit` lets the store page (in SQL once the collection's list values are ready, RFC-0042 §4, #110) instead of loading every match. Arguments, cursors and output are unchanged; without `orderBy` the list keeps its last-updated order.
+- 77fa9e5: render_page's long-line and input-label checks handle whitespace correctly again. A plain template literal ate the backslash, so the in-page script received `/s/` and `/s+/` instead of `/\s/` and `/\s+/`. As a result, long-line counted the letter "s" as blank and every real space and indentation run as text. input-label split `aria-labelledby` on the letter "s" and reported labelled inputs as unlabelled. The check parts are now `String.raw` templates.
+- Updated dependencies [7223152]
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [f73d05a]
+- Updated dependencies [6cb7945]
+- Updated dependencies [f669266]
+- Updated dependencies [786a455]
+- Updated dependencies [8a30e30]
+  - @cloudhal/core-ts@0.6.2
+  - @cloudhal/schedules@0.6.2
+  - @cloudhal/astro-renderer@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/analytics@0.6.2
+  - @cloudhal/comments@0.6.2
+  - @cloudhal/agent-runtime@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes

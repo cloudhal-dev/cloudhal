@@ -1,5 +1,22 @@
 # @cloudhal/comments
 
+## 0.6.2
+
+### Patch Changes
+
+- 8a30e30: The `./testing` subpath now ships. The published packages pointed `./testing` at `dist/src/testing.js` and `.d.ts`, but the build left those files out, so importing `@cloudhal/{storage,analytics,comments,schedules}/testing` failed with ERR_MODULE_NOT_FOUND. The suites run on your own vitest, 3 or later, which is an optional peer dependency. `@cloudhal/storage`'s Miniflare helpers also load your own `miniflare`, an optional peer of any version. The ranges are wide on purpose. When a direct dependency's optional peer does not match the copy in your project, npm stops with ERESOLVE, even if nothing imports `./testing`. No semver range matches the prerelease miniflare that wrangler currently brings in, so with a narrower range npm would install a second miniflare beside it.
+- Updated dependencies [7223152]
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [f73d05a]
+- Updated dependencies [6cb7945]
+- Updated dependencies [f669266]
+- Updated dependencies [786a455]
+- Updated dependencies [8a30e30]
+  - @cloudhal/core-ts@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
 ## 0.6.1
 
 ### Patch Changes
