@@ -201,8 +201,8 @@ catalogs:
       specifier: 6.5.2
       version: 6.5.2
     '@codemirror/language':
-      specifier: 6.12.4
-      version: 6.12.4
+      specifier: 6.13.1
+      version: 6.13.1
     '@codemirror/state':
       specifier: 6.7.6
       version: 6.7.6
@@ -520,178 +520,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 5.0.5(@types/node@26.6.5)(happy-dom@21.0.4)(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  examples/newsroom:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/newsroom-ja:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/smoke:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/starter-demo:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
-
-  examples/studio-demo:
-    dependencies:
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-
-  examples/ui-audit:
-    dependencies:
-      '@astrojs/cloudflare':
-        specifier: 'catalog:'
-        version: 14.3.4(@types/node@26.6.5)(astro@7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(wrangler@4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5))(yaml@2.9.1)
-      '@cloudhal/astro-renderer':
-        specifier: workspace:*
-        version: link:../../packages/astro-renderer
-      '@cloudhal/cli':
-        specifier: workspace:*
-        version: link:../../packages/cli
-      '@cloudhal/core-ts':
-        specifier: workspace:*
-        version: link:../../packages/core-ts
-      '@tailwindcss/vite':
-        specifier: 'catalog:'
-        version: 4.3.3(vite@8.3.5(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-      astro:
-        specifier: 'catalog:'
-        version: 7.3.6(@types/node@26.6.5)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
-      better-sqlite3:
-        specifier: 'catalog:'
-        version: 13.0.3
-      tailwindcss:
-        specifier: 'catalog:'
-        version: 4.3.3
-    devDependencies:
-      '@cloudhal/cloudflare':
-        specifier: workspace:*
-        version: link:../../packages/cloudflare
-      wrangler:
-        specifier: 'catalog:'
-        version: 4.148.0(@cloudflare/workers-types@5.20261007.1)(@types/node@26.6.5)
 
   packages/agent-runtime:
     dependencies:
@@ -1256,7 +1084,7 @@ importers:
         version: 6.5.2
       '@codemirror/language':
         specifier: 'catalog:'
-        version: 6.12.4
+        version: 6.13.1
       '@codemirror/state':
         specifier: 'catalog:'
         version: 6.7.6
@@ -1937,14 +1765,17 @@ packages:
   '@codemirror/lang-markdown@6.5.2':
     resolution: {integrity: sha512-AwBOdkWYuA//WcM0xO5PfHPUcmz/O2i5o0Nsg1U69SII/loCJlFI1Romd9xp2HYb1kYJRGZotyqRghuHH5n8Kw==}
 
-  '@codemirror/language@6.12.4':
-    resolution: {integrity: sha512-1q4PaT+o6PbgpkJt4Q8Fv5XJxTy4FUZ4MWETtyiDw3J0Pyr9E2vqcKL+k9wcvjNTIsauxvE7OfmWj3FRPHQ76A==}
+  '@codemirror/language@6.13.1':
+    resolution: {integrity: sha512-zfvU2r3TyylQLMj/te+5CnQ0rSqZi8B1oTCBbQkagcLW4Xc6imab6qN+pEJhsuNOLaJqiRyBXp9UhWA1DhVvDw==}
 
   '@codemirror/lint@6.9.7':
     resolution: {integrity: sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg==}
 
   '@codemirror/state@6.7.6':
     resolution: {integrity: sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==}
+
+  '@codemirror/streamparser@6.0.0':
+    resolution: {integrity: sha512-JTFPF6xrfjt0mnfGPgzcLiMwYmvIyNaoizp8BYzv8FE8KrT6GBGDZ190rtt+O7Wke3gG/MFHyiY9YGNeimof4w==}
 
   '@codemirror/view@6.43.15':
     resolution: {integrity: sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==}
@@ -5604,14 +5435,14 @@ snapshots:
 
   '@codemirror/autocomplete@6.20.3':
     dependencies:
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.6
       '@codemirror/view': 6.43.15
       '@lezer/common': 1.5.3
 
   '@codemirror/commands@6.11.1':
     dependencies:
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.6
       '@codemirror/view': 6.43.15
       '@lezer/common': 1.5.3
@@ -5619,7 +5450,7 @@ snapshots:
   '@codemirror/lang-css@6.3.1':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.6
       '@lezer/common': 1.5.3
       '@lezer/css': 1.3.9
@@ -5629,7 +5460,7 @@ snapshots:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/lang-css': 6.3.1
       '@codemirror/lang-javascript': 6.2.5
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.6
       '@codemirror/view': 6.43.15
       '@lezer/common': 1.5.3
@@ -5639,7 +5470,7 @@ snapshots:
   '@codemirror/lang-javascript@6.2.5':
     dependencies:
       '@codemirror/autocomplete': 6.20.3
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/lint': 6.9.7
       '@codemirror/state': 6.7.6
       '@codemirror/view': 6.43.15
@@ -5650,15 +5481,16 @@ snapshots:
     dependencies:
       '@codemirror/autocomplete': 6.20.3
       '@codemirror/lang-html': 6.4.12
-      '@codemirror/language': 6.12.4
+      '@codemirror/language': 6.13.1
       '@codemirror/state': 6.7.6
       '@codemirror/view': 6.43.15
       '@lezer/common': 1.5.3
       '@lezer/markdown': 1.8.0
 
-  '@codemirror/language@6.12.4':
+  '@codemirror/language@6.13.1':
     dependencies:
       '@codemirror/state': 6.7.6
+      '@codemirror/streamparser': 6.0.0
       '@codemirror/view': 6.43.15
       '@lezer/common': 1.5.3
       '@lezer/highlight': 1.2.5
@@ -5674,6 +5506,8 @@ snapshots:
   '@codemirror/state@6.7.6':
     dependencies:
       '@marijn/find-cluster-break': 1.0.4
+
+  '@codemirror/streamparser@6.0.0': {}
 
   '@codemirror/view@6.43.15':
     dependencies:
