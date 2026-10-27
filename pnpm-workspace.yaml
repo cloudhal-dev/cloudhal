@@ -27,7 +27,7 @@ catalog:
   astro: ^7.3.6
   "@astrojs/cloudflare": 14.3.4
   "@astrojs/starlight": 0.42.6
-  wrangler: 4.148.0
+  wrangler: 4.152.0
   "@tailwindcss/vite": ^4.3.3
   tailwindcss: ^4.3.3
   marked: ^18.1.1
