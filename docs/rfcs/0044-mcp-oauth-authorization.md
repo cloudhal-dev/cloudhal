@@ -292,8 +292,8 @@ controls, because the endpoint is anonymous:
    `client_uri`, `tos_uri`, `policy_uri` are stored but never rendered (RFC 7591 §5:
    self-asserted; the consent screen shows the redirect host instead); `grant_types` ⊆
    {`authorization_code`, `refresh_token`}; `response_types` = [`code`];
-   `token_endpoint_auth_method` ∈ {`none`, `private_key_jwt`} (no shared secrets are minted for DCR clients: nothing to leak);
-   `application_type` honoured for loopback rules.
+   `token_endpoint_auth_method` ∈ {`none`, `private_key_jwt`} (no shared secrets are minted for
+   DCR clients: nothing to leak); `application_type` honoured for loopback rules.
 3. `redirect_uris`: each must be `https://` or loopback (`http://localhost`, `http://127.0.0.1`,
    `http://[::1]`); at most 10.
 4. Lifetime: a DCR client with no live grant 30 days after registration is deleted by the
