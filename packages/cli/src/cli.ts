@@ -13,7 +13,10 @@ export const OPTIONS = {
   name: { type: "string" },
   starter: { type: "string" },
   port: { type: "string" },
-  host: { type: "boolean" },
+  host: { type: "string" },
+  "base-url": { type: "string" },
+  "behind-proxy": { type: "boolean" },
+  "init-if-empty": { type: "boolean" },
   label: { type: "string" },
   publish: { type: "boolean" },
   snapshot: { type: "string" },
@@ -84,7 +87,35 @@ const ONLY_FOR: Readonly<
   "no-media": { commands: ["export"] },
   "latest-only": { commands: ["export"] },
   "cancel-schedules": { commands: ["push"] },
+  "base-url": { commands: ["studio"] },
+  "behind-proxy": { commands: ["studio"] },
+  "init-if-empty": { commands: ["studio"] },
 };
+
+/**
+ * Flags whose value may be left out (`cloudhal dev --host`, as before `--host` took an address):
+ * the value they then stand for. `parseArgs` has no optional values, so a bare flag — at the end,
+ * or followed by another flag — gets it filled in first.
+ */
+const OPTIONAL_VALUE: Readonly<Record<string, string>> = { host: "0.0.0.0" };
+
+export function fillOptionalValues(argv: string[]): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i] as string;
+    out.push(arg);
+    if (arg === "--") {
+      out.push(...argv.slice(i + 1));
+      break;
+    }
+    const flag = arg.startsWith("--") ? arg.slice(2) : undefined;
+    const fill = flag && Object.hasOwn(OPTIONAL_VALUE, flag) ? OPTIONAL_VALUE[flag] : undefined;
+    if (fill === undefined) continue;
+    const next = argv[i + 1];
+    if (next === undefined || next.startsWith("-")) out.push(fill);
+  }
+  return out;
+}
 
 function refuseForeignFlags(command: string, values: Record<string, unknown>): void {
   for (const [flag, only] of Object.entries(ONLY_FOR))
@@ -105,7 +136,7 @@ export const COMMANDS: Record<string, CliCommand> = {
 
 export async function main(argv: string[]): Promise<number> {
   const { values, positionals } = parseArgs({
-    args: argv,
+    args: fillOptionalValues(argv),
     allowPositionals: true,
     options: OPTIONS,
   });

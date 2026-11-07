@@ -1,0 +1,6 @@
+---
+"@cloudhal/cli": patch
+"@cloudhal/api": patch
+---
+
+Self-hosting (#143): `cloudhal studio` can be reached from beyond the machine it runs on. `--host <addr>` (or `CLOUDHAL_HOST`) is the address it listens on (default `127.0.0.1`; `0.0.0.0` in a container), `--base-url <url>` (or `CLOUDHAL_BASE_URL`) the public origin behind a reverse proxy — Better Auth's `baseURL` (its session cookies are `Secure` for https), a trusted origin for the API's CSRF check, and the URL the command prints — and `--behind-proxy` (or `CLOUDHAL_BEHIND_PROXY=1`) makes the server take each request's scheme and host from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host` (`serveNode`'s new `trustProxy`, with `forwardedUrl` / `forwardedRequest` in `@cloudhal/api/node`); without the flag those headers are ignored, as before. `--init-if-empty` (or `CLOUDHAL_INIT=<starter>`, with `--starter`, `--name` / `CLOUDHAL_SITE_NAME`) creates the project the way `cloudhal init` does when the folder has no `cloudhal.json`, so a container starts on an empty volume; a folder with other files is refused, as `init` refuses it. `studio()` returns the bound `port` next to `url`. `cloudhal dev --host` now also takes an address (`--host [<addr>]`; alone it still means every interface).
