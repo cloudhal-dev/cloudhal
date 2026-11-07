@@ -17,6 +17,7 @@ import type { Context } from "hono";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { BuildHub } from "./build.ts";
 import type { MailSender } from "./mail.ts";
+import type { McpOauthOptions } from "./mcp-oauth.ts";
 import type { PlaygroundOptions } from "./playground.ts";
 import type { AiDeps } from "./routes/ai.ts";
 import type { UploadSecret } from "./uploads.ts";
@@ -42,6 +43,11 @@ export interface McpMountOptions {
   readonly media?: MediaToolOptions | undefined;
   /** A browser for `render_page` (RFC-0021 §4). */
   readonly render?: RenderDeps | undefined;
+  /**
+   * RFC-0044 §1: OAuth discovery for remote clients (the `WWW-Authenticate` challenge, the RFC 9728
+   * documents, the `insufficient_scope` step-up). Absent: `/mcp` answers a bare 401, as before.
+   */
+  readonly oauth?: McpOauthOptions | undefined;
 }
 
 export interface ApiDeps {

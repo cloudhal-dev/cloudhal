@@ -34,7 +34,10 @@ async function fullApp() {
     authHandler: auth.handler,
     agentKeys: auth.agentKeys,
     staff: auth.staff,
-    mcp: { stateKey: "route-scopes-state-key-0123456789abcdefg" },
+    mcp: {
+      stateKey: "route-scopes-state-key-0123456789abcdefg",
+      oauth: { issuer: "http://localhost/api/auth", resource: "http://localhost/mcp" },
+    },
     preview: { secret: "route-scopes-preview-secret-0123456789ab" },
     admin: { deployToken: "route-scopes-deploy-token-0123456789abc", storage: { sql, blobs } },
     analytics: new AnalyticsService({ sql, store: "sql", live: new SqlAnalytics(sql) }),

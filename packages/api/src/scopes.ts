@@ -39,6 +39,10 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["GET", "/api/auth/*", "public"],
   ["POST", "/api/auth/*", "public"],
   ["ALL", "/mcp", "signed-in"],
+  // RFC-0044 §1: OAuth discovery (served only with `mcp.oauth`; outside `/api`, so `routeGuard`
+  // never sees them, but every mounted route is declared).
+  ["GET", "/.well-known/oauth-protected-resource", "public"],
+  ["GET", "/.well-known/oauth-protected-resource/mcp", "public"],
   ["GET", "/api/me", "signed-in"],
 
   // operator (deployment token)
