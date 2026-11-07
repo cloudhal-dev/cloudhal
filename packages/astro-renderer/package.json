@@ -85,7 +85,7 @@
     "@cloudhal/comments": "workspace:*"
   },
   "peerDependencies": {
-    "astro": "^7.3.0",
+    "astro": "^7.4.0",
     "@astrojs/cloudflare": "^14.3.0"
   },
   "devDependencies": {
