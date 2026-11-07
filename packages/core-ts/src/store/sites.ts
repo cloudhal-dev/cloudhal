@@ -7,6 +7,8 @@ import { ConflictError, InvariantError, isOpGuardViolation, NotFoundError } from
 import { nodeHash } from "../hash.ts";
 import { checkHosts, hostStatements, hostsOf } from "../hosts.ts";
 import { ID_PREFIX } from "../ids.ts";
+import { settleListValues } from "../list-values/backfill.ts";
+import { planListState } from "../list-values/site-plan.ts";
 import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, insertNodeStatement } from "../node-sql.ts";
 import { type Creatable, uniquenessKey } from "../nodes.ts";
@@ -45,11 +47,14 @@ export class SiteEngine {
     // RFC-0034 §4: a hostname belongs to one site of the installation.
     const hosts = hostsOf(site);
     await checkHosts(this.#ctx.sql, hosts);
+    const hash = await nodeHash(site);
+    // RFC-0042 §4: a new site's listed collections are empty, so their list values are ready.
+    const lists = await planListState(undefined, site);
     await this.#ctx.runUnique(
       await insertNodeStatement("site", site, ts),
       "site",
       uniquenessKey("site", site),
-      hostStatements(hosts, { siteId: site.id, hash: await nodeHash(site) }),
+      [...hostStatements(hosts, { siteId: site.id, hash }), ...lists.statements(hash, ts)],
     );
     return site;
   }
@@ -114,6 +119,8 @@ export class SiteEngine {
     const refs = await this.#ctx.assets.planRefs("site", site.id, next, stored);
     const written = refs.node;
     if (options.dryRun) return written;
+    // RFC-0042 §4: a collection whose list definitions change is not ready until rebuilt.
+    const lists = await planListState(stored, written);
     const s = await casUpdateStatement(
       "site",
       written,
@@ -126,6 +133,7 @@ export class SiteEngine {
       ...(extra?.({ siteId: site.id, hash }, written.updatedAt) ?? []),
       ...refs.statements(hash),
       ...((await permalinks?.statements(hash)) ?? []),
+      ...lists.statements(hash, written.updatedAt),
     ];
     const r = await this.#run(s, more);
     if (r.changes !== 1) {
@@ -139,6 +147,8 @@ export class SiteEngine {
       }
       throw new ConflictError("site", site.id, site.rev, rev);
     }
+    if (lists.changed.length > 0)
+      await settleListValues(this.#ctx.sql, site.id, { collections: lists.changed });
     return written;
   }
 

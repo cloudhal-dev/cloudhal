@@ -15,10 +15,20 @@ import { localComments } from "./comments-local.ts";
 import { terminalMailSender } from "./mail-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
+import {
+  initIfEmpty,
+  resolveStudioInit,
+  resolveStudioServer,
+  type StudioInitFlags,
+  type StudioServerFlags,
+  studioAuthOrigins,
+  studioUrl,
+} from "./studio-options.ts";
 
-export interface StudioOptions {
+export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
   readonly projectDir: string;
-  readonly port?: number;
+  /** Progress lines (the first-run scaffold); default: nothing. */
+  readonly log?: (line: string) => void;
   /** Directory of a built Studio (`apps/studio/dist`). Defaults to the monorepo build when present. */
   readonly studioDist?: string;
   /** Skip authentication (local scripts only). */
@@ -51,7 +61,15 @@ export function isApiPath(pathname: string): boolean {
  */
 export async function studio(
   options: StudioOptions,
-): Promise<{ url: string; stop(): Promise<void> }> {
+): Promise<{ url: string; port: number; stop(): Promise<void> }> {
+  // Self-hosting (#143): where to listen, the public origin, the proxy headers, the first run.
+  const server = resolveStudioServer(options);
+  const scaffold = resolveStudioInit(options);
+  if (scaffold) {
+    const log = options.log ?? (() => {});
+    if (await initIfEmpty(options.projectDir, { ...scaffold, log }))
+      log(`created a new "${scaffold.starter}" project in ${options.projectDir}`);
+  }
   const cfg = await readProjectConfig(options.projectDir);
   // The theme's block types (RFC-0015 §6) join the built-ins, and its design settings
   // (RFC-0017 §1) check `Site.theme.config`: validated, offered, listed.
@@ -84,6 +102,7 @@ export async function studio(
           // RFC-0008 §11.1: the broken-link sweep's 404 rows
           ...(analytics.feature().enabled ? { analytics } : {}),
         });
+  const origins = studioAuthOrigins(server);
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,
@@ -102,11 +121,8 @@ export async function studio(
     // RFC-0016: Workers AI over REST when the environment has an account id and a token (never
     // stored); the settings are kept either way.
     ai: { store: new AiStore(local.sql), ...localAiTransport() },
-    // The Studio dev server (vite, :5173) proxies /api here during Studio development.
-    trustedOrigins: [
-      "http://localhost:5173",
-      ...(process.env.CLOUDHAL_TRUSTED_ORIGINS?.split(",") ?? []),
-    ],
+    // The Studio dev server, the public origin and CLOUDHAL_TRUSTED_ORIGINS (studio-options.ts).
+    trustedOrigins: origins.trustedOrigins,
     // Without auth anyone who can reach the port could write; answer localhost names only.
     ...(options.noAuth ? { allowedHosts: ["localhost", "127.0.0.1", "[::1]"] } : {}),
     mcp: {
@@ -123,9 +139,10 @@ export async function studio(
     const { createAuthFor } = await import("@cloudhal/api/auth/node");
     const auth = await createAuthFor({
       dataDir: local.dataDir,
-      baseURL: `http://localhost:${options.port ?? 8787}`,
+      // The public origin when there is one (its cookies are `Secure` behind https).
+      baseURL: origins.baseURL,
       // Better Auth checks Origin on browser POSTs itself; the Studio dev server must pass too.
-      trustedOrigins: deps.trustedOrigins ?? [],
+      trustedOrigins: origins.trustedOrigins,
     });
     deps = {
       ...deps,
@@ -150,13 +167,18 @@ export async function studio(
     app.get("*", (c, next) => (isApiPath(c.req.path) ? next() : spa(c, next)));
   }
 
-  const { server, port } = await serveNode(app, { port: options.port ?? 8787 });
+  const listening = await serveNode(app, {
+    port: server.port,
+    hostname: server.hostname,
+    trustProxy: server.behindProxy,
+  });
   return {
-    url: `http://localhost:${port}/`,
+    url: studioUrl(server, listening.port),
+    port: listening.port,
     stop: async () => {
       stopRollups();
       ticker?.stop();
-      await new Promise<void>((resolve) => server.close(() => resolve()));
+      await new Promise<void>((resolve) => listening.server.close(() => resolve()));
       await local.close();
     },
   };

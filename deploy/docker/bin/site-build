@@ -1,0 +1,13 @@
+#!/bin/sh
+# Builds the public site: static HTML from the published snapshot into /data/dist, which a web
+# server (the compose file's Caddy) serves. The project's dependencies are the image's
+# node_modules, linked into the project on first use, so no install and no network is needed.
+#   docker compose exec cloudhal site-build
+set -eu
+cd /data
+if [ ! -f cloudhal.json ]; then
+  echo "site-build: no project in /data yet; start the container once first" >&2
+  exit 1
+fi
+[ -e node_modules ] || ln -s /opt/cloudhal/node_modules node_modules
+exec cloudhal build "$@"

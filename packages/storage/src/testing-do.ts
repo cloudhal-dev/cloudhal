@@ -1,8 +1,9 @@
 /**
  * Test harness for `DoSqliteDriver` (RFC-0036 §2 invariant 6). A Miniflare Worker holds a test-only,
  * SQLite-backed Durable Object that runs the real driver on its own `ctx.storage`; from Node, every
- * `SqlDriver` call is one request to that object. Suites written for any `SqlDriver` (the storage
- * conformance suite, core-ts's behavioural suite) thereby run against Durable Object SQLite.
+ * `SqlDriver` call is one request to that object, sent over kept-alive connections. Suites written
+ * for any `SqlDriver` (the storage conformance suite, core-ts's behavioural suite) thereby run
+ * against Durable Object SQLite.
  */
 import {
   BlobIntegrityError,
@@ -54,10 +55,7 @@ const revive = (_k: string, v: unknown) =>
     ? new Uint8Array(Buffer.from((v as { $b: string }).$b, "base64"))
     : v;
 
-type Dispatch = (
-  url: string,
-  init: { method: string; body: string },
-) => Promise<{ text(): Promise<string> }>;
+type Dispatch = (path: string, body: string) => Promise<string>;
 
 /** Node-side `SqlDriver` whose every call runs `DoSqliteDriver` inside the test Durable Object. */
 class RemoteDoSqliteDriver implements SqlDriver {
@@ -71,11 +69,8 @@ class RemoteDoSqliteDriver implements SqlDriver {
   }
 
   async #call<T>(op: string, args: unknown[]): Promise<T> {
-    const res = await this.#dispatch(`http://do.test/?db=${encodeURIComponent(this.#db)}`, {
-      method: "POST",
-      body: encode({ op, args }),
-    });
-    const out = JSON.parse(await res.text(), revive) as {
+    const text = await this.#dispatch(`/?db=${encodeURIComponent(this.#db)}`, encode({ op, args }));
+    const out = JSON.parse(text, revive) as {
       ok?: T;
       error?: { name: string; message: string };
     };
@@ -102,6 +97,50 @@ class RemoteDoSqliteDriver implements SqlDriver {
     await this.#call("exec", [sql]);
   }
   async close() {}
+}
+
+/**
+ * Miniflare 4's `dispatchFetch` sets undici's `reset` on every request, so each call closed its
+ * connection and left a local port in TIME_WAIT for 30 s; the Durable Object suites exhausted the
+ * ephemeral ports on macOS (#116). Calls go straight to the entry socket instead, over kept-alive
+ * connections; idle ones close after 1 s. The entry worker routes a plain request to the only
+ * Worker by URL, and the Worker reads only `?db=` and the body.
+ */
+async function keepAliveDispatch(entry: URL): Promise<{ dispatch: Dispatch; close(): void }> {
+  const { Agent, request } = await import("node:http");
+  const agent = new Agent({ keepAlive: true, maxSockets: 4, timeout: 1_000 });
+  const dispatch: Dispatch = (path, body) =>
+    new Promise((resolve, reject) => {
+      const headers = {
+        "content-length": Buffer.byteLength(body),
+        "MF-Disable-Pretty-Error": "true",
+      };
+      const url = new URL(path, entry).href;
+      const req = request(url, { method: "POST", agent, headers }, (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        // A connection that closes mid-body (workerd exiting, `close()` during a call) ends the
+        // response without 'end', and the request emits no 'error' once a response exists.
+        res.on("error", reject);
+        res.on("close", () => {
+          if (!res.complete)
+            reject(new Error("do-sqlite test harness: connection closed mid-response"));
+        });
+        res.on("end", () => {
+          const text = Buffer.concat(chunks).toString("utf8");
+          // The Worker answers 200 for everything the driver does, its errors included. Anything
+          // else is the harness failing: a plain Error, so it never passes `toThrow(StorageError)`.
+          if (res.statusCode === 200) resolve(text);
+          else
+            reject(
+              new Error(`do-sqlite test harness: HTTP ${res.statusCode}: ${text.slice(0, 200)}`),
+            );
+        });
+      });
+      req.on("error", reject);
+      req.end(body);
+    });
+  return { dispatch, close: () => agent.destroy() };
 }
 
 /**
@@ -137,10 +176,12 @@ export async function createMiniflareDoSqlite(): Promise<{
     ],
     durableObjects: { DB: { className: "TestDb", useSQLite: true } },
   });
-  await mf.ready;
-  const dispatch: Dispatch = (url, init) => mf.dispatchFetch(url, init);
+  const http = await keepAliveDispatch(await mf.ready);
   return {
-    driver: (db = "default") => new RemoteDoSqliteDriver(dispatch, db),
-    dispose: () => mf.dispose(),
+    driver: (db = "default") => new RemoteDoSqliteDriver(http.dispatch, db),
+    dispose: async () => {
+      http.close();
+      await mf.dispose();
+    },
   };
 }

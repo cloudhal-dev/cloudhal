@@ -67,6 +67,9 @@ export const messages = {
       unavailableHint:
         "On Cloudflare, AI uses the Worker's binding; locally, set CLOUDFLARE_ACCOUNT_ID and CLOUDHAL_AI_TOKEN.",
       settings: "Open settings",
+      /** RFC-0036 §5: the playground leaves AI out; under "Available in your own install". */
+      playgroundHint:
+        "“Build with AI” runs on Workers AI, which the playground leaves out. Deploy Cloudhal to your Cloudflare account to use it.",
       /** RFC-0020 §6: picking a part of the page in the preview to aim the next brief at it. */
       pick: "Pick",
       picking: "Click a part of the page",

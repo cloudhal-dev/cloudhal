@@ -37,7 +37,7 @@ The open stage 3 items from RFC-0040 and RFC-0041 address these: structured data
    - Sorting only by number, date or datetime.
    - `now` is the only relative value (no offsets).
    - One in-memory evaluator (`fields/query.ts`) is shared by themes (`queryEntries`), `ContentList`, the API, MCP and Studio.
-   - No indexes in stage 3. A side table follows only if the 10,000-entry benchmark shows more than 50 ms CPU or more than 10,000 rows read per list.
+   - Step 3's benchmark exceeded the threshold (more than 50 ms CPU or 10,000 rows read per list) on the store, API and MCP path, so `entry_list_values` landed in stage 3 (#110): rows of resolved list-field values, written in the entry's batch; per-collection readiness with a fingerprint and a resumable backfill; the in-memory evaluator stays the fallback and the oracle. Themes and snapshots are unchanged.
    - Studio list columns and filters come from `listFields`.
 5. **Index pages and feeds:**
    - A collection's index page is an ordinary page made by "Create listing page", with a `contentList`; there is no `indexPath`.
@@ -56,9 +56,11 @@ The open stage 3 items from RFC-0040 and RFC-0041 address these: structured data
   - Collections get index pages and feeds.
 - Negative:
   - The structured-data table must follow Google's documentation.
-  - Unindexed listings scan a collection in memory.
+  - Listings scan a collection in memory until its list index is ready.
+  - Every entry write carries two list-value housekeeping statements.
   - Collection settings grow again.
 - Risks:
   - **JSON-LD injection:** mitigated by `jsonLdText` and plain-text constants.
   - **Gates on old site Workers:** guarded by the `gates: 2` feature flag.
   - **Mapping drift:** if a mapped field changes, the operations and `list_field_in_use` refuse or report it.
+  - **A stale list index:** never read; every statement checks readiness under the current definitions' fingerprint.

@@ -368,6 +368,7 @@ export interface MessageParams {
   "listings.contentList.ops.lt": { kind: "time" | "number" };
   "listings.contentList.ops.lte": { kind: "time" | "number" };
   "listings.createPage.exists": { path: string | number };
+  "listings.ended.reason": { action: "unlist" | "hide"; time: string | number; zone: string | number; field: string | number };
   "listings.expiry.past": { count: number };
   "listings.filters.any": { label: string | number };
   "listings.filters.is": { label: string | number; value: string | number };

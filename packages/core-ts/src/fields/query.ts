@@ -1,8 +1,8 @@
 /**
  * RFC-0042 §4: listings by field. One evaluator for every caller — themes (`queryEntries`),
  * `contentList` sections, the API, MCP and Studio's list columns — following `filter.ts`'s pattern
- * (one parser, one meaning). It runs in memory after the store's collection prefilter, so SQL and
- * in-memory results cannot drift. Pure, Worker-safe and Temporal-free.
+ * (one parser, one meaning). It defines every answer: the store's SQL over `entry_list_values`
+ * (#110) is checked against it, and it runs whenever that cannot. Pure, Worker-safe, Temporal-free.
  *
  * | Field type | `where` ops | `orderBy` | `value` |
  * |---|---|---|---|
@@ -251,7 +251,7 @@ export function parseFieldQuery(
 }
 
 /** A comparable form of a resolved value: a number, a day string, or undefined. */
-function sortKey(def: FieldDefinition, value: unknown): number | string | undefined {
+export function sortKey(def: FieldDefinition, value: unknown): number | string | undefined {
   if (value === undefined || value === null) return undefined;
   if (def.type === "number") return typeof value === "number" ? value : undefined;
   if (def.type === "date") return typeof value === "string" ? value : undefined;
@@ -264,7 +264,7 @@ function sortKey(def: FieldDefinition, value: unknown): number | string | undefi
 }
 
 /** An operand's comparable form at `now`. */
-function operandKey(
+export function operandKey(
   o: FieldOperand,
   def: FieldDefinition,
   now: number,

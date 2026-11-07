@@ -1,5 +1,55 @@
 # @cloudhal/mcp-server
 
+## 0.6.2
+
+### Patch Changes
+
+- f73d05a: `list_entries` with `orderBy` and `limit` lets the store page (in SQL once the collection's list values are ready, RFC-0042 §4, #110) instead of loading every match. Arguments, cursors and output are unchanged; without `orderBy` the list keeps its last-updated order.
+- 77fa9e5: render_page's long-line and input-label checks handle whitespace correctly again. A plain template literal ate the backslash, so the in-page script received `/s/` and `/s+/` instead of `/\s/` and `/\s+/`. As a result, long-line counted the letter "s" as blank and every real space and indentation run as text. input-label split `aria-labelledby` on the letter "s" and reported labelled inputs as unlabelled. The check parts are now `String.raw` templates.
+- Updated dependencies [7223152]
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [f73d05a]
+- Updated dependencies [6cb7945]
+- Updated dependencies [f669266]
+- Updated dependencies [786a455]
+- Updated dependencies [8a30e30]
+  - @cloudhal/core-ts@0.6.2
+  - @cloudhal/schedules@0.6.2
+  - @cloudhal/astro-renderer@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/analytics@0.6.2
+  - @cloudhal/comments@0.6.2
+  - @cloudhal/agent-runtime@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
+## 0.6.1
+
+### Patch Changes
+
+- 40dbfcb: Gaps an agent hit building a site through MCP:
+  
+  - **Section-only theme blocks in article bodies are refused.** A theme block type with `where: ["section"]` (say `link-cards`) has no component in an article, and drew "unknown component" there. `create_entry`/`update_entry` now refuse it inside a body ```` ```surface ```` fence (`invalid_surface`, with the component's path); primitives, built-in blocks and theme blocks that allow `body` stay. `get_catalog`'s "In article bodies" lists which blocks a body may use and which are page sections only.
+  - **`list_entries` lists every collection by default**, not only `posts`: a site whose articles live in `blog` got `[]`. `where`/`orderBy` need the collection whose list fields they use; without one they are refused (`invalid_query` at `collection`) instead of ignored.
+  - **`long-line` gives a text column one verdict.** It counted characters over a rounded line count, so how full a paragraph's last line was decided whether it passed, and identical paragraphs in one column disagreed. It now counts the characters on each rendered line, leaves each paragraph's last line out, and pools the paragraphs of one width and font: one example per column, with its width and how many paragraphs it holds.
+  - **Blog starter:** a primary surface `Button` in an article body keeps its `on-brand` text; the body's link colour no longer applies to buttons (it failed contrast at 2.5:1 light, 1.3:1 dark).
+- 92c3867: Theme scripts work on deployed sites, and `render_page` says when they would not.
+  
+  - The `cloudhal()` integration no longer lets Astro inline a component's `<script>` (under 4 KB) into the page, where the Site Worker's `script-src 'self'` blocked it: script chunks always ship as files (`build.assetsInlineLimit`), other assets keep the project's own limit. A theme that set `vite.build.assetsInlineLimit` itself for this can drop it.
+  - `cloudhal dev` sends the Site Worker's policy as `Content-Security-Policy-Report-Only` on pages without their own, so the browser console shows what a deploy would block without breaking Vite's dev client.
+  - `render_page` and `cloudhal render` gain two checks: `surface-broken` (a body ```` ```surface ```` fence the preview cannot draw, or a component with an unknown block type or props that do not fit, named with the problem) and `script-blocked` (a script the page's CSP refused, inline or by URL; under `cloudhal dev`'s report-only policy, what a deploy would block).
+- Updated dependencies [40dbfcb]
+- Updated dependencies [028f396]
+- Updated dependencies [92c3867]
+  - @cloudhal/core-ts@0.6.1
+  - @cloudhal/astro-renderer@0.6.1
+  - @cloudhal/comments@0.6.1
+  - @cloudhal/agent-runtime@0.6.1
+  - @cloudhal/analytics@0.6.1
+  - @cloudhal/core-contracts@0.6.1
+  - @cloudhal/schedules@0.6.1
+  - @cloudhal/storage@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes

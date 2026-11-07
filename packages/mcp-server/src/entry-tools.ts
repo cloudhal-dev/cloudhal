@@ -42,11 +42,13 @@ const listEntriesTool: ToolDefinition = {
   name: "list_entries",
   title: "List articles",
   description:
-    'Content entries, newest first. `collection` defaults to posts (unless the filter names one). `filter` selects by terms (RFC-0002 grammar): clauses joined by "+" (AND), "[a,b]" = either, "-" = none of, "primary:category:x" = primary term, "category:x>*" = x or a sub-category, "collection:posts"; values are term slugs (old slugs work) or ids. Example: "category:news+tag:[ai,llm]+-tag:sponsored". `where`/`orderBy` filter and sort by the collection\'s list fields (RFC-0042; list_collections → listFields), e.g. upcoming events: where [{"field":"startsAt","op":"gte","value":"now"}], orderBy {"field":"startsAt","direction":"asc"}; `limit` pages the answer (total, nextCursor → cursor).',
+    'Content entries, newest first. Without `collection` (or a "collection:" filter clause), entries of every collection; each entry carries its `collection`. `filter` selects by terms (RFC-0002 grammar): clauses joined by "+" (AND), "[a,b]" = either, "-" = none of, "primary:category:x" = primary term, "category:x>*" = x or a sub-category, "collection:posts"; values are term slugs (old slugs work) or ids. Example: "category:news+tag:[ai,llm]+-tag:sponsored". `where`/`orderBy` filter and sort by the collection\'s list fields (RFC-0042; list_collections → listFields), e.g. upcoming events: where [{"field":"startsAt","op":"gte","value":"now"}], orderBy {"field":"startsAt","direction":"asc"}; `limit` pages the answer (total, nextCursor → cursor).',
   inputSchema: obj(
     {
       siteId: id,
-      collection: str("Collection slug", { default: "posts", pattern: SLUG_PATTERN }),
+      collection: str("Collection slug; leave out for every collection", {
+        pattern: SLUG_PATTERN,
+      }),
       filter: str("Filter over term assignments, e.g. category:news+tag:ai", {
         minLength: 1,
         maxLength: 512,
@@ -81,9 +83,8 @@ const listEntriesTool: ToolDefinition = {
   handler: async (a, ctx) => {
     await requireSite(ctx, a.siteId as string);
     const filter = a.filter as string | undefined;
-    const collection =
-      (a.collection as string | undefined) ??
-      (filter && /(^|\+)-?collection:/.test(filter) ? undefined : "posts");
+    // Every collection by default: a site whose articles live in `blog` saw none under `posts`.
+    const collection = a.collection as string | undefined;
     const query: EntryQuery = {
       ...(collection !== undefined ? { collection } : {}),
       ...(filter !== undefined ? { filter } : {}),

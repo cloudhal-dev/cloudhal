@@ -9,7 +9,7 @@ Cloudhal must run on Cloudflare (workerd) and self-hosted. Wrangler, miniflare a
 ## Decision
 - Runtime: **Node 24 LTS** floor (`engines.node >= 24`), Node 26 in the CI matrix; switch primary to 26 after it enters LTS (2026-10-28).
 - Package manager: **pnpm 12** with `catalog:` and `catalogMode: strict`; build scripts allow-listed via `allowBuilds`.
-- Tasks: **Turborepo 2.11** (enable `experimentalCargoWorkspaces` when more crates exist). Lint/format: **Biome 2.5** only. Tests: **Vitest 5**. Types: **TypeScript 7.0** (`module: nodenext`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `rewriteRelativeImportExtensions`). Releases: **Changesets 3**.
+- Tasks: **Turborepo 2.11** (enable `experimentalCargoWorkspaces` when more crates exist). Lint/format: **Biome 2.6** only. Tests: **Vitest 5**. Types: **TypeScript 7.0** (`module: nodenext`, `verbatimModuleSyntax`, `erasableSyntaxOnly`, `rewriteRelativeImportExtensions`). Releases: **Changesets 3**.
 - Rust: stable toolchain, **edition 2024, resolver 3**, `[workspace.package]` inheritance, clippy `-D warnings`.
 - **Bun** is a supported secondary runtime for `cloudhal serve` and pure packages: a `bun-sqlite` storage adapter and a Bun CI job; never for `cloudhal dev` (must spawn wrangler/workerd). No Bun-only APIs in shared code.
 

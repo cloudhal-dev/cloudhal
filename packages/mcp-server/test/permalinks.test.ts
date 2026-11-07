@@ -127,9 +127,18 @@ describe("set_collection_permalink (RFC-0038 §5)", () => {
 
   it("an overlap or a no-op is refused before a person is asked", async () => {
     const run = direct(w, "edits");
+    // The page at /about would be the collection's index page; one under it is in the way.
+    await w.store.createPage(w.site, {
+      siteId: w.site.id,
+      path: "/about/team",
+      title: "Team",
+      locale: w.site.defaultLocale,
+      status: "draft",
+      sections: [],
+    });
     await expect(run({ permalink: "/about/{slug}" })).rejects.toMatchObject({
       code: "path_conflict",
-      message: expect.stringContaining("would cover page /about"),
+      message: expect.stringContaining("would cover page /about/team"),
     });
     await expect(run({ permalink: "/tag/{slug}" })).rejects.toMatchObject({
       code: "path_conflict",

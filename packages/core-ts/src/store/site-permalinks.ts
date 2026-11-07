@@ -13,9 +13,9 @@ import {
   collectionPrefixes,
   configuredPrefixFree,
   noArchiveOverlapping,
-  noPageWithin,
+  noPageUnder,
   pathsOverlap,
-  pathWithin,
+  pathUnder,
 } from "../permalink-paths.ts";
 import { changedPermalinks, type PermalinkChange } from "../permalinks.ts";
 import { RedirectPlan, redirectLocale } from "../redirects.ts";
@@ -64,7 +64,7 @@ export async function planPermalinks(
     guard: and(
       ...changes.flatMap((c) => [
         noArchiveOverlapping(next.id, c.to),
-        ...(c.configured ? [noPageWithin(next.id, c.to)] : []),
+        ...(c.configured ? [noPageUnder(next.id, c.to)] : []),
       ]),
     ),
     async statements(hash) {
@@ -103,9 +103,10 @@ async function checkPermalinks(
     for (const tax of taxonomies)
       if (pathsOverlap(tax.archive.basePath, c.to))
         conflict(`${at} collides with the ${tax.key} archive ${tax.archive.basePath}`);
-    // A default `/<collection>` keeps today's rule: a page there wins over an entry.
+    // A default `/<collection>` keeps today's rule: a page there wins over an entry. A page at
+    // the prefix itself is the collection's index page (RFC-0038 §"Out of scope" 3).
     if (!c.configured) continue;
-    const page = pages.find((p) => pathWithin(p.path, c.to));
+    const page = pages.find((p) => pathUnder(p.path, c.to));
     if (page) conflict(`${at} would cover page ${page.path}`, { pageId: page.id });
   }
 }
@@ -126,12 +127,12 @@ function conflict(message: string, details?: Record<string, unknown>): never {
   throw new InvariantError("path_conflict", message, details);
 }
 
-/** The reverse of invariant 1 for page writes: no page at or under a configured prefix. */
+/** The reverse of invariant 1 for page writes: no page under a configured prefix, only at it. */
 export async function checkPagePath(ctx: StoreContext, page: Page, site?: Site): Promise<void> {
   await ctx.tax.checkPagePath(page);
   const s = site ?? (await ctx.graph.getSite(page.siteId));
   for (const { collection, prefix } of collectionPrefixes(s, []))
-    if (pathWithin(page.path, prefix))
+    if (pathUnder(page.path, prefix))
       conflict(`page path ${page.path} lies in collection "${collection}" at ${prefix}`, {
         collection,
       });
@@ -141,6 +142,6 @@ export async function checkPagePath(ctx: StoreContext, page: Page, site?: Site):
 export function pageGuard(ctx: StoreContext, page: Page): Cond {
   return and(
     ctx.tax.pageGuard(page),
-    configuredPrefixFree(page.siteId, page.path, "within"),
+    configuredPrefixFree(page.siteId, page.path, "under"),
   ) as Cond;
 }

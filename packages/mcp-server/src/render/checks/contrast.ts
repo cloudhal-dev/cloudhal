@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: contrast: text against what is painted beneath it, band by band.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const CONTRAST_CHECKS = `  // contrast: text against what is painted beneath it (elementsFromPoint), band by band.
+export const CONTRAST_CHECKS = String.raw`  // contrast: text against what is painted beneath it (elementsFromPoint), band by band.
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 1;
   const g = canvas.getContext("2d", { willReadFrequently: true });

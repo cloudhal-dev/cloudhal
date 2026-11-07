@@ -1,0 +1,2 @@
+# RFC-0039 site archives are gzip-compressed tar files: never convert line endings, diff or merge them.
+*.cloudhal binary

@@ -161,7 +161,8 @@ describe("the CLI reference", () => {
   it("has a section per command of cloudhal --help, with its flags", async () => {
     const { cliReference } = await import("../src/lib/reference.ts");
     const { body } = cliReference();
-    for (const command of ["init", "dev", "studio", "mcp", "deploy", "push", "pull", "schedules"]) {
+    const commands = ["init", "dev", "studio", "mcp", "deploy", "push", "pull", "export", "import"];
+    for (const command of [...commands, "schedules"]) {
       expect(body).toContain(`\n## ${command}\n`);
     }
     expect(body).toContain("cloudhal mcp [--mode plan|manual|edits|auto|bypass]");

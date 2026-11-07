@@ -1,4 +1,5 @@
 /** A minimal DevTools client over a browser-level socket (flat sessions), and base64 helpers. */
+import { CSP_LISTENER } from "./checks/scripts.ts";
 import { type CdpSocket, RenderError, type RenderSession } from "./types.ts";
 
 /**
@@ -123,6 +124,8 @@ export async function cdpSession(
           },
         ],
       });
+      // Before the page's own scripts: keep the CSP violations it raises (`script-blocked`).
+      await s("Page.addScriptToEvaluateOnNewDocument", { source: CSP_LISTENER });
       const loaded = cdp.waitFor("Page.loadEventFired", sessionId, options.loadTimeoutMs ?? 12_000);
       const nav = await s("Page.navigate", { url });
       if (typeof nav.errorText === "string" && nav.errorText)

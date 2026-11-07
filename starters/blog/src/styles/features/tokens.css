@@ -107,6 +107,7 @@
 .ch-body :is(p, li, blockquote) {
   text-wrap: pretty;
 }
-.ch-richtext a {
+/* Links in a body, not buttons: a surface Button keeps its own colours (on-brand on brand). */
+.ch-richtext a:not(.ch-button) {
   color: var(--ch-color-link);
 }

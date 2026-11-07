@@ -13,6 +13,8 @@ The same scripts run with `pnpm`, `yarn` or `bun run`; `npx cloudhal <command>` 
 ## What to commit
 Everything but `.gitignore`'s list. `cloudhal.json` holds the project's settings (the site id, custom domains, analytics, comments …) and goes with the project; the content itself lives in `.cloudhal/`, which stays on your machine (or in the deployment: `cloudhal push` / `pull`). Secrets never go in `cloudhal.json`: `cloudhal deploy` keeps them in `.cloudhal/deploy/`.
 
+To keep the content with the project as well, export it to a file and commit that file: `cloudhal export --out content/site.cloudhal`. A fresh clone then runs `cloudhal import content/site.cloudhal` before working; a clone that imported an earlier version picks up a newer one with `cloudhal import content/site.cloudhal --replace` ([site archives](https://cloudhal.dev/docs/guides/site-archives)).
+
 `cloudhal.json` → `domains.site` (set with `cloudhal domain set <hostname>`) is also the address a static build (`cloudhal build`) writes into canonical links, the sitemap, feeds and `robots.txt`.
 
 ## Routes

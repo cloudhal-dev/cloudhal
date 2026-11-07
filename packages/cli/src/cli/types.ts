@@ -21,6 +21,36 @@ export function untilSignal(also?: (resolve: () => void) => void): Promise<void>
 }
 
 /**
+ * An `AbortSignal` that Ctrl-C and SIGTERM abort while a command writes a file. Listening replaces
+ * Node's default exit, which runs no `finally`, so the writer can remove its temporary file; a
+ * second Ctrl-C exits at once. `exitCode` is the shell's code for the signal received (130, 143);
+ * `dispose` stops listening.
+ */
+export function abortOnSignal(): {
+  signal: AbortSignal;
+  exitCode(): number;
+  dispose(): void;
+} {
+  const controller = new AbortController();
+  let code = 1;
+  const handlers = (["SIGINT", "SIGTERM"] as const).map((sig) => {
+    const handler = () => {
+      code = sig === "SIGINT" ? 130 : 143;
+      controller.abort();
+    };
+    process.once(sig, handler);
+    return { sig, handler };
+  });
+  return {
+    signal: controller.signal,
+    exitCode: () => code,
+    dispose: () => {
+      for (const { sig, handler } of handlers) process.off(sig, handler);
+    },
+  };
+}
+
+/**
  * A command whose first positional picks an action (`cloudhal media gc`); an unknown or missing
  * action throws `usage`. The action gets the positionals after its name.
  */

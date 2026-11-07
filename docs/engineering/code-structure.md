@@ -15,7 +15,7 @@ without a big-bang refactor.
 | Source | File | Function | Params | Nesting | Complexity |
 | --- | --- | --- | --- | --- | --- |
 | ESLint core defaults (`max-lines`, `max-lines-per-function`, `max-params`, `max-depth`, `complexity`) | 300 | 50 | 3 | 4 | 20 (cyclomatic) |
-| Biome 2.5 defaults (`noExcessiveLinesPerFile`, `noExcessiveLinesPerFunction`, `useMaxParams`, `noExcessiveCognitiveComplexity`) | 300 | 50 | 4 | — | 15 (cognitive) |
+| Biome 2.6 defaults (`noExcessiveLinesPerFile`, `noExcessiveLinesPerFunction`, `useMaxParams`, `noExcessiveCognitiveComplexity`) | 300 | 50 | 4 | — | 15 (cognitive) |
 | Airbnb JS style | no file/function cap; `max-len` 100 | — | — | — | off |
 | Google TypeScript style | no numeric caps; "one concept per file", named exports, no default exports | — | — | — | — |
 | Clippy (`too_many_lines` pedantic, `too_many_arguments`, `cognitive_complexity`, `excessive_nesting`) | — | 100 | 7 | off by default | 25 (cognitive) |

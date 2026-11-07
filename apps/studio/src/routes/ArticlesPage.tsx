@@ -33,6 +33,7 @@ import { CollectionActions } from "../components/CollectionActions.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { EntryPath } from "../components/EntryPath.tsx";
+import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
 import {
@@ -45,7 +46,6 @@ import { EntryLiveItems } from "../components/LiveRowItems.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
-import { Status } from "../components/Status.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { type TaxonomyData, useTaxonomyData } from "../components/Taxonomy.tsx";
@@ -536,7 +536,7 @@ function ArticleRow({
         </Table.Cell>
       )}
       <Table.Cell className="whitespace-nowrap">
-        <Status status={e.status} />
+        <EntryStatus siteId={siteId} entry={e} />
       </Table.Cell>
       <Table.Cell className="whitespace-nowrap">
         <RelativeTime iso={e.updatedAt} />

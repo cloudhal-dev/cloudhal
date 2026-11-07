@@ -50,7 +50,7 @@ The scaffolder prints these steps with the package manager it was run with.
 |---|---|
 | `cloudhal.json` | The project's Cloudhal settings: site id, deployment name, analytics, comments, schedules |
 | `src/` | The Astro theme: routes, layouts and `theme.ts`. Edit it like any Astro project |
-| `.cloudhal/` | The local store (SQLite and media). Not committed; `cloudhal push` and `pull` move content between it and a deployment |
+| `.cloudhal/` | The local store (SQLite and media). Not committed; `cloudhal push` and `pull` move content between it and a deployment, and `cloudhal export` copies one site into a single file ([site archives](/docs/guides/site-archives)) |
 | `package.json` | Scripts: `dev`, `studio`, `mcp`, `deploy`, `build`, `snapshot` |
 
 The site's content (pages, articles, menus, settings) lives in the store, not in files. Agents and Studio change it; every change is a snapshot you can diff and roll back.

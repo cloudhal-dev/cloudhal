@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: overflow-x, img-alt / img-broken, heading-order.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const LAYOUT_CHECKS = `  // overflow-x: the outermost elements that stick out past the screen's right edge.
+export const LAYOUT_CHECKS = String.raw`  // overflow-x: the outermost elements that stick out past the screen's right edge.
   const sw = document.documentElement.scrollWidth;
   if (sw > W + 1) {
     const clipped = (el) => {

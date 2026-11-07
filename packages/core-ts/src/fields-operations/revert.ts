@@ -26,6 +26,7 @@ import {
   readOperation,
   refuseRunning,
   requireSite,
+  settleLists,
   writeSite,
 } from "./state.ts";
 import {
@@ -38,6 +39,7 @@ import {
   type OperationContext,
   operationContext,
   operationKey,
+  operationKeys,
 } from "./types.ts";
 
 /** The marker that reads the operation's end state as the earlier one's source. */
@@ -217,6 +219,7 @@ export async function revertFieldOperation(
       guard: marked ? markerGuard(siteId, op.collection, operationId) : undefined,
       freshAlso: (sourceId) => (earlier.has(sourceId) ? snaps.before.get(sourceId) : undefined),
       done: out.restored + out.edited.length,
+      lists: { collection: op.collection, keys: operationKeys(op) },
     });
     for (const w of r.written)
       if (w.decision?.replace) out.restored++;
@@ -239,5 +242,6 @@ export async function revertFieldOperation(
     label: labelOf("revert ", op),
     metadata: { [META.kind]: FIELD_MIGRATION, [META.id]: operationId, [META.phase]: "reverted" },
   });
+  await settleLists(ctx, siteId, out.restored + out.edited.length);
   return { ...out, done: true, skipped: [], snapshotId: snapshot.id };
 }

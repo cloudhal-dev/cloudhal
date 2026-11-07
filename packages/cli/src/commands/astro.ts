@@ -7,7 +7,8 @@ import { resolveBuildSnapshot } from "./snapshot.ts";
 export interface DevOptions {
   readonly projectDir: string;
   readonly port?: number;
-  readonly host?: boolean;
+  /** `true` (every interface) or an address to listen on; default: this machine only. */
+  readonly host?: boolean | string;
   /** `false` skips the scheduler's Node ticker (RFC-0008 §8.4). */
   readonly scheduler?: boolean;
 }
@@ -27,7 +28,7 @@ export async function dev(
     logLevel: "info",
     server: {
       ...(options.port !== undefined ? { port: options.port } : {}),
-      ...(options.host ? { host: true } : {}),
+      ...(options.host ? { host: options.host } : {}),
     },
   });
   const addr = server.address;

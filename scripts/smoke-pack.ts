@@ -2,8 +2,10 @@
  * End-to-end check of what npm users get (ADR-0013): build, `pnpm pack` every publishable package,
  * then — in an empty directory outside the monorepo, with plain npm — `npm create cloudhal`,
  * `npm install`, snapshot + build the site, serve it with `cloudhal dev`, and bundle both
- * Cloudflare Workers with `cloudhal deploy --dry-run`. Needs network access to the npm registry
- * for third-party dependencies; @cloudhal/* come from the local tarballs.
+ * Cloudflare Workers with `cloudhal deploy --dry-run`. A second project, with the packages that
+ * ship `./testing` suites as direct dependencies next to vitest 4 and miniflare 3, must resolve
+ * with `npm install --dry-run` (no ERESOLVE on their optional peers). Needs network access to the
+ * npm registry for third-party dependencies; @cloudhal/* come from the local tarballs.
  *
  *   node scripts/smoke-pack.ts [--keep] [--tarballs <dir>]
  *
@@ -11,7 +13,7 @@
  * (`publish-ci.ts`) publishes exactly what this test installed.
  */
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,6 +94,7 @@ try {
     JSON.stringify({ ...pkg, overrides: transitive }, null, 2),
   );
   run("npm", ["install", "--no-audit", "--no-fund"], site);
+  await directPeersInstall(path.join(tmp, "direct-peers"), overrides);
   run("npx", ["cloudhal", "snapshot", "--publish", "--label", "smoke"], site);
   run("npx", ["cloudhal", "build"], site);
   const html = await readFile(path.join(site, "dist/index.html"), "utf8");
@@ -138,4 +141,40 @@ try {
   if (keep) console.log(`kept ${tmp}`);
   // A dev server child may still be flushing node_modules/.vite for a moment after the group stops.
   else await rm(tmp, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+}
+
+/**
+ * A project that depends directly on the packages whose `./testing` suites have optional
+ * vitest/miniflare peers, with other majors of both. npm stops with ERESOLVE when a direct
+ * dependency's optional peer does not match the project's copy, whether or not anything imports
+ * `./testing`. The default starter only reaches these packages transitively, so it misses that.
+ */
+async function directPeersInstall(dir: string, tarballs: Record<string, string>): Promise<void> {
+  const direct = [
+    "@cloudhal/storage",
+    "@cloudhal/analytics",
+    "@cloudhal/comments",
+    "@cloudhal/schedules",
+  ];
+  const dependencies = Object.fromEntries(direct.map((name) => [name, tarballs[name]]));
+  const overrides = Object.fromEntries(
+    Object.entries(tarballs).filter(([name]) => !direct.includes(name)),
+  );
+  await mkdir(dir, { recursive: true });
+  await writeFile(
+    path.join(dir, "package.json"),
+    JSON.stringify(
+      {
+        name: "smoke-direct-peers",
+        private: true,
+        dependencies,
+        devDependencies: { vitest: "^4.0.0", miniflare: "^3.0.0" },
+        overrides,
+      },
+      null,
+      2,
+    ),
+  );
+  run("npm", ["install", "--dry-run", "--no-audit", "--no-fund"], dir);
+  console.log("✓ direct dependencies resolve next to vitest 4 and miniflare 3");
 }

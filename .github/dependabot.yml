@@ -18,3 +18,10 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+  # The self-host image's base image and the compose file's Caddy (docs/guides/self-host.md).
+  - package-ecosystem: docker
+    directory: /deploy/docker
+    schedule: { interval: weekly }
+  - package-ecosystem: docker-compose
+    directory: /deploy/docker
+    schedule: { interval: weekly }

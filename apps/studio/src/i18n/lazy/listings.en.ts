@@ -52,6 +52,25 @@ export const messages = {
       gatesUnsupported:
         "This site's live server doesn't apply expiry yet. Deploy the site first, then save the expiry again.",
     },
+    /**
+     * RFC-0042 §3.3: a published entry whose collection's expiry has passed. Its status stays
+     * Published; this badge follows the status in the collection list and the editor's header.
+     */
+    ended: {
+      /**
+       * Badge beside the status in the collection list and the entry editor's header. Must read
+       * differently from an entry's own end ("Expired {time}", schedules.card.state.expired) and
+       * must say it comes from the collection rule.
+       */
+      badge: "Ended (collection rule)",
+      /**
+       * The badge's tooltip. `time` is a date and time already formatted in the site's time zone,
+       * `zone` the zone's city ("Istanbul", "UTC"), `field` the date field's label, `action`
+       * unlist or hide. Keep both branches and `other`; never put an apostrophe directly before `{`.
+       */
+      reason:
+        "{action, select, unlist {This entry ended on {time} ({zone} time) under its collection's expiry on “{field}”. It's still published and its page stays at its address, but it has left lists, feeds, the sitemap and search.} hide {This entry ended on {time} ({zone} time) under its collection's expiry on “{field}”. It's still published, but its page answers “not found”, and it has left every list, feed and search.} other {This entry ended on {time} ({zone} time) under its collection's expiry on “{field}”.}}",
+    },
     structuredData: {
       title: "Structured data",
       description:

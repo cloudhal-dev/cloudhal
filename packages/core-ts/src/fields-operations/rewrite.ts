@@ -14,7 +14,9 @@ import {
 } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import type { ValueChange } from "../fields/migration.ts";
+import { sameJson } from "../fields/types.ts";
 import { nodeHash } from "../hash.ts";
+import { passResetStatement } from "../list-values/state-sql.ts";
 import { fieldAssetRefs } from "../media/field-refs.ts";
 import { and, type Cond, casUpdateStatement, hashIs } from "../node-sql.ts";
 import { fieldRefStatements } from "../store/entry-fields.ts";
@@ -76,6 +78,13 @@ export interface PassInput {
   readonly freshAlso?: ((sourceId: string) => string | undefined) | undefined;
   /** Entries this call already rewrote (the budget counts across passes). */
   readonly done: number;
+  /**
+   * RFC-0042 §4: the collection and the field keys the operation rewrites. Each batch resets
+   * (`passResetStatement`) the list values of collections listing one of them, or any other key a
+   * body of the batch changes (a revert's restored body can carry an edit made while the
+   * operation ran); the backfill rebuilds them once the operation is done.
+   */
+  readonly lists: { readonly collection: string; readonly keys: readonly string[] };
 }
 
 export interface PassResult {
@@ -152,6 +161,17 @@ async function statementsOf(input: PassInput, p: Planned): Promise<SqlStatement[
 const outOfBudget = (ctx: OperationContext, done: number) =>
   done >= ctx.budget.entries || Date.now() - ctx.started >= ctx.budget.ms;
 
+/** The operation's keys, and every other field key a planned body changes. */
+function resetKeys(keys: readonly string[], planned: readonly Planned[]): string[] {
+  const out = new Set(keys);
+  for (const p of planned) {
+    const [was, now] = [p.stored.entry.fields ?? {}, p.next.fields ?? {}];
+    for (const k of new Set([...Object.keys(was), ...Object.keys(now)]))
+      if (!out.has(k) && !sameJson(was[k], now[k])) out.add(k);
+  }
+  return [...out];
+}
+
 /** One pass over the rows: plan, then write in batches until done or out of budget. */
 export async function rewritePass(input: PassInput): Promise<PassResult> {
   const { ctx } = input;
@@ -171,6 +191,13 @@ export async function rewritePass(input: PassInput): Promise<PassResult> {
       heads.push({ index: statements.length, p });
       statements.push(...(await statementsOf(input, p)));
     }
+    const batch = heads.map((h) => h.p);
+    const ids = batch.map((p) => p.next.id);
+    const { collection } = input.lists;
+    const keys = resetKeys(input.lists.keys, batch);
+    statements.push(
+      passResetStatement({ siteId: input.site.id, ids, at: ctx.stamp(), collection, keys }),
+    );
     const results = await ctx.store.sql.batch(statements);
     for (const { index, p } of heads) {
       const id = p.next.id;

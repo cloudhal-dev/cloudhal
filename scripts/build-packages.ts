@@ -8,9 +8,13 @@
  *   each package keeps its own `.d.ts` files, specifiers rewritten the same way.
  * - Assets (`.astro`, `.json`, generated `.js`/`.d.ts`, `.css`) are copied, `.ts` specifiers in
  *   `.astro`/`.js` rewritten too.
+ * - Tests never ship. A package's test-support entry (`src/testing.ts`, on vitest) ships only where
+ *   its `exports` name it (`./testing`); its `testing-*.ts` siblings ship as they are.
+ * - After the build every published `exports`/`bin` target must exist (scripts/verify-exports.ts).
  *
- *   node scripts/build-packages.ts            # build all
+ *   node scripts/build-packages.ts            # build all, then verify the targets
  *   node scripts/build-packages.ts --check    # verify publishConfig matches exports (CI)
+ *   node scripts/build-packages.ts --verify   # verify the targets of the current dist only
  *   node scripts/build-packages.ts --write-publish-config
  */
 import { execFileSync } from "node:child_process";
@@ -18,6 +22,7 @@ import { cp, mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promi
 import { createRequire, stripTypeScriptTypes } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishTargets, verifyPackages } from "./verify-exports.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(ROOT, "packages/core-ts/package.json"));
@@ -41,11 +46,26 @@ export const PACKAGES = [
 
 /** Directories inside a package that hold code or runtime assets (mirrored into dist/). */
 const SOURCE_DIRS = ["src", "scripts", "bin", "migrations"];
-const SKIP_FILE = /(\.test\.tsx?|[\\/]testing\.ts)$/;
+const TEST_FILE = /\.test\.tsx?$/;
+/** A package's test-support entry; it ships only where its exports name it (./testing). */
+const TESTING_ENTRY = /(^|[\\/])testing\.ts$/;
 /** Development-only generators: they run in the monorepo (on dev dependencies) and never ship. */
 const DEV_ONLY = new Set(["core-ts/scripts/gen-icons.ts"]);
 
 type Json = Record<string, unknown>;
+
+/** The package-relative sources (no `./`) that a package's `exports` and `bin` name. */
+export function exportedSources(pkg: Json): Set<string> {
+  const targets = [...publishTargets(pkg.exports, "."), ...publishTargets(pkg.bin, "bin")];
+  return new Set(targets.map(([, target]) => target.replace(/^\.\//, "")));
+}
+
+/** Whether `rel` (relative to package `name`) goes into dist. */
+export function shipsFile(name: string, rel: string, exported: ReadonlySet<string>): boolean {
+  if (TEST_FILE.test(rel) || DEV_ONLY.has(`${name}/${rel}`)) return false;
+  return !TESTING_ENTRY.test(rel) || exported.has(rel);
+}
+
 interface LexedImport {
   specifier?: string | null;
   start?: number;
@@ -160,10 +180,11 @@ async function buildPackage(name: string, typesRoot: string): Promise<void> {
   const dir = path.join(ROOT, "packages", name);
   const dist = path.join(dir, "dist");
   await rm(dist, { recursive: true, force: true });
+  const exported = exportedSources(await readPkg(name));
   for (const sub of SOURCE_DIRS) {
     for (const file of await walk(path.join(dir, sub))) {
       const rel = path.relative(dir, file);
-      if (SKIP_FILE.test(file) || DEV_ONLY.has(`${name}/${rel}`)) continue;
+      if (!shipsFile(name, rel, exported)) continue;
       const target = path.join(dist, rel);
       await mkdir(path.dirname(target), { recursive: true });
       if (/\.tsx?$/.test(file) && !file.endsWith(".d.ts")) {
@@ -236,8 +257,17 @@ async function readPkg(name: string): Promise<Json> {
   ) as Json;
 }
 
+/** Prints every published exports/bin target that does not resolve; false when there is one. */
+async function reportTargets(): Promise<boolean> {
+  const problems = await verifyPackages(ROOT, PACKAGES);
+  for (const problem of problems) console.error(problem);
+  if (!problems.length) console.log("every published exports/bin target resolves");
+  return problems.length === 0;
+}
+
 async function main() {
   const args = new Set(process.argv.slice(2));
+  if (args.has("--verify")) process.exit((await reportTargets()) ? 0 : 1);
   if (args.has("--check") || args.has("--write-publish-config")) {
     let stale = 0;
     for (const name of PACKAGES) {
@@ -275,6 +305,7 @@ async function main() {
     if (name === "cli") await buildCliAssets();
     console.log(`built ${name}`);
   }
+  if (!(await reportTargets())) process.exit(1);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) await main();

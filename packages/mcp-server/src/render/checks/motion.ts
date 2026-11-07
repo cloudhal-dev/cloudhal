@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: The reader's scroll pass, then motion-cls, reduced-motion, motion-budget, flash; defines `frame`.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const MOTION_CHECKS = `  // RFC-0024 §8: scroll through the page once, as a reader would, so reveals play, then measure.
+export const MOTION_CHECKS = String.raw`  // RFC-0024 §8: scroll through the page once, as a reader would, so reveals play, then measure.
   let shift = 0;
   let po;
   try {

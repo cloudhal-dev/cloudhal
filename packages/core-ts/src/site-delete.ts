@@ -20,6 +20,8 @@ export const SITE_TABLES = [
   "search_index",
   "search_index_cjk",
   "search_state",
+  "entry_list_values",
+  "entry_list_state",
   "ai_usage",
   "ai_settings",
   "body_proposals",

@@ -3,10 +3,19 @@ export const HELP = `cloudhal — agent-native sites
 
 Usage:
   cloudhal init <dir> [--name <name>] [--starter blog]   create a site project with a seeded local store
-  cloudhal dev [--port <n>] [--host]                      live preview (drafts visible)
+  cloudhal dev [--port <n>] [--host [<addr>]]             live preview (drafts visible)
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
-  cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
+  cloudhal studio [--port <n>] [--host [<addr>]] [--base-url <url>] [--behind-proxy] [--no-auth]
+                  [--init-if-empty [--starter blog] [--name <name>]]
+                                                          API + Studio UI for this project (default :8787);
+                                                          self-hosting: --host 0.0.0.0 (CLOUDHAL_HOST) listens
+                                                          beyond this machine, --base-url (CLOUDHAL_BASE_URL)
+                                                          is the public origin behind a reverse proxy,
+                                                          --behind-proxy (CLOUDHAL_BEHIND_PROXY=1) trusts its
+                                                          X-Forwarded-Proto/Host, --init-if-empty
+                                                          (CLOUDHAL_INIT=<starter>) creates the project first
+                                                          when the folder has no cloudhal.json
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
   cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
@@ -27,6 +36,32 @@ Usage:
                                                           local site → deployment (refused while releases are
                                                           open unless --cancel-schedules cancels them)
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
+  cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
+                                                          one site as a .cloudhal file (RFC-0039): its graph,
+                                                          snapshots and media; never user accounts, comments,
+                                                          analytics or secrets (its history names who made each
+                                                          change). Default <site-slug>-<YYYYMMDD>.cloudhal, dated
+                                                          by the newest row it holds (a deletion alone does not
+                                                          move it); a file there is replaced only by the same
+                                                          archive, --out <file> replaces any;
+                                                          --site: a site listed in cloudhal.json sites;
+                                                          --no-media: the graph only; --latest-only: only the
+                                                          published and the latest snapshot
+  cloudhal import <file> [--replace] [--dry-run] | --revert <snapshot-id> [--dry-run]
+                                                          a .cloudhal file into this project (RFC-0039), its site
+                                                          id kept; every file is verified before anything is
+                                                          written. By default the archive's site must be
+                                                          cloudhal.json's siteId or listed in sites, and absent
+                                                          here or holding exactly the archive's nodes (missing
+                                                          snapshots and media are added); --replace: the local
+                                                          nodes become the archive's, its published snapshot
+                                                          included, after a "before import <file>" snapshot of
+                                                          them; an archive of another site switches cloudhal.json
+                                                          siteId to it (the old site stays in the local store,
+                                                          unlisted; write its id back to undo); --revert <id>:
+                                                          back to such a snapshot, revs moved forward, saving the
+                                                          current graph first; --dry-run prints the manifest and
+                                                          the difference and writes nothing
   cloudhal owner transfer --to <email> [--admin-url <url>]
                                                           make a member the deployment's Owner
                                                           (lockout recovery; uses the deployment token)

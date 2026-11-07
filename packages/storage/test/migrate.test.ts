@@ -46,6 +46,7 @@ describe("migrate", () => {
       "0026_search_cjk",
       "0027_multi_site",
       "0028_site_members",
+      "0029_entry_list_values",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -77,6 +78,7 @@ describe("migrate", () => {
       "0026_search_cjk",
       "0027_multi_site",
       "0028_site_members",
+      "0029_entry_list_values",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -110,6 +112,8 @@ describe("migrate", () => {
       "comment_threads",
       "commenter_emails",
       "comments",
+      "entry_list_state",
+      "entry_list_values",
       "invitation",
       "media_blobs",
       "media_uploads",
@@ -185,6 +189,7 @@ describe("migrate", () => {
       "0026_search_cjk",
       "0027_multi_site",
       "0028_site_members",
+      "0029_entry_list_values",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -215,6 +220,7 @@ describe("migrate", () => {
       "0026_search_cjk",
       "0027_multi_site",
       "0028_site_members",
+      "0029_entry_list_values",
     ]);
     await h.dispose();
   });
@@ -252,6 +258,7 @@ describe("migrate", () => {
       "0026_search_cjk",
       "0027_multi_site",
       "0028_site_members",
+      "0029_entry_list_values",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

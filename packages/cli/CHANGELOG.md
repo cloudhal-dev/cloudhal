@@ -1,5 +1,89 @@
 # @cloudhal/cli
 
+## 0.6.2
+
+### Patch Changes
+
+- d91ef8f: Dependency patch updates (#115). `@cloudhal/api` depends on Better Auth 1.7.12 and on exactly the versions it uses itself: `@better-auth/core` and `@better-auth/api-key` 1.7.12, `@better-auth/utils` 0.5.0 and `better-call` 1.4.4. `@cloudhal/cloudflare` asks for zod ^4.6.7 (GHSA-mrhx-c7xc-m3w5 is fixed in 4.6.6). `@cloudhal/core-ts` and `@cloudhal/astro-renderer` use marked ^18.1.1. `@cloudhal/core-ts` and `@cloudhal/schedules` use temporal-polyfill 1.0.6. `@cloudhal/astro-renderer` uses vite ^8.3.5. The Studio shipped in `@cloudhal/cli` is built with React 19.3.1, TanStack Router 1.170.46 and TanStack Query 5.104.5. marked 18.1.1 splits a few unusual markdown inputs differently: a blockquote ends before an unquoted line that follows a heading, rule or HTML block, and indented HTML blocks interrupt a paragraph. A stored body like that keeps rendering and shows virtual block ids until its next write.
+- 330b650: New `cloudhal export` (RFC-0039, #47) writes one site of the local project to a single `.cloudhal` file. The file is a gzipped tar holding the site's content graph (nodes, snapshots and the node bodies they reference, as NDJSON parts), its media files and its takedown ledger, with every file's SHA-256 listed in the manifest. The flags:
+  
+  - `--out <file>` names the file, and replaces a file already there once the new one is complete. By default the file is `<site-slug>-<YYYYMMDD>.cloudhal` in the current folder, dated by the newest timestamp among the rows it holds (deleting content alone does not move that date; the next edit or snapshot does). A file already at the default name is replaced only by the same archive; any other (a later edit the same day, other flags, a deletion) is left alone and the export asks for `--out`.
+  - `--site <id>` exports another site listed in `cloudhal.json` `sites`. `--site`, `--no-media` and `--latest-only` are refused on every other command.
+  - `--no-media` writes the graph only.
+  - `--latest-only` keeps only the published and the latest snapshot, and only the media they and the current content need. It is refused while a field operation is unfinished (`cloudhal fields continue|revert`).
+  
+  A damaged or missing local media file stops the export (run `cloudhal media verify`); so do Ctrl-C and SIGTERM. Either way no file is written and an existing one is left as it was. Exporting an unchanged site again with the same CLI and Node version gives the same bytes. An archive never contains user accounts, sessions, roles, agent keys, comments, readers, analytics, the audit log, scheduled releases, automations, schedule runs, pending approvals, open edit suggestions, deployment secrets or webhook credentials, and the export prints this list. Its history does name who made each change (the user or agent of each snapshot, upload, block edit, review and takedown).
+- 2c18a7c: New `cloudhal import <file> [--dry-run]` (RFC-0039, #47) reads a `.cloudhal` file written by `cloudhal export` into the local project, keeping the site's id.
+  
+  - It reads the file twice. First it verifies every file's size and SHA-256, every row and every node body (each must be the node its snapshot refs name), and checks the archive against the project. A damaged or edited file, invalid content, an archive of another site, a site whose nodes differ, or missing media is therefore refused before anything is written. Then it reads the file again, refusing it if it changed in between, copies the media the project lacks and imports the graph, keeping the archive's published snapshot as `cloudhal pull` does.
+  - By default a bootstrap import. The archive's site must be `cloudhal.json`'s `siteId` or listed in `sites`, and the project must not hold it yet or hold exactly its nodes; missing snapshots, node bodies and media are added. A site whose nodes differ is refused; `--replace` replaces them (see its own note).
+  - An archive written with `--no-media` imports only when the project already has its media.
+  - Taken-down content stays down: the archive's takedowns are recorded and their bytes never written, a local copy of content the archive's ledger took down is deleted (the summary says how many), and an archive carrying content this project has taken down is refused.
+  - `--dry-run` prints the manifest and what the import would add, change or remove (nodes by kind and title, snapshots, media to copy), writes nothing, and exits 1 when the import would be refused.
+  - Ctrl-C and SIGTERM stop the import before the graph is written; media already copied stay in the blob store, unreferenced, and the next import reuses them. A storage failure while the graph is written says the import stopped partway; running it again completes it, search index included.
+  - Opening an existing local store applies pending migrations, as every command does; a project without one gets none from a dry run or a refused import.
+- 33ae911: `cloudhal import <file> --replace [--dry-run]` (RFC-0039 rollout step 4, #47) makes the local site's nodes the archive's, its published snapshot included, as `cloudhal pull --replace` does. `cloudhal push` still keeps a deployment's own published snapshot, so a local replace never moves production. Snapshots are only ever added.
+  
+  - When it changes a site the project already holds, the current graph is saved first as a snapshot labelled `before import <file>` and the result as `import <file>`; the summary prints `(undo: cloudhal import --revert <id>)`. A new or unchanged site gets no snapshot; a site the plan found unchanged is checked again just before the write, and refused if another process changed it meanwhile. A run that stopped after the first snapshot reuses it the next time.
+  - The archive's nodes keep their revs, as with `pull --replace`. A Studio tab or agent still holding a node at the rev the archive gives it can save over it without a conflict, so the summary counts those nodes and says to reload open Studio tabs.
+  - New `cloudhal import --revert <snapshot-id> [--dry-run]` brings the site back to a `before import` snapshot, its published snapshot included, saving the current graph first as `before revert import <file>`, so a revert can itself be reverted. Its revs only move forward: a node edited since comes back at the rev after its current one, so a stale editor gets a conflict. Studio's rollback only moves the published pointer to an earlier snapshot, which cannot undo a replace.
+  - An archive of a site `cloudhal.json` does not list switches its `siteId`, and the old id's place in `sites`, to the archive's, editing only those values in the file (layout and other keys stay as written), once the import has landed. The old site stays in the local store, unlisted and untouched; writing the old id back by hand undoes the switch (`--revert` restores nodes only), and the summary names `cloudhal site delete` to remove the old site for good. A deployed project is warned that its deployment serves the old site, and that a deployment of the imported site is updated from the project that deployed it.
+  - Refused before anything is written: open releases of the site (cancel them in Studio), an unfinished field operation, a hostname another local site serves (now a refusal `--dry-run` reports, for bootstrap imports too), and an archive site id `cloudhal.json` cannot name.
+  - `--dry-run` shows the snapshots it would take, the published-snapshot change and the `cloudhal.json` change; it exits 0, or 1 when the import would be refused.
+  - `--cancel-schedules` is now refused by every command but `cloudhal push`.
+- 68cd5a1: Studio shows **Ended (collection rule)** beside the status of a published entry whose collection's expiry has passed (RFC-0042 §3.3, #113), in the collection list and in the entry editor's header. Until now such an entry looked plainly published while the site had already left it out of lists, or answered "not found". The badge explains itself on hover, from the keyboard and with a tap on touch screens. It names the date field, when the entry ended in the site's time zone, and what the site does: the page keeps its address but leaves lists, feeds, the sitemap and search, or the page answers "not found". Drafts, embargoed entries and entries whose own "Hide after" has passed get no badge (their own dates show in the editor's Schedule card). A translation reads its original's date only while the original is published, as the site does. The badge and its words load only for collections that have an expiry. Translations of the new words are AI drafts awaiting review.
+- Updated dependencies [7223152]
+- Updated dependencies [d91ef8f]
+- Updated dependencies [970c8a1]
+- Updated dependencies [df8695e]
+- Updated dependencies [f73d05a]
+- Updated dependencies [f73d05a]
+- Updated dependencies [6cb7945]
+- Updated dependencies [f669266]
+- Updated dependencies [77fa9e5]
+- Updated dependencies [786a455]
+- Updated dependencies [8a30e30]
+  - @cloudhal/core-ts@0.6.2
+  - @cloudhal/api@0.6.2
+  - @cloudhal/cloudflare@0.6.2
+  - @cloudhal/schedules@0.6.2
+  - @cloudhal/storage@0.6.2
+  - @cloudhal/mcp-server@0.6.2
+  - @cloudhal/analytics@0.6.2
+  - @cloudhal/comments@0.6.2
+  - @cloudhal/agent-runtime@0.6.2
+  - @cloudhal/core-contracts@0.6.2
+
+## 0.6.1
+
+### Patch Changes
+
+- 40dbfcb: Gaps an agent hit building a site through MCP:
+  
+  - **Section-only theme blocks in article bodies are refused.** A theme block type with `where: ["section"]` (say `link-cards`) has no component in an article, and drew "unknown component" there. `create_entry`/`update_entry` now refuse it inside a body ```` ```surface ```` fence (`invalid_surface`, with the component's path); primitives, built-in blocks and theme blocks that allow `body` stay. `get_catalog`'s "In article bodies" lists which blocks a body may use and which are page sections only.
+  - **`list_entries` lists every collection by default**, not only `posts`: a site whose articles live in `blog` got `[]`. `where`/`orderBy` need the collection whose list fields they use; without one they are refused (`invalid_query` at `collection`) instead of ignored.
+  - **`long-line` gives a text column one verdict.** It counted characters over a rounded line count, so how full a paragraph's last line was decided whether it passed, and identical paragraphs in one column disagreed. It now counts the characters on each rendered line, leaves each paragraph's last line out, and pools the paragraphs of one width and font: one example per column, with its width and how many paragraphs it holds.
+  - **Blog starter:** a primary surface `Button` in an article body keeps its `on-brand` text; the body's link colour no longer applies to buttons (it failed contrast at 2.5:1 light, 1.3:1 dark).
+- 4103a32: Studio on a playground (RFC-0036): the Build page no longer says "This deployment can't reach Workers AI". It says Build with AI is available in your own install, since the playground leaves AI out, and links to deploying Cloudhal. Translations of the new sentence are AI drafts awaiting review.
+- 92c3867: Theme scripts work on deployed sites, and `render_page` says when they would not.
+  
+  - The `cloudhal()` integration no longer lets Astro inline a component's `<script>` (under 4 KB) into the page, where the Site Worker's `script-src 'self'` blocked it: script chunks always ship as files (`build.assetsInlineLimit`), other assets keep the project's own limit. A theme that set `vite.build.assetsInlineLimit` itself for this can drop it.
+  - `cloudhal dev` sends the Site Worker's policy as `Content-Security-Policy-Report-Only` on pages without their own, so the browser console shows what a deploy would block without breaking Vite's dev client.
+  - `render_page` and `cloudhal render` gain two checks: `surface-broken` (a body ```` ```surface ```` fence the preview cannot draw, or a component with an unknown block type or props that do not fit, named with the problem) and `script-blocked` (a script the page's CSP refused, inline or by URL; under `cloudhal dev`'s report-only policy, what a deploy would block).
+- Updated dependencies [40dbfcb]
+- Updated dependencies [028f396]
+- Updated dependencies [92c3867]
+  - @cloudhal/core-ts@0.6.1
+  - @cloudhal/mcp-server@0.6.1
+  - @cloudhal/api@0.6.1
+  - @cloudhal/cloudflare@0.6.1
+  - @cloudhal/comments@0.6.1
+  - @cloudhal/agent-runtime@0.6.1
+  - @cloudhal/analytics@0.6.1
+  - @cloudhal/core-contracts@0.6.1
+  - @cloudhal/schedules@0.6.1
+  - @cloudhal/storage@0.6.1
+
 ## 0.6.0
 
 ### Minor Changes

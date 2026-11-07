@@ -445,6 +445,23 @@ describe("listings, expiry and structured data over MCP (RFC-0042 §7)", () => {
     expect(bad.message).toContain("list_collections");
     const cursor = await rejection(list({ collection: "events", limit: 2, cursor: "zzz" }));
     expect(paths(cursor)).toEqual(["cursor"]);
+    // List fields belong to one collection: without it they are refused, not ignored.
+    const noCollection = await rejection(
+      list({ orderBy: { field: "startsAt", direction: "asc" } }),
+    );
+    expect(paths(noCollection)).toEqual(["collection"]);
+  });
+
+  it("list_entries without a collection lists every collection, not only posts", async () => {
+    w = await world(LISTED);
+    await event(w, "Soon gig", { startsAt: at(T + 2 * HOUR), state: "scheduled", price: 20 });
+    const all = (await call(w, "list_entries")({})).result as { entries: ContentEntry[] };
+    expect(new Set(all.entries.map((e) => e.collection))).toEqual(new Set(["posts", "events"]));
+    const posts = (await call(w, "list_entries")({ collection: "posts" })).result as {
+      entries: ContentEntry[];
+    };
+    expect(posts.entries.every((e) => e.collection === "posts")).toBe(true);
+    expect(posts.entries.length).toBe(all.entries.length - 1);
   });
 
   it("preview_structured_data returns the entry's JSON-LD and its issues", async () => {

@@ -10,8 +10,11 @@ import { I18nProvider, type Locale } from "../src/i18n/index.tsx";
 import type { Ability, InstanceInfo, Me, Role } from "../src/lib/api.ts";
 import { FALLBACK_ABILITIES, FALLBACK_ROLE_SCOPES, holds, roleRules } from "../src/lib/roles.ts";
 
-export function wrap(children: ReactNode, locale: Locale = "en") {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+/** A query client as `wrap` makes it, for tests that seed or change its cache. */
+export const testQueryClient = () =>
+  new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+export function wrap(children: ReactNode, locale: Locale = "en", qc = testQueryClient()) {
   return (
     <I18nProvider initialLocale={locale}>
       <QueryClientProvider client={qc}>

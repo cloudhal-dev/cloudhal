@@ -498,17 +498,8 @@ export class SiteGraphStore {
     return out;
   }
 
-  async deleteContentEntry(entry: ContentEntry): Promise<void> {
-    await assertUnlocked(this.#sql, entry.siteId, [entry.id]);
-    const [r] = await this.#sql.batch([
-      {
-        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
-        params: [entry.id, entry.rev, entry.siteId],
-      },
-      this.#assets.dropRefsStatement(entry.id),
-    ]);
-    if (r?.changes !== 1)
-      throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#revOf(entry.id));
+  deleteContentEntry(entry: ContentEntry): Promise<void> {
+    return this.#entries.delete(entry);
   }
 
   // ───────────────────────────── taxonomies (RFC-0002) ─────────────────────────────

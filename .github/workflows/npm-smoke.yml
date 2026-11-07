@@ -9,6 +9,7 @@ on:
   pull_request:
     paths:
       - "scripts/build-packages.ts"
+      - "scripts/verify-exports.ts"
       - "scripts/smoke-pack.ts"
       - "packages/*/package.json"
       - "packages/cli/src/assets.ts"

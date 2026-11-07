@@ -45,6 +45,14 @@ Start from `npm create cloudhal@latest`, then:
 - commit `cloudhal.json` and a root `wrangler.jsonc` that names the site Worker, a `DB` D1 database (placeholder id `00000000-0000-0000-0000-000000000000`) and a `BLOBS` R2 bucket
 - remove the `build` script (Workers Builds would run it before `deploy`), keep `"deploy": "cloudhal deploy"`
 - commit a lockfile and a `.node-version` of `24`. The CLI runs on Node 24.
+- copy cloudhal-template's `.github/dependabot.yml` to get a PR for each release, and keep `src/` in step with the starter yourself: Dependabot moves dependencies only. Keep workflow files (`.github/workflows/`) out of a template: whether the button's copy may contain them is not documented.
+
+## Keeping the template current
+
+- Each Cloudhal release opens a PR on cloudhal-template that moves it to the new version and that version's starter theme (`src/`, `public/`, `astro.config.mjs`, `tsconfig.json`). It is merged once its `cloudhal/template-check` status is green (the sync installs a copy with `npm ci` and runs `cloudhal deploy --dry-run` with `WORKERS_CI=1`), so the button deploys the latest release.
+- If your copy has the template's `.github/dependabot.yml`, Dependabot opens a PR in it for each `@cloudhal/*` release. Nothing checks that PR in your copy, and merging it deploys: run `npm ci` and `WORKERS_CI=1 npx cloudhal deploy --dry-run` on its branch first, or add a check workflow of your own.
+- Your theme stays as it was when the copy was made: Dependabot moves the dependencies only, and releases keep older themes working. In 0.x a minor version may break, so read the release notes before merging a minor bump.
+- Delete `.github/dependabot.yml` to stop the PRs.
 
 ## Before 0.3.2: the site Worker shows Studio
 

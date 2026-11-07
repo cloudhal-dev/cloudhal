@@ -1,9 +1,10 @@
 /**
  * Sight for agents (RFC-0021 §4): renders a page in a real browser at a few widths and returns
  * screenshots plus automatic checks (overflow, alt text, broken images, heading order, contrast,
- * empty sections, tap targets, line length). The browser is a DevTools socket: local Chrome under
- * Node (`@cloudhal/cli`), Cloudflare Browser Rendering on Workers (`@cloudhal/cloudflare`). One
- * small DevTools client serves both, so there is no browser library to bundle.
+ * empty sections, tap targets, line length, broken surfaces, blocked scripts, …). The browser is a
+ * DevTools socket: local Chrome under Node (`@cloudhal/cli`), Cloudflare Browser Rendering on
+ * Workers (`@cloudhal/cloudflare`). One small DevTools client serves both, so there is no browser
+ * library to bundle.
  *
  * Worker-safe: no Node imports.
  */

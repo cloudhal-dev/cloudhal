@@ -180,13 +180,14 @@
 }
 /* Loud surfaces: their text, buttons and links follow the surface's own text color. */
 :is(
-  [data-surface="brand"],
-  [data-surface="inverse"],
-  [data-surface="accent"],
-  [data-surface="gradient"],
-  [data-tone="brand"],
-  [data-tone="inverse"]
-) :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
+    [data-surface="brand"],
+    [data-surface="inverse"],
+    [data-surface="accent"],
+    [data-surface="gradient"],
+    [data-tone="brand"],
+    [data-tone="inverse"]
+  )
+  :is(.ch-text, .ch-stat__label, .ch-stat__detail) {
   color: inherit;
   opacity: 0.85;
 }

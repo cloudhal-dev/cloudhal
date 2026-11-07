@@ -1,20 +1,27 @@
 /**
- * RFC-0042 §4 "Indexing: none in stage 3" — the trigger for a side table: a list of a
- * 10,000-entry collection by field, measured on SQLite and on D1 (Miniflare). The RFC's threshold
- * (open question 10): more than 50 ms CPU or more than 10,000 rows read per list means
- * `entry_list_values` lands; below it, in-memory evaluation over today's collection scan stays.
+ * RFC-0042 §4 — a list of a 10,000-entry collection by field, measured on SQLite and on D1
+ * (Miniflare). The RFC's threshold (open question 10): more than 50 ms CPU or more than 10,000
+ * rows read per list. Step 3 measured the store path above it (#105), so `entry_list_values`
+ * landed (#110): `queryContentEntries` (the API, Studio, MCP) now answers from the side table
+ * once the collection is ready, and this asserts it stays under the threshold on both backends.
  *
  * Not part of `pnpm test` (it seeds 10,000 entries): `pnpm --filter @cloudhal/astro-renderer
- * bench:lists`. It prints a table and fails only when a path crosses the threshold.
+ * bench:lists`. It prints a table and fails only when a per-request path crosses the threshold.
  *
  * - CPU is this process's (`process.cpuUsage`): the store's SQL on SQLite, the evaluator, JSON
  *   parsing. On D1 the database runs in workerd, so CPU here is what a Worker spends besides D1.
  * - Rows: rows the driver returned (SQLite) and D1's own `meta.rows_read` (D1).
+ * - Per request too: an unordered page of a broad filter (70% of the collection), which reads
+ *   each match's id once and the page's entries by id.
+ * - Informational: the rebuild of the side table (the backfill a migration or settings change
+ *   needs, writes not counted), a deep page (offset 4,980) and an unpaged answer (every match's
+ *   body, so about three rows read per match on D1).
  */
 import type { Site } from "@cloudhal/core-contracts";
 import {
   GATES_ENFORCED,
   queryContentEntries,
+  rebuildListValues,
   SiteGraphStore,
   seedStarterSite,
 } from "@cloudhal/core-ts";
@@ -40,6 +47,14 @@ const QUERY = {
   orderBy: { field: "startsAt", direction: "asc" },
   limit: 20,
 } satisfies FieldEntryQuery;
+
+/** Unordered, 70% of the collection matches (`price` is `i % 500`), first page. */
+const BROAD = {
+  collection: "events",
+  where: [{ field: "price", op: "gte", value: "150" }],
+  limit: 20,
+} satisfies FieldEntryQuery;
+const { limit: _limit, ...UNPAGED } = QUERY;
 
 /** Counts rows: returned rows, or D1's `rows_read` when the driver reports it. */
 class Counting implements SqlDriver {
@@ -172,6 +187,34 @@ async function seedSqlite(): Promise<{ store: SiteGraphStore; site: Site; sql: S
 }
 
 const samples: Sample[] = [];
+const API_PATH = "store queryContentEntries (API)";
+const BROAD_PATH = "store queryContentEntries, unordered 70%";
+
+/** The side table is ready for `events` (else the store path would measure the scan). */
+async function expectReady(sql: SqlDriver, siteId: string) {
+  const state = await sql.get<{ ready: number }>(
+    "SELECT ready FROM entry_list_state WHERE site_id = ? AND collection = 'events'",
+    [siteId],
+  );
+  expect(state?.ready, "events list values ready").toBe(1);
+}
+
+/** One timed rebuild of the site's list values (rows: reads only; writes are D1's rows_written). */
+async function rebuild(backend: string, counter: Counting, siteId: string): Promise<Sample> {
+  counter.rows = 0;
+  const c0 = process.cpuUsage();
+  const t0 = performance.now();
+  const r = await rebuildListValues(counter, { siteId });
+  const c = process.cpuUsage(c0);
+  return {
+    backend,
+    path: "rebuildListValues (backfill, once)",
+    cpuMs: (c.user + c.system) / 1000,
+    wallMs: performance.now() - t0,
+    rows: counter.rows,
+    matched: r.collections.reduce((n, x) => n + x.written, 0),
+  };
+}
 
 async function runPaths(backend: string, store: SiteGraphStore, counter: Counting, siteId: string) {
   // Today's scan without field conditions, for comparison: what every list already costs.
@@ -181,8 +224,23 @@ async function runPaths(backend: string, store: SiteGraphStore, counter: Countin
     })),
   );
   samples.push(
-    await measure(backend, "store queryContentEntries (API)", counter, () =>
+    await measure(backend, API_PATH, counter, () =>
       queryContentEntries(store, siteId, { ...QUERY, now: NOW }),
+    ),
+  );
+  samples.push(
+    await measure(backend, "store queryContentEntries, offset 4980", counter, () =>
+      queryContentEntries(store, siteId, { ...QUERY, offset: 4_980, now: NOW }),
+    ),
+  );
+  samples.push(
+    await measure(backend, BROAD_PATH, counter, () =>
+      queryContentEntries(store, siteId, { ...BROAD, now: NOW }),
+    ),
+  );
+  samples.push(
+    await measure(backend, "store queryContentEntries, unpaged", counter, () =>
+      queryContentEntries(store, siteId, { ...UNPAGED, now: NOW }),
     ),
   );
   const live = new LiveSource(store, siteId, { includeDrafts: false, now: () => NOW });
@@ -226,7 +284,12 @@ describe(`listing a ${N}-entry collection by field (RFC-0042 §4)`, () => {
     );
     const counter = new Counting(sql);
     const counted = new SiteGraphStore({ sql: counter, blobs: store.blobs, gates: GATES_ENFORCED });
+    await expectReady(sql, site.id);
     await runPaths("sqlite", counted, counter, site.id);
+    // Informational: the same rows rebuilt from scratch, as after a migration.
+    await sql.run("DELETE FROM entry_list_state WHERE site_id = ?", [site.id]);
+    samples.push(await rebuild("sqlite", counter, site.id));
+    await expectReady(sql, site.id);
 
     // The same site on D1 (Miniflare): copied with a bundle import.
     d1 = await createMiniflareD1();
@@ -248,6 +311,9 @@ describe(`listing a ${N}-entry collection by field (RFC-0042 §4)`, () => {
         rows.slice(i, i + 50).map((r) => ({ sql: insert, params: cols.map((c) => r[c] ?? null) })),
       );
     const d1counter = new Counting(d1sql, d1.db);
+    // The raw copy bypassed every write path: build the side table as the backfill job would.
+    samples.push(await rebuild("d1 (miniflare)", d1counter, site.id));
+    await expectReady(d1sql, site.id);
     const d1store = new SiteGraphStore({
       sql: d1counter,
       blobs: target.blobs,
@@ -270,7 +336,10 @@ describe(`listing a ${N}-entry collection by field (RFC-0042 §4)`, () => {
       expect(s.matched, `${s.backend} ${s.path}`).toBeGreaterThan(0);
       if (s.path.startsWith("SnapshotSource warm"))
         expect(s.cpuMs, `${s.backend} ${s.path} cpu`).toBeLessThan(CPU_LIMIT_MS);
+      if (s.path === API_PATH || s.path === BROAD_PATH) {
+        expect(s.cpuMs, `${s.backend} ${s.path} cpu`).toBeLessThan(CPU_LIMIT_MS);
+        expect(s.rows, `${s.backend} ${s.path} rows`).toBeLessThan(ROWS_LIMIT);
+      }
     }
-    expect(ROWS_LIMIT).toBe(10_000);
   });
 });

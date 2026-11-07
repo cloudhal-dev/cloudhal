@@ -45,13 +45,13 @@ import {
   ScheduleLock,
 } from "../components/EditorSchedule.tsx";
 import { EntryPath } from "../components/EntryPath.tsx";
+import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { EntryAddress, ViewLiveButton } from "../components/LiveAddress.tsx";
 import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
-import { Status } from "../components/Status.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
 import { TagsMigrationBanner } from "../components/TagsMigration.tsx";
 import { useTaxonomyData } from "../components/Taxonomy.tsx";
@@ -291,7 +291,7 @@ export function ArticleEditorPage() {
       title={title}
       description={
         <span className="flex flex-wrap items-center gap-2">
-          <Status status={draft.status} />
+          <EntryStatus siteId={siteId} entry={draft} saved={query.data} />
           <EntryPath siteId={siteId} entry={draft} />
         </span>
       }

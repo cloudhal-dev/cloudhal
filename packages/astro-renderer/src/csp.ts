@@ -26,3 +26,18 @@ export function turnstileCsp(): string {
     `frame-src ${TURNSTILE_ORIGIN}; object-src 'none'`,
   );
 }
+
+/**
+ * Vite's `build.assetsInlineLimit` for a site build: never inline a script chunk. Astro inlines a
+ * component's `<script>` under the limit (4 KB by default) into the page, where `SITE_CSP`'s
+ * `script-src 'self'` blocks it on the deployed site. Other assets keep the project's own limit.
+ */
+export function scriptsNotInlined<C extends Uint8Array>(
+  limit: number | ((file: string, content: C) => boolean | undefined) | undefined,
+): (file: string, content: C) => boolean | undefined {
+  return (file, content) => {
+    if (/\.[cm]?js$/.test(file)) return false;
+    if (typeof limit === "function") return limit(file, content);
+    return limit === undefined ? undefined : content.byteLength < limit;
+  };
+}

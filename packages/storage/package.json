@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/storage",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Cloudhal storage interfaces (SQL driver, blob store) with Cloudflare D1/R2/Durable Object SQLite and local SQLite/filesystem adapters",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
@@ -36,10 +36,18 @@
     "@cloudhal/core-contracts": "workspace:*"
   },
   "peerDependencies": {
-    "better-sqlite3": "^13.0.0"
+    "better-sqlite3": "^13.0.0",
+    "miniflare": "*",
+    "vitest": ">=3.0.0"
   },
   "peerDependenciesMeta": {
     "better-sqlite3": {
+      "optional": true
+    },
+    "miniflare": {
+      "optional": true
+    },
+    "vitest": {
       "optional": true
     }
   },

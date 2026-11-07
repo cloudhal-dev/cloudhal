@@ -68,6 +68,15 @@ export function describePermalinkApi(label: string, factory: ApiStoreFactory): v
     });
 
     it("refuses an overlap with a page (409 path_conflict) and a reserved prefix (409 reserved_path)", async () => {
+      // A page at the prefix (/about) would be the collection's index page; one under it is not.
+      await store.createPage((await store.getSite(siteId)) as Site, {
+        siteId,
+        path: "/about/team",
+        title: "Team",
+        locale: "en",
+        status: "draft",
+        sections: [],
+      });
       const current = await site();
       const clash = await putSite({
         ...current,
@@ -75,7 +84,7 @@ export function describePermalinkApi(label: string, factory: ApiStoreFactory): v
       });
       expect(clash.status).toBe(409);
       expect(clash.body.error).toBe("path_conflict");
-      expect(clash.body.message).toContain("/about");
+      expect(clash.body.message).toContain("/about/team");
 
       const archive = await putSite({
         ...current,

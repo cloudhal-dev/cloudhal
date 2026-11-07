@@ -10,7 +10,7 @@ Storage interfaces and adapters for Cloudhal. The interface is shaped by the mos
 | `@cloudhal/storage/do-sqlite` | `DoSqliteDriver` — a SQLite-backed Durable Object's `ctx.storage` (RFC-0036); `batch` runs in `transactionSync` |
 | `@cloudhal/storage/fs` | `FsBlobStore` — directory on disk |
 | `@cloudhal/storage/r2` | `R2BlobStore` — Cloudflare R2 binding |
-| `@cloudhal/storage/testing` | conformance suites + Miniflare helpers (`createMiniflareD1`, `createMiniflareR2`, `createMiniflareDoSqlite`) |
+| `@cloudhal/storage/testing` | conformance suites + Miniflare helpers (`createMiniflareD1`, `createMiniflareR2`, `createMiniflareDoSqlite`); needs vitest 3 or later, and miniflare for the helpers (optional peers) |
 
 ```ts
 import { migrate, migrations } from "@cloudhal/storage";
@@ -25,7 +25,7 @@ await sql.batch([
 
 Migrations are TypeScript modules under `migrations/` (plain SQL strings) so they bundle for Workers without filesystem access. Each migration is applied as one atomic batch.
 
-Every adapter must pass `describeSqlDriverConformance` / `describeBlobStoreConformance`; the D1, R2 and Durable Object suites run against Miniflare (workerd in-process), so no Cloudflare account is needed. `createMiniflareDoSqlite()` runs `DoSqliteDriver` inside a test-only Durable Object and hands Node a driver whose every call is one request to it, so any `SqlDriver` suite (core-ts's included) runs on Durable Object SQLite.
+Every adapter must pass `describeSqlDriverConformance` / `describeBlobStoreConformance`; the D1, R2 and Durable Object suites run against Miniflare (workerd in-process), so no Cloudflare account is needed. `createMiniflareDoSqlite()` runs `DoSqliteDriver` inside a test-only Durable Object and hands Node a driver whose every call is one request to it, over kept-alive connections, so any `SqlDriver` suite (core-ts's included) runs on Durable Object SQLite.
 
 A whole site in one Durable Object (the playground's shape):
 

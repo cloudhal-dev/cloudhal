@@ -11,9 +11,9 @@ export function pathsOverlap(a: string, b: string): boolean {
   return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
 }
 
-/** `path` equals `base` or lies under it. */
-export function pathWithin(path: string, base: string): boolean {
-  return path === base || path.startsWith(`${base}/`);
+/** `path` lies strictly under `base` (`/blog/x` under `/blog`, but not `/blog` itself). */
+export function pathUnder(path: string, base: string): boolean {
+  return path.startsWith(`${base}/`);
 }
 
 export interface CollectionPrefix {
@@ -51,29 +51,31 @@ const PERMALINK = "json_extract(c.value, '$.permalink')";
 const PREFIX = `substr(${PERMALINK}, 1, length(${PERMALINK}) - 7)`;
 
 /**
- * Holds while no configured collection prefix in the site row's `collections` contains `path`
- * (`within`: a page path) or overlaps it either way (`overlap`: an archive base path).
+ * Holds while no configured collection prefix in the site row's `collections` has `path` strictly
+ * under it (`under`: a page path; the page at the prefix itself is the collection's index page,
+ * RFC-0038) or overlaps it either way (`overlap`: an archive base path).
  */
 export function configuredPrefixFree(
   siteId: string,
   path: string,
-  mode: "within" | "overlap",
+  mode: "under" | "overlap",
 ): Cond {
-  const within = `${PREFIX} = ? OR substr(?, 1, length(${PREFIX}) + 1) = ${PREFIX} || '/'`;
-  const cond = mode === "within" ? within : `${within} OR substr(${PREFIX}, 1, ?) = ?`;
-  const extra = mode === "within" ? [] : [path.length + 1, `${path}/`];
+  const under = `substr(?, 1, length(${PREFIX}) + 1) = ${PREFIX} || '/'`;
+  const cond =
+    mode === "under" ? under : `${PREFIX} = ? OR ${under} OR substr(${PREFIX}, 1, ?) = ?`;
+  const params = mode === "under" ? [path] : [path, path, path.length + 1, `${path}/`];
   return {
     sql: `NOT EXISTS (SELECT 1 FROM nodes s, json_each(s.body, '$.collections') c WHERE s.id = ? AND s.kind = 'site' AND ${PERMALINK} IS NOT NULL AND (${cond}))`,
-    params: [siteId, path, path, ...extra],
+    params: [siteId, ...params],
   };
 }
 
-/** Holds while no page of the site sits at `base` or under it. */
-export function noPageWithin(siteId: string, base: string): Cond {
+/** Holds while no page of the site sits strictly under `base` (a page at `base` may stay). */
+export function noPageUnder(siteId: string, base: string): Cond {
   const path = "json_extract(body, '$.path')";
   return {
-    sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE site_id = ? AND kind = 'page' AND (${path} = ? OR substr(${path}, 1, ?) = ?))`,
-    params: [siteId, base, base.length + 1, `${base}/`],
+    sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE site_id = ? AND kind = 'page' AND substr(${path}, 1, ?) = ?)`,
+    params: [siteId, base.length + 1, `${base}/`],
   };
 }
 

@@ -12,7 +12,7 @@ Blogs and newsrooms first; documentation sites and research or data documentatio
 - **Safe change loop** — Intent → Agent → Snapshot → Diff → Preview → Approve → Publish → Rollback.
 - **Policy-first** — humans and agents are the same kind of actor; the policy engine checks every tool call against scopes, not the skill's good intentions.
 - **MCP-native** — the agent surface is a Model Context Protocol server (spec 2026-07-28), usable from Claude, Cursor, Codex or any MCP client.
-- **Self-hostable, Cloudflare-ready** — runs offline on SQLite + filesystem; deploys to Cloudflare Workers/D1/R2 with the same storage interface.
+- **Self-hostable, Cloudflare-ready** — runs offline on SQLite + filesystem; deploys to Cloudflare Workers/D1/R2 with the same storage interface. On your own server: the official image `ghcr.io/cloudhal-dev/cloudhal` (Studio, API and MCP in one container, your data on one volume, `docker compose up`); see the [self-host guide](docs/guides/self-host.md).
 - **Analytics without cookies** — page views, sources, countries, devices and Core Web Vitals from one first-party script, in Studio, in each article's editor and for agents (read-only MCP tools). No personal data by default; see the [privacy guide for site owners](docs/guides/analytics-privacy.md).
 - **Reader comments, moderated** — first-party comments on articles: a plain form that works without JavaScript, a cookie-less proof of work instead of a CAPTCHA (Cloudflare Turnstile optional), every guest comment held for a person, agents that label and hide but never approve, erasure and DSA reports built in. Comments live in your database, outside snapshots. Off for each site until you turn them on; see the [guide for site owners](docs/guides/comments.md).
 - **Schedules** — publish later as releases that pin the exact versions a person approved; embargoes and expiries the site enforces on every request, with no scheduler needed; one every-minute tick on Cloudflare (cron, or a Durable Object alarm when no cron slot is free) and on Node; built-in checks and scheduled agent tasks with their own keys, run windows, budgets and a taint rule. No language model runs inside Cloudhal; see the [schedules guide](docs/guides/schedules.md).
@@ -82,7 +82,7 @@ packages/astro-renderer   Astro 7 integration, live/snapshot data sources, secti
 packages/analytics        cookie-less site analytics: beacon handler, WAE and SQLite stores, rollups
 packages/comments         reader comments (RFC-0007): rules, proof of work, submission pipeline, SQLite/D1 store
 packages/schedules        schedules (RFC-0008): time model, RRULE subset, releases, automations, taint, budgets, runDue, SQLite/D1 store
-packages/cli              the cloudhal CLI: init, dev, studio, mcp, deploy, push, pull, … (all commands: cloudhal --help, https://cloudhal.dev/docs/reference/cli)
+packages/cli              the cloudhal CLI: init, dev, studio, mcp, deploy, push, pull, export, import, … (all commands: cloudhal --help, https://cloudhal.dev/docs/reference/cli)
 packages/api              Hono HTTP API + Better Auth + /mcp endpoint + agent API keys (Node and Workers)
 packages/agent-runtime    policy engine, skill loader, audit log (SDK-free)
 packages/mcp-server       MCP server: over 100 tools (README tool reference), approval gate, agent modes, skills as resources; stdio + HTTP

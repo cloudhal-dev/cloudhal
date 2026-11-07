@@ -31,7 +31,7 @@ const devCommand: CliCommand = async (_rest, values, { projectDir }) => {
   const server = await dev({
     projectDir,
     ...(values.port ? { port: Number(values.port) } : {}),
-    ...(values.host ? { host: true } : {}),
+    ...(values.host ? { host: values.host } : {}),
   });
   if (server.url) console.log(`cloudhal dev → ${server.url}`);
   await untilSignal();
@@ -69,6 +69,14 @@ const studioCommand: CliCommand = async (_rest, values, { projectDir }) => {
     projectDir,
     ...(values.port ? { port: Number(values.port) } : {}),
     ...(values["no-auth"] ? { noAuth: true } : {}),
+    // Self-hosting (#143); the environment fills what the flags leave out (studio-options.ts).
+    ...(values.host ? { host: values.host } : {}),
+    ...(values["base-url"] ? { baseUrl: values["base-url"] } : {}),
+    ...(values["behind-proxy"] ? { behindProxy: true } : {}),
+    ...(values["init-if-empty"] ? { initIfEmpty: true } : {}),
+    ...(values.starter ? { starter: values.starter } : {}),
+    ...(values.name ? { name: values.name } : {}),
+    log: (l) => console.log(`  ${l}`),
   });
   console.log(`cloudhal studio → ${s.url}`);
   await untilSignal();

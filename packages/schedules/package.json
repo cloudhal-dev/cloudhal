@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/schedules",
-  "version": "0.6.0",
+  "version": "0.6.2",
   "description": "Cloudhal schedules (RFC-0008): the time model, the RRULE subset and its sentences, releases (pin, closure, rl1: hash, compose, conflicts, state machine), automation and run state, taint and budget accounting, the Scheduler and runDue, and the SQLite/D1 store. Worker-safe.",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
@@ -34,6 +34,14 @@
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "temporal-polyfill": "catalog:"
+  },
+  "peerDependencies": {
+    "vitest": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

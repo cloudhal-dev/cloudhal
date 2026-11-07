@@ -6,6 +6,7 @@ import { ConflictError, NotFoundError } from "../errors.ts";
 import { nodeHash } from "../hash.ts";
 import { assertUnlocked } from "../holds.ts";
 import { ID_PREFIX } from "../ids.ts";
+import { planListValues, planListValuesDelete } from "../list-values/write-plan.ts";
 import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { uniquenessKey } from "../nodes.ts";
@@ -104,7 +105,10 @@ export class EntryEngine {
     const hash = await nodeHash(entry);
     // RFC-0041 §5: a change to non-localized values alone leaves translations fresh.
     const forward = await planSourceForward(this.#ctx, site, { stored, entry, ts });
-    const extra = [...refs.statements(hash), ...fields.statements(hash), ...(await forward(hash))];
+    // RFC-0042 §4: list values before source-forward, which changes the translations' hashes.
+    const lists = await planListValues(this.#ctx.sql, site, { stored, entry, at: ts });
+    const own = [...refs.statements(hash), ...fields.statements(hash), ...lists(hash)];
+    const extra = [...own, ...(await forward(hash))];
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
@@ -152,5 +156,22 @@ export class EntryEngine {
       },
     });
     return entry;
+  }
+
+  /** CAS delete with its asset references and list values (RFC-0042 §4), in one batch. */
+  async delete(entry: ContentEntry): Promise<void> {
+    await assertUnlocked(this.#ctx.sql, entry.siteId, [entry.id]);
+    const site = await this.#ctx.graph.getSite(entry.siteId);
+    const lists = await planListValuesDelete(this.#ctx.sql, site, entry, this.#ctx.stamp());
+    const [r] = await this.#ctx.sql.batch([
+      {
+        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
+        params: [entry.id, entry.rev, entry.siteId],
+      },
+      this.#ctx.assets.dropRefsStatement(entry.id),
+      ...lists,
+    ]);
+    if (r?.changes !== 1)
+      throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#ctx.revOf(entry.id));
   }
 }

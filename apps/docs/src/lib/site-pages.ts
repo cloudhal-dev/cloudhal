@@ -75,6 +75,7 @@ const docsIndex: SitePage = {
 - [Installation](/docs/start/installation): Node 24, npm, pnpm, Yarn or Bun.
 - [Quickstart](/docs/start/quickstart): create a site, open Studio, connect an agent, publish, deploy.
 - [Deploy to Cloudflare with one click](/docs/guides/deploy-button), with nothing installed.
+- [Self-host with Docker](/docs/guides/self-host): the official image, compose, a reverse proxy, upgrades and backups.
 
 ## Agents
 
@@ -89,6 +90,7 @@ const docsIndex: SitePage = {
 - [Typed custom fields](/docs/guides/fields): definitions, operations, languages and themes
 - [Structured data, expiry and listings](/docs/guides/structured-data): JSON-LD presets, entries that end on a date, listings by field and collection feeds
 - [Several sites in one deployment](/docs/guides/multi-site)
+- [Site archives](/docs/guides/site-archives): backups, moving a site, templates; \`cloudhal export\` and \`import\`
 - [Analytics and privacy](/docs/guides/analytics-privacy)
 - [Translations with Weblate](/docs/guides/translations-weblate)
 

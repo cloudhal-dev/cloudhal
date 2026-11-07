@@ -82,4 +82,4 @@ On a deployment, agents use the remote MCP endpoint at `https://<studio-host>/mc
 
 - [How agents work with Cloudhal](/docs/agents): modes, approvals, skills and the tool list.
 - [CLI reference](/docs/reference/cli).
-- Guides: [search](/docs/guides/search), [schedules](/docs/guides/schedules), [comments](/docs/guides/comments), [several sites](/docs/guides/multi-site).
+- Guides: [search](/docs/guides/search), [schedules](/docs/guides/schedules), [comments](/docs/guides/comments), [several sites](/docs/guides/multi-site), [site archives](/docs/guides/site-archives).

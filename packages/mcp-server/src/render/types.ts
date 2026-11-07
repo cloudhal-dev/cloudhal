@@ -89,6 +89,10 @@ export const RENDER_CHECK_IDS = [
   "image-fit",
   // RFC-0023 §2: a web font with no metric-matched fallback, so its text moves when it loads.
   "font-fallback",
+  // RFC-0020 §5: a body surface the page could not draw (an unknown component, props that do not fit).
+  "surface-broken",
+  // A script the page's Content-Security-Policy refused (the Site Worker's is script-src 'self').
+  "script-blocked",
 ] as const;
 export type RenderCheckId = (typeof RENDER_CHECK_IDS)[number];
 

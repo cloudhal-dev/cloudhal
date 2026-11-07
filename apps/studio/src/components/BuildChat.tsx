@@ -17,11 +17,20 @@ import {
   SkeletonLine,
   Text,
 } from "@cloudhal/ui";
-import { GearSix, Sparkle, StopCircle, Target, WarningCircle, X } from "@phosphor-icons/react";
+import {
+  CloudArrowUp,
+  GearSix,
+  Sparkle,
+  StopCircle,
+  Target,
+  WarningCircle,
+  X,
+} from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { listOf, useT } from "../i18n/index.tsx";
 import { api, errorCode } from "../lib/api.ts";
+import { usePlayground } from "./usePlayground.ts";
 
 /**
  * The model Build recommends (RFC-0020 open question 7): it finished every brief of the Build
@@ -173,6 +182,8 @@ export function BuildChat({
     }
   };
 
+  // RFC-0036 §5: a playground has no AI by design; say so, not that the deployment is broken.
+  const playground = usePlayground();
   const ai = settings.data;
   const reachable = ai !== undefined && ai.transport !== "none";
   const on = reachable && ai.settings.enabled;
@@ -182,23 +193,12 @@ export function BuildChat({
       icon={<Sparkle />}
       description={on ? t("build.chat.description") : undefined}
     >
-      {settings.isPending ? (
-        <div className="grid gap-3">
-          <SkeletonLine minWidth={50} maxWidth={80} />
-          <SkeletonLine minWidth={30} maxWidth={60} />
-        </div>
-      ) : !on ? (
-        <SectionEmpty
-          icon={<Sparkle size={32} className="text-kumo-inactive" />}
-          title={reachable ? t("build.chat.off") : t("build.chat.unavailable")}
-          description={reachable ? t("build.chat.offHint") : t("build.chat.unavailableHint")}
-          contents={
-            reachable ? (
-              <LinkButton href={`/sites/${siteId}/settings`} variant="secondary" icon={GearSix}>
-                {t("build.chat.settings")}
-              </LinkButton>
-            ) : undefined
-          }
+      {playground || !on ? (
+        <BuildChatOff
+          siteId={siteId}
+          deployUrl={playground?.deployUrl}
+          reachable={reachable}
+          pending={settings.isPending}
         />
       ) : (
         <div className="grid gap-6">
@@ -267,5 +267,57 @@ export function BuildChat({
         </div>
       )}
     </SectionCard>
+  );
+}
+
+/**
+ * Build chat while it cannot run: loading, a playground (RFC-0036 §5 leaves AI out), a deployment
+ * that cannot reach Workers AI, or AI turned off for the site.
+ */
+function BuildChatOff({
+  siteId,
+  deployUrl,
+  reachable,
+  pending,
+}: {
+  siteId: string;
+  deployUrl: string | undefined;
+  reachable: boolean;
+  pending: boolean;
+}) {
+  const t = useT("build");
+  if (deployUrl !== undefined)
+    return (
+      <SectionEmpty
+        icon={<Sparkle size={32} className="text-kumo-inactive" />}
+        title={t("playground.unavailableTitle")}
+        description={t("build.chat.playgroundHint")}
+        contents={
+          <LinkButton href={deployUrl} external variant="primary" icon={CloudArrowUp}>
+            {t("playground.deploy")}
+          </LinkButton>
+        }
+      />
+    );
+  if (pending)
+    return (
+      <div className="grid gap-3">
+        <SkeletonLine minWidth={50} maxWidth={80} />
+        <SkeletonLine minWidth={30} maxWidth={60} />
+      </div>
+    );
+  return (
+    <SectionEmpty
+      icon={<Sparkle size={32} className="text-kumo-inactive" />}
+      title={reachable ? t("build.chat.off") : t("build.chat.unavailable")}
+      description={reachable ? t("build.chat.offHint") : t("build.chat.unavailableHint")}
+      contents={
+        reachable ? (
+          <LinkButton href={`/sites/${siteId}/settings`} variant="secondary" icon={GearSix}>
+            {t("build.chat.settings")}
+          </LinkButton>
+        ) : undefined
+      }
+    />
   );
 }

@@ -2,7 +2,7 @@
  * In-page checks, part of `RENDER_CHECK_SCRIPT`: skip-link, landmarks, header-contrast, focus-obscured.
  * Plain source text, run inside the page; it shares the script's locals (see ./index.ts).
  */
-export const NAVIGATION_CHECKS = `  // skip-link: the first focusable element is a link to the main content (or inside it).
+export const NAVIGATION_CHECKS = String.raw`  // skip-link: the first focusable element is a link to the main content (or inside it).
   const shown = (e) => e.getClientRects().length > 0 && getComputedStyle(e).visibility !== "hidden";
   const focusables = [...document.querySelectorAll('a[href],button,input,select,textarea,summary,[tabindex]:not([tabindex="-1"])')]
     .filter((e) => !e.disabled && !e.closest("[inert],dialog:not([open]),[popover]:not(:popover-open)") && shown(e));
