@@ -9,7 +9,7 @@ catalogMode: strict
 
 catalog:
   "@capsizecss/unpack": 4.0.1
-  "@biomejs/biome": 2.6.2
+  "@biomejs/biome": 2.6.5
   "@changesets/cli": 3.0.3
   "@phosphor-icons/core": 2.1.1
   "@types/node": ^26.6.5
@@ -19,7 +19,7 @@ catalog:
   tsx: ^4.23.15
   turbo: 2.11.10
   typescript: 7.0.2
-  vitest: 5.0.5
+  vitest: 5.1.0
   better-sqlite3: 13.0.3
   "@types/better-sqlite3": ^9.6.0
   miniflare: 4.20260730.0
