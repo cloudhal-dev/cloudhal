@@ -24,10 +24,10 @@ catalog:
   "@types/better-sqlite3": ^9.6.0
   miniflare: 4.20260730.0
   "@cloudflare/workers-types": ^5.20261007.1
-  astro: ^7.3.6
-  "@astrojs/cloudflare": 14.3.4
+  astro: ^7.4.7
+  "@astrojs/cloudflare": 14.4.4
   "@astrojs/starlight": 0.42.6
-  wrangler: 4.152.0
+  wrangler: 4.158.0
   "@tailwindcss/vite": ^4.3.3
   tailwindcss: ^4.3.3
   marked: ^18.1.1

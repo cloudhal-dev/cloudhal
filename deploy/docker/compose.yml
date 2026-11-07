@@ -1,0 +1,49 @@
+# Cloudhal self-hosted (docs/guides/self-host.md): Studio, the API and the MCP endpoint in one
+# container, every file on the `cloudhal-data` volume. Copy .env.example to .env, then
+#   docker compose up -d                      Studio on http://localhost:8787
+#   docker compose --profile caddy up -d      + Caddy with automatic TLS for CLOUDHAL_BASE_URL
+#                                               (Studio) and CLOUDHAL_SITE_URL (the built site)
+services:
+  cloudhal:
+    image: ghcr.io/cloudhal-dev/cloudhal:${CLOUDHAL_TAG:-latest}
+    restart: unless-stopped
+    # Bound to this machine unless CLOUDHAL_BIND says otherwise; with the caddy profile the proxy
+    # is the way in.
+    ports:
+      - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_PORT:-8787}:8787"
+    environment:
+      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:-http://localhost:8787}
+      CLOUDHAL_BEHIND_PROXY: ${CLOUDHAL_BEHIND_PROXY:-0}
+      CLOUDHAL_INIT: ${CLOUDHAL_INIT:-blog}
+      CLOUDHAL_SITE_NAME: ${CLOUDHAL_SITE_NAME:-My site}
+      CLOUDHAL_AUTOMATIONS: ${CLOUDHAL_AUTOMATIONS:-on}
+      CLOUDHAL_TRUSTED_ORIGINS: ${CLOUDHAL_TRUSTED_ORIGINS:-}
+      CLOUDHAL_AI_TOKEN: ${CLOUDHAL_AI_TOKEN:-}
+      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+    volumes:
+      - cloudhal-data:/data
+
+  caddy:
+    profiles: [caddy]
+    image: caddy:2.11
+    restart: unless-stopped
+    depends_on:
+      - cloudhal
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:?set CLOUDHAL_BASE_URL in .env}
+      CLOUDHAL_SITE_URL: ${CLOUDHAL_SITE_URL:?set CLOUDHAL_SITE_URL in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # the built site (`site-build` writes /data/dist), read-only
+      - cloudhal-data:/srv/cloudhal:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  cloudhal-data:
+  caddy-data:
+  caddy-config:

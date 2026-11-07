@@ -1,0 +1,8 @@
+# The build context is this folder: the installer, the entrypoint scripts and, for edge builds,
+# the packed tarballs. Nothing else is needed in the image.
+README.md
+compose.yml
+Caddyfile
+.env.example
+.env
+.DS_Store

@@ -1,0 +1,11 @@
+#!/bin/sh
+# The image's entrypoint: `studio` (the default command) runs `cloudhal studio` in /data and
+# scaffolds the project first when the volume is empty; anything else runs as given, so
+# `docker run … cloudhal export` or `docker compose exec cloudhal site-build` work too.
+set -eu
+cd /data
+if [ "${1:-studio}" = "studio" ]; then
+  [ $# -gt 0 ] && shift
+  exec cloudhal studio --init-if-empty "$@"
+fi
+exec "$@"

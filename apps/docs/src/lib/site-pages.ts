@@ -75,6 +75,7 @@ const docsIndex: SitePage = {
 - [Installation](/docs/start/installation): Node 24, npm, pnpm, Yarn or Bun.
 - [Quickstart](/docs/start/quickstart): create a site, open Studio, connect an agent, publish, deploy.
 - [Deploy to Cloudflare with one click](/docs/guides/deploy-button), with nothing installed.
+- [Self-host with Docker](/docs/guides/self-host): the official image, compose, a reverse proxy, upgrades and backups.
 
 ## Agents
 

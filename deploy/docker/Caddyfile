@@ -1,0 +1,19 @@
+# Caddy for the compose file's `caddy` profile: automatic TLS for both hosts (the DNS of each must
+# point at this machine, ports 80 and 443 open). Studio and the API at CLOUDHAL_BASE_URL, proxied
+# with X-Forwarded-Proto/Host (set CLOUDHAL_BEHIND_PROXY=1); the public site, as `site-build`
+# wrote it, at CLOUDHAL_SITE_URL.
+{$CLOUDHAL_BASE_URL} {
+	reverse_proxy cloudhal:8787
+}
+
+{$CLOUDHAL_SITE_URL} {
+	root * /srv/cloudhal/dist
+	encode zstd gzip
+	try_files {path} {path}/ {path}.html
+	file_server
+	handle_errors {
+		@notfound expression {err.status_code} == 404
+		rewrite @notfound /404.html
+		file_server
+	}
+}
