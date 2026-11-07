@@ -116,8 +116,9 @@ not apply, cacheable for an hour:
 `scopesForMode("edits")` (`packages/agent-runtime/src/modes.ts`, what a new agent key gets,
 RFC-0005 §5), not every key scope. Clients that find no `scope` in the challenge request exactly
 this list (MCP "Scope Selection Strategy"; Claude and Codex document the same order).
-`offline_access` is deliberately absent here ("MCP Servers SHOULD NOT include `offline_access`"); it is in the AS metadata, so
-clients that want a refresh token add it themselves.
+`offline_access` is deliberately absent here ("MCP Servers SHOULD NOT include
+`offline_access`"); it is in the AS metadata, so clients that want a refresh token add it
+themselves.
 
 An unauthenticated request to `/mcp` (no credential, or an expired or invalid token) answers:
 
@@ -290,8 +291,8 @@ controls, because the endpoint is anonymous:
 2. Body ≤ 5 KB; `client_name` required, 1–100 characters, shown escaped; `logo_uri`,
    `client_uri`, `tos_uri`, `policy_uri` are stored but never rendered (RFC 7591 §5:
    self-asserted; the consent screen shows the redirect host instead); `grant_types` ⊆
-   {`authorization_code`, `refresh_token`}; `response_types` = [`code`]; `token_endpoint_auth_method` ∈ {`none`,
-   `private_key_jwt`} (no shared secrets are minted for DCR clients: nothing to leak);
+   {`authorization_code`, `refresh_token`}; `response_types` = [`code`];
+   `token_endpoint_auth_method` ∈ {`none`, `private_key_jwt`} (no shared secrets are minted for DCR clients: nothing to leak);
    `application_type` honoured for loopback rules.
 3. `redirect_uris`: each must be `https://` or loopback (`http://localhost`, `http://127.0.0.1`,
    `http://[::1]`); at most 10.
