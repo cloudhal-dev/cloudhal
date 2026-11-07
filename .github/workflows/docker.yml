@@ -1,0 +1,146 @@
+name: Docker image
+
+# The official self-host image, ghcr.io/cloudhal-dev/cloudhal (issue #143, docs/guides/self-host.md).
+# Built from the npm release, never from the tree, so the image is exactly what npm users get:
+# - release.yml calls this after a successful npm publish (`workflow_call` with the version):
+#   tags X.Y.Z, X.Y, latest and sha-<short>;
+# - Actions › Docker image › Run workflow with a version re-publishes or backfills it (X.Y.Z, X.Y
+#   and sha-<short>; `latest` never moves on a dispatch, so a backfill cannot point it at an
+#   older release); with no version it builds `edge`;
+# - nightly, `edge` is built from main's own packed tarballs (scripts/pack-packages.ts): tagged
+#   edge and sha-<short> only, never latest;
+# - a pull request that touches the image builds it for linux/amd64 without pushing and runs the
+#   same smoke test and scan.
+# Every push is linux/amd64 + linux/arm64 with an SBOM, buildx provenance and a GitHub build
+# attestation; scripts/docker-smoke.ts then runs the amd64 image (empty volume, health check, the
+# first owner through the API, a publish, `site-build`), and Trivy fails the job on a CRITICAL
+# vulnerability with a fix. Versions before 0.6.3 have no `--init-if-empty`: the image needs it.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Cloudhal version on npm, x.y.z
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Cloudhal version on npm, x.y.z (empty builds edge from this ref)
+        type: string
+        required: false
+        default: ""
+  schedule:
+    - cron: "41 3 * * *"
+  pull_request:
+    paths:
+      - "deploy/docker/**"
+      - ".github/workflows/docker.yml"
+      - "scripts/docker-smoke.ts"
+      - "scripts/pack-packages.ts"
+
+permissions: {}
+
+concurrency:
+  group: docker-${{ github.event_name == 'pull_request' && github.ref || inputs.version || 'edge' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/cloudhal
+
+jobs:
+  image:
+    name: ${{ inputs.version && format('Image {0}', inputs.version) || 'Image edge' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ inputs.version || '' }}
+      PUSH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+
+      # edge: the packages of this ref, built and packed the way the release job packs them
+      - if: env.VERSION == ''
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - if: env.VERSION == ''
+        run: pnpm install --frozen-lockfile
+      - if: env.VERSION == ''
+        run: node scripts/pack-packages.ts deploy/docker/tarballs
+
+      - if: env.PUSH == 'true'
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=v${{ env.VERSION }},enable=${{ env.VERSION != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=v${{ env.VERSION }},enable=${{ env.VERSION != '' }}
+            type=raw,value=latest,enable=${{ env.VERSION != '' && github.event_name != 'workflow_dispatch' }}
+            type=raw,value=edge,enable=${{ env.VERSION == '' }}
+            type=sha,prefix=sha-
+          labels: |
+            org.opencontainers.image.title=Cloudhal
+            org.opencontainers.image.description=Agent-native site platform: Studio, API and MCP server, self-hosted
+            org.opencontainers.image.documentation=https://github.com/cloudhal-dev/cloudhal/blob/main/docs/guides/self-host.md
+            org.opencontainers.image.vendor=Cloudhal
+            org.opencontainers.image.version=${{ env.VERSION || 'edge' }}
+      - if: env.PUSH == 'true'
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: deploy/docker
+          platforms: ${{ env.PUSH == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          push: ${{ env.PUSH == 'true' }}
+          load: ${{ env.PUSH != 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: CLOUDHAL_VERSION=${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # attestations need a registry push; a loaded local image takes none
+          sbom: ${{ env.PUSH == 'true' }}
+          provenance: ${{ env.PUSH == 'true' && 'mode=max' || 'false' }}
+      - if: env.PUSH == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+      - id: ref
+        run: |
+          if [ "$PUSH" = "true" ]; then echo "image=$IMAGE@$DIGEST" >> "$GITHUB_OUTPUT"
+          else echo "image=$FIRST_TAG" >> "$GITHUB_OUTPUT"; fi
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          FIRST_TAG: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+      - name: Smoke test (linux/amd64)
+        run: node scripts/docker-smoke.ts --image "$SMOKE_IMAGE"
+        env:
+          SMOKE_IMAGE: ${{ steps.ref.outputs.image }}
+      - name: Trivy scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ steps.ref.outputs.image }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
