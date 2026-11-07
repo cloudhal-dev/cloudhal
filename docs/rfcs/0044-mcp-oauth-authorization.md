@@ -115,8 +115,8 @@ not apply, cacheable for an hour:
 `scopes_supported` is "the minimal set of scopes necessary for basic functionality": exactly
 `scopesForMode("edits")` (`packages/agent-runtime/src/modes.ts`, what a new agent key gets,
 RFC-0005 §5), not every key scope. Clients that find no `scope` in the challenge request exactly
-this list (MCP "Scope Selection Strategy"; Claude and Codex document the same order). `offline_access` is deliberately
-absent here ("MCP Servers SHOULD NOT include `offline_access`"); it is in the AS metadata, so
+this list (MCP "Scope Selection Strategy"; Claude and Codex document the same order).
+`offline_access` is deliberately absent here ("MCP Servers SHOULD NOT include `offline_access`"); it is in the AS metadata, so
 clients that want a refresh token add it themselves.
 
 An unauthenticated request to `/mcp` (no credential, or an expired or invalid token) answers:
@@ -162,8 +162,8 @@ scopes required for the current operation in a single challenge").
 `@better-auth/oauth-provider` with resource binding and the RFC 9728 document, plus `jwt()` for
 the signing key and `cimd()` for §3, added to `createInstance` in
 `packages/api/src/auth/instance.ts`. Same `betterAuth({...})` call, same database handle
-(better-sqlite3 on Node, the D1 binding on Workers), same migration pipeline (§7). The issuer is Better Auth's base path on the deployment's
-public origin: `https://studio.example.com/api/auth`.
+(better-sqlite3 on Node, the D1 binding on Workers), same migration pipeline (§7). The issuer is
+Better Auth's base path on the deployment's public origin: `https://studio.example.com/api/auth`.
 
 | Endpoint | Path | Note |
 |---|---|---|
@@ -289,8 +289,8 @@ controls, because the endpoint is anonymous:
    installation through `StaffStore.hit` (the fixed-window helper agent keys use).
 2. Body ≤ 5 KB; `client_name` required, 1–100 characters, shown escaped; `logo_uri`,
    `client_uri`, `tos_uri`, `policy_uri` are stored but never rendered (RFC 7591 §5:
-   self-asserted; the consent screen shows the redirect host instead); `grant_types` ⊆ {`authorization_code`,
-   `refresh_token`}; `response_types` = [`code`]; `token_endpoint_auth_method` ∈ {`none`,
+   self-asserted; the consent screen shows the redirect host instead); `grant_types` ⊆
+   {`authorization_code`, `refresh_token`}; `response_types` = [`code`]; `token_endpoint_auth_method` ∈ {`none`,
    `private_key_jwt`} (no shared secrets are minted for DCR clients: nothing to leak);
    `application_type` honoured for loopback rules.
 3. `redirect_uris`: each must be `https://` or loopback (`http://localhost`, `http://127.0.0.1`,
