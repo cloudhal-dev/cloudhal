@@ -10,14 +10,14 @@
 # linux/arm64. The public site is `cloudhal build` output (`site-build` in the container) that a
 # web server such as the compose file's Caddy serves from the same volume.
 
-FROM node:24-bookworm-slim AS build
+FROM node:25-bookworm-slim AS build
 ARG CLOUDHAL_VERSION=""
 COPY . /ctx
 RUN node /ctx/install.mjs /ctx /opt/cloudhal \
   && npm cache clean --force \
   && rm -rf /root/.npm /tmp/*
 
-FROM node:24-bookworm-slim
+FROM node:25-bookworm-slim
 ARG CLOUDHAL_VERSION=""
 LABEL org.opencontainers.image.title="Cloudhal" \
   org.opencontainers.image.description="Agent-native site platform: Studio, API and MCP server, self-hosted" \
