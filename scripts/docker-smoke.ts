@@ -91,7 +91,7 @@ try {
     .getSetCookie()
     .map((c) => c.split(";")[0] as string)
     .find((c) => c.includes("better-auth.session_token="));
-  expect(cookie !== undefined, "sign-up set a session cookie");
+  if (cookie === undefined) throw new Error("sign-up set no session cookie");
   const me = await api("GET", "/api/me", { cookie });
   expect(
     (me.body as { role?: string }).role === "owner",
@@ -102,7 +102,8 @@ try {
 
   const sites = await api("GET", "/api/sites", { cookie });
   const site = (sites.body as { id: string; name: string }[])[0];
-  expect(site?.name === "Smoke Site", "the scaffolded site is listed", sites.body);
+  if (site?.name !== "Smoke Site") expect(false, "the scaffolded site is listed", sites.body);
+  if (!site) throw new Error("no site");
   const publish = await api("POST", `/api/sites/${site.id}/snapshots`, {
     cookie,
     body: { publish: true, label: "smoke" },
