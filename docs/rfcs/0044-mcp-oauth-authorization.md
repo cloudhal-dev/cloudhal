@@ -1,6 +1,7 @@
 # RFC-0044: Remote MCP authorization: OAuth 2.1 for Cloudhal deployments
 
-- Status: Draft
+- Status: Accepted (2026-11-08, by Halil; ADR to follow with Phase 2). Open questions decided
+  as recommended.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-08
 - Related:
   - [#144](https://github.com/cloudhal-dev/cloudhal/issues/144) (problem statement and phases);
@@ -602,7 +603,25 @@ sequenceDiagram
   rate-limited by its D1-backed limiter on Workers.
 - **Threat model:** §6.
 
-## Open questions
+## Decisions (2026-11-08)
+
+Every open question was decided as recommended by the owner on 2026-11-08:
+
+1. **DCR on by default**, with the limits of §3 and the `CLOUDHAL_MCP_DCR=off` switch.
+2. **Refresh reuse window:** `mcp()`'s 30 s, so two concurrent refreshes from one client succeed.
+3. **Access token lifetime:** 1 h; revocation is immediate through the grant read.
+4. **Mode at consent:** the member chooses `plan` / `edits` / `auto` on the consent screen, capped
+   by role, as the key dialog offers.
+5. **Pre-registered clients:** deferred to a later RFC; the admin API exists.
+6. **AS metadata root alias:** served, next to the path-inserted form.
+7. **DPoP:** later, once a client we target sends it by default.
+8. **Consent memory:** skipped when the same client asks for a subset of already-granted scopes,
+   shown for anything new; the audit row says which.
+9. **Client host allow-list:** no default; `CLOUDHAL_MCP_CLIENT_HOSTS` stays opt-in.
+10. **The playground** stays out of OAuth.
+
+The questions as asked, for the record:
+
 
 1. **DCR on by default** (§3), so Cursor works out of the box, with the limits and the
    `CLOUDHAL_MCP_DCR=off` switch? *Recommend: yes.* The alternative is off by default with a
