@@ -216,7 +216,7 @@
 }
 /* On a brand hero the primary button would vanish into it: its colors swap until the fill. */
 .ch-header[data-transparent]:is([data-over="brand"], [data-over="gradient"]):not([data-ch-scrolled])
-.ch-button--primary {
+  .ch-button--primary {
   background: var(--ch-color-on-brand);
   color: var(--ch-color-brand);
 }
