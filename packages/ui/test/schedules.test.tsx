@@ -927,56 +927,56 @@ describe("RescheduleDialog", () => {
   });
 });
 
+const labels: ScheduleFiltersLabels = {
+  toolbar: "Filter schedules",
+  facet: {
+    kind: "Kind",
+    state: "State",
+    origin: "Origin",
+    approval: "Approval",
+    collection: "Collection",
+    term: "Category or tag",
+    locale: "Language",
+  },
+  selected: (f, n) => `${f}, ${n} selected`,
+  clear: "Clear filters",
+  view: "View",
+  builtinViews: "Built-in views",
+  savedViews: "Saved views",
+  saveView: "Save view…",
+};
+
+function Filters({ onChange }: { onChange: (v: ScheduleFilterValue) => void }) {
+  const [value, setValue] = useState<ScheduleFilterValue>({ kind: ["publish"] });
+  return (
+    <ScheduleFilters
+      value={value}
+      onChange={(v) => {
+        onChange(v);
+        setValue(v);
+      }}
+      facets={[
+        {
+          facet: "kind",
+          options: [
+            { value: "publish", label: "Publish" },
+            { value: "release", label: "Release" },
+          ],
+        },
+        { facet: "origin", options: [{ value: "agent", label: "Agents" }] },
+      ]}
+      labels={labels}
+      views={[
+        { id: "all", label: "All", builtin: true },
+        { id: "waiting", label: "Waiting for approval", builtin: true },
+      ]}
+      view="all"
+      onViewChange={() => {}}
+    />
+  );
+}
+
 describe("ScheduleFilters", () => {
-  const labels: ScheduleFiltersLabels = {
-    toolbar: "Filter schedules",
-    facet: {
-      kind: "Kind",
-      state: "State",
-      origin: "Origin",
-      approval: "Approval",
-      collection: "Collection",
-      term: "Category or tag",
-      locale: "Language",
-    },
-    selected: (f, n) => `${f}, ${n} selected`,
-    clear: "Clear filters",
-    view: "View",
-    builtinViews: "Built-in views",
-    savedViews: "Saved views",
-    saveView: "Save view…",
-  };
-
-  function Filters({ onChange }: { onChange: (v: ScheduleFilterValue) => void }) {
-    const [value, setValue] = useState<ScheduleFilterValue>({ kind: ["publish"] });
-    return (
-      <ScheduleFilters
-        value={value}
-        onChange={(v) => {
-          onChange(v);
-          setValue(v);
-        }}
-        facets={[
-          {
-            facet: "kind",
-            options: [
-              { value: "publish", label: "Publish" },
-              { value: "release", label: "Release" },
-            ],
-          },
-          { facet: "origin", options: [{ value: "agent", label: "Agents" }] },
-        ]}
-        labels={labels}
-        views={[
-          { id: "all", label: "All", builtin: true },
-          { id: "waiting", label: "Waiting for approval", builtin: true },
-        ]}
-        view="all"
-        onViewChange={() => {}}
-      />
-    );
-  }
-
   it("is controlled, multi-valued and clears", async () => {
     const onChange = vi.fn();
     render(<Filters onChange={onChange} />);
