@@ -258,6 +258,11 @@ export interface Principal {
   /** The API key an agent authenticated with (lets it ask for an elevation of that key). */
   keyId?: string | undefined;
   /**
+   * RFC-0044 §5: the OAuth grant an agent's access token belongs to (a connection approved on the
+   * consent screen). Only such principals get the `insufficient_scope` step-up challenge.
+   */
+  grantId?: string | undefined;
+  /**
    * RFC-0008 §11.2: the key is an automation's key (`purpose: "automation"` in its metadata). It
    * works only inside an open run of that automation, except `begin_run` and `get_mode`.
    */

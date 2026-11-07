@@ -6,13 +6,13 @@ import {
   type Principal,
 } from "@cloudhal/agent-runtime";
 import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
-import { createCloudhalMcpHandler } from "@cloudhal/mcp-server/http";
 import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { type Context, Hono } from "hono";
 import { createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
-import { errorHandler, unauthorized } from "./errors.ts";
+import { errorHandler } from "./errors.ts";
+import { mountMcp } from "./mcp-mount.ts";
 import { PLAYGROUND_PRINCIPAL, playgroundGuard } from "./playground.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { mountAdmin } from "./routes/admin-mount.ts";
@@ -222,37 +222,8 @@ export function createApi(deps: ApiDeps) {
 
   app.get("/api/me", meHandler(membership));
 
-  if (deps.mcp) {
-    const mcp = createCloudhalMcpHandler({
-      store: deps.store,
-      build,
-      ...deps.mcp,
-      previewSecret: deps.mcp.previewSecret ?? deps.preview?.secret,
-      now: deps.now,
-      ownership,
-      analytics: deps.analytics,
-      comments: deps.comments,
-      schedules,
-    });
-    app.all("/mcp", async (c) => {
-      // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
-      const origin = c.req.header("origin");
-      if (origin && origin !== new URL(c.req.url).origin)
-        return c.json(
-          { error: "forbidden", message: "cross-origin MCP requests are not allowed" },
-          403,
-        );
-      const principal = c.get("principal");
-      if (!principal) throw unauthorized();
-      // A signed-in person without a membership has no scopes; refuse rather than list tools.
-      if (deps.staff && principal.actor.kind === "human" && !principal.person)
-        return c.json(
-          { error: "not_a_member", message: "Your access was removed. Ask an administrator." },
-          403,
-        );
-      return mcp.fetch(c.req.raw, principal);
-    });
-  }
+  // RFC-0044 §1: with `mcp.oauth`, the route also serves OAuth discovery.
+  if (deps.mcp) mountMcp(app, { ...deps, mcp: deps.mcp }, { build, ownership, schedules });
 
   if (deps.agentKeys) app.route("/api/agent-keys", agentKeys(deps.agentKeys));
 
