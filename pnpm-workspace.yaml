@@ -57,7 +57,7 @@ catalog:
   "@better-auth/utils": 0.5.0
   better-call: 1.4.4
   "@modelcontextprotocol/server": 2.3.1
-  "@modelcontextprotocol/client": 2.3.1
+  "@modelcontextprotocol/client": 2.4.0
   zod: 4.6.7
   "@better-auth/cli": ^1.4.21
   "@cloudflare/kumo": ^2.14.0
