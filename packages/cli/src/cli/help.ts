@@ -3,10 +3,19 @@ export const HELP = `cloudhal — agent-native sites
 
 Usage:
   cloudhal init <dir> [--name <name>] [--starter blog]   create a site project with a seeded local store
-  cloudhal dev [--port <n>] [--host]                      live preview (drafts visible)
+  cloudhal dev [--port <n>] [--host [<addr>]]             live preview (drafts visible)
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
-  cloudhal studio [--port <n>] [--no-auth]                API + Studio UI for this project (default :8787)
+  cloudhal studio [--port <n>] [--host [<addr>]] [--base-url <url>] [--behind-proxy] [--no-auth]
+                  [--init-if-empty [--starter blog] [--name <name>]]
+                                                          API + Studio UI for this project (default :8787);
+                                                          self-hosting: --host 0.0.0.0 (CLOUDHAL_HOST) listens
+                                                          beyond this machine, --base-url (CLOUDHAL_BASE_URL)
+                                                          is the public origin behind a reverse proxy,
+                                                          --behind-proxy (CLOUDHAL_BEHIND_PROXY=1) trusts its
+                                                          X-Forwarded-Proto/Host, --init-if-empty
+                                                          (CLOUDHAL_INIT=<starter>) creates the project first
+                                                          when the folder has no cloudhal.json
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
   cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
