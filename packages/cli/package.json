@@ -43,7 +43,7 @@
     "better-sqlite3": "catalog:"
   },
   "peerDependencies": {
-    "astro": "^7.3.0"
+    "astro": "^7.4.0"
   },
   "devDependencies": {
     "@types/node": "catalog:",
