@@ -169,7 +169,7 @@ export function ScheduleSettingsSection({ siteId }: { siteId: string }) {
   const capDirty = data !== undefined && capValid && capNumber !== data.dailyWriteCap;
   const health = scheduler.data;
   const tone =
-    health?.state === "running" ? "success" : health?.state === "unknown" ? "secondary" : "error";
+    health?.state === "running" ? "success" : health?.state === "unknown" ? "neutral" : "error";
 
   return (
     <SettingsSection

@@ -176,7 +176,7 @@ function CalendarAside({
   const scheduler = useSchedulerStatus();
   const s = scheduler.data;
   const a = "schedules.aside" as const;
-  const tone = s?.state === "running" ? "success" : s?.state === "unknown" ? "secondary" : "error";
+  const tone = s?.state === "running" ? "success" : s?.state === "unknown" ? "neutral" : "error";
   return (
     <>
       <SectionCard

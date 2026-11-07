@@ -152,7 +152,7 @@ function ProjectSiteRow({ site }: { site: ProjectSite }) {
             {t("common.live")}
           </Badge>
         ) : (
-          <Badge variant="secondary" appearance="dot">
+          <Badge variant="neutral" appearance="dot">
             {t("sites.notPublished")}
           </Badge>
         )}
