@@ -95,8 +95,14 @@ minimumReleaseAgeExclude:
 # GHSA-rgj7-g3m4-5g8c. Only Miniflare's Images binding and cf.image mocks load it; Cloudhal uses
 # neither. Monorepo installs only (overrides are not published). Remove when `pnpm why -r sharp`
 # shows nothing below 0.35.5 without it (ADR-0012, addendum 2026-10-25).
+# Miniflare 4.20260730.0 (ADR-0012's pin) also pins undici exactly to 7.28.0, below the fixes for
+# GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26, GHSA-qrxm-fqhp-jwvm, GHSA-xjj6-f33q-929c,
+# GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3, GHSA-4cwx-7wf7-3272 and the medium/low undici 7.x
+# advisories patched in 7.29.0, 7.29.1 and 7.30.1 (Dependabot alerts #5-#32 on 2026-11-08). Every
+# other undici 7.x in the tree is already 7.30.1+. Remove when Miniflare 4 is no longer pinned.
 overrides:
   "sharp@<0.35.5": 0.35.5
+  "undici@<7.30.1": 7.30.2
 
 patchedDependencies:
   '@cloudflare/kumo@2.14.0': patches/@cloudflare__kumo@2.14.0.patch
