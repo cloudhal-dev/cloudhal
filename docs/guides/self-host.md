@@ -18,18 +18,18 @@ curl -fsSL https://raw.githubusercontent.com/cloudhal-dev/cloudhal/main/deploy/d
 docker compose up -d
 ```
 
-Open http://localhost:8787. The first start on the empty volume creates a project from the blog starter (`CLOUDHAL_INIT`, named after `CLOUDHAL_SITE_NAME`) and runs the migrations; the first account that signs up is the Owner, after which sign-up closes and everyone else joins by invite. Invites are links: Studio's Team page creates one, shows it once, and you pass it on yourself; a forgotten password is reset with a link an Administrator creates there. Nothing is mailed (see [limits](#limits)).
+Studio answers at http://localhost:8787. The first start on the empty volume creates a project from the blog starter (`CLOUDHAL_INIT`, named after `CLOUDHAL_SITE_NAME`) and runs the migrations. It also prints a one-time setup link to the container's logs (`docker compose logs cloudhal`), `http://localhost:8787/login#setup=<token>`. Open it to create the Owner account. Without it sign-up is refused, so nobody who reaches the port first can claim the installation. After that sign-up closes and everyone else joins by invite. To choose the token yourself (for example from a secrets manager), set `CLOUDHAL_SETUP_TOKEN` to a random value of 32 characters or more, using only letters, digits and `- . _ ~` (`openssl rand -hex 32`). The log then shows the link with `<CLOUDHAL_SETUP_TOKEN>` in place of the value. Invites are links: Studio's Team page creates one, shows it once, and you pass it on yourself; a forgotten password is reset with a link an Administrator creates there. Nothing is mailed (see [limits](#limits)).
 
 Agents connect to the MCP endpoint at `<base URL>/mcp` with an agent key made in Studio, as for a Cloudflare deployment ([connect an agent](../agents/clients.md)).
 
 ## Beyond localhost: a public origin
 
-Studio's sign-in cookies and the API's origin checks are tied to the URL browsers use, so `CLOUDHAL_BASE_URL` must be exactly the origin Studio is opened at whenever that is not `http://localhost:8787` — another port on this machine (`CLOUDHAL_PORT=9000` goes with `CLOUDHAL_BASE_URL=http://localhost:9000`) as much as a DNS name. With it wrong, Studio loads but sign-up and sign-in answer 403.
+Studio's sign-in cookies and the API's origin checks are tied to the URL browsers use, so `CLOUDHAL_BASE_URL` must be exactly the origin Studio is opened at whenever that is not `http://localhost:8787` — another port on this machine (`CLOUDHAL_PORT=9000` goes with `CLOUDHAL_BASE_URL=http://localhost:9000`) as much as a DNS name. With it wrong, Studio loads but sign-up and sign-in answer 403. The compose default `http://localhost:8787` is wrong too for anyone who opens Studio from another machine (`http://<lan-ip>:8787` with `CLOUDHAL_BIND=0.0.0.0`): set it to that origin, or set it empty (`CLOUDHAL_BASE_URL=`), so that sign-in accepts whatever address the browser used and the log warns. Behind a reverse proxy it is required: `cloudhal studio` refuses to start with `CLOUDHAL_BEHIND_PROXY=1` and no `CLOUDHAL_BASE_URL`.
 
 | Variable | What it does |
 | --- | --- |
-| `CLOUDHAL_BASE_URL` | The origin browsers open Studio at, e.g. `https://studio.example.com`: Better Auth's base URL (its cookies become `Secure` on https), a trusted origin for the API, and the URL the log prints. Origin only, no path. |
-| `CLOUDHAL_BEHIND_PROXY` | `1` when a reverse proxy terminates TLS in front of the container: each request's scheme and host are then taken from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host`. Set it only when the proxy is the only way in, since the headers are then trusted. |
+| `CLOUDHAL_BASE_URL` | The origin browsers open Studio at, e.g. `https://studio.example.com`. Required behind a reverse proxy, and recommended whenever Studio is reached from another machine. It is Better Auth's base URL (its cookies become `Secure` for https), the only origin sign-in accepts besides `CLOUDHAL_TRUSTED_ORIGINS`, the origin of invite and password-reset links, and the URL the log prints. Without it, sign-in accepts whatever address the browser used, and the log warns. Origin only, no path. |
+| `CLOUDHAL_BEHIND_PROXY` | `1` when a reverse proxy terminates TLS in front of the container: each request's scheme and host are then taken from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host`, and the client's address for rate limits from the last `X-Forwarded-For` hop. Needs `CLOUDHAL_BASE_URL`. Set it only when the proxy is the only way in, since the headers are then trusted. |
 | `CLOUDHAL_HOST` | The address the server binds inside the container; the image sets `0.0.0.0`. |
 
 With the compose file's **`caddy` profile** both are handled for you: set `CLOUDHAL_BASE_URL` (Studio) and `CLOUDHAL_SITE_URL` (the public site) in `.env`, both `https://` origins, `CLOUDHAL_BEHIND_PROXY=1`, keep `CLOUDHAL_BIND=127.0.0.1`, point both names at the server and run
@@ -40,7 +40,21 @@ docker compose --profile caddy up -d
 
 Caddy obtains and renews certificates for both hosts, proxies the Studio host to the container with the forwarded headers, and serves the built site for the site host. Without the profile the two variables are not needed; with it, Caddy refuses to start while either is empty and says so in `docker compose logs caddy`.
 
-With a **reverse proxy of your own** (nginx, Traefik, a cloud load balancer): proxy the Studio host to port 8787, pass `X-Forwarded-Proto` and `X-Forwarded-Host`, set `CLOUDHAL_BASE_URL` and `CLOUDHAL_BEHIND_PROXY=1`, and serve `/data/site/current` from the volume for the site host (a symlink to the newest build, which the server must follow; nginx and Caddy do by default).
+With a **reverse proxy of your own** (nginx, Traefik, a cloud load balancer): proxy the Studio host to port 8787, set `CLOUDHAL_BASE_URL` and `CLOUDHAL_BEHIND_PROXY=1`, and send `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-For`. The proxy must overwrite or append `X-Forwarded-For` with the client's address, never pass on what the client sent: its last hop is the address rate limits count (Caddy does this by default). For nginx:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    # Build chat streams server-sent events
+    proxy_buffering off;
+}
+```
+
+Serve `/data/site/current` from the volume for the site host (a symlink to the newest build, which the server must follow; nginx and Caddy do by default).
 
 ## Environment
 
@@ -50,8 +64,9 @@ All of these are read by `cloudhal studio` in the container, except those marked
 | --- | --- | --- |
 | `CLOUDHAL_TAG` (compose) | `latest` | The image tag; see [upgrades](#upgrades). |
 | `CLOUDHAL_VOLUME` (compose) | `cloudhal-data` | The name of the volume that holds the installation; see [backup and restore](#backup-and-restore). A second Cloudhal stack on the same host needs a name of its own (and its own `CLOUDHAL_PORT` and `CLOUDHAL_BASE_URL`): two containers on one volume are not supported. |
-| `CLOUDHAL_BASE_URL` | `http://localhost:8787` | The origin browsers open Studio at, as above. |
+| `CLOUDHAL_BASE_URL` | `http://localhost:8787` | The origin browsers open Studio at, as above; required with `CLOUDHAL_BEHIND_PROXY=1`. Set empty to accept any address the browser uses. |
 | `CLOUDHAL_BEHIND_PROXY` | `0` | Trust `X-Forwarded-*`. |
+| `CLOUDHAL_SETUP_TOKEN` | empty | The first owner's setup token. Empty: a token is generated at each start while there is no account, and printed to the logs. |
 | `CLOUDHAL_BIND`, `CLOUDHAL_PORT` (compose) | `127.0.0.1`, `8787` | Which address and port of the host publish the container's port 8787. A new port goes into `CLOUDHAL_BASE_URL` too. |
 | `CLOUDHAL_SITE_URL` | empty | The public site's `https://` origin: Caddy serves the site there (caddy profile), and `site-build` makes its host the site's domain ([the site's origin](#the-public-site)). |
 | `CLOUDHAL_INIT` | `blog` | The starter a first start on an empty volume scaffolds. |
@@ -61,7 +76,7 @@ All of these are read by `cloudhal studio` in the container, except those marked
 | `BETTER_AUTH_SECRET` | created on the volume | Better Auth's secret. Unset, the container creates one at first start and keeps it at `/data/.cloudhal/auth-secret`; set it only to supply your own, and never empty. |
 | `CLOUDHAL_AI_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | empty | Workers AI over REST for Build chat (both or neither). The token is kept in the container's memory, never written to the volume. |
 
-**Secrets.** `CLOUDHAL_AI_TOKEN` and `BETTER_AUTH_SECRET` are secrets, and `.env` holds them once they are set: keep the file private (`chmod 600 .env`) and out of version control. The compose file passes each of them to the container only when it is set, so if the compose folder is a checkout, put the secrets in a second file outside it and name both files in `COMPOSE_ENV_FILES` for every `docker compose` command — in the shell profile and in the cron line's environment:
+**Secrets.** `CLOUDHAL_AI_TOKEN`, `BETTER_AUTH_SECRET` and `CLOUDHAL_SETUP_TOKEN` are secrets, and `.env` holds them once they are set: keep the file private (`chmod 600 .env`) and out of version control. The compose file passes each of them to the container only when it is set, so if the compose folder is a checkout, put the secrets in a second file outside it and name both files in `COMPOSE_ENV_FILES` for every `docker compose` command — in the shell profile and in the cron line's environment:
 
 ```bash
 export COMPOSE_ENV_FILES=.env,/etc/cloudhal/secrets.env
@@ -177,6 +192,7 @@ docker compose cp cloudhal:/data/backup.cloudhal .
 
 - **Mail.** There is no mail sender in the container: invites and password resets are links made on Studio's Team page and passed on by hand. With `mail` in `cloudhal.json` (`"mail": { "from": "studio@example.com" }`) the container prints every mail it would send to its logs instead (`docker compose logs cloudhal`) and Studio offers delivery by email too — good for trying the flows, not for people who expect mail. An SMTP sender is a follow-up.
 - **`render_page`** (the agents' screenshot tool) needs Chrome, which the image does not carry: the tool reports itself unavailable. A `-chrome` variant is a possible follow-up.
+- **`--no-auth`** is refused unless `--host` is loopback and `--behind-proxy` is off, so it cannot be used in the container, which binds `0.0.0.0`.
 - **One process.** `cloudhal studio` runs the scheduler's tick, the comments job and analytics rollups itself, on the project's SQLite file; several containers on one volume are not supported.
 - **The site is static** between builds, as above.
 - **Deploying to Cloudflare** from the container is not set up (the Cloudflare adapter is not installed); use the CLI on your machine for that.

@@ -13,8 +13,10 @@ services:
       - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_PORT:-8787}:8787"
     environment:
       # The origin browsers open Studio at, which sign-in is tied to: it changes together with
-      # CLOUDHAL_PORT, and is the public https origin behind a proxy (.env.example).
-      - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL:-http://localhost:8787}
+      # CLOUDHAL_PORT, and is the public https origin behind a proxy, where it is required
+      # (CLOUDHAL_BEHIND_PROXY=1 without it does not start). Unset: localhost; set empty in .env:
+      # sign-in accepts whatever address the browser used (.env.example).
+      - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL-http://localhost:8787}
       - CLOUDHAL_BEHIND_PROXY=${CLOUDHAL_BEHIND_PROXY:-0}
       - CLOUDHAL_INIT=${CLOUDHAL_INIT:-blog}
       - CLOUDHAL_SITE_NAME=${CLOUDHAL_SITE_NAME:-My site}
@@ -27,6 +29,9 @@ services:
       # set there, so an unset BETTER_AUTH_SECRET leaves the container with the secret it created
       # on the volume (/data/.cloudhal/auth-secret). Never set it to an empty value.
       - BETTER_AUTH_SECRET
+      # The first owner's setup token; empty: one is generated at each start while there is no
+      # account, and the setup link is printed to the logs.
+      - CLOUDHAL_SETUP_TOKEN=${CLOUDHAL_SETUP_TOKEN:-}
       - CLOUDHAL_AI_TOKEN
       - CLOUDFLARE_ACCOUNT_ID
     volumes:
