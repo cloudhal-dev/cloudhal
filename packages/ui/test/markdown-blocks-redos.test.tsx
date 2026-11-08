@@ -19,10 +19,10 @@ describe("markdown block trims (#174)", () => {
   });
 
   it("merges a block with a long run of blank lines in linear time", () => {
-    const tall = `x${"\n".repeat(100_000)}y`;
+    const tall = `x${"\n".repeat(200_000)}y`;
     const start = performance.now();
     const out = mergeBlocks(splitMarkdown(""), [], ["a", tall, "b"]);
-    expect(performance.now() - start).toBeLessThan(500);
+    expect(performance.now() - start).toBeLessThan(1500);
     expect(out).toBe(`a\n\n${tall}\n\nb\n`);
   });
 });

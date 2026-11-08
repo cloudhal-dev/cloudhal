@@ -39,11 +39,11 @@ describe("frontmatter lines (#174 item 5)", () => {
 
   it("stays linear on lines that made the regexes backtrack", () => {
     const start = performance.now();
-    expect(nestedLine(" ".repeat(100_000))).toBeUndefined();
-    expect(nestedLine(`  key:${" ".repeat(100_000)}x\r`)).toBeUndefined();
-    expect(topLine(`name:${" ".repeat(100_000)}x\r`)).toBeUndefined();
-    const fm = `---\nmetadata:\n${" ".repeat(100_000)}\n---\nbody`;
+    expect(nestedLine(" ".repeat(200_000))).toBeUndefined();
+    expect(nestedLine(`  key:${" ".repeat(200_000)}x\r`)).toBeUndefined();
+    expect(topLine(`name:${" ".repeat(200_000)}x\r`)).toBeUndefined();
+    const fm = `---\nmetadata:\n${" ".repeat(200_000)}\n---\nbody`;
     expect(() => parseFrontmatter(fm)).not.toThrow();
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(performance.now() - start).toBeLessThan(1500);
   });
 });

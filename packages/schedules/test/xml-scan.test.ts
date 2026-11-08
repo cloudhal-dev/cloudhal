@@ -22,14 +22,17 @@ function strings(alphabet: readonly string[], count: number, maxLength: number, 
   return out;
 }
 
-function fast<T>(ms: number, f: () => T): T {
+/** Fails when `f` takes longer than 1.5 s, the bound of the repo's ReDoS tests (#168). */
+function fast<T>(f: () => T): T {
   const start = performance.now();
   const value = f();
-  expect(performance.now() - start).toBeLessThan(ms);
+  expect(performance.now() - start).toBeLessThan(1500);
   return value;
 }
 
-const N = 100_000;
+// 200k characters, more where the old regex's cost grew slowly: each case took the replaced
+// regex seconds.
+const N = 200_000;
 const OLD_CDATA = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
 const OLD_MEDIA = /<(?:enclosure|media:content)\b[^>]*?\burl\s*=\s*(["'])(.*?)\1/g;
 const oldBlocks = (text: string, n: string) =>
@@ -68,6 +71,26 @@ describe("feed-check scanners (#174 item 4)", () => {
     expect(mediaUrlValues('<enclosure length="1" url="https://x/a.mp3"/>')).toEqual([
       "https://x/a.mp3",
     ]);
+    // A feed with several tags of both kinds: `type=` before and after `url=`, the word `url`
+    // in text between tags, and `data-url`. The regex has a word boundary between "-" and "url",
+    // so it took `data-url` for the url attribute; the scanner keeps that (results unchanged).
+    const feed = [
+      "<item><title>The url of the day</title>",
+      '<enclosure type="audio/mpeg" url="https://x/1.mp3" length="9"/>',
+      "<media:content url='https://x/2.jpg' type=\"image/jpeg\"/>",
+      "<description>see url = here</description>",
+      '<enclosure data-url="https://x/no" type="a" url = "https://x/3.mp3"/>',
+      '<media:content data-url="https://x/no"/><enclosure url="https://x/4.mp3">',
+      "</item>",
+    ].join("\n");
+    expect(mediaUrlValues(feed)).toEqual([
+      "https://x/1.mp3",
+      "https://x/2.jpg",
+      "https://x/no",
+      "https://x/no",
+      "https://x/4.mp3",
+    ]);
+    expect(mediaUrlValues(feed)).toEqual([...feed.matchAll(OLD_MEDIA)].map((m) => m[2]));
   });
 
   it("urlPath trims trailing slashes as before", () => {
@@ -82,20 +105,20 @@ describe("feed-check scanners (#174 item 4)", () => {
   });
 
   it("stays linear on openers without closers", () => {
-    fast(100, () => cdataParts("<![CDATA[ ".repeat(N / 10)));
-    fast(100, () => elementContents("<item>".repeat(N / 6), "item"));
-    fast(100, () => elementContents("<item ".repeat(N / 6), "item"));
-    fast(100, () => elementContents(`<item>${"</item ".repeat(N / 7)}`, "item"));
-    fast(100, () => mediaUrlValues("<enclosure url= ".repeat(N / 16)));
-    fast(100, () => mediaUrlValues(`<enclosure${' url="'.repeat(N / 6)}`));
-    fast(100, () => mediaUrlValues('<enclosure url="a">'.repeat(N / 19)));
+    fast(() => cdataParts("<![CDATA[ ".repeat((5 * N) / 10)));
+    fast(() => elementContents("<item>".repeat((2 * N) / 6), "item"));
+    fast(() => elementContents("<item ".repeat(N / 6), "item"));
+    fast(() => elementContents(`<item>${"</item ".repeat(N / 7)}`, "item"));
+    fast(() => mediaUrlValues("<enclosure url= ".repeat((2 * N) / 16)));
+    fast(() => mediaUrlValues(`<enclosure${' url="'.repeat(N / 6)}`));
+    fast(() => mediaUrlValues('<enclosure url="a">'.repeat(N / 19)));
     // Per-tag searches for `>` and `url` used to run to the end of the feed for every tag.
-    fast(100, () => mediaUrlValues('<enclosure url="a" '.repeat(N / 19)));
-    fast(100, () => mediaUrlValues("<enclosure>".repeat(N / 11)));
-    fast(100, () =>
+    fast(() => mediaUrlValues('<enclosure url="a" '.repeat((2 * N) / 19)));
+    fast(() => mediaUrlValues("<enclosure>".repeat((2 * N) / 11)));
+    fast(() =>
       mediaUrlValues(`${'<enclosure url="a" '.repeat(N / 38)}<![CDATA[${"x".repeat(N / 2)}]]>>`),
     );
     expect(mediaUrlValues('<enclosure url="a" '.repeat(3))).toEqual(["a", "a", "a"]);
-    fast(100, () => expect(urlPath(`https://x/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
+    fast(() => expect(urlPath(`https://x/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
   });
 });

@@ -22,7 +22,7 @@ describe("isPagePath (#174)", () => {
 
   it("stays linear on a long run of dots", () => {
     const start = performance.now();
-    expect(isPagePath(`/${".".repeat(100_000)}/`)).toBe(true);
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(isPagePath(`/${".".repeat(200_000)}/`)).toBe(true);
+    expect(performance.now() - start).toBeLessThan(1500);
   });
 });

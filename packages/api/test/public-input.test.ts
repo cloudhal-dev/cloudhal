@@ -54,10 +54,10 @@ describe("isEmailAddress (#174)", () => {
   it("answers in linear time on input that made the old regex backtrack", () => {
     // The old regex took about a second on 40k dots and grew with the square of the length.
     const start = performance.now();
-    expect(isEmailAddress(`a@${".".repeat(100_000)}@`)).toBe(false);
-    expect(isEmailAddress(`a@b${".".repeat(100_000)}`)).toBe(false);
+    expect(isEmailAddress(`a@${".".repeat(200_000)}@`)).toBe(false);
+    expect(isEmailAddress(`a@b${".".repeat(200_000)}`)).toBe(false);
     expect(isEmailAddress(`a@${".".repeat(200)}@`)).toBe(false);
-    expect(performance.now() - start).toBeLessThan(100);
+    expect(performance.now() - start).toBeLessThan(1500);
   });
 });
 
@@ -92,15 +92,23 @@ describe("public token endpoints (#174)", () => {
       body,
     });
 
-  it("refuses a 100k-character address quickly, before any regex sees it", async () => {
+  it("refuses an adversarial address quickly, before any regex sees it", async () => {
     const app = await setup();
-    const email = `a@${".".repeat(60_000)}@`; // under the body cap; the old regex took ~2 s
-    const start = performance.now();
-    const res = await post(app, "/api/password-reset/request", JSON.stringify({ email }));
-    expect(res.status).toBe(400);
-    expect(performance.now() - start).toBeLessThan(500);
+    // A valid request first, so the timed ones measure the check and not the app's first call.
     const ok = await post(app, "/api/password-reset/request", JSON.stringify({ email: "x@y.z" }));
     expect(ok.status).toBe(202);
+    // 60k dots fit under the body cap (the old regex took about 2 s); 200k do not (it took
+    // about 23 s, and the old body had no cap).
+    for (const [dots, status] of [
+      [60_000, 400],
+      [200_000, 413],
+    ] as const) {
+      const email = `a@${".".repeat(dots)}@`;
+      const start = performance.now();
+      const res = await post(app, "/api/password-reset/request", JSON.stringify({ email }));
+      expect(res.status).toBe(status);
+      expect(performance.now() - start).toBeLessThan(1500);
+    }
   });
 
   it("answers 413 for a body above the cap, with or without content-length", async () => {

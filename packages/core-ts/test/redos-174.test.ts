@@ -34,15 +34,18 @@ function strings(alphabet: readonly string[], count: number, maxLength: number, 
   return out;
 }
 
-/** Runs `f` and fails when it takes longer than `ms` (generous: CI machines are busy). */
-function fast<T>(ms: number, f: () => T): T {
+/**
+ * Runs `f` and fails when it takes longer than 1.5 s, the bound of the repo's ReDoS tests (#168):
+ * linear code answers in milliseconds, the replaced regexes took seconds on these inputs.
+ */
+function fast<T>(f: () => T): T {
   const start = performance.now();
   const value = f();
-  expect(performance.now() - start).toBeLessThan(ms);
+  expect(performance.now() - start).toBeLessThan(1500);
   return value;
 }
 
-const N = 100_000;
+const N = 200_000;
 
 describe("redirect paths (#174 item 2)", () => {
   const oldNormalise = (path: string) => {
@@ -60,7 +63,9 @@ describe("redirect paths (#174 item 2)", () => {
   };
   /** What a redirect `from` can be (the contract's pattern). */
   const FROM = /^\/(?:[^\s?#/\\]+(?:\/[^\s?#/\\]+)*)?$/;
-  const validFrom = (a: string) => FROM.test(a) && a.length <= REDIRECT_FROM_MAX_LENGTH;
+  /** The contract's `maxLength` counts code points (ajv), not UTF-16 units. */
+  const validFrom = (a: string) => FROM.test(a) && [...a].length <= REDIRECT_FROM_MAX_LENGTH;
+  const usable = (list: string[]) => list.filter(validFrom);
 
   it("normalisePath and joinTarget answer as before", () => {
     for (const p of strings(["/", "a", "?", "#", "b"], 3000, 12))
@@ -95,23 +100,45 @@ describe("redirect paths (#174 item 2)", () => {
     expect(matchRedirect(redirects, "//x")?.redirect.from).toBe("/");
   });
 
+  it("counts a from's length in code points, and never cuts inside a `//`", () => {
+    // 600 astral characters: 601 code points (a valid `from`), 1201 UTF-16 units.
+    const from = `/${"😀".repeat(600)}`;
+    const redirect = { from, to: "/new", match: "prefix" } as unknown as Redirect;
+    expect(matchRedirect([redirect], `${from}/x`)?.location).toBe("/new/x");
+    // Long enough for the cut (more than 2 × 1024 units): the walk still starts at `from`.
+    const tail = `/${"x".repeat(1000)}`;
+    expect(matchRedirect([redirect], `${from}${tail}`)?.location).toBe(`/new${tail}`);
+    // A `//` right at the cut: the first ancestor stops before it, never ending in "/".
+    for (const p of [
+      `/${"a".repeat(1022)}//b`,
+      `/${"a".repeat(2046)}//b`,
+      `/${"a".repeat(2047)}//b`,
+    ]) {
+      const list = ancestorPaths(p);
+      expect(list[0], `${p.length}`).toBe(p.slice(0, p.indexOf("//")));
+      expect(list.every((a) => a === "/" || !a.endsWith("/"))).toBe(true);
+      expect(usable(list)).toEqual(usable(oldAncestors(p)));
+    }
+  });
+
   it("stays linear on long runs of slashes", () => {
-    fast(100, () => expect(normalisePath(`/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
-    fast(100, () => expect(joinTarget(`/t${"/".repeat(N)}`, "/r")).toBe("/t/r"));
-    fast(100, () => expect(ancestorPaths(`/a${"/".repeat(N)}b`)).toEqual(["/a", "/"]));
+    fast(() => expect(normalisePath(`/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
+    fast(() => expect(joinTarget(`/t${"/".repeat(N)}`, "/r")).toBe("/t/r"));
+    fast(() => expect(ancestorPaths(`/a${"/".repeat(N)}b`)).toEqual(["/a", "/"]));
     // Many short segments: only ancestors within a `from`'s length are listed, so the output
     // stays bounded (it used to be one ancestor per segment, quadratic in total size).
     const long = "/a".repeat(N / 2);
-    const ancestors = fast(100, () => ancestorPaths(long));
-    expect(ancestors[0]).toBe("/a".repeat(REDIRECT_FROM_MAX_LENGTH / 2));
-    expect(ancestors).toEqual(oldAncestors(long.slice(0, 4000)).filter(validFrom));
+    const ancestors = fast(() => ancestorPaths(long));
+    expect(ancestors[0]).toBe("/a".repeat(REDIRECT_FROM_MAX_LENGTH));
+    expect(usable(ancestors)).toEqual(usable(oldAncestors(long.slice(0, 5000))));
+    const units = 2 * REDIRECT_FROM_MAX_LENGTH;
     expect(ancestors.reduce((n, a) => n + a.length, 0)).toBeLessThanOrEqual(
-      REDIRECT_FROM_MAX_LENGTH * (REDIRECT_FROM_MAX_LENGTH / 2 + 1),
+      units * (units / 2 + 1),
     );
-    // Long fuzzed paths still give the old answer filtered to what a `from` can be.
-    for (const raw of strings(["/", "a", "bb"], 200, 900)) {
+    // Long fuzzed paths (some astral) keep every ancestor a `from` could be.
+    for (const raw of strings(["/", "a", "bb", "😀"], 300, 1600)) {
       const p = `/${raw}`;
-      expect(ancestorPaths(p)).toEqual(oldAncestors(p).filter(validFrom));
+      expect(usable(ancestorPaths(p))).toEqual(usable(oldAncestors(p)));
     }
   });
 });
@@ -136,16 +163,16 @@ describe("SVG CSS (#174 item 4)", () => {
   });
 
   it("stays linear on unclosed comments, url( runs and long lengths", () => {
-    fast(100, () => stripCssComments("/* ".repeat(N / 3)));
-    fast(100, () => cssUrlValues(`url(${" ".repeat(N)}`));
-    fast(100, () => cssUrlValues("url(".repeat(N / 4)));
-    fast(100, () => cssUrlValues(`url('${"a".repeat(N)}`));
-    fast(100, () => svgPixels(`${"1".repeat(N)}x`));
-    fast(100, () => svgPixels(`1${" ".repeat(N)}x`));
+    fast(() => stripCssComments("/* ".repeat((2 * N) / 3)));
+    fast(() => cssUrlValues(`url(${" ".repeat(N)}`));
+    fast(() => cssUrlValues("url(".repeat(N / 4)));
+    fast(() => cssUrlValues(`url('${"a".repeat(N)}`));
+    fast(() => svgPixels(`${"1".repeat(N)}x`));
+    fast(() => svgPixels(`1${" ".repeat(N)}x`));
     // The old `url(` check took minutes on 20k spaces; a whole document with them is quick now
     // (attribute values are read from a 64 KiB window, so the document case stays below it).
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" style="fill: url(${" ".repeat(20_000)}"/>`;
-    expect(fast(500, () => checkSvg(svg)).ok).toBe(true);
+    expect(fast(() => checkSvg(svg)).ok).toBe(true);
   });
 });
 
@@ -182,17 +209,21 @@ describe("search text (#174 item 4)", () => {
   });
 
   it("stays linear on openers without closers", () => {
-    fast(150, () => stripFences("```a\n".repeat(N / 5)));
+    fast(() => stripFences("```a\n".repeat(N / 5)));
     // Line ends without "\n": every opener used to search to the end for one.
-    fast(150, () => stripFences("```a\r".repeat(N / 5)));
-    fast(150, () => stripFences("```a\u2028".repeat(N / 5)));
-    fast(150, () => stripFences(`${"```a\r".repeat(N / 5)}\n`));
+    fast(() => stripFences("```a\r".repeat(N / 5)));
+    fast(() => stripFences("```a\u2028".repeat(N / 5)));
+    fast(() => stripFences(`${"```a\r".repeat(N / 5)}\n`));
+    fast(() => stripFences("```a\u2029".repeat(N / 5)));
+    fast(() => stripFences("```a\r\n".repeat(N / 6)));
     // Directive lines with CR endings: `[^\n]*` used to run across every following line.
-    fast(150, () => searchText({ format: "markdown", value: "::a{}x\r".repeat(N / 7) }));
-    fast(100, () => linkTexts("![a".repeat(N / 3), true));
-    fast(100, () => linkTexts("[a](".repeat(N / 4), false));
-    fast(100, () => linkTexts("[a]x".repeat(N / 4), false));
-    fast(100, () => stripTags("<a".repeat(N / 2)));
-    fast(500, () => searchText({ format: "markdown", value: `${"```a\n[x](<".repeat(N / 10)}` }));
+    fast(() => searchText({ format: "markdown", value: "::a{}x\r".repeat(N / 7) }));
+    fast(() => searchText({ format: "markdown", value: "::a{}x\u2028".repeat(N / 7) }));
+    fast(() => searchText({ format: "markdown", value: "::a{}x\u2029".repeat(N / 7) }));
+    fast(() => linkTexts("![a".repeat(N / 3), true));
+    fast(() => linkTexts("[a](".repeat(N / 4), false));
+    fast(() => linkTexts("[a]x".repeat(N / 4), false));
+    fast(() => stripTags("<a".repeat(N / 2)));
+    fast(() => searchText({ format: "markdown", value: `${"```a\n[x](<".repeat(N / 10)}` }));
   });
 });
