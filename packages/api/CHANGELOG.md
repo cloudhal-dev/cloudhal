@@ -1,5 +1,35 @@
 # @cloudhal/api
 
+## 0.6.4
+
+### Patch Changes
+
+- 471087a: **Security (self-hosting, #165).** In 0.6.3 a self-hosted `cloudhal studio` (the Docker image included) exposed to a network before its first sign-up could be claimed by whoever reached it first: the first account to sign up became the Owner, and nothing on the Node path asked for the setup token the Cloudflare deployment already requires. If you run 0.6.3 beyond `localhost`, upgrade and check that the Owner account is yours. In 0.6.4:
+  
+  - **A setup token for the first account.** While nobody has an account, `cloudhal studio` requires the one-time token from `CLOUDHAL_SETUP_TOKEN` (32 characters or more, letters, digits and `- . _ ~` only, e.g. `openssl rand -hex 32`; a shorter or other value stops the start) or, when that is unset, one it generates at start and prints as a `…/login#setup=<token>` link to its output (read it from the container's logs: `docker compose logs cloudhal`). Sign-up without the token is refused; once the Owner exists the link is no longer printed. An operator's own token is never printed.
+  - **Sign-in from the address browsers actually use.** With `--host` beyond loopback and no `--base-url`, Better Auth refused every sign-up, sign-in and sign-out with `403 INVALID_ORIGIN` because only `http://localhost:<port>` was trusted. Without a public origin Studio now also trusts the origin each request was made to, as the API's own CSRF check does (on a loopback `--host` only when that origin is `localhost`, `127.0.0.1` or `[::1]`, so a DNS name rebound to the machine is not trusted); with `--base-url` set, that origin alone (plus `CLOUDHAL_TRUSTED_ORIGINS`) may sign in. `--base-url` is the origin browsers open Studio at: required behind a reverse proxy and recommended whenever `--host` is not loopback; a start without it beyond loopback prints a one-line warning.
+  - **`--no-auth` stays on this machine.** It is refused unless `--host` is loopback (`127.0.0.1`, the default, or `::1`) and `--behind-proxy` is off.
+  - **Rate limits count the real client.** The public token endpoints (invites, password resets) and Better Auth's own limits keyed on `X-Forwarded-For` / `CF-Connecting-IP` as the client sent them. `serveNode` now derives the client's address itself: the socket's, or with `trustProxy` the last `X-Forwarded-For` hop, which the proxy appended; the API (`ApiDeps.clientAddressHeader`) and Better Auth (`AuthOptions.clientAddressHeader`) read only that value on Node, while Workers keep `CF-Connecting-IP`. Sessions record that address too, and Better Auth's own limits (sign-in and sign-up: 3 per 10 s per address) now apply on Node as on Workers, stored in the project's SQLite; before they were on only under `NODE_ENV=production`.
+  - Behind a trusted proxy, `forwardedUrl` takes the last value of `X-Forwarded-Proto` / `X-Forwarded-Host`, the one the proxy added, not the first, which a client can send.
+  - `--base-url` is also the origin of invite and password-reset links (`ApiDeps.studioOrigin`).
+  - Studio's setup banner no longer names only `cloudhal deploy`: it speaks of the setup link printed when Cloudhal started or was deployed (other languages are AI drafts awaiting review).
+  - Studio's login page reads `#setup=<token>` without form decoding, so an operator's own token containing `+` (from `openssl rand -base64`, for a Cloudflare deployment too) is no longer turned into a space and refused.
+  - **`--behind-proxy` needs `--base-url`.** `cloudhal studio` refuses to start with `--behind-proxy` / `CLOUDHAL_BEHIND_PROXY=1` and no `--base-url` / `CLOUDHAL_BASE_URL`. Behind a proxy the public origin is known, and as Better Auth's base URL it makes session cookies `Secure` (`__Secure-` prefix) on https and is the one origin sign-in accepts. In 0.6.3 that combination could not sign in at all, so no working setup breaks.
+  - `--init-if-empty` stages the scaffold in `.cloudhal-init` inside the folder and moves it into place with `cloudhal.json` last, so a container stopped during its first start no longer crash-loops on "is not empty": the next start redoes the scaffold when the staged `cloudhal.json` is missing, cut off or names no site, and finishes it otherwise. A fresh ext4 volume whose only entry is `lost+found` counts as empty.
+  - A bare `--host` means `0.0.0.0`, every IPv4 address; pass `--host ::` for IPv6 as well. The help says so.
+  
+  New in `@cloudhal/api`: `CLIENT_ADDRESS_HEADER`, `clientAddress` and `inboundRequest` in `@cloudhal/api/node`; `trustedOriginsWithOwn` (with `loopbackOnly`) and `AuthOptions.trustedOrigins` as a function in `@cloudhal/api/auth`; `createAuthFor` takes `setupToken`, `trustRequestOrigin` and `originCheck`. `studio()` returns `setup` (the link, while nobody has an account) and `warnings`.
+- Updated dependencies [b073595]
+  - @cloudhal/astro-renderer@0.6.4
+  - @cloudhal/mcp-server@0.6.4
+  - @cloudhal/agent-runtime@0.6.4
+  - @cloudhal/analytics@0.6.4
+  - @cloudhal/comments@0.6.4
+  - @cloudhal/core-contracts@0.6.4
+  - @cloudhal/core-ts@0.6.4
+  - @cloudhal/schedules@0.6.4
+  - @cloudhal/storage@0.6.4
+
 ## 0.6.3
 
 ### Patch Changes

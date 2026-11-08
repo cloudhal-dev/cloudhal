@@ -1,5 +1,16 @@
 # @cloudhal/astro-renderer
 
+## 0.6.4
+
+### Patch Changes
+
+- b073595: Status pages (RFC-0043 §1, #117). A site that cannot show its pages answers with one small, translated, self-contained page instead of plain text: `not-published` (503, `Retry-After: 3600`, `noindex`) before the first publish, `preview-expired` (410) for a preview link that does not verify, `unavailable` (503) for a Worker that serves no site, and `error` (500, with the `cf-ray` as a reference) when a render fails. The Site Worker answers them before Astro runs, every one `no-store` with its own CSP; `GET /__cloudhal/health` answers `{ "ok": true, "state": "published" | "not-published" }` in the admin's `/api/health` shape. The page is in the request's locale (host or path prefix, then the site default, then English) for every language Studio speaks, right to left where needed, through the same `pnpm i18n:export/import` flow as Studio's catalogs. A theme may restyle it with an optional `statusPage` export in `src/theme.ts` (`@cloudhal/astro-renderer/status-page`), which falls back to the built-in page on a throw, a slow answer or an oversized document and never runs for `error`; `cloudhal dev` draws each state at `/__cloudhal/status/<state>`. The blog starter's routes use `statusPage`/`statusPlain` as their own fallback. **Behaviour change:** an invalid or expired preview link now answers 410 instead of silently showing the published page.
+- @cloudhal/analytics@0.6.4
+  - @cloudhal/comments@0.6.4
+  - @cloudhal/core-contracts@0.6.4
+  - @cloudhal/core-ts@0.6.4
+  - @cloudhal/storage@0.6.4
+
 ## 0.6.3
 
 ### Patch Changes
