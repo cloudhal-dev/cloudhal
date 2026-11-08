@@ -1,5 +1,20 @@
 # @cloudhal/schedules
 
+## 0.6.5
+
+### Patch Changes
+
+- c15218e: Second ReDoS sweep (#174). Input that made a regex backtrack is now handled in linear time; results are unchanged.
+  
+  - **Unauthenticated password-reset request.** `POST /api/password-reset/request` (and invite creation) checks the address length before anything else, and the address check no longer backtracks: `a@` followed by many dots used to cost seconds of CPU per request. Public token endpoints (`/api/password-reset/*`, invite acceptance) refuse a JSON body over 64 KiB with `413 payload_too_large`, whether or not it declares a `content-length`.
+  - **core-ts.** Redirect path normalising and matching (on every site request): `normalisePath`, `joinTarget`, and `ancestorPaths`, which no longer lists ancestors that no redirect can match: those longer than a `from` may be (1024 code points) or holding `//`. Directive lines in search text keep their braces on one line, so a directive whose `{…}` spans a lone `\r` is no longer read as one. Search text built at publish time: fenced code, links, images and tags. SVG upload checks: CSS comments, `url(…)` references (about cubic on `url(` followed by spaces) and width/height lengths (new `css-scan.ts`).
+  - **schedules.** The feed check's CDATA, element and `<enclosure>`/`<media:content>` url scans, and `urlPath`.
+  - **agent-runtime.** SKILL.md frontmatter lines (a line of spaces was quadratic).
+  - **Studio** (in `@cloudhal/cli`): the markdown body editor's trailing-newline trims.
+- Updated dependencies [b0ebd95]
+  - @cloudhal/storage@0.6.5
+  - @cloudhal/core-contracts@0.6.5
+
 ## 0.6.4
 
 ### Patch Changes

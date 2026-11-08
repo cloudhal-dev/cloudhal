@@ -1,5 +1,33 @@
 # @cloudhal/api
 
+## 0.6.5
+
+### Patch Changes
+
+- b0ebd95: MCP OAuth step-up follow-ups (RFC-0044 phase 1, #168). These stay latent until phase 2 gives connections a `grantId`. A policy denial for missing scopes now carries `missing`, the required scopes that neither the caller's scopes nor an own variant satisfy. The new `stepUpScopes(policy, principal, tool, args)` turns that into the scopes a token should ask for, using the same rules as the handler: a propose call's `proposeScopes`, the own variant the member's role holds (`content:write:own` for an Author, `content:draft:own` for a Contributor, `site:publish:own` for an Author's publish) and the member's role on the call's site (RFC-0034 A2), capped by their installation role as consent caps a token (an installation Contributor who is an Editor on one site is asked for `content:draft:own` there). A call that would still be denied with those scopes, such as a write in plan mode or a tool outside the declared skill, is not challenged. The `/mcp` step-up 403 asks for exactly that set and now leaves an audit row, like other denials. `createApi` throws when `mcp.oauth.resource` is not the public URL of `/mcp`. A playground refuses both OAuth protected-resource documents (`403 {error: "playground", block: "mcp"}`), as its route table already said.
+- b0ebd95: Cloudhal's own rate-limit counters move out of Better Auth's `rateLimit` table into `rate_limits` (migration `0030_rate_limits`, #168). This covers the hourly cap of 3 reset mails per address, the per-minute buckets of the public token endpoints and each agent key's window. Better Auth prunes `rateLimit` by its own 60 s window, so the hourly reset-mail cap used to restart about a minute after any sign-in from the same address. Each hit counts in one statement (an upsert with `RETURNING`). Because the keys come from client addresses and submitted email addresses, about one hit in 32 also deletes up to 500 expired counters through an `expires_at` index. The migration deletes the old `cloudhal:` rows from `rateLimit`, so each counter starts over once at upgrade.
+- c15218e: Second ReDoS sweep (#174). Input that made a regex backtrack is now handled in linear time; results are unchanged.
+  
+  - **Unauthenticated password-reset request.** `POST /api/password-reset/request` (and invite creation) checks the address length before anything else, and the address check no longer backtracks: `a@` followed by many dots used to cost seconds of CPU per request. Public token endpoints (`/api/password-reset/*`, invite acceptance) refuse a JSON body over 64 KiB with `413 payload_too_large`, whether or not it declares a `content-length`.
+  - **core-ts.** Redirect path normalising and matching (on every site request): `normalisePath`, `joinTarget`, and `ancestorPaths`, which no longer lists ancestors that no redirect can match: those longer than a `from` may be (1024 code points) or holding `//`. Directive lines in search text keep their braces on one line, so a directive whose `{…}` spans a lone `\r` is no longer read as one. Search text built at publish time: fenced code, links, images and tags. SVG upload checks: CSS comments, `url(…)` references (about cubic on `url(` followed by spaces) and width/height lengths (new `css-scan.ts`).
+  - **schedules.** The feed check's CDATA, element and `<enclosure>`/`<media:content>` url scans, and `urlPath`.
+  - **agent-runtime.** SKILL.md frontmatter lines (a line of spaces was quadratic).
+  - **Studio** (in `@cloudhal/cli`): the markdown body editor's trailing-newline trims.
+- Updated dependencies [b0ebd95]
+- Updated dependencies [b0ebd95]
+- Updated dependencies [b0ebd95]
+- Updated dependencies [c15218e]
+- Updated dependencies [f4a1ee3]
+  - @cloudhal/core-ts@0.6.5
+  - @cloudhal/analytics@0.6.5
+  - @cloudhal/astro-renderer@0.6.5
+  - @cloudhal/comments@0.6.5
+  - @cloudhal/agent-runtime@0.6.5
+  - @cloudhal/storage@0.6.5
+  - @cloudhal/schedules@0.6.5
+  - @cloudhal/mcp-server@0.6.5
+  - @cloudhal/core-contracts@0.6.5
+
 ## 0.6.4
 
 ### Patch Changes

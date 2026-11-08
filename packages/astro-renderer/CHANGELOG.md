@@ -1,5 +1,22 @@
 # @cloudhal/astro-renderer
 
+## 0.6.5
+
+### Patch Changes
+
+- b0ebd95: Slug and name trims run in one linear pass instead of `/^-+|-+$/g` (CodeQL js/polynomial-redos, #168). This covers `slugify`, `foldName` and `slugifyFilename` in core-ts (the new `trimChar` is exported from `@cloudhal/core-ts/names`), heading ids in astro-renderer, and Studio's option, media and entry slugs. Results are unchanged. These trims were already linear in practice, because a run of other characters was collapsed to one `-` first. These inputs were quadratic and are linear now: analytics' `datasetName` on a long run of `_` inside a deployment name; json-render component keys in `fromJsonRender` (`./interop`); trailing whitespace in directive blocks and on comment lines; trailing `/` in request paths (the playground guard and route matching in api, analytics paths, the renderer's link localizing and redirect splats, the docs Worker). The new `trimEndChar` is exported from `@cloudhal/core-ts/names` too.
+  
+  Also in 0.6.3, with no changeset at the time (#161): Studio's "Not published" badges and its "unknown" scheduler state show their status dot again. They used a Badge variant without a dot colour and rendered no dot.
+- f4a1ee3: Status page fixes after RFC-0043 PR 1 (#167). The Site Worker no longer turns a 5xx the renderer or the theme answers on purpose into the `error` page: the starter's own `not-published` 503 for a request that reaches Astro (a `POST`, say) passes unchanged and logs nothing; only Astro's own 500 page (HTML, or its empty fallback when no 500 page renders) and thrown errors become the `error` page. A theme page that throws now gets that page with a reference and a `cloudhal: request failed` log line: the blog starter's catch-all route rethrows when Astro renders it as the error route, instead of answering its own 404 for the page's path (theme copies made from an earlier starter can add the same two lines at the top of `[...path].astro`). A store that cannot be read before rendering answers 503 `unavailable` with `Retry-After: 300`, as `/__cloudhal/health` reports it, instead of a 500; so does a multi-site Worker whose hostname map cannot be read (health `503 { ok: false }`, pages the English `unavailable` page). The `error` page uses the site's language and name when the request has already read the site, taken from the published snapshot (an unpublished rename never shows). An invalid preview token on a feed, sitemap, `llms.txt` or JSON path answers 410 instead of the published content, and no response says why a token failed any more (`x-cloudhal-preview-error` is now always `invalid`).
+- Updated dependencies [b0ebd95]
+- Updated dependencies [b0ebd95]
+- Updated dependencies [c15218e]
+  - @cloudhal/core-ts@0.6.5
+  - @cloudhal/analytics@0.6.5
+  - @cloudhal/comments@0.6.5
+  - @cloudhal/storage@0.6.5
+  - @cloudhal/core-contracts@0.6.5
+
 ## 0.6.4
 
 ### Patch Changes
