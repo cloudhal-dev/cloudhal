@@ -51,13 +51,22 @@ export async function jsonBody(c: Context<Env>): Promise<Record<string, unknown>
   return body as Record<string, unknown>;
 }
 
-/** The client address for rate limits. */
+/**
+ * The request header a trusted front writes the client's address to. On Node `serveNode` sets it
+ * (the socket's address, or behind a trusted proxy the last `X-Forwarded-For` hop) after dropping
+ * whatever the client sent under that name; `createApi({ clientAddressHeader })` and Better Auth
+ * (`AuthOptions.clientAddressHeader`) then read only that value (#165). Workers read Cloudflare's
+ * `CF-Connecting-IP` instead, which the runtime vouches for.
+ */
+export const CLIENT_ADDRESS_HEADER = "x-cloudhal-client-address";
+
+/**
+ * The client address for rate limits: the header the deployment vouches for
+ * (`ApiDeps.clientAddressHeader`, default `CF-Connecting-IP`), else one shared bucket. Never
+ * `X-Forwarded-For` as the client sent it: that made the limits spoofable on Node (#165).
+ */
 export function clientIp(c: Context<Env>): string {
-  return (
-    c.req.header("cf-connecting-ip") ??
-    c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ??
-    "local"
-  );
+  return c.req.header(c.get("clientAddressHeader") ?? "cf-connecting-ip") ?? "local";
 }
 
 /**

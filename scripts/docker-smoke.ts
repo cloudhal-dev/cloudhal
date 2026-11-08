@@ -17,6 +17,9 @@ const port = Number(arg("port") ?? 18787);
 const keep = process.argv.includes("--keep");
 const name = `cloudhal-smoke-${process.pid}`;
 const origin = `http://localhost:${port}`;
+// #165: the first account needs the setup token; the container gets one so the test need not read
+// the printed link from its logs.
+const setupToken = `smoke-setup-token-${crypto.randomUUID()}`;
 
 const docker = (args: string[], input?: string): string =>
   execFileSync("docker", args, { encoding: "utf8", ...(input ? { input } : {}) }).trim();
@@ -37,7 +40,7 @@ async function waitHealthy(): Promise<void> {
 async function api(
   method: string,
   path: string,
-  options: { body?: unknown; cookie?: string } = {},
+  options: { body?: unknown; cookie?: string; headers?: Record<string, string> } = {},
 ): Promise<{ status: number; body: unknown; res: Response }> {
   const res = await fetch(`${origin}${path}`, {
     method,
@@ -45,6 +48,7 @@ async function api(
       origin,
       "content-type": "application/json",
       ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...options.headers,
     },
     ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
   });
@@ -73,6 +77,8 @@ docker([
   `CLOUDHAL_BASE_URL=${origin}`,
   "-e",
   "CLOUDHAL_SITE_NAME=Smoke Site",
+  "-e",
+  `CLOUDHAL_SETUP_TOKEN=${setupToken}`,
   image,
 ]);
 try {
@@ -83,10 +89,18 @@ try {
   expect((health.body as { ok?: boolean }).ok === true, "health says ok", health.body);
   step("/api/health answers { ok: true }");
 
+  const owner = {
+    name: "Smoke Owner",
+    email: "owner@example.com",
+    password: "smoke-test-password",
+  };
+  const squatter = await api("POST", "/api/auth/sign-up/email", { body: owner });
+  expect(squatter.status === 403, "sign-up without the setup token is refused", squatter.body);
   const signUp = await api("POST", "/api/auth/sign-up/email", {
-    body: { name: "Smoke Owner", email: "owner@example.com", password: "smoke-test-password" },
+    body: owner,
+    headers: { "x-cloudhal-setup-token": setupToken },
   });
-  expect(signUp.status === 200, "sign-up of the first owner", signUp.body);
+  expect(signUp.status === 200, "sign-up of the first owner with the setup token", signUp.body);
   const cookie = signUp.res.headers
     .getSetCookie()
     .map((c) => c.split(";")[0] as string)

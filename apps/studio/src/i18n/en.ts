@@ -69,7 +69,7 @@ export const en = {
     failed: "Sign-in failed",
     setupTitle: "Set up this Studio",
     setupDescription:
-      "You opened the setup link from `cloudhal deploy`. The account you create now becomes the owner; afterwards sign-up closes.",
+      "You opened the setup link printed when Cloudhal started or was deployed. The account you create now becomes the owner; afterwards sign-up closes.",
   },
   sites: {
     title: "Sites",

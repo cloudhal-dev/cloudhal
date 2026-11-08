@@ -20,6 +20,12 @@ export interface InitOptions {
   readonly name?: string;
   readonly starter?: string;
   readonly log?: (line: string) => void;
+  /**
+   * The folder the project will live in when `dir` is only a staging folder it is moved from
+   * (`cloudhal studio --init-if-empty`): relative `link:` paths to a source checkout are computed
+   * from here. Default: `dir`.
+   */
+  readonly finalDir?: string;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -42,14 +48,27 @@ export async function findWorkspaceRoot(dir: string): Promise<string | undefined
   }
 }
 
-function slugify(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64) || "site"
-  );
+/**
+ * A package name from a site name: lowercase, every run of other characters one `-`, no `-` at
+ * either end, at most 64 characters. One pass, linear in the input (no backtracking regex: CodeQL
+ * js/polynomial-redos).
+ */
+export function slugify(s: string): string {
+  let out = "";
+  let dash = false;
+  for (const ch of s.toLowerCase()) {
+    if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) {
+      if (dash && out) {
+        // a dash only when the character after it fits too: never a trailing "-"
+        if (out.length + 2 > 64) break;
+        out += "-";
+      }
+      dash = false;
+      out += ch;
+      if (out.length >= 64) break;
+    } else dash = true;
+  }
+  return out || "site";
 }
 
 export interface InitResult {
@@ -96,7 +115,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
   const out = repo
     ? materializeDependencies(pkg, await monorepoVersions(repo), {
         // real paths, so the relative link survives symlinked folders (macOS /var → /private/var)
-        linkFrom: await realpath(projectDir),
+        linkFrom: await realpath(options.finalDir ?? projectDir),
       })
     : pkg;
   await writeFile(pkgPath, `${JSON.stringify(out, null, 2)}\n`);

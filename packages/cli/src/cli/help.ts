@@ -1,24 +1,40 @@
-/** `cloudhal --help`; every command it names has an entry in `COMMANDS` (cli.ts). */
-export const HELP = `cloudhal — agent-native sites
-
-Usage:
-  cloudhal init <dir> [--name <name>] [--starter blog]   create a site project with a seeded local store
-  cloudhal dev [--port <n>] [--host [<addr>]]             live preview (drafts visible)
+/**
+ * `cloudhal --help`; every command it names has an entry in `COMMANDS` (cli.ts). The usage text is
+ * in four pieces, each a readable size: the project on this machine, Cloudflare, content and sites,
+ * operations. `HELP` prints them in that order.
+ */
+/** init, dev, snapshot, build, studio, mcp: the project on this machine. */
+const PROJECT = `  cloudhal init <dir> [--name <name>] [--starter blog]   create a site project with a seeded local store
+  cloudhal dev [--port <n>] [--host [<addr>]]             live preview (drafts visible); --host alone is
+                                                          0.0.0.0, every IPv4 address (:: for IPv6 too)
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
   cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
   cloudhal studio [--port <n>] [--host [<addr>]] [--base-url <url>] [--behind-proxy] [--no-auth]
                   [--init-if-empty [--starter blog] [--name <name>]]
                                                           API + Studio UI for this project (default :8787);
+                                                          while nobody has an account it prints a one-time
+                                                          setup link for the owner (or set CLOUDHAL_SETUP_TOKEN:
+                                                          32+ characters of A-Z a-z 0-9 - . _ ~); --no-auth
+                                                          skips sign-in for local scripts and is refused
+                                                          unless --host is loopback and --behind-proxy is off;
                                                           self-hosting: --host 0.0.0.0 (CLOUDHAL_HOST) listens
-                                                          beyond this machine, --base-url (CLOUDHAL_BASE_URL)
-                                                          is the public origin behind a reverse proxy,
+                                                          beyond this machine (alone: every IPv4 address),
+                                                          --base-url (CLOUDHAL_BASE_URL) is the origin browsers
+                                                          open Studio at, required behind a reverse proxy and
+                                                          recommended whenever --host is not loopback (without
+                                                          it sign-in accepts each request's own origin),
                                                           --behind-proxy (CLOUDHAL_BEHIND_PROXY=1) trusts its
-                                                          X-Forwarded-Proto/Host, --init-if-empty
+                                                          X-Forwarded-Proto/Host and the last X-Forwarded-For
+                                                          hop and needs --base-url, --init-if-empty
                                                           (CLOUDHAL_INIT=<starter>) creates the project first
-                                                          when the folder has no cloudhal.json
+                                                          when the folder is empty (lost+found aside) and has
+                                                          no cloudhal.json
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
-  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
+`;
+
+/** deploy, domain, push, pull: the Cloudflare deployment. */
+const CLOUDFLARE = `  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
                   [--force-downgrade] [--no-build-studio]
                                                           site + admin Workers on Cloudflare (uses wrangler login);
                                                           --jurisdiction eu keeps a newly created D1 database
@@ -36,7 +52,10 @@ Usage:
                                                           local site → deployment (refused while releases are
                                                           open unless --cancel-schedules cancels them)
   cloudhal pull [--replace] [--admin-url <url>]           deployment → local site
-  cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
+`;
+
+/** export, import, owner, site, migrate, fields: content and sites. */
+const CONTENT = `  cloudhal export [--out <file>] [--site <id>] [--no-media] [--latest-only]
                                                           one site as a .cloudhal file (RFC-0039): its graph,
                                                           snapshots and media; never user accounts, comments,
                                                           analytics or secrets (its history names who made each
@@ -76,7 +95,10 @@ Usage:
                                                           change a collection's typed fields with their values
                                                           (RFC-0041): snapshotted, resumable; --dry-run reports
                                                           and greps the theme; revert <id> undoes a run
-  cloudhal media import-urls [--dry-run] [--include-markdown] [--allow-host <host>]… | --revert <id>
+`;
+
+/** media, analytics, comments, schedules, ai, render, motion, tokens, chrome, search. */
+const OPERATIONS = `  cloudhal media import-urls [--dry-run] [--include-markdown] [--allow-host <host>]… | --revert <id>
                                                           copy linked images into the media library
                                                           (RFC-0004); revertible
   cloudhal media verify [<assetId>]                       recompute media checksums
@@ -120,3 +142,8 @@ Usage:
                                                           (publishing keeps it current; for restored backups)
   cloudhal --help
 `;
+
+export const HELP = `cloudhal — agent-native sites
+
+Usage:
+${PROJECT}${CLOUDFLARE}${CONTENT}${OPERATIONS}`;

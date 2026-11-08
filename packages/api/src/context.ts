@@ -84,6 +84,14 @@ export interface ApiDeps {
   readonly allowedHosts?: readonly string[];
   /** When true (default), mutating routes require an actor. */
   readonly requireAuth?: boolean;
+  /**
+   * The request header that carries the client's network address for rate limits (RFC-0005 §7.1):
+   * `CF-Connecting-IP` by default (Workers; Cloudflare sets it on every request). On Node pass
+   * `CLIENT_ADDRESS_HEADER` from `@cloudhal/api/node`, which `serveNode` writes from the socket
+   * (or, with `trustProxy`, from the last `X-Forwarded-For` hop) after removing the client's own
+   * copy, so a client cannot pick its bucket (#165).
+   */
+  readonly clientAddressHeader?: string;
   /** Clock for time-based answers such as `/api/notifications` (tests). */
   readonly now?: () => Date;
   /**
@@ -171,5 +179,7 @@ export type Env = {
     schedules: SchedulesDeps | undefined;
     /** The scheduler (RFC-0008); undefined on servers without one. */
     scheduler: SchedulerControl | undefined;
+    /** `ApiDeps.clientAddressHeader`: where the client's address is read for rate limits. */
+    clientAddressHeader: string | undefined;
   };
 };

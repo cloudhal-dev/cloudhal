@@ -6,10 +6,10 @@ import {
   type Principal,
 } from "@cloudhal/agent-runtime";
 import { ANALYTICS_OFF } from "@cloudhal/analytics/service";
-import { schedulesAvailable } from "@cloudhal/mcp-server/schedules";
+import { type SchedulesDeps, schedulesAvailable } from "@cloudhal/mcp-server/schedules";
 import { defineTools, toolPolicies } from "@cloudhal/mcp-server/tools";
 import { type Context, Hono } from "hono";
-import { createBuildHub } from "./build.ts";
+import { type BuildHub, createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler } from "./errors.ts";
 import { mountMcp } from "./mcp-mount.ts";
@@ -173,24 +173,9 @@ export function createApi(deps: ApiDeps) {
     await next();
   });
 
+  const shared: SharedContext = { build, ownership, policy, defer, clock, uploadSecret, schedules };
   app.use("*", async (c, next) => {
-    c.set("store", deps.store);
-    c.set("build", build);
-    c.set("audit", deps.audit ?? deps.mcp?.audit);
-    c.set("previewSecret", deps.preview?.secret);
-    c.set("approvals", deps.mcp?.approvals);
-    c.set("agentKeys", deps.agentKeys);
-    c.set("staff", deps.staff);
-    c.set("ownership", ownership);
-    c.set("policy", policy);
-    c.set("mail", deps.mail);
-    c.set("defer", defer);
-    c.set("now", clock);
-    c.set("uploadSecret", uploadSecret);
-    c.set("analytics", deps.analytics);
-    c.set("comments", deps.comments);
-    c.set("schedules", schedules);
-    c.set("scheduler", deps.scheduler);
+    setContext(c, deps, shared);
     // The fenced Better Auth endpoints never reach credential resolution.
     // Raw and decoded: whichever form Better Auth or Hono would dispatch on is fenced.
     if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname) || FENCED_AUTH_PATHS.test(c.req.path))
@@ -293,6 +278,40 @@ export function createApi(deps: ApiDeps) {
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),
   );
   return app;
+}
+
+/** What `createApi` builds once and every request reads next to its `ApiDeps`. */
+interface SharedContext {
+  readonly build: BuildHub;
+  readonly ownership: OwnershipResolver;
+  readonly policy: () => PolicyEngine;
+  readonly defer: (task: Promise<unknown>) => void;
+  readonly clock: () => Date;
+  readonly uploadSecret: UploadSecret;
+  readonly schedules: SchedulesDeps | undefined;
+}
+
+/** The per-request variables (`Env["Variables"]`) every route reads. */
+function setContext(c: Context<Env>, deps: ApiDeps, shared: SharedContext): void {
+  c.set("store", deps.store);
+  c.set("build", shared.build);
+  c.set("audit", deps.audit ?? deps.mcp?.audit);
+  c.set("previewSecret", deps.preview?.secret);
+  c.set("approvals", deps.mcp?.approvals);
+  c.set("agentKeys", deps.agentKeys);
+  c.set("staff", deps.staff);
+  c.set("ownership", shared.ownership);
+  c.set("policy", shared.policy);
+  c.set("mail", deps.mail);
+  c.set("defer", shared.defer);
+  c.set("now", shared.clock);
+  c.set("uploadSecret", shared.uploadSecret);
+  c.set("analytics", deps.analytics);
+  c.set("comments", deps.comments);
+  c.set("schedules", shared.schedules);
+  c.set("scheduler", deps.scheduler);
+  // #165: where rate limits read the client's address (`ApiDeps.clientAddressHeader`).
+  c.set("clientAddressHeader", deps.clientAddressHeader);
 }
 
 /** Who is calling: the playground's one principal (RFC-0036 §5), else the deployment's resolver. */

@@ -50,7 +50,7 @@ export function describeAgentKeyAuthApi(label: string, backend: RolesBackend): v
           method,
           headers: {
             "content-type": "application/json",
-            "x-forwarded-for": `10.2.0.${ip++ % 250}`,
+            "cf-connecting-ip": `10.2.0.${ip++ % 250}`,
             ...headers,
           },
         });

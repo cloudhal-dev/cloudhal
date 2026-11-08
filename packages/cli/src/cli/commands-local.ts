@@ -7,6 +7,7 @@ import { describeMotionAudit, motionAudit } from "../commands/motion.ts";
 import { describeRender, render } from "../commands/render.ts";
 import { snapshot } from "../commands/snapshot.ts";
 import { studio } from "../commands/studio.ts";
+import { describeSetup } from "../commands/studio-auth.ts";
 import { tokensExport } from "../commands/tokens.ts";
 import { detectPackageManager, nextSteps } from "../project-setup.ts";
 import { type CliCommand, untilSignal } from "./types.ts";
@@ -78,7 +79,10 @@ const studioCommand: CliCommand = async (_rest, values, { projectDir }) => {
     ...(values.name ? { name: values.name } : {}),
     log: (l) => console.log(`  ${l}`),
   });
+  for (const warning of s.warnings) console.error(`warning: ${warning}`);
   console.log(`cloudhal studio → ${s.url}`);
+  // #165: the one-time setup link for the owner account, read from the log by self-hosters.
+  if (s.setup) console.log(describeSetup(s.setup));
   await untilSignal();
   await s.stop();
   return 0;
