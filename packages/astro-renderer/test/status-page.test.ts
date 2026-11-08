@@ -31,7 +31,13 @@ import {
   statusPlain,
   statusStrings,
 } from "../src/status-page.ts";
-import { isStatusPagePath, statusInput, statusLocale, statusTheme } from "../src/status-serve.ts";
+import {
+  isStatusPagePath,
+  statusInput,
+  statusLocale,
+  statusTheme,
+  trimTrailingSlashes,
+} from "../src/status-serve.ts";
 import { STATUS_CATALOG } from "../src/status-strings/catalog.ts";
 import { en } from "../src/status-strings/en.ts";
 
@@ -243,6 +249,18 @@ describe("language and direction (§1.4, §1.5)", () => {
     expect(statusLocale(site, "de.example", "/")).toBe("de");
     expect(statusLocale(site, "example.com", "/fr/")).toBe("en");
     expect(statusLocale({ locales: ["tr"], defaultLocale: "tr" }, "x", "/")).toBe("tr");
+  });
+
+  it("trims trailing slashes in linear time, however many there are", () => {
+    expect(trimTrailingSlashes("/")).toBe("/");
+    expect(trimTrailingSlashes("///")).toBe("/");
+    expect(trimTrailingSlashes("/tr/about/")).toBe("/tr/about");
+    expect(trimTrailingSlashes("/tr/about")).toBe("/tr/about");
+    const long = `/tr${"/".repeat(200_000)}`;
+    const started = performance.now();
+    expect(trimTrailingSlashes(long)).toBe("/tr");
+    expect(statusLocale({ locales: ["en", "tr"], defaultLocale: "en" }, "x", long)).toBe("tr");
+    expect(performance.now() - started).toBeLessThan(500);
   });
 });
 

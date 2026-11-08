@@ -32,9 +32,16 @@ export interface LocaleSite {
   readonly localization?: Site["localization"] | undefined;
 }
 
+/** The path without trailing slashes (`/` for the root), in one linear pass: request text. */
+export function trimTrailingSlashes(pathname: string): string {
+  let end = pathname.length;
+  while (end > 0 && pathname.charCodeAt(end - 1) === 47) end--;
+  return end === 0 ? "/" : pathname.slice(0, end);
+}
+
 /** §1.4: the locale of the request's host or path prefix when it is the site's, else the default. */
 export function statusLocale(site: LocaleSite, host: string, pathname: string): string {
-  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : "/";
+  const path = trimTrailingSlashes(pathname);
   try {
     return localeRequest(site as Site, host, path).locale;
   } catch {
