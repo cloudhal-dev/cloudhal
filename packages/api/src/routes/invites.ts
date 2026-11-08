@@ -29,6 +29,7 @@ import type { Actor } from "@cloudhal/core-contracts";
 import { type Context, Hono } from "hono";
 import { actorIdForUser, type StaffService } from "../auth.ts";
 import type { Env } from "../context.ts";
+import { isEmailAddress } from "../email.ts";
 import { apiError, badRequest, notFound } from "../errors.ts";
 import { MailError } from "../mail.ts";
 import { inviteMail } from "../mail-messages.ts";
@@ -81,8 +82,6 @@ export function inviteView(i: InviteRow): InviteView {
     ...(i.sites ? { sites: i.sites } : {}),
   };
 }
-
-export const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function gone() {
   return apiError(
@@ -210,7 +209,7 @@ export function inviteRoutes(options: {
       const { person, actor, staff } = me(c);
       const body = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
       const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-      if (!EMAIL.test(email) || email.length > 254) throw badRequest("a valid email is required");
+      if (!isEmailAddress(email)) throw badRequest("a valid email is required");
       const { role, sites } = await inviteTarget(c, person, body);
       const hours =
         body.expiresInHours === undefined ? inviteDefaultHours(role) : body.expiresInHours;

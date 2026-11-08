@@ -1,6 +1,7 @@
 import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { assertValid, type SkillManifest } from "@cloudhal/core-contracts";
+import { nestedLine, topLine } from "./frontmatter-lines.ts";
 
 export interface LoadedSkill {
   manifest: SkillManifest;
@@ -36,14 +37,14 @@ export function parseFrontmatter(markdown: string): {
   let currentMap: Record<string, string> | undefined;
   for (const raw of (m[1] as string).split(/\r?\n/)) {
     if (!raw.trim() || raw.trim().startsWith("#")) continue;
-    const nested = raw.match(/^\s+([^:]+):\s*(.*)$/);
+    const nested = nestedLine(raw);
     if (nested && currentMap) {
-      currentMap[nested[1] as string] = unquote((nested[2] as string).trim());
+      currentMap[nested[0]] = unquote(nested[1].trim());
       continue;
     }
-    const top = raw.match(/^([A-Za-z][\w-]*):\s*(.*)$/);
+    const top = topLine(raw);
     if (!top) throw new SkillError(`invalid frontmatter line: ${raw}`);
-    const [, key, value] = top as unknown as [string, string, string];
+    const [key, value] = top;
     if (value.trim() === "") {
       currentMap = {};
       fm[key] = currentMap;

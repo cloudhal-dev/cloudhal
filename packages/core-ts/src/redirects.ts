@@ -11,13 +11,14 @@ import {
 } from "@cloudhal/core-contracts";
 import { InvariantError } from "./errors.ts";
 import { ID_PREFIX } from "./ids.ts";
+import { trimEndChar } from "./names.ts";
 import type { OpBatch } from "./node-sql.ts";
 import type { Creatable } from "./nodes.ts";
 
 /** `/a/b/` → `/a/b`; the root stays `/`. Query and fragment are not part of a request path here. */
 export function normalisePath(path: string): string {
   const p = path.split(/[?#]/, 1)[0] ?? "/";
-  return p.length > 1 ? p.replace(/\/+$/, "") || "/" : p || "/";
+  return p.length > 1 ? trimEndChar(p, "/") || "/" : p || "/";
 }
 
 /** A target split into its site path and the `?query#fragment` suffix; `undefined` for https URLs. */
@@ -33,13 +34,22 @@ export function joinTarget(to: string, rest: string): string {
   const i = to.search(/[?#]/);
   const head = i < 0 ? to : to.slice(0, i);
   const tail = i < 0 ? "" : to.slice(i);
-  return `${head.replace(/\/+$/, "")}${rest}${tail}`;
+  return `${trimEndChar(head, "/")}${rest}${tail}`;
 }
 
-/** The proper ancestors of a path, longest first, including `/`. */
+/**
+ * The proper ancestors of a path that a redirect's `from` can be, longest first, including `/`.
+ * A `from` has no empty segment, so no ancestor that holds `//` can match: the walk starts below
+ * the first `//` (#174; a run of slashes used to yield one useless ancestor per slash).
+ */
 export function ancestorPaths(path: string): string[] {
   const out: string[] = [];
   let p = path;
+  const cut = path.indexOf("//");
+  if (cut >= 0) {
+    p = path.slice(0, cut) || "/";
+    out.push(p);
+  }
   while (p.length > 1) {
     p = p.slice(0, p.lastIndexOf("/")) || "/";
     out.push(p);

@@ -12,6 +12,7 @@
 import type { FeedFinding, FindingSeverity, GateStateName } from "./findings.ts";
 import { instantMs, MINUTE_MS } from "./instant.ts";
 import { plainLine } from "./text.ts";
+import { cdataParts, elementContents, mediaUrlValues } from "./xml-scan.ts";
 
 /** Documents larger than this are not parsed (`feed-invalid`). */
 export const MAX_DOCUMENT_CHARS = 5_000_000;
@@ -153,15 +154,10 @@ const ENTITIES: Record<string, string> = {
 
 /** Element text: CDATA unwrapped, the five XML entities and numeric references decoded. */
 export function xmlText(raw: string): string {
-  const parts: string[] = [];
-  const re = /<!\[CDATA\[([\s\S]*?)\]\]>/g;
-  let last = 0;
-  for (const m of raw.matchAll(re)) {
-    parts.push(decode(raw.slice(last, m.index)), m[1] as string);
-    last = (m.index ?? 0) + m[0].length;
-  }
-  parts.push(decode(raw.slice(last)));
-  return parts.join("").trim();
+  return cdataParts(raw)
+    .map((p) => decode(p.text) + (p.cdata ?? ""))
+    .join("")
+    .trim();
 }
 
 function decode(s: string): string {
@@ -178,30 +174,20 @@ function safeChar(code: number): string | undefined {
     : undefined;
 }
 
-function escapeName(name: string): string {
-  return name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /** Every `<name>…</name>` block (non-nesting elements such as `item`, `url`). */
 function blocks(text: string, name: string): string[] {
-  const n = escapeName(name);
-  return [...text.matchAll(new RegExp(`<${n}(?:\\s[^>]*)?>([\\s\\S]*?)</${n}\\s*>`, "g"))].map(
-    (m) => m[1] as string,
-  );
+  return elementContents(text, name);
 }
 
 /** The text of the first `<name>` child, or undefined. */
 function child(block: string, name: string): string | undefined {
-  const n = escapeName(name);
-  const m = new RegExp(`<${n}(?:\\s[^>]*)?>([\\s\\S]*?)</${n}\\s*>`).exec(block);
-  return m ? xmlText(m[1] as string) : undefined;
+  const first = elementContents(block, name, 1)[0];
+  return first === undefined ? undefined : xmlText(first);
 }
 
 /** `url="…"` attributes of `<enclosure>` and `<media:content>`. */
 function mediaAttributes(block: string): string[] {
-  return [...block.matchAll(/<(?:enclosure|media:content)\b[^>]*?\burl\s*=\s*(["'])(.*?)\1/g)].map(
-    (m) => decode(m[2] as string),
-  );
+  return mediaUrlValues(block).map(decode);
 }
 
 /** A URL's path as the site routes it (no query, fragment or trailing slash), or undefined. */
@@ -214,7 +200,10 @@ export function urlPath(url: string): string | undefined {
     } catch {
       // keep the encoded form
     }
-    return p.length > 1 ? p.replace(/\/+$/, "") || "/" : p || "/";
+    // A linear trim of trailing "/" (`/\/+$/` backtracks on a long run of "/" inside the path).
+    let end = p.length;
+    while (end > 1 && p[end - 1] === "/") end--;
+    return p.length > 1 ? p.slice(0, end) : p || "/";
   } catch {
     return undefined;
   }

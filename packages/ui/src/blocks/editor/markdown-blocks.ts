@@ -15,6 +15,7 @@ import {
   type SplitMarkdown,
   splitMarkdown,
 } from "@cloudhal/core-ts/body-blocks";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import { Marked } from "marked";
 
 export type { MarkdownUnit, SplitMarkdown } from "@cloudhal/core-ts/body-blocks";
@@ -66,12 +67,13 @@ export function mergeBlocks(
   }
   // A block that was not last before keeps the blank lines it had in the middle: end it with one
   // newline, like a new block. An untouched body ends exactly as it did.
-  if (previous !== source.units.length - 1 && out !== "") out = out.replace(/\n*$/, "\n");
+  if (previous !== source.units.length - 1 && out !== "") out = `${trimEndChar(out, "\n")}\n`;
   return out;
 }
 
 /** `text` ready for another block: nothing, or ending in one blank line. */
 function separated(text: string): string {
   if (text === "") return "";
-  return `${text.replace(/\n*$/, "")}\n\n`;
+  // `trimEndChar`, not `/\n*$/`: that backtracks on a long run of newlines inside the text (#174).
+  return `${trimEndChar(text, "\n")}\n\n`;
 }
