@@ -87,15 +87,19 @@ export interface StudioSetup {
   readonly tokenSource: "env" | "generated";
 }
 
+/** The setup link with the token replaced by its variable's name (a string search, no regex). */
+function withoutToken(url: string): string {
+  const at = url.indexOf("#setup=");
+  return `${at === -1 ? url : url.slice(0, at)}#setup=<CLOUDHAL_SETUP_TOKEN>`;
+}
+
 /**
  * What `cloudhal studio` prints for a `StudioSetup` (an operator reads it from the container's
  * log). A token the operator set themselves is not repeated: logs may be kept.
  */
 export function describeSetup(setup: StudioSetup): string {
   const fromEnv = setup.tokenSource === "env";
-  const link = fromEnv
-    ? setup.url.replace(/#setup=.*$/, "#setup=<CLOUDHAL_SETUP_TOKEN>")
-    : setup.url;
+  const link = fromEnv ? withoutToken(setup.url) : setup.url;
   return [
     "No account yet. Create the owner account (once) at this one-time setup link:",
     `  ${link}`,
@@ -106,11 +110,21 @@ export function describeSetup(setup: StudioSetup): string {
   ].join("\n");
 }
 
-/** One line for a Studio reachable beyond this machine, or behind a proxy, without a public origin (#165). */
+/**
+ * Behind a reverse proxy the public origin is known, and Better Auth needs it as its base URL: for
+ * `Secure` session cookies on https and for the one origin sign-in accepts. Without it the server
+ * would trust whatever origin the forwarded headers name, or (on loopback) refuse every sign-in, so
+ * `--behind-proxy` without `--base-url` is refused at start (#165).
+ */
+export function assertProxyHasBaseUrl(server: StudioServer): void {
+  if (!server.behindProxy || server.baseUrl !== undefined) return;
+  throw new Error(
+    "--behind-proxy (CLOUDHAL_BEHIND_PROXY) needs --base-url: set CLOUDHAL_BASE_URL to the public origin browsers open Studio at, e.g. https://studio.example.com",
+  );
+}
+
+/** One line for a Studio reachable beyond this machine without a public origin (#165). */
 export function noBaseUrlWarning(server: StudioServer): string | undefined {
-  if (server.baseUrl !== undefined) return undefined;
-  if (server.behindProxy)
-    return "--behind-proxy without --base-url: sign-in accepts only this machine's own addresses; set --base-url (CLOUDHAL_BASE_URL) to the public origin browsers open Studio at";
-  if (isLoopbackHost(server.hostname)) return undefined;
+  if (server.baseUrl !== undefined || isLoopbackHost(server.hostname)) return undefined;
   return `--host ${server.hostname} without --base-url: sign-in accepts the origin of each request; set --base-url (CLOUDHAL_BASE_URL) to the origin browsers open Studio at, e.g. http://<this machine's address>:${server.port}`;
 }

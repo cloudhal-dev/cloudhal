@@ -11,9 +11,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { fillOptionalValues } from "../src/cli.ts";
-import { init } from "../src/commands/init.ts";
+import { init, slugify } from "../src/commands/init.ts";
 import {
   assertNoAuthLocal,
+  assertProxyHasBaseUrl,
   describeSetup,
   isLoopbackHost,
   noBaseUrlWarning,
@@ -240,6 +241,38 @@ describe("studio auth options (#165)", () => {
       expect(isLoopbackHost(h), h).toBe(false);
   });
 
+  it("refuses --behind-proxy without a public origin", () => {
+    for (const hostname of ["0.0.0.0", "127.0.0.1", undefined])
+      expect(() => assertProxyHasBaseUrl({ ...server, hostname, behindProxy: true })).toThrow(
+        /--behind-proxy \(CLOUDHAL_BEHIND_PROXY\) needs --base-url.*CLOUDHAL_BASE_URL/,
+      );
+    expect(() =>
+      assertProxyHasBaseUrl({
+        ...server,
+        hostname: "0.0.0.0",
+        behindProxy: true,
+        baseUrl: "https://studio.example.com",
+      }),
+    ).not.toThrow();
+    expect(() => assertProxyHasBaseUrl({ ...server, hostname: "0.0.0.0" })).not.toThrow();
+  });
+
+  it("makes slugs and setup lines in linear time (CodeQL js/polynomial-redos)", () => {
+    expect(slugify("  Hello,  World! ")).toBe("hello-world");
+    expect(slugify("---")).toBe("site");
+    expect(slugify("a".repeat(70))).toBe("a".repeat(64));
+    expect(slugify(`${"a".repeat(63)} b`)).toBe("a".repeat(63));
+    const start = performance.now();
+    expect(slugify("-".repeat(100_000))).toBe("site");
+    expect(slugify(`x${" -".repeat(100_000)}y`)).toBe("x-y");
+    const long = describeSetup({
+      url: `http://localhost:8787/login#setup=${"#setup=".repeat(100_000)}`,
+      tokenSource: "env",
+    });
+    expect(long).toContain("http://localhost:8787/login#setup=<CLOUDHAL_SETUP_TOKEN>\n");
+    expect(performance.now() - start).toBeLessThan(1000);
+  });
+
   it("allows --no-auth on this machine only", () => {
     expect(() => assertNoAuthLocal({ ...server, hostname: undefined })).not.toThrow();
     expect(() => assertNoAuthLocal({ ...server, hostname: "::1" })).not.toThrow();
@@ -290,9 +323,6 @@ describe("studio auth options (#165)", () => {
     expect(
       noBaseUrlWarning({ ...server, hostname: "0.0.0.0", baseUrl: "https://studio.example.com" }),
     ).toBeUndefined();
-    expect(noBaseUrlWarning({ ...server, hostname: "127.0.0.1", behindProxy: true })).toMatch(
-      /--behind-proxy without --base-url/,
-    );
     expect(noBaseUrlWarning({ ...server, hostname: "0.0.0.0" })).toMatch(
       /--host 0\.0\.0\.0 without --base-url.*CLOUDHAL_BASE_URL.*:8787/,
     );
@@ -401,6 +431,37 @@ describe("cloudhal studio on an empty folder and behind a proxy", () => {
     expect(await initIfEmpty(moving, { starter: "blog" })).toBe(false);
   });
 
+  it("redoes a scaffold whose staged cloudhal.json was cut off, empty or names no site", async () => {
+    for (const [name, content] of [
+      ["cut", '{"siteId": "site_'],
+      ["empty", ""],
+      ["nosite", '{"dataDir": ".cloudhal"}'],
+    ] as const) {
+      const dir = path.join(tmp, `staged-${name}`);
+      await mkdir(path.join(dir, INIT_STAGING_DIR), { recursive: true });
+      await writeFile(path.join(dir, INIT_STAGING_DIR, "cloudhal.json"), content);
+      expect(await initIfEmpty(dir, { starter: "blog", name: "Redo" }), name).toBe(true);
+      const cfg = JSON.parse(await readFile(path.join(dir, "cloudhal.json"), "utf8")) as {
+        siteId: string;
+      };
+      expect(cfg.siteId, name).toMatch(/\S/);
+      expect(await exists(path.join(dir, INIT_STAGING_DIR)), name).toBe(false);
+    }
+  });
+
+  it("scaffolds a fresh ext4 volume whose only entry is lost+found, and keeps it", async () => {
+    const volume = path.join(tmp, "ext4");
+    await mkdir(path.join(volume, "lost+found"), { recursive: true });
+    expect(await initIfEmpty(volume, { starter: "blog", name: "Volume" })).toBe(true);
+    expect(await exists(path.join(volume, "cloudhal.json"))).toBe(true);
+    expect(await exists(path.join(volume, "lost+found"))).toBe(true);
+    // anything else still makes the folder not empty
+    const other = path.join(tmp, "ext4-other");
+    await mkdir(path.join(other, "lost+found"), { recursive: true });
+    await writeFile(path.join(other, "notes.txt"), "mine");
+    await expect(initIfEmpty(other, { starter: "blog" })).rejects.toThrow(/is not empty/);
+  });
+
   it("refuses --no-auth beyond loopback or behind a proxy, before touching the folder", async () => {
     const projectDir = path.join(tmp, "no-auth");
     await mkdir(projectDir);
@@ -414,6 +475,19 @@ describe("cloudhal studio on an empty folder and behind a proxy", () => {
     await expect(studio({ ...base, behindProxy: true, env: {} })).rejects.toThrow(
       /--behind-proxy is set/,
     );
+    expect(await readdir(projectDir)).toEqual([]);
+  });
+
+  it("refuses --behind-proxy without --base-url before touching the folder", async () => {
+    const projectDir = path.join(tmp, "proxy-no-base");
+    await mkdir(projectDir);
+    const base = { projectDir, port: 0, initIfEmpty: true } as const;
+    await expect(studio({ ...base, host: "0.0.0.0", behindProxy: true, env: {} })).rejects.toThrow(
+      /needs --base-url/,
+    );
+    await expect(
+      studio({ ...base, env: { CLOUDHAL_HOST: "0.0.0.0", CLOUDHAL_BEHIND_PROXY: "1" } }),
+    ).rejects.toThrow(/CLOUDHAL_BASE_URL/);
     expect(await readdir(projectDir)).toEqual([]);
   });
 

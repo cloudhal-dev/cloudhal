@@ -28,7 +28,7 @@ In a second terminal:
 npm run studio
 ```
 
-Open <http://localhost:8787>. The first account you create becomes the Owner, and sign-up then closes. Studio is where people edit content, review what agents changed, approve publishes and roll back.
+While the project has no account, `cloudhal studio` prints a one-time setup link, `http://localhost:8787/login#setup=<token>`. Open it and create the first account, which becomes the Owner; sign-up then closes, and everyone else joins by invite. Without the link nobody can sign up, so a Studio reachable from a network cannot be claimed by whoever finds it first. Afterwards open <http://localhost:8787>. Studio is where people edit content, review what agents changed, approve publishes and roll back.
 
 ## 4. Connect an agent
 

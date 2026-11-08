@@ -25,9 +25,10 @@ const PROJECT = `  cloudhal init <dir> [--name <name>] [--starter blog]   create
                                                           it sign-in accepts each request's own origin),
                                                           --behind-proxy (CLOUDHAL_BEHIND_PROXY=1) trusts its
                                                           X-Forwarded-Proto/Host and the last X-Forwarded-For
-                                                          hop, --init-if-empty (CLOUDHAL_INIT=<starter>)
-                                                          creates the project first when the folder has no
-                                                          cloudhal.json
+                                                          hop and needs --base-url, --init-if-empty
+                                                          (CLOUDHAL_INIT=<starter>) creates the project first
+                                                          when the folder is empty (lost+found aside) and has
+                                                          no cloudhal.json
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
 `;

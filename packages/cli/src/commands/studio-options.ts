@@ -5,7 +5,7 @@
  * Flags win over the environment: `CLOUDHAL_HOST`, `CLOUDHAL_BASE_URL`, `CLOUDHAL_BEHIND_PROXY`,
  * `CLOUDHAL_INIT` (a starter name), `CLOUDHAL_SITE_NAME`.
  */
-import { access, mkdir, readdir, rename, rm } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { CONFIG_FILE } from "../config.ts";
 import { init } from "./init.ts";
@@ -164,8 +164,10 @@ export const INIT_STAGING_DIR = ".cloudhal-init";
  * as `init` refuses it, so a volume mounted at the wrong path is never written over. The scaffold
  * is staged in `.cloudhal-init` inside the folder and moved up entry by entry, `cloudhal.json`
  * last, so a container stopped at any point starts again cleanly: a staging folder without a
- * config is redone, one with a config is moved the rest of the way (#165; before, a stop
- * mid-scaffold crash-looped on "is not empty"). Returns whether a project was created.
+ * complete config (missing, cut off, no `siteId`) is redone, one with a complete config is moved
+ * the rest of the way (#165; before, a stop mid-scaffold crash-looped on "is not empty"). A fresh
+ * ext4 volume's `lost+found` does not make the folder non-empty. Returns whether a project was
+ * created.
  */
 export async function initIfEmpty(
   projectDir: string,
@@ -174,8 +176,10 @@ export async function initIfEmpty(
   if (await exists(path.join(projectDir, CONFIG_FILE))) return false;
   await mkdir(projectDir, { recursive: true });
   const staging = path.join(projectDir, INIT_STAGING_DIR);
-  const staged = await exists(path.join(staging, CONFIG_FILE));
-  const others = (await readdir(projectDir)).filter((entry) => entry !== INIT_STAGING_DIR);
+  const staged = await completeConfig(path.join(staging, CONFIG_FILE));
+  const others = (await readdir(projectDir)).filter(
+    (entry) => entry !== INIT_STAGING_DIR && entry !== LOST_AND_FOUND,
+  );
   if (others.length > 0 && !staged) throw new Error(`${projectDir} is not empty`);
   if (!staged) {
     // whatever an earlier start left unfinished, then a fresh scaffold
@@ -193,6 +197,22 @@ export async function initIfEmpty(
   await moveUp(staging, projectDir, CONFIG_FILE);
   await rm(staging, { recursive: true, force: true });
   return true;
+}
+
+/** What `mkfs.ext4` leaves at the root of a new file system (a Docker volume on a fresh disk). */
+const LOST_AND_FOUND = "lost+found";
+
+/**
+ * Whether a staged `cloudhal.json` is the finished one `init` writes last: it parses and names a
+ * site. A file cut off by a stop while it was written (or empty) means the scaffold is redone.
+ */
+async function completeConfig(file: string): Promise<boolean> {
+  try {
+    const cfg = JSON.parse(await readFile(file, "utf8")) as { siteId?: unknown };
+    return typeof cfg.siteId === "string" && cfg.siteId.length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** One staged entry into the project; one that an earlier start already moved stays as it is. */

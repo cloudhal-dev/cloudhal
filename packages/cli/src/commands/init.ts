@@ -48,14 +48,27 @@ export async function findWorkspaceRoot(dir: string): Promise<string | undefined
   }
 }
 
-function slugify(s: string): string {
-  return (
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64) || "site"
-  );
+/**
+ * A package name from a site name: lowercase, every run of other characters one `-`, no `-` at
+ * either end, at most 64 characters. One pass, linear in the input (no backtracking regex: CodeQL
+ * js/polynomial-redos).
+ */
+export function slugify(s: string): string {
+  let out = "";
+  let dash = false;
+  for (const ch of s.toLowerCase()) {
+    if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) {
+      if (dash && out) {
+        // a dash only when the character after it fits too: never a trailing "-"
+        if (out.length + 2 > 64) break;
+        out += "-";
+      }
+      dash = false;
+      out += ch;
+      if (out.length >= 64) break;
+    } else dash = true;
+  }
+  return out || "site";
 }
 
 export interface InitResult {

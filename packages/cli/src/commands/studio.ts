@@ -17,6 +17,7 @@ import { resolveSkillsDir } from "./mcp.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
 import {
   assertNoAuthLocal,
+  assertProxyHasBaseUrl,
   hasAccounts,
   noBaseUrlWarning,
   resolveSetupToken,
@@ -88,6 +89,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
   const server = resolveStudioServer(options, env);
   // #165: an API without authentication never leaves this machine.
   if (options.noAuth) assertNoAuthLocal(server);
+  assertProxyHasBaseUrl(server);
   // RFC-0005 §7, #165: the first account's token, refused (CLOUDHAL_SETUP_TOKEN) before anything starts.
   const setup = options.noAuth ? undefined : resolveSetupToken(env);
   const scaffold = resolveStudioInit(options, env);
