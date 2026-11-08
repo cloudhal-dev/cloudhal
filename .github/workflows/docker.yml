@@ -1,20 +1,30 @@
 name: Docker image
 
 # The official self-host image, ghcr.io/cloudhal-dev/cloudhal (issue #143, docs/guides/self-host.md).
-# Built from the npm release, never from the tree, so the image is exactly what npm users get:
-# - release.yml calls this after a successful npm publish (`workflow_call` with the version):
-#   tags X.Y.Z, X.Y, latest and sha-<short>;
-# - Actions › Docker image › Run workflow with a version re-publishes or backfills it (X.Y.Z, X.Y
-#   and sha-<short>; `latest` never moves on a dispatch, so a backfill cannot point it at an
-#   older release); with no version it builds `edge`;
-# - nightly, `edge` is built from main's own packed tarballs (scripts/pack-packages.ts): tagged
-#   edge and sha-<short> only, never latest;
+# Built from the npm release, never from the tree, so the image is exactly what npm users get.
+# Three jobs, so that no release tag moves before the gates pass (#166):
+# - `build` builds linux/amd64 + linux/arm64 with an SBOM and buildx provenance, pushes it under
+#   the candidate tag `sha-<short>` only, then runs scripts/docker-smoke.ts on the amd64 image
+#   (empty volume, health check, Studio's page, an anonymous `/mcp` call, the first owner through
+#   the API, a publish, `site-build` twice) and Trivy, which fails the job on a CRITICAL
+#   vulnerability with a fix;
+# - `smoke-arm64` runs the same smoke test on the arm64 image, on GitHub's native arm64 runner
+#   (free for public repositories; under QEMU a Node process and an Astro build take far longer
+#   than the ten minutes that would be worth);
+# - `tag` adds the release tags to the very digest that passed, with `imagetools create`, and then
+#   writes the GitHub build attestation for it.
+# Which tags `tag` adds:
+# - release.yml calls this after a successful npm publish (`workflow_call` with the version), and
+#   Actions › Docker image › Run workflow with a version re-publishes or backfills one. X.Y.Z
+#   always; X.Y when the version is the highest patch of that minor among the repository's v*
+#   tags; `latest` when it is the highest release of all. So a release started by hand still gets
+#   `latest`, and a backfill of an older patch moves nothing backwards.
+# - with no version (a dispatch without one, and nightly) `edge` is built from main's own packed
+#   tarballs (scripts/pack-packages.ts) and tagged edge only, never latest;
 # - a pull request that touches the image builds it for linux/amd64 without pushing and runs the
-#   same smoke test and scan.
-# Every push is linux/amd64 + linux/arm64 with an SBOM, buildx provenance and a GitHub build
-# attestation; scripts/docker-smoke.ts then runs the amd64 image (empty volume, health check, the
-# first owner through the API, a publish, `site-build`), and Trivy fails the job on a CRITICAL
-# vulnerability with a fix. Versions before 0.6.3 have no `--init-if-empty`: the image needs it.
+#   amd64 smoke test and the scan.
+# Versions before 0.6.4 cannot pass the gates: the smoke test expects the first owner's setup
+# token (#165), which 0.6.4 brought, and the image needs `--init-if-empty` (0.6.3).
 
 on:
   workflow_call:
@@ -49,15 +59,15 @@ env:
   IMAGE: ghcr.io/${{ github.repository_owner }}/cloudhal
 
 jobs:
-  image:
-    name: ${{ inputs.version && format('Image {0}', inputs.version) || 'Image edge' }}
+  build:
+    name: ${{ inputs.version && format('Build {0}', inputs.version) || 'Build edge' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
       contents: read
       packages: write
-      id-token: write
-      attestations: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     env:
       VERSION: ${{ inputs.version || '' }}
       PUSH: ${{ github.event_name != 'pull_request' }}
@@ -68,6 +78,21 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      # The compose file's Caddyfile, in the Caddy the compose file runs (a few seconds).
+      - name: Validate the Caddyfile
+        run: |
+          docker run --rm \
+            -e CLOUDHAL_BASE_URL=https://studio.example.com \
+            -e CLOUDHAL_SITE_URL=https://www.example.com \
+            -v "$PWD/deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - name: Check the version
+        if: env.VERSION != ''
+        run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::version must be x.y.z (got '$VERSION')"
+            exit 1
+          fi
 
       # edge: the packages of this ref, built and packed the way the release job packs them
       - if: env.VERSION == ''
@@ -83,17 +108,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # The candidate tag only; the release tags come from the `tag` job once the gates pass.
       - id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ${{ env.IMAGE }}
           flavor: latest=false
-          tags: |
-            type=semver,pattern={{version}},value=v${{ env.VERSION }},enable=${{ env.VERSION != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=v${{ env.VERSION }},enable=${{ env.VERSION != '' }}
-            type=raw,value=latest,enable=${{ env.VERSION != '' && github.event_name != 'workflow_dispatch' }}
-            type=raw,value=edge,enable=${{ env.VERSION == '' }}
-            type=sha,prefix=sha-
+          tags: type=sha,prefix=sha-
           labels: |
             org.opencontainers.image.title=Cloudhal
             org.opencontainers.image.description=Agent-native site platform: Studio, API and MCP server, self-hosted
@@ -118,12 +139,6 @@ jobs:
           # attestations need a registry push; a loaded local image takes none
           sbom: ${{ env.PUSH == 'true' }}
           provenance: ${{ env.PUSH == 'true' && 'mode=max' || 'false' }}
-      - if: env.PUSH == 'true'
-        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
-          push-to-registry: true
 
       - id: ref
         run: |
@@ -144,3 +159,95 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           format: table
+
+  smoke-arm64:
+    name: Smoke test (linux/arm64)
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: node scripts/docker-smoke.ts --image "$IMAGE@$DIGEST"
+        env:
+          DIGEST: ${{ needs.build.outputs.digest }}
+
+  tag:
+    name: ${{ inputs.version && format('Tag {0}', inputs.version) || 'Tag edge' }}
+    needs: [build, smoke-arm64]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ inputs.version || '' }}
+      DIGEST: ${{ needs.build.outputs.digest }}
+    steps:
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: tags
+        name: Which tags this digest gets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VERSION" ]; then
+            tags="edge"
+          else
+            # Every released version: the repository's v* tags (release.yml pushes one per release)
+            # plus this version itself, which has none yet when a release is finished by hand.
+            # `grep` always matches at least this version, so the pipelines never come up empty.
+            released=$( { gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/v" --jq '.[].ref' | sed 's#^refs/tags/v##'; echo "$VERSION"; } \
+              | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -uV)
+            minor="${VERSION%.*}"
+            highest=$(printf '%s\n' "$released" | tail -n 1)
+            highest_of_minor=$(printf '%s\n' "$released" | grep -E "^${minor//./\\.}\.[0-9]+$" | tail -n 1)
+            tags="$VERSION"
+            [ "$highest_of_minor" = "$VERSION" ] && tags="$tags $minor"
+            [ "$highest" = "$VERSION" ] && tags="$tags latest"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "Tagging $IMAGE@$DIGEST as: $tags" | tee -a "$GITHUB_STEP_SUMMARY"
+      - id: push
+        name: Tag the digest that passed
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          for t in $TAGS; do args+=(--tag "$IMAGE:$t"); done
+          # One source and no annotations: the index is copied as it is, so the digest stays the
+          # one the smoke tests and Trivy saw. Read back and checked, and the attestation below
+          # names what the tags really point at.
+          docker buildx imagetools create "${args[@]}" "$IMAGE@$DIGEST"
+          first="${TAGS%% *}"
+          final=$(docker buildx imagetools inspect "$IMAGE:$first" --format '{{.Manifest.Digest}}')
+          echo "digest=$final" >> "$GITHUB_OUTPUT"
+          if [ "$final" != "$DIGEST" ]; then
+            echo "::warning::$IMAGE:$first is $final, not the tested $DIGEST"
+          fi
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true

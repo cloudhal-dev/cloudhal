@@ -1,13 +1,149 @@
 #!/bin/sh
-# Builds the public site: static HTML from the published snapshot into /data/dist, which a web
-# server (the compose file's Caddy) serves. The project's dependencies are the image's
-# node_modules, linked into the project on first use, so no install and no network is needed.
+# Builds the public site as static HTML and publishes it on the volume:
 #   docker compose exec cloudhal site-build
+# The served path is /data/dist, as in 0.6.3, so a web server (the compose file's Caddy, or nginx
+# with root /data/dist) needs no change. It is now a symlink to /data/site/current, which points at
+# the newest build in /data/site/<build id>; /data/site/previous points at the one before.
+#
+# `cloudhal build` always writes <project>/dist and empties it first, so it never runs in /data:
+# the project's own files are copied to /data/.site-build (its node_modules and data directory are
+# symlinks, so the build reads the same store) and the site is built there. Only a finished build
+# is published: it moves to /data/site/<build id>, then `current`, `previous` and `dist` are each
+# replaced with one rename (`ln -sfn` + `mv -T`), which is atomic. Visitors see the previous build
+# until the new one is complete, never a 404 or a half-written page — except for a moment on the
+# first build after upgrading from 0.6.3, when the real /data/dist folder is moved aside and the
+# symlink takes its place (two renames; bookworm's coreutils has no `mv --exchange`). A failed
+# build changes nothing. The build before the current one is kept (pages opened from it still load
+# their hashed assets, which the Caddyfile serves from `previous`); older ones are removed; the
+# 0.6.3 folder is kept as `site/legacy-0.6.3` for one build. Never run an Astro build in /data by
+# hand (`cloudhal build`, `cloudhal deploy`): it would empty the served build through the symlink.
+#
+# The snapshot is the published one, else the latest: before the first publish the site is built
+# from the latest snapshot (RFC-0043's `cloudhal build --published` is not in this version). The
+# project's dependencies are the image's node_modules, linked into the project on first use, so no
+# install and no network is needed.
 set -eu
 cd /data
 if [ ! -f cloudhal.json ]; then
   echo "site-build: no project in /data yet; start the container once first" >&2
   exit 1
 fi
+# One build at a time: a cron run and a hand-started one would otherwise share the staging folder.
+exec 9>/tmp/site-build.lock
+if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
+  echo "site-build: another build is running; try again when it is done" >&2
+  exit 1
+fi
 [ -e node_modules ] || ln -s /opt/cloudhal/node_modules node_modules
-exec cloudhal build "$@"
+
+# Preflight, before anything is written. A real /data/dist folder is the 0.6.3 layout: it moves
+# aside on publish. A mount point there (a host bind mount) cannot be moved: refuse, rather than
+# fail after every build and leave a new one behind each time.
+legacy=""
+if [ -d dist ] && [ ! -L dist ]; then
+  if command -v mountpoint >/dev/null 2>&1; then
+    if mountpoint -q dist; then legacy=mount; fi
+  elif [ "$(stat -c %d dist)" != "$(stat -c %d .)" ]; then
+    legacy=mount
+  fi
+  if [ "$legacy" = mount ]; then
+    echo "site-build: /data/dist is a mount point; site-build publishes it as a symlink to /data/site/current. Remove that mount and serve /data/dist (or /data/site/current) from the volume instead" >&2
+    exit 1
+  fi
+  legacy=0.6.3
+fi
+# Temporary links an interrupted run left behind (the prune below handles folders only).
+find . -maxdepth 1 -type l -name 'dist.*' -exec rm -f {} +
+if [ -d site ]; then
+  find site -maxdepth 1 -type l \( -name 'current.*' -o -name 'previous.*' \) -exec rm -f {} +
+fi
+
+# The public origin for canonical links, the sitemap and feeds is the site's primary domain, kept
+# in cloudhal.json as `domains.site` (`cloudhal domain set <hostname>`). CLOUDHAL_SITE_URL — the
+# origin Caddy serves — sets it when they differ; without either, the build's URLs say localhost.
+# Setting the domain never stops the build: a value it cannot use is reported and skipped.
+if [ -n "${CLOUDHAL_SITE_URL:-}" ]; then
+  host=$(node -e '
+    let u;
+    try { u = new URL(process.argv[1]); } catch { u = undefined; }
+    if (!u || u.protocol !== "https:" || u.port || u.pathname !== "/" || u.search || u.hash) {
+      console.error("site-build: CLOUDHAL_SITE_URL must be an https origin without a path or port, such as https://www.example.org (got " + JSON.stringify(process.argv[1]) + "); building without it");
+      process.exit(0);
+    }
+    // the rule for site domains (core-ts isHostname): labels, a dot, a letter TLD
+    if (!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(u.hostname)) {
+      console.error("site-build: " + u.hostname + " cannot be a site domain (no dot, or an IP address); building without it");
+      process.exit(0);
+    }
+    process.stdout.write(u.hostname);
+  ' "$CLOUDHAL_SITE_URL")
+  case "$host" in
+    "") ;;
+    example.com | *.example.com | example.net | *.example.net | example.org | *.example.org)
+      echo "site-build: CLOUDHAL_SITE_URL is the placeholder $CLOUDHAL_SITE_URL; set the site's real origin, or leave it empty" >&2
+      ;;
+    *)
+      current=$(node -e '
+        const cfg = JSON.parse(require("node:fs").readFileSync("cloudhal.json", "utf8"));
+        process.stdout.write(cfg.domains?.site ?? "");
+      ')
+      if [ "$host" != "$current" ]; then
+        if cloudhal domain set "$host" >/dev/null; then
+          echo "site-build: public origin https://$host (cloudhal.json domains.site; the live site's primary domain)"
+          echo "site-build: a published snapshot that names another primary domain keeps it until the next publish"
+        else
+          echo "site-build: could not make $host the site's domain; building without it" >&2
+        fi
+      fi
+      ;;
+  esac
+fi
+
+
+# Stage: the project's files, copied; node_modules and the data directory (cloudhal.json
+# `dataDir`, default .cloudhal), linked; the build output, archives and caches, left out.
+data_top=$(node -e '
+  const cfg = JSON.parse(require("node:fs").readFileSync("cloudhal.json", "utf8"));
+  process.stdout.write(String(cfg.dataDir ?? ".cloudhal").replace(/^(\.\/)+/, "").split("/")[0]);
+')
+stage=.site-build
+rm -rf "$stage"
+trap 'rm -rf "/data/$stage"' EXIT
+mkdir "$stage"
+for entry in .[!.]* ..?* *; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  # (the data directory first: `*.cloudhal`, for archives, would match `.cloudhal` too)
+  case "$entry" in
+    # node_modules is itself a link (to /opt/cloudhal/node_modules): link its target, not a chain
+    node_modules) ln -s "$(readlink -f node_modules)" "$stage/node_modules" ;;
+    "$data_top") ln -s "/data/$entry" "$stage/$entry" ;;
+    "$stage" | site | dist | .astro | .cloudhal-init | ?*.cloudhal | *.tgz) ;;
+    *) cp -a "$entry" "$stage/" ;;
+  esac
+done
+(cd "$stage" && cloudhal build "$@")
+
+# Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
+id="$(date -u +%Y%m%dT%H%M%SZ).$$"
+mkdir -p site
+mv "$stage/dist" "site/$id"
+prev=$(readlink site/current 2>/dev/null || true)
+# The 0.6.3 folder becomes `previous`, so its pages' assets keep loading for one more build.
+if [ "$legacy" = 0.6.3 ]; then prev="legacy-0.6.3"; fi
+ln -sfn "$id" "site/current.$$"
+mv -T "site/current.$$" site/current
+if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
+  ln -sfn "$prev" "site/previous.$$"
+  mv -T "site/previous.$$" site/previous
+fi
+# /data/dist, the stable served path. A 0.6.3 volume has a real folder there: it moves aside once
+# (two renames, the one moment it is missing), and every later build only replaces the symlink.
+if [ "$legacy" = 0.6.3 ]; then
+  rm -rf site/legacy-0.6.3
+  mv dist site/legacy-0.6.3
+fi
+ln -sfn site/current "dist.$$"
+mv -T "dist.$$" dist
+# Builds that neither `current` nor `previous` points at.
+find site -mindepth 1 -maxdepth 1 -type d ! -name "$id" ! -name "${prev:-$id}" -exec rm -rf {} +
+echo "site-build: /data/dist -> site/current -> $id"

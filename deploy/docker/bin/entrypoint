@@ -4,7 +4,25 @@
 # `docker run … cloudhal export` or `docker compose exec cloudhal site-build` work too.
 set -eu
 cd /data
+# An empty BETTER_AUTH_SECRET (a blank value in .env) would be taken as the secret itself: treat it
+# as unset, so the secret created on the volume stays in use.
+if [ -z "${BETTER_AUTH_SECRET-unset}" ]; then unset BETTER_AUTH_SECRET; fi
 if [ "${1:-studio}" = "studio" ]; then
+  # Behind a proxy the public origin is required (`cloudhal studio` refuses to start without one).
+  # A localhost origin there is a leftover default, such as a .env from 0.6.3, and would only fail
+  # every sign-in with 403: refuse it as loudly.
+  proxy=$(printf '%s' "${CLOUDHAL_BEHIND_PROXY:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  case "$proxy" in
+    1 | true | yes | on)
+      case "${CLOUDHAL_BASE_URL:-}" in
+        http://localhost | http://localhost:* | https://localhost | https://localhost:* | \
+          http://127.0.0.1 | http://127.0.0.1:* | https://127.0.0.1 | https://127.0.0.1:*)
+          echo "entrypoint: CLOUDHAL_BEHIND_PROXY=1 needs CLOUDHAL_BASE_URL set to the public origin browsers open Studio at, not $CLOUDHAL_BASE_URL" >&2
+          exit 1
+          ;;
+      esac
+      ;;
+  esac
   [ $# -gt 0 ] && shift
   exec cloudhal studio --init-if-empty "$@"
 fi

@@ -1,10 +1,12 @@
 /**
  * What a self-hoster gets (docs/guides/self-host.md, #143): runs the image with an empty volume,
- * waits for its HEALTHCHECK, then — through the API, as Studio would — creates the first owner,
- * lists the scaffolded site, publishes it, builds the public site with `site-build` and reads the
- * built home page. Run by .github/workflows/docker.yml after every build, and by hand:
+ * waits for its HEALTHCHECK, then — through the API, as Studio would — checks that the first owner
+ * can sign up only with the setup token (#165), that Studio's page is served and that `/mcp`
+ * refuses an anonymous call, lists the scaffolded site, publishes it, builds the public site with
+ * `site-build` twice (the second build swaps the served tree in place, #166) and reads the built
+ * home page. Run by .github/workflows/docker.yml after every build, and by hand:
  *
- *   node scripts/docker-smoke.ts [--image <ref>] [--port <n>] [--keep]
+ *   node scripts/docker-smoke.ts [--image <ref>] [--platform <os/arch>] [--port <n>] [--keep]
  */
 import { execFileSync, spawnSync } from "node:child_process";
 
@@ -13,6 +15,7 @@ const arg = (name: string): string | undefined => {
   return i === -1 ? undefined : process.argv[i + 1];
 };
 const image = arg("image") ?? "cloudhal:local";
+const platform = arg("platform");
 const port = Number(arg("port") ?? 18787);
 const keep = process.argv.includes("--keep");
 const name = `cloudhal-smoke-${process.pid}`;
@@ -20,6 +23,10 @@ const origin = `http://localhost:${port}`;
 // #165: the first account needs the setup token; the container gets one so the test need not read
 // the printed link from its logs.
 const setupToken = `smoke-setup-token-${crypto.randomUUID()}`;
+/** The built home page, as the starter renders the site name. */
+const HOME_H1 = /<h1[^>]*>Smoke Site<\/h1>/;
+/** The served path: a symlink to /data/site/current, the newest build (#166). */
+const SITE = "/data/dist";
 
 const docker = (args: string[], input?: string): string =>
   execFileSync("docker", args, { encoding: "utf8", ...(input ? { input } : {}) }).trim();
@@ -66,11 +73,21 @@ function expect(ok: boolean, what: string, detail?: unknown): void {
   if (!ok) throw new Error(`${what}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
 }
 
+/** Runs `site-build` in the container; returns the build `current` points at afterwards. */
+function siteBuild(which: string): string {
+  const r = spawnSync("docker", ["exec", name, "site-build"], { stdio: "inherit" });
+  expect(r.status === 0, `site-build (${which}) exited ${r.status}`);
+  const served = docker(["exec", name, "readlink", SITE]);
+  expect(served === "site/current", `${SITE} links to site/current`, served);
+  return docker(["exec", name, "readlink", "/data/site/current"]);
+}
+
 docker([
   "run",
   "-d",
   "--name",
   name,
+  ...(platform ? ["--platform", platform] : []),
   "-p",
   `127.0.0.1:${port}:8787`,
   "-e",
@@ -112,7 +129,26 @@ try {
     "the first account is the Owner",
     me.body,
   );
-  step("the first owner signed up through the API");
+  step("the first owner signed up with the setup token, not without it");
+
+  // Studio's index.html (the SPA fallback), not an API 404 and not an empty page.
+  const home = await fetch(`${origin}/`);
+  const homeHtml = await home.text();
+  expect(home.status === 200, "GET /", home.status);
+  expect(
+    (home.headers.get("content-type") ?? "").includes("text/html") &&
+      homeHtml.includes("<title>Cloudhal Studio</title>"),
+    "GET / is Studio's index.html",
+    { type: home.headers.get("content-type"), start: homeHtml.slice(0, 120) },
+  );
+  step("GET / serves Studio");
+
+  // The MCP endpoint is public but never anonymous (ADR-0011).
+  const mcp = await api("POST", "/mcp", {
+    body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+  });
+  expect(mcp.status === 401, "POST /mcp without credentials is refused with 401", mcp.status);
+  step("POST /mcp without credentials answers 401");
 
   const sites = await api("GET", "/api/sites", { cookie });
   const site = (sites.body as { id: string; name: string }[])[0];
@@ -125,10 +161,44 @@ try {
   expect(publish.status === 200 || publish.status === 201, "publish", publish.body);
   step(`site ${site.id} published`);
 
-  spawnSync("docker", ["exec", name, "site-build"], { stdio: "inherit" });
-  const html = docker(["exec", name, "cat", "/data/dist/index.html"]);
-  expect(/<h1[^>]*>Smoke Site<\/h1>/.test(html), "the built home page shows the site name");
-  step("site-build wrote the public site to /data/dist");
+  // A volume from 0.6.3 has a real /data/dist folder: the first build moves it aside, keeps it as
+  // site/previous, and puts the symlink in its place (#166).
+  docker(["exec", name, "sh", "-c", "mkdir -p /data/dist && touch /data/dist/marker"]);
+  const first = siteBuild("first");
+  const resolved = docker(["exec", name, "readlink", "-f", SITE]);
+  expect(resolved.startsWith("/data/site/"), `${SITE} resolves under /data/site/`, resolved);
+  const legacy = spawnSync("docker", ["exec", name, "test", "-e", "/data/site/previous/marker"]);
+  expect(legacy.status === 0, "site/previous is the moved 0.6.3 folder, marker included");
+  step("the first site-build moved a 0.6.3 /data/dist aside as site/previous");
+  expect(
+    HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
+    "the built home page shows the site name",
+  );
+  step(`site-build published the site: ${SITE} -> site/current -> ${first}`);
+
+  // A second build swaps the served tree in one rename and keeps the one before it, whose pages
+  // may still load their assets (#166).
+  const second = siteBuild("second");
+  expect(second !== first, "the second build is a new tree", { first, second });
+  const kept = docker([
+    "exec",
+    name,
+    "sh",
+    "-c",
+    "ls -1 /data/site | grep -v -x -e current -e previous",
+  ]);
+  expect(
+    kept === [first, second].sort().join("\n"),
+    "the newest build and the one before it are kept",
+    kept,
+  );
+  const previous = docker(["exec", name, "readlink", "/data/site/previous"]);
+  expect(previous === first, "site/previous links to the first build", previous);
+  expect(
+    HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
+    "the home page is served after the swap",
+  );
+  step("a second site-build swapped the served tree and kept the previous one");
   console.log("\nDocker smoke test passed.");
 } catch (e) {
   console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}\n--- container logs ---`);
