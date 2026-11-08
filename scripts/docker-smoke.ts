@@ -161,7 +161,15 @@ try {
   expect(publish.status === 200 || publish.status === 201, "publish", publish.body);
   step(`site ${site.id} published`);
 
+  // A volume from 0.6.3 has a real /data/dist folder: the first build moves it aside, keeps it as
+  // site/previous, and puts the symlink in its place (#166).
+  docker(["exec", name, "sh", "-c", "mkdir -p /data/dist && touch /data/dist/marker"]);
   const first = siteBuild("first");
+  const resolved = docker(["exec", name, "readlink", "-f", SITE]);
+  expect(resolved.startsWith("/data/site/"), `${SITE} resolves under /data/site/`, resolved);
+  const legacy = spawnSync("docker", ["exec", name, "test", "-e", "/data/site/previous/marker"]);
+  expect(legacy.status === 0, "site/previous is the moved 0.6.3 folder, marker included");
+  step("the first site-build moved a 0.6.3 /data/dist aside as site/previous");
   expect(
     HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
     "the built home page shows the site name",

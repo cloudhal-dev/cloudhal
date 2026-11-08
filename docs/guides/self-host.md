@@ -20,6 +20,8 @@ docker compose up -d
 
 Studio answers at http://localhost:8787. The first start on the empty volume creates a project from the blog starter (`CLOUDHAL_INIT`, named after `CLOUDHAL_SITE_NAME`) and runs the migrations. It also prints a one-time setup link to the container's logs (`docker compose logs cloudhal`), `http://localhost:8787/login#setup=<token>`. Open it to create the Owner account. Without it sign-up is refused, so nobody who reaches the port first can claim the installation. After that sign-up closes and everyone else joins by invite. To choose the token yourself (for example from a secrets manager), set `CLOUDHAL_SETUP_TOKEN` to a random value of 32 characters or more, using only letters, digits and `- . _ ~` (`openssl rand -hex 32`). The log then shows the link with `<CLOUDHAL_SETUP_TOKEN>` in place of the value. Invites are links: Studio's Team page creates one, shows it once, and you pass it on yourself; a forgotten password is reset with a link an Administrator creates there. Nothing is mailed (see [limits](#limits)).
 
+**Version.** The setup link needs image 0.6.4 or later. With an older image (a `CLOUDHAL_TAG` before 0.6.4, or `latest` until 0.6.4 is released) there is no setup token and the first account that signs up becomes the Owner: keep Studio on this machine (`CLOUDHAL_BIND=127.0.0.1`), do not start the caddy profile on a public host, and create the Owner first.
+
 Agents connect to the MCP endpoint at `<base URL>/mcp` with an agent key made in Studio, as for a Cloudflare deployment ([connect an agent](../agents/clients.md)).
 
 ## Beyond localhost: a public origin
@@ -32,7 +34,7 @@ Studio's sign-in cookies and the API's origin checks are tied to the URL browser
 | `CLOUDHAL_BEHIND_PROXY` | `1` when a reverse proxy terminates TLS in front of the container: each request's scheme and host are then taken from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host`, and the client's address for rate limits from the last `X-Forwarded-For` hop. Requires `CLOUDHAL_BASE_URL`: Studio refuses to start without it. Set it only when the proxy is the only way in, since the headers are then trusted. |
 | `CLOUDHAL_HOST` | The address the server binds inside the container; the image sets `0.0.0.0`. |
 
-With the compose file's **`caddy` profile** both are handled for you: set `CLOUDHAL_BASE_URL` (Studio) and `CLOUDHAL_SITE_URL` (the public site) in `.env`, both `https://` origins, `CLOUDHAL_BEHIND_PROXY=1`, keep `CLOUDHAL_BIND=127.0.0.1`, point both names at the server, download the Caddyfile next to `compose.yml` (without it Docker creates an empty `./Caddyfile/` folder and Caddy cannot start) and run
+With the compose file's **`caddy` profile** both are handled for you: set `CLOUDHAL_BASE_URL` (Studio) and `CLOUDHAL_SITE_URL` (the public site) in `.env`, both `https://` origins, `CLOUDHAL_BEHIND_PROXY=1`, keep `CLOUDHAL_BIND=127.0.0.1`, point both names at the server, download the Caddyfile next to `compose.yml` (without it Docker creates an empty `./Caddyfile/` folder and Caddy cannot start; if that folder already exists, `rmdir Caddyfile` first) and run
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/cloudhal-dev/cloudhal/main/deploy/docker/Caddyfile
@@ -58,7 +60,7 @@ location / {
 }
 ```
 
-Serve `/data/dist` from the volume for the site host. It is the stable path: a real folder with the 0.6.3 image, and from 0.6.4 on a symlink to the newest build, which the server must follow (nginx and Caddy do by default). A build replaces the symlink atomically, so the server never sees it missing.
+Serve `/data/dist` from the volume for the site host. It is the stable path: a real folder with the 0.6.3 image, and from 0.6.4 on a symlink to the newest build, which the server must follow (nginx and Caddy do by default). A build replaces the symlink atomically, so the server never sees it missing — except for a moment on the first build after upgrading from 0.6.3, when the real folder moves aside and the symlink takes its place. A mount point of your own at `/data/dist` cannot be moved: `site-build` refuses it, so serve the volume's `/data/dist` instead.
 
 ## Environment
 
@@ -96,7 +98,7 @@ A one-off `docker compose --env-file … up -d` is not enough: the next command 
 docker compose exec cloudhal site-build
 ```
 
-and Caddy (or your web server) serves `/data/dist` from the volume. `cloudhal build` always writes the project's `dist` folder and empties it first, so `site-build` never runs it in `/data`: it copies the project's files to `/data/.site-build` (its `node_modules` and data folder linked, so the build reads the same database) and builds there. The finished build moves to `/data/site/<build id>`; then `/data/site/current`, `/data/site/previous` and `/data/dist` — symlinks to the newest build, the one before it, and `current` — are each replaced with one rename (`ln -sfn` and `mv -T`, which is atomic). Visitors see the previous build until the new one is complete, never a 404 or a half-written page, and a failed build changes nothing. The build before the current one is kept, and the compose file's Caddyfile serves a hashed asset (`/_astro/*`, `/_cloudhal/*`, `/media/*`) from it when the current build no longer has it, so a page opened before the swap still loads its scripts and media; older builds are removed. Do not run `cloudhal build` in `/data` by hand: it would write through the `dist` symlink and empty the served build. Run `site-build` after each publish; a cron line on the host (`*/15 * * * * cd /path/to/cloudhal && docker compose exec -T cloudhal site-build`) keeps the site at most that far behind (`exec` runs in the running container, so it needs no `COMPOSE_ENV_FILES`). Drafts and scheduled releases show in Studio at once (the editor previews drafts); the public pages change when the next build runs. Signed preview links to unpublished content on the public site belong to the Cloudflare deployment; the container has no preview secret. Rebuilding on publish from inside the container is a follow-up issue; serving the site live from the snapshot, as the Cloudflare deployment does, is an RFC of its own.
+and Caddy (or your web server) serves `/data/dist` from the volume. `cloudhal build` always writes the project's `dist` folder and empties it first, so `site-build` never runs it in `/data`: it copies the project's files to `/data/.site-build` (its `node_modules` and data folder linked, so the build reads the same database) and builds there. The finished build moves to `/data/site/<build id>`; then `/data/site/current`, `/data/site/previous` and `/data/dist` — symlinks to the newest build, the one before it, and `current` — are each replaced with one rename (`ln -sfn` and `mv -T`, which is atomic). Visitors see the previous build until the new one is complete, never a 404 or a half-written page — except for a moment on the first build after upgrading from 0.6.3, when the real `/data/dist` folder moves to `/data/site/legacy-0.6.3` (kept as `previous` for one build) and the symlink takes its place: the container's coreutils cannot swap a folder for a symlink in one step. A failed build changes nothing. The build before the current one is kept, and the compose file's Caddyfile serves a hashed asset (`/_astro/*`, `/_cloudhal/*`, `/media/*`) from it when the current build no longer has it, so a page opened before the swap still loads its scripts and media; older builds are removed. Never run an Astro build inside `/data` by hand (`cloudhal build`, `cloudhal deploy`): it would write through the `dist` symlink and empty the served build. Run `site-build` after each publish; a cron line on the host (`*/15 * * * * cd /path/to/cloudhal && docker compose exec -T cloudhal site-build`) keeps the site at most that far behind (`exec` runs in the running container, so it needs no `COMPOSE_ENV_FILES`). Drafts and scheduled releases show in Studio at once (the editor previews drafts); the public pages change when the next build runs. Signed preview links to unpublished content on the public site belong to the Cloudflare deployment; the container has no preview secret. Rebuilding on publish from inside the container is a follow-up issue; serving the site live from the snapshot, as the Cloudflare deployment does, is an RFC of its own.
 
 **The site's origin.** Canonical links, the sitemap, feeds and structured data need the public origin, which a static build cannot learn from a request. `cloudhal build` takes it from the site's primary domain, kept in `cloudhal.json` as `domains.site` and set with `cloudhal domain set <hostname>` (`docker compose exec cloudhal cloudhal domain set www.example.com`). `site-build` does this for you from `CLOUDHAL_SITE_URL`, an `https://` origin without a path or port, whenever it is set and differs (a name without a dot, such as `localhost`, or an IP address is skipped with a warning, and the build goes on). The domain then becomes the site's primary domain on the live site too, replacing one chosen in Studio. A published snapshot that already names a primary domain keeps it in that build: the new one reaches the pages with the next publish, and `site-build` says so. Without any domain the build's URLs say `localhost`.
 
@@ -114,7 +116,13 @@ docker compose pull && docker compose up -d
 
 Database migrations run when the container starts, as they do on every `cloudhal studio` start. Going back to an older image over a newer database is not supported: take a backup first.
 
-**From the compose files of 0.6.3.** The compose file now names the volume `cloudhal-data` outright, where the earlier file left the name to compose (`<project>_cloudhal-data`; [issue #166](https://github.com/cloudhal-dev/cloudhal/issues/166)). Before anything else, set `CLOUDHAL_VOLUME=<project>_cloudhal-data` in `.env` to keep your volume (see [backup and restore](#backup-and-restore)): without it `docker compose up` creates an empty `cloudhal-data` and starts a fresh site next to your data. Then download the new files next to `.env` (the Caddyfile only for the caddy profile) and pull:
+**From the compose files of 0.6.3.** The compose file now names the volume `cloudhal-data` outright, where the earlier file left the name to compose (`<project>_cloudhal-data`; [issue #166](https://github.com/cloudhal-dev/cloudhal/issues/166)). In this order:
+
+1. **Keep your volume.** Set `CLOUDHAL_VOLUME=<project>_cloudhal-data` in `.env` (see [backup and restore](#backup-and-restore)). Without it `docker compose up` creates an empty `cloudhal-data` and starts a fresh site next to your data.
+2. **Fix two values a 0.6.3 `.env` carries**, before anything starts:
+   - `CLOUDHAL_BASE_URL=http://localhost:8787`: behind a proxy, set the public origin. The new entrypoint refuses `CLOUDHAL_BEHIND_PROXY=1` with a localhost base URL, and the container would restart in a loop.
+   - `CLOUDHAL_SITE_URL=https://www.example.com`: set the site's origin, or leave it empty (`site-build` refuses to make an example domain the site's).
+3. **Download the new files** next to `.env`: `compose.yml`, the `Caddyfile` for the caddy profile (an old one keeps working, but the previous-build fallback for hashed assets needs the new one; if `./Caddyfile/` is a folder, `rmdir Caddyfile` first), and `.env.example` to compare with your `.env` (saved as `.env.example`, never over `.env`):
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/cloudhal-dev/cloudhal/main/deploy/docker/compose.yml
@@ -125,18 +133,23 @@ curl -fsSLO https://raw.githubusercontent.com/cloudhal-dev/cloudhal/main/deploy/
 ```
 
 ```bash
+curl -fsSLO https://raw.githubusercontent.com/cloudhal-dev/cloudhal/main/deploy/docker/.env.example
+```
+
+4. **Pull and check the image.** This check never touches the named volume:
+
+```bash
 docker compose pull
 ```
 
-The new files need the 0.6.4 image or later. Check the image you pulled before starting it; this form mounts no volume, so it cannot create an empty one (use your `CLOUDHAL_TAG`):
-
 ```bash
-docker run --rm --entrypoint grep ghcr.io/cloudhal-dev/cloudhal:0.6 -c site/current /opt/cloudhal/bin/site-build
+docker run --rm --entrypoint grep "$(docker compose config --images | grep cloudhal-dev/cloudhal)" -c site/current /opt/cloudhal/bin/site-build
 ```
 
-A number above 0 means the new `site-build`. Then start the stack as usual (`docker compose up -d`, or `docker compose --profile caddy up -d`).
+   A number above 0 means 0.6.4 or later. A 0 means the image is still 0.6.3 (0.6.4 is not on your tag yet): the new files work with it too, `/data/dist` stays a real folder, and the layout changes with the first build of a 0.6.4 image.
+5. **Start the stack** as usual (`docker compose up -d`, or `docker compose --profile caddy up -d`).
 
-The site stays at `/data/dist` throughout: the 0.6.3 `site-build` wrote a real folder there, and the first build of 0.6.4 moves it aside and puts the symlink in its place, so an old Caddyfile or an nginx root of `/data/dist` keeps working. A `.env` from 0.6.3 also sets `CLOUDHAL_SITE_URL` to the placeholder `https://www.example.com` — replace it with the site's origin, or leave it empty (`site-build` refuses to make an example domain the site's) — and `CLOUDHAL_BASE_URL=http://localhost:8787`, which the image refuses behind a proxy: set the public origin there.
+The site stays at `/data/dist` throughout. The 0.6.3 `site-build` wrote a real folder there. The first build of 0.6.4 moves it to `/data/site/legacy-0.6.3`, kept as `previous` for one build, and puts the symlink in its place: `/data/dist` is missing only between those two renames. An old Caddyfile or an nginx root of `/data/dist` keeps working.
 
 ## Backup and restore
 

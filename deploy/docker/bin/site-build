@@ -10,10 +10,13 @@
 # symlinks, so the build reads the same store) and the site is built there. Only a finished build
 # is published: it moves to /data/site/<build id>, then `current`, `previous` and `dist` are each
 # replaced with one rename (`ln -sfn` + `mv -T`), which is atomic. Visitors see the previous build
-# until the new one is complete, never a 404 or a half-written page; a failed build changes
-# nothing. The build before the current one is kept (pages opened from it still load their hashed
-# assets, which the Caddyfile serves from `previous`); older ones are removed. Do not run
-# `cloudhal build` in /data by hand: it would empty the served build through the `dist` symlink.
+# until the new one is complete, never a 404 or a half-written page — except for a moment on the
+# first build after upgrading from 0.6.3, when the real /data/dist folder is moved aside and the
+# symlink takes its place (two renames; bookworm's coreutils has no `mv --exchange`). A failed
+# build changes nothing. The build before the current one is kept (pages opened from it still load
+# their hashed assets, which the Caddyfile serves from `previous`); older ones are removed; the
+# 0.6.3 folder is kept as `site/legacy-0.6.3` for one build. Never run an Astro build in /data by
+# hand (`cloudhal build`, `cloudhal deploy`): it would empty the served build through the symlink.
 #
 # The snapshot is the published one, else the latest: before the first publish the site is built
 # from the latest snapshot (RFC-0043's `cloudhal build --published` is not in this version). The
@@ -32,6 +35,28 @@ if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
   exit 1
 fi
 [ -e node_modules ] || ln -s /opt/cloudhal/node_modules node_modules
+
+# Preflight, before anything is written. A real /data/dist folder is the 0.6.3 layout: it moves
+# aside on publish. A mount point there (a host bind mount) cannot be moved: refuse, rather than
+# fail after every build and leave a new one behind each time.
+legacy=""
+if [ -d dist ] && [ ! -L dist ]; then
+  if command -v mountpoint >/dev/null 2>&1; then
+    if mountpoint -q dist; then legacy=mount; fi
+  elif [ "$(stat -c %d dist)" != "$(stat -c %d .)" ]; then
+    legacy=mount
+  fi
+  if [ "$legacy" = mount ]; then
+    echo "site-build: /data/dist is a mount point; site-build publishes it as a symlink to /data/site/current. Remove that mount and serve /data/dist (or /data/site/current) from the volume instead" >&2
+    exit 1
+  fi
+  legacy=0.6.3
+fi
+# Temporary links an interrupted run left behind (the prune below handles folders only).
+find . -maxdepth 1 -type l -name 'dist.*' -exec rm -f {} +
+if [ -d site ]; then
+  find site -maxdepth 1 -type l \( -name 'current.*' -o -name 'previous.*' \) -exec rm -f {} +
+fi
 
 # The public origin for canonical links, the sitemap and feeds is the site's primary domain, kept
 # in cloudhal.json as `domains.site` (`cloudhal domain set <hostname>`). CLOUDHAL_SITE_URL — the
@@ -103,15 +128,20 @@ id="$(date -u +%Y%m%dT%H%M%SZ).$$"
 mkdir -p site
 mv "$stage/dist" "site/$id"
 prev=$(readlink site/current 2>/dev/null || true)
+# The 0.6.3 folder becomes `previous`, so its pages' assets keep loading for one more build.
+if [ "$legacy" = 0.6.3 ]; then prev="legacy-0.6.3"; fi
 ln -sfn "$id" "site/current.$$"
 mv -T "site/current.$$" site/current
 if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
   ln -sfn "$prev" "site/previous.$$"
   mv -T "site/previous.$$" site/previous
 fi
-# /data/dist, the stable served path. A 0.6.3 volume has a real directory there: it moves aside
-# once (two renames), and every later build only replaces the symlink.
-if [ -d dist ] && [ ! -L dist ]; then mv dist "site/0.6.3-dist.$$"; fi
+# /data/dist, the stable served path. A 0.6.3 volume has a real folder there: it moves aside once
+# (two renames, the one moment it is missing), and every later build only replaces the symlink.
+if [ "$legacy" = 0.6.3 ]; then
+  rm -rf site/legacy-0.6.3
+  mv dist site/legacy-0.6.3
+fi
 ln -sfn site/current "dist.$$"
 mv -T "dist.$$" dist
 # Builds that neither `current` nor `previous` points at.

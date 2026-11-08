@@ -78,6 +78,14 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
+      # The compose file's Caddyfile, in the Caddy the compose file runs (a few seconds).
+      - name: Validate the Caddyfile
+        run: |
+          docker run --rm \
+            -e CLOUDHAL_BASE_URL=https://studio.example.com \
+            -e CLOUDHAL_SITE_URL=https://www.example.com \
+            -v "$PWD/deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2.11 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Check the version
         if: env.VERSION != ''
         run: |
