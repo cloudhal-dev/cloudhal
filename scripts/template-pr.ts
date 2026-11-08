@@ -1,6 +1,7 @@
 /**
  * The text of the cloudhal-template PR that scripts/template-sync.ts writes for
- * .github/workflows/template-sync.yml (issue #111): what moved, what to read, what must pass.
+ * .github/workflows/template-sync.yml, or for a hand run of the script (issue #111): what moved,
+ * what to read, what must pass, and who opened it.
  * A pure function over scripts/template-plan.ts's operations; Node built-ins only.
  */
 import type { DepChange, SyncOp } from "./template-plan.ts";
@@ -11,7 +12,7 @@ export interface PrBodyOptions {
   readonly from: string | undefined;
   readonly to: string;
   readonly deps?: readonly DepChange[] | undefined;
-  /** The workflow run that opened the PR. */
+  /** The workflow run that opened the PR; undefined when the script ran by hand. */
   readonly runUrl?: string | undefined;
 }
 
@@ -69,9 +70,11 @@ export function prBody(o: PrBodyOptions): string {
     "",
     "### Before merging",
     "",
-    "The `cloudhal/template-check` status must be green: the Template sync run installed a copy of this branch with `npm ci` and ran `cloudhal deploy --dry-run` with `WORKERS_CI=1`. Merging changes what the Deploy to Cloudflare button deploys from now on; sites created earlier keep their theme.",
+    `The \`cloudhal/template-check\` status must be green: ${o.runUrl ? "the Template sync run" : "whoever synced by hand"} installed a copy of this branch with \`npm ci\` and ran \`cloudhal deploy --dry-run\` with \`WORKERS_CI=1\`. Merging changes what the Deploy to Cloudflare button deploys from now on; sites created earlier keep their theme.`,
     "",
-    `Opened by the Cloudhal release workflow${o.runUrl ? ` ([run](${o.runUrl}))` : ""}. Do not push to this branch: a re-run of Template sync rebuilds it from \`main\` and replaces it.`,
+    o.runUrl
+      ? `Opened by the Cloudhal release workflow ([run](${o.runUrl})). Do not push to this branch: a re-run of Template sync rebuilds it from \`main\` and replaces it.`
+      : "Opened by hand with `scripts/template-sync.ts` (CONTRIBUTING.md, Releasing), not by the Template sync workflow. Do not push to this branch: a run of Template sync rebuilds it from `main` and replaces it.",
     "",
   ].join("\n");
 }

@@ -526,6 +526,14 @@ describe("PR body", () => {
     expect(body).toContain("Do not push to this branch");
   });
 
+  it("says who opened it: the workflow run, or a hand run of the script", () => {
+    const byHand = prBody({ ops: [], from: "0.6.0", to: "0.6.3" });
+    expect(byHand).toContain("Opened by hand with `scripts/template-sync.ts`");
+    expect(byHand).toContain("whoever synced by hand installed a copy of this branch");
+    expect(byHand).not.toContain("release workflow");
+    expect(byHand).toContain("None: dependencies and the lockfile only.");
+  });
+
   it("caps each path list at 50", () => {
     const ops = Array.from({ length: 60 }, (_, i) =>
       write(`src/f${String(i).padStart(2, "0")}.css`),

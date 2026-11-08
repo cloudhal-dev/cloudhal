@@ -1,7 +1,8 @@
 /**
  * Moves cloudhal-template (the Deploy to Cloudflare button) to a Cloudhal release, issue #111.
  * .github/workflows/template-sync.yml runs it after each npm publish, then refreshes the
- * lockfile and opens the PR; scripts/template-plan.ts has the rules.
+ * lockfile and opens the PR; scripts/template-plan.ts has the rules. Without the workflow's
+ * GitHub App it runs by hand from a checkout, the same two commands (CONTRIBUTING.md, Releasing).
  *
  *   node scripts/template-sync.ts --template <dir> --version <x.y.z>
  *     [--starter <dir>] [--wait <seconds>] [--summary <file>] [--check] [--allow-downgrade]
