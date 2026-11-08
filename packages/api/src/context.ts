@@ -14,6 +14,7 @@ import type { CommentsDeps } from "@cloudhal/mcp-server/comments";
 import type { SchedulesDeps } from "@cloudhal/mcp-server/schedules";
 import type { MediaToolOptions, RenderDeps } from "@cloudhal/mcp-server/tools";
 import type { Context } from "hono";
+import type { OauthServer } from "./auth/types.ts";
 import type { AgentKeyService, StaffService } from "./auth.ts";
 import type { BuildHub } from "./build.ts";
 import type { MailSender } from "./mail.ts";
@@ -73,6 +74,12 @@ export interface ApiDeps {
   readonly signUp?: "first-user" | "closed" | "open";
   /** Mounts `/api/agent-keys` (create/list/delete API keys for agents). */
   readonly agentKeys?: AgentKeyService;
+  /**
+   * RFC-0044 Phase 2: the OAuth authorization server (`CloudhalAuth.oauth`). Mounts its RFC 8414
+   * metadata at the well-known paths, Studio's consent API and `/api/agent-grants`. Set
+   * `mcp.oauth` from the same issuer and resource so discovery points at it.
+   */
+  readonly oauthServer?: OauthServer | undefined;
   /** Extra fetch handler mounted at `/api/auth/*` (Better Auth). */
   readonly authHandler?: (request: Request) => Promise<Response>;
   /**

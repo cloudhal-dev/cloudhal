@@ -209,6 +209,7 @@ export function memberRoutes(options: {
       // 2. sessions, 3. keys, 4. their pending invites, 5. their agents' pending requests
       await staff.revokeSessions(target.userId);
       const keysDisabled = await staff.store.disableKeysOf(target.userId);
+      await staff.store.revokeGrantsOf(target.userId); // RFC-0044: their OAuth connections too
       const invitesCanceled = await staff.store.cancelInvitesBy(target.userId, person.userId);
       const agents = await staff.store.agentsOf(target.userId);
       const requestsDenied =

@@ -58,11 +58,16 @@ const DENY: readonly (readonly [string, string, PlaygroundBlock])[] = [
   ["ALL", "/api/invites/*", "people"],
   ["ALL", "/api/agent-keys", "keys"],
   ["ALL", "/api/agent-keys/*", "keys"],
+  // RFC-0044 Decision 10: the playground stays out of OAuth.
+  ["ALL", "/api/agent-grants", "keys"],
+  ["ALL", "/api/agent-grants/*", "keys"],
   ["ALL", "/mcp", "mcp"],
   // RFC-0044 decision 10: a playground has one fixed principal and no authorization server, so
   // its MCP never speaks OAuth discovery (the documents are only mounted with `mcp.oauth`).
   ["GET", "/.well-known/oauth-protected-resource", "mcp"],
   ["GET", "/.well-known/oauth-protected-resource/mcp", "mcp"],
+  ["GET", "/.well-known/oauth-authorization-server", "mcp"],
+  ["GET", "/.well-known/oauth-authorization-server/api/auth", "mcp"],
   ["ALL", `${S}/approvals`, "agent"],
   ["ALL", `${S}/approvals/*`, "agent"],
   ["ALL", `${S}/ai/*`, "agent"],

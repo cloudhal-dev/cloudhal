@@ -534,6 +534,7 @@ describe("instance and skills", () => {
       features: {
         agentKeys: false,
         mcp: true,
+        mcpOauth: false,
         activity: false,
         previewLinks: false,
         deployTransfer: false,

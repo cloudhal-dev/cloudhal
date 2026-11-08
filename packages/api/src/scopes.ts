@@ -44,6 +44,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // never sees them, but every mounted route is declared).
   ["GET", "/.well-known/oauth-protected-resource", "public"],
   ["GET", "/.well-known/oauth-protected-resource/mcp", "public"],
+  // RFC-0044 §2: authorization server metadata (served only with `oauthServer`).
+  ["GET", "/.well-known/oauth-authorization-server", "public"],
+  ["GET", "/.well-known/oauth-authorization-server/api/auth", "public"],
   ["GET", "/api/me", "signed-in"],
 
   // operator (deployment token)
@@ -110,6 +113,11 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["DELETE", "/api/agent-keys/:id", "member"],
   ["POST", "/api/agent-keys/:id/elevation", "member"],
   ["DELETE", "/api/agent-keys/:id/elevation", "member"],
+  // RFC-0044 §4: OAuth connections (consent screen, list, revoke).
+  ["GET", "/api/agent-grants/consent", "member"],
+  ["POST", "/api/agent-grants/consent", "member"],
+  ["GET", "/api/agent-grants", "member"],
+  ["DELETE", "/api/agent-grants/:id", "member"],
 
   // members, invites, password resets (RFC-0005 §10.1)
   ["GET", "/api/members", "member"],

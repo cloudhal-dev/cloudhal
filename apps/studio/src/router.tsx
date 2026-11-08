@@ -79,6 +79,10 @@ const CommenterPage = lazyRouteComponent(
   "CommenterPage",
 );
 const LoginPage = lazyRouteComponent(() => import("./routes/LoginPage.tsx"), "LoginPage");
+const OAuthConsentPage = lazyRouteComponent(
+  () => withMessages(import("./routes/OAuthConsentPage.tsx"), ["oauthConsent"]),
+  "OAuthConsentPage",
+);
 const InvitePage = lazyRouteComponent(() => import("./routes/InvitePage.tsx"), "InvitePage");
 const ResetPasswordPage = lazyRouteComponent(
   () => import("./routes/ResetPasswordPage.tsx"),
@@ -235,6 +239,12 @@ const accountRoute = createRoute({
   id: "account",
   beforeLoad: requireSession,
   component: AccountShell,
+});
+/** RFC-0044 §4: an MCP client's authorization request, after sign-in (the provider sends it here). */
+const oauthConsentRoute = createRoute({
+  getParentRoute: () => accountRoute,
+  path: "/oauth/consent",
+  component: OAuthConsentPage,
 });
 const sitesRoute = createRoute({
   getParentRoute: () => accountRoute,
@@ -525,6 +535,7 @@ const routeTree = rootRoute.addChildren([
   forgotPasswordRoute,
   indexRoute,
   accountRoute.addChildren([
+    oauthConsentRoute,
     sitesRoute,
     projectRoute,
     agentsRoute,

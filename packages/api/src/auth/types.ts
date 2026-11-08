@@ -9,6 +9,8 @@ import type { SqlDriver } from "@cloudhal/storage";
 import type { Auth } from "better-auth";
 import type { ActorResolver, PrincipalResolver } from "../context.ts";
 import type { StaffStore } from "../staff.ts";
+import type { AgentGrantService } from "./agent-grants.ts";
+import type { AuthLog, McpOauthServerOptions } from "./oauth.ts";
 
 export interface AuthOptions {
   /** better-sqlite3 `Database`, `node:sqlite` `DatabaseSync`, or a Cloudflare `D1Database` binding. */
@@ -64,6 +66,15 @@ export interface AuthOptions {
   };
   /** Clock for time-boxed elevations and invites (tests). */
   readonly now?: () => Date;
+  /**
+   * RFC-0044 Phase 2: run the OAuth 2.1 authorization server for remote MCP clients. Its issuer is
+   * `baseURL`'s origin plus `/api/auth`, so `baseURL` must be the stable public origin (on Node,
+   * `cloudhal studio --base-url`); `resource` is the `/mcp` URL tokens are bound to. Unset, the
+   * deployment has no authorization server and `/mcp` takes keys and sessions only.
+   */
+  readonly mcpOauth?: McpOauthServerOptions | undefined;
+  /** Where Better Auth's log lines go (default: the console, errors and warnings only). */
+  readonly log?: AuthLog | undefined;
   /** Requests one API key may make per window (default 600 per minute); see `resolvePrincipal`. */
   readonly agentKeyRateLimit?: { readonly windowMs: number; readonly max: number };
 }
@@ -130,6 +141,31 @@ export interface CloudhalAuth {
   readonly staff: StaffService;
   /** The underlying Better Auth instance (server API: `auth.api.*`). */
   readonly instance: Auth;
+  /**
+   * RFC-0044 Phase 2, with `AuthOptions.mcpOauth`: the authorization server. Pass it to
+   * `createApi` as `oauthServer` and its `issuer`/`resource` as `mcp.oauth`.
+   */
+  readonly oauth?: OauthServer | undefined;
+}
+
+/** What `createApi` needs of the authorization server (RFC-0044 §2, §4). */
+export interface OauthServer {
+  readonly issuer: string;
+  readonly resource: string;
+  readonly grants: AgentGrantService;
+  /** The RFC 8414 authorization server metadata document. */
+  readonly metadata: () => Promise<Record<string, unknown>>;
+  /**
+   * Server-side only (no HTTP route): a pre-registered public client, created as the signed-in
+   * member `headers` belong to. Phase 2 uses it in tests; Phase 3 adds CIMD, DCR and a CLI.
+   */
+  readonly createClient: (input: OauthClientInput) => Promise<{ clientId: string }>;
+}
+
+export interface OauthClientInput {
+  readonly headers: Headers;
+  readonly name: string;
+  readonly redirectUris: readonly string[];
 }
 
 export interface AgentKeySummary {

@@ -21,7 +21,7 @@ Sprint 5 makes Cloudhal usable *by agents*: an MCP client must be able to create
 |---|---|---|---|
 | Register tools directly with the SDK (zod schemas) | Less code | Policy/audit/tests tied to SDK types; zod in our tree despite ADR-0001 | Contract schemas already exist; `fromJsonSchema` reuses them |
 | Approval only via `confirmToken` | Works everywhere | The agent sees the token; relies on the host to involve a human | Elicitation is the first-class path; token is the documented fallback (ADR-0004) |
-| OAuth 2.1 (`@better-auth/mcp` + CIMD) now | Spec-aligned remote auth | Much larger surface; not needed for local/CI agents | Sprint 6; API keys cover agents today |
+| OAuth 2.1 (`@better-auth/mcp` + CIMD) now | Spec-aligned remote auth | Much larger surface; not needed for local/CI agents | Sprint 6; API keys cover agents today. **Done (2026-11-09):** RFC-0044 Phase 1 (discovery) and Phase 2 (authorization server, [ADR-0045](0045-mcp-authorization-server.md)); a token resolves to the same `Principal` a key does, so §5–6 still hold for keys |
 | Durable Object / sessionful server | Server-initiated elicitation works for legacy clients | Deprecated pattern; session affinity | Stateless per ADR-0004 |
 
 ## Consequences

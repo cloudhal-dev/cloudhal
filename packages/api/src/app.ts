@@ -13,6 +13,7 @@ import { type BuildHub, createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler } from "./errors.ts";
 import { mountMcp } from "./mcp-mount.ts";
+import { fencedOauthPath, mountOauthServer } from "./oauth-server.ts";
 import { PLAYGROUND_PRINCIPAL, playgroundGuard } from "./playground.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { mountAdmin } from "./routes/admin-mount.ts";
@@ -152,33 +153,17 @@ export function createApi(deps: ApiDeps) {
     });
   }
 
-  // CSRF: state-changing requests that may carry a session cookie must come from this origin (or a
-  // trusted one). Better Auth checks its own routes; /api/admin uses a bearer token, not cookies.
   // RFC-0020 §6: page changes for Studio's Build view (MCP tools and Studio saves report here).
   const build = deps.build ?? createBuildHub(deps.now);
   const trusted = new Set(deps.trustedOrigins ?? []);
-  app.use("/api/*", async (c, next) => {
-    const method = c.req.method;
-    const path = new URL(c.req.url).pathname;
-    if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
-    if (path.startsWith("/api/auth/") || path.startsWith("/api/admin/")) return next();
-    const origin = c.req.header("origin");
-    const own = new URL(c.req.url).origin;
-    const fetchSite = c.req.header("sec-fetch-site");
-    const ok =
-      origin !== undefined
-        ? origin === own || trusted.has(origin)
-        : fetchSite === undefined || fetchSite === "same-origin" || fetchSite === "none";
-    if (!ok) return c.json({ error: "forbidden", message: "cross-origin request refused" }, 403);
-    await next();
-  });
+  app.use("/api/*", csrfGuard(trusted)); // CSRF for cookie-carrying writes
 
   const shared: SharedContext = { build, ownership, policy, defer, clock, uploadSecret, schedules };
   app.use("*", async (c, next) => {
     setContext(c, deps, shared);
     // The fenced Better Auth endpoints never reach credential resolution.
     // Raw and decoded: whichever form Better Auth or Hono would dispatch on is fenced.
-    if (FENCED_AUTH_PATHS.test(new URL(c.req.url).pathname) || FENCED_AUTH_PATHS.test(c.req.path))
+    if (fencedAuthPath(new URL(c.req.url).pathname) || fencedAuthPath(c.req.path))
       return c.json({ error: "not_found", message: "not found" }, 404);
     const principal = await resolvePrincipal(c, deps);
     c.set("principal", principal);
@@ -211,6 +196,8 @@ export function createApi(deps: ApiDeps) {
   if (deps.mcp) mountMcp(app, { ...deps, mcp: deps.mcp }, { build, ownership, schedules });
 
   if (deps.agentKeys) app.route("/api/agent-keys", agentKeys(deps.agentKeys));
+  // RFC-0044 Phase 2: the authorization server's metadata, consent and connections.
+  if (deps.oauthServer) mountOauthServer(app, deps.oauthServer);
 
   app.route(
     "/api",
@@ -220,6 +207,7 @@ export function createApi(deps: ApiDeps) {
         features: {
           agentKeys: Boolean(deps.agentKeys),
           mcp: Boolean(deps.mcp),
+          mcpOauth: Boolean(deps.oauthServer && deps.mcp?.oauth),
           activity: Boolean(deps.audit ?? deps.mcp?.audit),
           previewLinks: Boolean(deps.preview),
           deployTransfer: Boolean(deps.admin) && problems.length === 0,
@@ -278,6 +266,33 @@ export function createApi(deps: ApiDeps) {
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),
   );
   return app;
+}
+
+/** Better Auth paths HTTP callers never reach (raw and decoded forms are both checked). */
+function fencedAuthPath(path: string): boolean {
+  return FENCED_AUTH_PATHS.test(path) || fencedOauthPath(path);
+}
+
+/**
+ * CSRF: state-changing requests that may carry a session cookie must come from this origin (or a
+ * trusted one). Better Auth checks its own routes; /api/admin uses a bearer token, not cookies.
+ */
+function csrfGuard(trusted: ReadonlySet<string>) {
+  return async (c: Context<Env>, next: () => Promise<void>) => {
+    const method = c.req.method;
+    const path = new URL(c.req.url).pathname;
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS") return next();
+    if (path.startsWith("/api/auth/") || path.startsWith("/api/admin/")) return next();
+    const origin = c.req.header("origin");
+    const own = new URL(c.req.url).origin;
+    const fetchSite = c.req.header("sec-fetch-site");
+    const ok =
+      origin !== undefined
+        ? origin === own || trusted.has(origin)
+        : fetchSite === undefined || fetchSite === "same-origin" || fetchSite === "none";
+    if (!ok) return c.json({ error: "forbidden", message: "cross-origin request refused" }, 403);
+    await next();
+  };
 }
 
 /** What `createApi` builds once and every request reads next to its `ApiDeps`. */

@@ -304,7 +304,7 @@
       "params": 5
     },
     "packages/api/src/app.ts::createApi": {
-      "lines": 173
+      "lines": 160
     },
     "packages/api/src/build-turn.ts::runBuildTurn": {
       "lines": 260
@@ -370,10 +370,10 @@
       "params": 5
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
-      "lines": 272
+      "lines": 262
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker>fetch": {
-      "lines": 209
+      "lines": 199
     },
     "packages/comments/src/client/comments.browser.js::enhance": {
       "lines": 205

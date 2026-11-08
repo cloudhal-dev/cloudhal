@@ -55,10 +55,27 @@ export function takeSetupToken(): string | undefined {
   }
 }
 
+/**
+ * RFC-0044 §4: an MCP client's authorization request sends a signed-out member here with the
+ * provider's signed request as the query string (`client_id`, …, `sig`). Signing in posts it
+ * along (`oauth_query`), and the provider answers where to go next: the consent screen.
+ */
+export function oauthRequest(): string | undefined {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    return params.has("sig") && params.has("client_id")
+      ? window.location.search.slice(1)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function LoginPage() {
   const t = useT();
   const navigate = useNavigate();
   const [setupToken] = useState(takeSetupToken);
+  const [authorization] = useState(oauthRequest);
   const [mode, setMode] = useState<"signin" | "signup">(setupToken ? "signup" : "signin");
   useEffect(() => {
     if (setupToken) setMode("signup");
@@ -79,7 +96,11 @@ export function LoginPage() {
             { name, email, password },
             setupToken ? { headers: { "x-cloudhal-setup-token": setupToken } } : undefined,
           )
-        : await authClient.signIn.email({ email, password });
+        : await authClient.signIn.email({
+            email,
+            password,
+            ...(authorization ? { oauth_query: authorization } : {}),
+          } as { email: string; password: string });
     setBusy(false);
     if (result.error) {
       setError(result.error.message ?? t("auth.failed"));
@@ -89,6 +110,11 @@ export function LoginPage() {
       sessionStorage.removeItem(SETUP_KEY);
     } catch {
       // storage unavailable
+    }
+    const next = (result.data as { url?: unknown } | null)?.url;
+    if (authorization && typeof next === "string") {
+      window.location.assign(next);
+      return;
     }
     await navigate({ to: "/sites" });
   }

@@ -2,6 +2,7 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { AiStore, type CloudhalApi, createApi, restTransport } from "@cloudhal/api";
+import { mcpOauthFor, type OauthServer } from "@cloudhal/api/auth";
 import { CLIENT_ADDRESS_HEADER, serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
@@ -36,7 +37,7 @@ import {
 
 export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
   readonly projectDir: string;
-  /** Progress lines (the first-run scaffold); default: nothing. */
+  /** Progress lines (the first-run scaffold, why OAuth is off); default: nothing. */
   readonly log?: (line: string) => void;
   /** Directory of a built Studio (`apps/studio/dist`). Defaults to the monorepo build when present. */
   readonly studioDist?: string;
@@ -168,6 +169,8 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     },
   };
   let firstOwner: SetupToken | undefined;
+  // RFC-0044 §10: the issuer is the public base URL; without one, OAuth stays off.
+  const oauth = mcpOauthFor(server.baseUrl, env.CLOUDHAL_MCP_OAUTH);
   if (setup) {
     const { createAuthFor } = await import("@cloudhal/api/auth/node");
     const auth = await createAuthFor({
@@ -179,6 +182,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
       trustRequestOrigin: origins.trustRequestOrigin,
       setupToken: setup.token,
       originCheck: options.authOriginCheck,
+      ...oauthOption(oauth),
     });
     deps = {
       ...deps,
@@ -188,6 +192,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
       agentKeys: auth.agentKeys,
       staff: auth.staff,
       signUp: auth.signUp,
+      ...withOauthServer(auth.oauth, deps.mcp),
     };
     // RFC-0005 §7, #165: until somebody has an account, the first sign-up needs the token.
     if (!(await hasAccounts(local.sql))) firstOwner = setup;
@@ -202,6 +207,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
   });
   const url = studioUrl(server, listening.port);
   const warning = noBaseUrlWarning(server);
+  logOauthOff(options.log, setup ? oauth : undefined);
   return {
     url,
     port: listening.port,
@@ -215,6 +221,32 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
       await new Promise<void>((resolve) => listening.server.close(() => resolve()));
       await local.close();
     },
+  };
+}
+
+/** Logs why remote MCP clients cannot connect by URL (RFC-0044 §10); nothing when they can. */
+function logOauthOff(
+  log: ((line: string) => void) | undefined,
+  oauth: ReturnType<typeof mcpOauthFor> | undefined,
+): void {
+  if (oauth && "off" in oauth)
+    log?.(`OAuth for remote MCP clients is off: ${oauth.off}. Agent keys still work.`);
+}
+
+/** `createAuthFor`'s `mcpOauth` when the authorization server runs. */
+function oauthOption(oauth: ReturnType<typeof mcpOauthFor>) {
+  return "mcpOauth" in oauth ? { mcpOauth: oauth.mcpOauth } : {};
+}
+
+/** RFC-0044 Phase 2: remote MCP clients connect by URL; discovery names this issuer. */
+function withOauthServer(
+  server: OauthServer | undefined,
+  mcp: Parameters<typeof createApi>[0]["mcp"],
+): Partial<Parameters<typeof createApi>[0]> {
+  if (!server || !mcp) return {};
+  return {
+    oauthServer: server,
+    mcp: { ...mcp, oauth: { issuer: server.issuer, resource: server.resource } },
   };
 }
 

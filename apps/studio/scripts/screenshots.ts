@@ -232,7 +232,9 @@ async function shoot(opts: Options, width: number): Promise<string[]> {
         result?: { data?: string };
       };
       const tag = `${opts.scheme ? `_${opts.scheme}` : ""}${opts.locale ? `_${opts.locale}` : ""}${opts.pseudo ? (opts.pseudo === "rtl" ? "_pseudo-rtl" : "_pseudo") : ""}`;
-      const name = `${p.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}${action ? "_action" : ""}${tag}_${width}.png`;
+      // The path names the file; a query string (e.g. `/oauth/consent`'s signed request) does not.
+      const bare = p.split("?")[0] ?? p;
+      const name = `${bare.replace(/[^a-z0-9]+/gi, "_").replace(/^_|_$/g, "") || "root"}${action ? "_action" : ""}${tag}_${width}.png`;
       const file = path.join(opts.out, name);
       writeFileSync(file, Buffer.from(shot.result?.data ?? "", "base64"));
       const notes = [

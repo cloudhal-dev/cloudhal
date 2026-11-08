@@ -76,6 +76,8 @@ export const ROUTE_TEMPLATES: Record<string, Template> = {
   "routes/CommenterPage.tsx": "editor",
   "routes/AssetPage.tsx": "editor",
   "routes/LoginPage.tsx": "auth",
+  // RFC-0044 §4: an MCP client's authorization request, approved or denied by the member.
+  "routes/OAuthConsentPage.tsx": "consent",
   "routes/MembersPage.tsx": "list",
   "routes/InvitePage.tsx": "token",
   "routes/ResetPasswordPage.tsx": "token",
@@ -100,6 +102,7 @@ export type Template =
   | "auth"
   | "token"
   | "recover"
+  | "consent"
   | "shell";
 
 /** What each template must be composed from (names must appear in the file). DESIGN.md §2a–2f. */
@@ -141,6 +144,9 @@ export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
   // `/forgot-password` (RFC-0011, DESIGN.md §2r): the auth frame, one email field, the neutral
   // answer as a Banner, the way back to sign in.
   recover: ["AuthLayout", "Input", "Button", "Banner", "LinkButton"],
+  // OAuth consent (RFC-0044 §4, DESIGN.md §2): a narrow `PageLayout` of `SectionCard`s (who
+  // asks, the scopes as checkboxes, the mode picker) with Approve and Deny in the last footer.
+  consent: ["PageLayout", "title=", "SectionCard", "Checkbox.Group", "ModePicker", "Button"],
   shell: ["AppFrame", "Sidebar.Group", "Sidebar.MenuButton", "SidebarSwitcher"],
 };
 
