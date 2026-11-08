@@ -1,0 +1,17 @@
+# CodeQL analysis configuration (.github/workflows/codeql.yml).
+#
+# Everything generated or not hand-written is left out, so findings point at code someone can fix
+# here: the JSON Schema → TypeScript/Rust output (AGENTS.md "Never edit generated files"), the
+# i18n parameter types and loaders, golden fixtures, build output and the vendored test archives.
+name: Cloudhal
+
+paths-ignore:
+  - "**/generated/**"
+  - "**/dist/**"
+  - "**/node_modules/**"
+  - "**/fixtures/**"
+  - "**/__snapshots__/**"
+  - apps/studio/src/i18n/loaders/**
+  - target/**
+  - .i18n/**
+  - "**/*.min.js"

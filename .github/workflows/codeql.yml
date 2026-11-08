@@ -1,0 +1,60 @@
+name: CodeQL
+
+# Code scanning (GitHub Advanced Security, free on public repositories): CodeQL analyses the
+# TypeScript/JavaScript packages, the Rust crates and the workflow files themselves on every pull
+# request, on every push to main and once a week, and uploads the results to Security › Code
+# scanning. Rust uses `build-mode: none` (the extractor needs no build; rustup and cargo on the
+# runner are enough). .github/codeql/codeql-config.yml excludes generated code, fixtures and build
+# output so findings land in hand-written code only.
+#
+# Actions are pinned to commit SHAs with the version in a comment (as release.yml does); Dependabot
+# updates the SHA and the comment together.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Monday 05:17 UTC, before the working day in Europe.
+    - cron: "17 5 * * 1"
+
+permissions: {}
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+      # Only private repositories need these (to fetch internal CodeQL packs and workflow data).
+      packages: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: rust
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:${{ matrix.language }}"
