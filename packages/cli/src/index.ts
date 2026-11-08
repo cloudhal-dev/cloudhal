@@ -62,7 +62,8 @@ export {
   schedulesStatus,
 } from "./commands/schedules.ts";
 export { resolveBuildSnapshot, type SnapshotOptions, snapshot } from "./commands/snapshot.ts";
-export { type StudioOptions, studio } from "./commands/studio.ts";
+export { type StudioHandle, type StudioOptions, studio } from "./commands/studio.ts";
+export { describeSetup, type StudioSetup } from "./commands/studio-auth.ts";
 export { pullSite, pushSite, type SyncOptions } from "./commands/sync.ts";
 export {
   type AnalyticsConfig,

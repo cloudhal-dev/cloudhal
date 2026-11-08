@@ -1,8 +1,8 @@
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
-import { AiStore, createApi, restTransport } from "@cloudhal/api";
-import { serveNode } from "@cloudhal/api/node";
+import { AiStore, type CloudhalApi, createApi, restTransport } from "@cloudhal/api";
+import { CLIENT_ADDRESS_HEADER, serveNode } from "@cloudhal/api/node";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
@@ -15,6 +15,14 @@ import { localComments } from "./comments-local.ts";
 import { terminalMailSender } from "./mail-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
+import {
+  assertNoAuthLocal,
+  hasAccounts,
+  noBaseUrlWarning,
+  resolveSetupToken,
+  type SetupToken,
+  type StudioSetup,
+} from "./studio-auth.ts";
 import {
   initIfEmpty,
   resolveStudioInit,
@@ -31,7 +39,7 @@ export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
   readonly log?: (line: string) => void;
   /** Directory of a built Studio (`apps/studio/dist`). Defaults to the monorepo build when present. */
   readonly studioDist?: string;
-  /** Skip authentication (local scripts only). */
+  /** Skip authentication (local scripts only: a loopback `host` and no `behindProxy`, #165). */
   readonly noAuth?: boolean;
   /** Where printed mail goes (tests); default stdout (RFC-0011). */
   readonly mailOut?: (text: string) => void;
@@ -39,6 +47,21 @@ export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
   readonly scheduler?: boolean;
   /** @deprecated the comments job runs on the scheduler's tick; `false` skips the ticker. */
   readonly commentsJob?: boolean;
+  /** The environment `CLOUDHAL_*` is read from (tests); default `process.env`. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  /** Tests: run Better Auth's Origin check under `NODE_ENV=test` too (`AuthOptions.originCheck`). */
+  readonly authOriginCheck?: "always";
+}
+
+/** A running `cloudhal studio`. */
+export interface StudioHandle {
+  readonly url: string;
+  readonly port: number;
+  /** While nobody has an account: the one-time link that creates the owner (RFC-0005 §7, #165). */
+  readonly setup?: StudioSetup;
+  /** For the operator: a Studio reachable beyond this machine without `--base-url` (#165). */
+  readonly warnings: readonly string[];
+  stop(): Promise<void>;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -59,12 +82,15 @@ export function isApiPath(pathname: string): boolean {
  * Runs the Cloudhal API (and, when built, the Studio UI) for the project on Node.
  * Authentication is wired by `createAuthFor()` from `@cloudhal/api/auth` when available.
  */
-export async function studio(
-  options: StudioOptions,
-): Promise<{ url: string; port: number; stop(): Promise<void> }> {
+export async function studio(options: StudioOptions): Promise<StudioHandle> {
+  const env = options.env ?? process.env;
   // Self-hosting (#143): where to listen, the public origin, the proxy headers, the first run.
-  const server = resolveStudioServer(options);
-  const scaffold = resolveStudioInit(options);
+  const server = resolveStudioServer(options, env);
+  // #165: an API without authentication never leaves this machine.
+  if (options.noAuth) assertNoAuthLocal(server);
+  // RFC-0005 §7, #165: the first account's token, refused (CLOUDHAL_SETUP_TOKEN) before anything starts.
+  const setup = options.noAuth ? undefined : resolveSetupToken(env);
+  const scaffold = resolveStudioInit(options, env);
   if (scaffold) {
     const log = options.log ?? (() => {});
     if (await initIfEmpty(options.projectDir, { ...scaffold, log }))
@@ -102,7 +128,7 @@ export async function studio(
           // RFC-0008 §11.1: the broken-link sweep's 404 rows
           ...(analytics.feature().enabled ? { analytics } : {}),
         });
-  const origins = studioAuthOrigins(server);
+  const origins = studioAuthOrigins(server, env);
   let deps: Parameters<typeof createApi>[0] = {
     store: local.store,
     analytics,
@@ -123,6 +149,10 @@ export async function studio(
     ai: { store: new AiStore(local.sql), ...localAiTransport() },
     // The Studio dev server, the public origin and CLOUDHAL_TRUSTED_ORIGINS (studio-options.ts).
     trustedOrigins: origins.trustedOrigins,
+    // #165: rate limits count the address `serveNode` derived, never a client-sent header, and
+    // invite and reset links name the public origin when there is one.
+    clientAddressHeader: CLIENT_ADDRESS_HEADER,
+    ...(server.baseUrl ? { studioOrigin: server.baseUrl } : {}),
     // Without auth anyone who can reach the port could write; answer localhost names only.
     ...(options.noAuth ? { allowedHosts: ["localhost", "127.0.0.1", "[::1]"] } : {}),
     mcp: {
@@ -135,7 +165,8 @@ export async function studio(
       render: localRender(),
     },
   };
-  if (!options.noAuth) {
+  let firstOwner: SetupToken | undefined;
+  if (setup) {
     const { createAuthFor } = await import("@cloudhal/api/auth/node");
     const auth = await createAuthFor({
       dataDir: local.dataDir,
@@ -143,6 +174,9 @@ export async function studio(
       baseURL: origins.baseURL,
       // Better Auth checks Origin on browser POSTs itself; the Studio dev server must pass too.
       trustedOrigins: origins.trustedOrigins,
+      trustRequestOrigin: origins.trustRequestOrigin,
+      setupToken: setup.token,
+      originCheck: options.authOriginCheck,
     });
     deps = {
       ...deps,
@@ -153,28 +187,26 @@ export async function studio(
       staff: auth.staff,
       signUp: auth.signUp,
     };
+    // RFC-0005 §7, #165: until somebody has an account, the first sign-up needs the token.
+    if (!(await hasAccounts(local.sql))) firstOwner = setup;
   }
   const app = createApi(deps);
-
-  if (serveStudio) {
-    const { serveStatic } = await import("@hono/node-server/serve-static");
-    const root = path.relative(process.cwd(), studioDist) || ".";
-    app.use("/assets/*", serveStatic({ root }));
-    // The SPA fallback is for Studio's own routes only: an /api path the API did not answer (a
-    // route that is not mounted, e.g. agent keys without auth) falls through to the API's JSON 404
-    // rather than receiving index.html with a 200.
-    const spa = serveStatic({ root, path: "index.html" });
-    app.get("*", (c, next) => (isApiPath(c.req.path) ? next() : spa(c, next)));
-  }
+  if (serveStudio) await serveSpa(app, studioDist);
 
   const listening = await serveNode(app, {
     port: server.port,
     hostname: server.hostname,
     trustProxy: server.behindProxy,
   });
+  const url = studioUrl(server, listening.port);
+  const warning = noBaseUrlWarning(server);
   return {
-    url: studioUrl(server, listening.port),
+    url,
     port: listening.port,
+    ...(firstOwner
+      ? { setup: { url: `${url}login#setup=${firstOwner.token}`, tokenSource: firstOwner.source } }
+      : {}),
+    warnings: warning ? [warning] : [],
     stop: async () => {
       stopRollups();
       ticker?.stop();
@@ -182,6 +214,18 @@ export async function studio(
       await local.close();
     },
   };
+}
+
+/** A built Studio next to the API: its assets, and `index.html` for every path that is not the API's. */
+async function serveSpa(app: CloudhalApi, studioDist: string): Promise<void> {
+  const { serveStatic } = await import("@hono/node-server/serve-static");
+  const root = path.relative(process.cwd(), studioDist) || ".";
+  app.use("/assets/*", serveStatic({ root }));
+  // The SPA fallback is for Studio's own routes only: an /api path the API did not answer (a
+  // route that is not mounted, e.g. agent keys without auth) falls through to the API's JSON 404
+  // rather than receiving index.html with a 200.
+  const spa = serveStatic({ root, path: "index.html" });
+  app.get("*", (c, next) => (isApiPath(c.req.path) ? next() : spa(c, next)));
 }
 
 /** Workers AI over REST from `CLOUDFLARE_ACCOUNT_ID` and `CLOUDHAL_AI_TOKEN` (RFC-0016 §1). */

@@ -20,6 +20,12 @@ export interface InitOptions {
   readonly name?: string;
   readonly starter?: string;
   readonly log?: (line: string) => void;
+  /**
+   * The folder the project will live in when `dir` is only a staging folder it is moved from
+   * (`cloudhal studio --init-if-empty`): relative `link:` paths to a source checkout are computed
+   * from here. Default: `dir`.
+   */
+  readonly finalDir?: string;
 }
 
 async function exists(p: string): Promise<boolean> {
@@ -96,7 +102,7 @@ export async function init(options: InitOptions): Promise<InitResult> {
   const out = repo
     ? materializeDependencies(pkg, await monorepoVersions(repo), {
         // real paths, so the relative link survives symlinked folders (macOS /var → /private/var)
-        linkFrom: await realpath(projectDir),
+        linkFrom: await realpath(options.finalDir ?? projectDir),
       })
     : pkg;
   await writeFile(pkgPath, `${JSON.stringify(out, null, 2)}\n`);

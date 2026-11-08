@@ -5,19 +5,24 @@
  * Flags win over the environment: `CLOUDHAL_HOST`, `CLOUDHAL_BASE_URL`, `CLOUDHAL_BEHIND_PROXY`,
  * `CLOUDHAL_INIT` (a starter name), `CLOUDHAL_SITE_NAME`.
  */
-import { access } from "node:fs/promises";
+import { access, mkdir, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { CONFIG_FILE } from "../config.ts";
 import { init } from "./init.ts";
+import { isLoopbackHost } from "./studio-auth.ts";
 
 type Env = Readonly<Record<string, string | undefined>>;
 
 /** The flags `cloudhal studio` takes for where and how it is served. */
 export interface StudioServerFlags {
   readonly port?: number;
-  /** `--host`: the address to listen on (default `127.0.0.1`; `0.0.0.0` for every interface). */
+  /** `--host`: the address to listen on (default `127.0.0.1`; `0.0.0.0` for every IPv4 address). */
   readonly host?: string;
-  /** `--base-url`: the public origin (scheme, host, port), e.g. `https://studio.example.com`. */
+  /**
+   * `--base-url`: the origin browsers open Studio at (scheme, host, port), e.g.
+   * `https://studio.example.com`; required behind a reverse proxy, recommended whenever `--host`
+   * is not loopback. Without it sign-in accepts each request's own origin (#165).
+   */
   readonly baseUrl?: string;
   /** `--behind-proxy`: trust `X-Forwarded-Proto` / `X-Forwarded-Host`. */
   readonly behindProxy?: boolean;
@@ -96,12 +101,16 @@ export function studioUrl(server: StudioServer, port: number): string {
  * Better Auth's `baseURL` (the origin browsers use; its cookies are `Secure` for https) and the
  * origins the API accepts state-changing requests from: the Studio dev server, the public origin
  * (so a proxy that keeps the request on http still passes the API's CSRF check), and
- * `CLOUDHAL_TRUSTED_ORIGINS`.
+ * `CLOUDHAL_TRUSTED_ORIGINS`. Without a public origin (#165) Better Auth also trusts the origin
+ * each request was made to, as the API's CSRF check does: any (`"any"`, a server listening beyond
+ * loopback, reached at `http://<lan-ip>:8787`), or on a loopback server only this machine's names
+ * (`"loopback"`: `localhost`, `127.0.0.1`, `[::1]`, so a rebound DNS name is not). With a public
+ * origin (`false`) only it and the list may sign in.
  */
 export function studioAuthOrigins(
   server: StudioServer,
   env: Env = process.env,
-): { baseURL: string; trustedOrigins: string[] } {
+): { baseURL: string; trustedOrigins: string[]; trustRequestOrigin: "any" | "loopback" | false } {
   const baseURL = server.baseUrl ?? `http://localhost:${server.port}`;
   const trustedOrigins = [
     // The Studio dev server (vite, :5173) proxies /api here during Studio development.
@@ -112,6 +121,8 @@ export function studioAuthOrigins(
   return {
     baseURL,
     trustedOrigins: [...new Set(trustedOrigins.map((o) => o.trim()))].filter(Boolean),
+    trustRequestOrigin:
+      server.baseUrl !== undefined ? false : isLoopbackHost(server.hostname) ? "loopback" : "any",
   };
 }
 
@@ -135,27 +146,58 @@ export function resolveStudioInit(
   };
 }
 
+async function exists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** The folder inside the project where `--init-if-empty` stages the scaffold before moving it up. */
+export const INIT_STAGING_DIR = ".cloudhal-init";
+
 /**
  * Creates the project the way `cloudhal init` does when the folder has no `cloudhal.json` (a
- * container starting on an empty volume). A folder that has other files but no config is left
- * alone: `init` refuses it, so a volume mounted at the wrong path is never written over.
- * Returns whether a project was created.
+ * container starting on an empty volume). A folder that has other files but no config is refused,
+ * as `init` refuses it, so a volume mounted at the wrong path is never written over. The scaffold
+ * is staged in `.cloudhal-init` inside the folder and moved up entry by entry, `cloudhal.json`
+ * last, so a container stopped at any point starts again cleanly: a staging folder without a
+ * config is redone, one with a config is moved the rest of the way (#165; before, a stop
+ * mid-scaffold crash-looped on "is not empty"). Returns whether a project was created.
  */
 export async function initIfEmpty(
   projectDir: string,
   options: { starter: string; name?: string | undefined; log?: (line: string) => void },
 ): Promise<boolean> {
-  try {
-    await access(path.join(projectDir, CONFIG_FILE));
-    return false;
-  } catch {
-    // no project yet
+  if (await exists(path.join(projectDir, CONFIG_FILE))) return false;
+  await mkdir(projectDir, { recursive: true });
+  const staging = path.join(projectDir, INIT_STAGING_DIR);
+  const staged = await exists(path.join(staging, CONFIG_FILE));
+  const others = (await readdir(projectDir)).filter((entry) => entry !== INIT_STAGING_DIR);
+  if (others.length > 0 && !staged) throw new Error(`${projectDir} is not empty`);
+  if (!staged) {
+    // whatever an earlier start left unfinished, then a fresh scaffold
+    await rm(staging, { recursive: true, force: true });
+    await init({
+      dir: staging,
+      finalDir: projectDir,
+      starter: options.starter,
+      name: options.name ?? path.basename(path.resolve(projectDir)),
+      ...(options.log ? { log: options.log } : {}),
+    });
   }
-  await init({
-    dir: projectDir,
-    starter: options.starter,
-    ...(options.name ? { name: options.name } : {}),
-    ...(options.log ? { log: options.log } : {}),
-  });
+  for (const entry of (await readdir(staging)).filter((entry) => entry !== CONFIG_FILE))
+    await moveUp(staging, projectDir, entry);
+  await moveUp(staging, projectDir, CONFIG_FILE);
+  await rm(staging, { recursive: true, force: true });
   return true;
+}
+
+/** One staged entry into the project; one that an earlier start already moved stays as it is. */
+async function moveUp(staging: string, projectDir: string, entry: string): Promise<void> {
+  const target = path.join(projectDir, entry);
+  if (await exists(target)) await rm(path.join(staging, entry), { recursive: true, force: true });
+  else await rename(path.join(staging, entry), target);
 }

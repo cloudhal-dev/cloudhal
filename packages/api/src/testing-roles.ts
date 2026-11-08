@@ -126,7 +126,7 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
         method,
         headers: {
           "content-type": "application/json",
-          "x-forwarded-for": `10.0.${Math.floor(ip / 250)}.${ip++ % 250}`,
+          "cf-connecting-ip": `10.0.${Math.floor(ip / 250)}.${ip++ % 250}`,
           ...(opts.cookie ? { cookie: opts.cookie } : {}),
           ...opts.headers,
         },
@@ -1414,7 +1414,7 @@ export function describeRolesApi(label: string, backend: RolesBackend): void {
           (
             await call("POST", "/api/invites/inspect", {
               body: { token: "chinv_x" },
-              headers: { "x-forwarded-for": "203.0.113.9" },
+              headers: { "cf-connecting-ip": "203.0.113.9" },
             })
           ).status,
         );

@@ -21,7 +21,24 @@ export interface AuthOptions {
   /** Browser-facing origin of the API, e.g. http://localhost:8787 or https://studio.example.com */
   readonly baseURL: string;
   readonly secret: string;
-  readonly trustedOrigins?: readonly string[];
+  /**
+   * Origins browsers may make cookie-bearing requests from, besides `baseURL`'s. A function is
+   * asked per request (and once at start-up, without one): `trustedOriginsWithOwn` adds the origin
+   * the request was made to, for a Studio reached at whatever address the browser used (#165).
+   */
+  readonly trustedOrigins?: readonly string[] | TrustedOriginsFn;
+  /**
+   * The request header that carries the client's address, for Better Auth's rate limits and the
+   * `ipAddress` of sessions. On Node it is `CLIENT_ADDRESS_HEADER` (`@cloudhal/api/node`), which
+   * `serveNode` writes from the socket or the trusted proxy's last hop; with `workers` it is
+   * `cf-connecting-ip`. Unset, Better Auth reads `X-Forwarded-For`, which any client can send.
+   */
+  readonly clientAddressHeader?: string | undefined;
+  /**
+   * `"always"` runs Better Auth's Origin check under `NODE_ENV=test` too, where Better Auth skips
+   * it by default; for tests of the check itself.
+   */
+  readonly originCheck?: "always" | undefined;
   /**
    * Who may create an account with email + password:
    * - `first-user` (default): only while no user exists — the first account is the Owner, then
@@ -53,6 +70,49 @@ export interface AuthOptions {
 
 /** The default per-key request budget: generous for an agent session, a brake on a runaway loop. */
 export const AGENT_KEY_RATE_LIMIT = { windowMs: 60_000, max: 600 } as const;
+
+/** Better Auth's dynamic `trustedOrigins`: the list for one request (none at start-up). */
+export type TrustedOriginsFn = (request: Request | undefined) => string[] | Promise<string[]>;
+
+/**
+ * Trusted origins that also accept the origin a request was made to (its scheme and `Host`;
+ * behind a trusted proxy the forwarded ones), as the API's own CSRF check does. A Studio served
+ * without a public origin (`cloudhal studio --host 0.0.0.0` and no `--base-url`) is then reachable
+ * at whatever address the browser used instead of refusing every sign-in with `INVALID_ORIGIN`
+ * (#165). A page on another origin still fails: browsers never let it choose the `Host`. With
+ * `loopbackOnly` the request's origin counts only when its host is `localhost` or a literal loopback
+ * address such as `127.0.0.1` or `[::1]` (a server listening on loopback; a DNS name rebound to it
+ * is not trusted).
+ */
+export function trustedOriginsWithOwn(
+  origins: readonly string[],
+  options: { readonly loopbackOnly?: boolean } = {},
+): TrustedOriginsFn {
+  return (request) => {
+    const own = request ? originOf(request.url) : undefined;
+    const counts = own !== undefined && (!options.loopbackOnly || isLoopbackOrigin(own));
+    return counts ? [...origins, own] : [...origins];
+  };
+}
+
+/** `localhost` or a literal loopback address (127.0.0.0/8, `[::1]`, `[::ffff:7f00:1]`); never a DNS name. */
+function isLoopbackOrigin(origin: string): boolean {
+  const host = new URL(origin).hostname;
+  return (
+    host === "localhost" ||
+    host === "[::1]" ||
+    /^\[::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}\]$/.test(host) ||
+    /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)
+  );
+}
+
+function originOf(url: string): string | undefined {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return undefined;
+  }
+}
 
 export interface CloudhalAuth {
   readonly handler: (request: Request) => Promise<Response>;

@@ -23,6 +23,11 @@ describe("owner setup link", () => {
     expect(takeSetupToken()).toBe("def456");
   });
 
+  it("keeps a token's + and decodes %xx, as the server compares it byte for byte", () => {
+    window.history.replaceState(null, "", "/login#setup=ab+c/d%3D=");
+    expect(takeSetupToken()).toBe("ab+c/d==");
+  });
+
   it("is absent on a normal sign-in", () => {
     expect(takeSetupToken()).toBeUndefined();
   });

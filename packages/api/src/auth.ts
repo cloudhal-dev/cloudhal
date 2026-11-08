@@ -22,6 +22,8 @@ export {
   SETUP_TOKEN_HEADER,
   type StaffService,
   signUpMode,
+  type TrustedOriginsFn,
+  trustedOriginsWithOwn,
 } from "./auth/types.ts";
 
 /**

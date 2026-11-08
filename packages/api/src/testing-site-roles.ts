@@ -49,7 +49,7 @@ export function describeSiteRolesApi(label: string, backend: RolesBackend): void
           method,
           headers: {
             "content-type": "application/json",
-            "x-forwarded-for": `10.1.0.${ip++ % 250}`,
+            "cf-connecting-ip": `10.1.0.${ip++ % 250}`,
             ...(cookie ? { cookie } : {}),
           },
           ...(body !== undefined ? { body: JSON.stringify(body) } : {}),

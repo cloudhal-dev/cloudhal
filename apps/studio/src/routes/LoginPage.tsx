@@ -11,15 +11,32 @@ import { authClient } from "../lib/auth.ts";
 const SETUP_KEY = "cloudhal.setupToken";
 
 /**
- * A fresh deployment's owner arrives with `/login#setup=<token>` (printed by `cloudhal deploy`):
- * in the fragment, the token never reaches a server, its logs or a referrer. `?setup=` (links
+ * One `name=value` of a fragment, percent-decoded but not form-decoded: an operator's own token
+ * (`CLOUDHAL_SETUP_TOKEN`) may hold a `+`, which `URLSearchParams` would read as a space (#165).
+ */
+function fragmentValue(hash: string, name: string): string | undefined {
+  for (const part of hash.replace(/^#/, "").split("&")) {
+    const eq = part.indexOf("=");
+    if (eq === -1 || part.slice(0, eq) !== name) continue;
+    try {
+      return decodeURIComponent(part.slice(eq + 1));
+    } catch {
+      return part.slice(eq + 1);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A fresh deployment's owner arrives with `/login#setup=<token>` (printed by `cloudhal deploy` and
+ * `cloudhal studio`): in the fragment, the token never reaches a server, its logs or a referrer. `?setup=` (links
  * printed by earlier versions) works too. The token is moved out of the URL at once (screenshots,
  * history) and kept for this tab only; the server requires it for the first account.
  */
 export function takeSetupToken(): string | undefined {
   try {
     const url = new URL(window.location.href);
-    const fromHash = new URLSearchParams(url.hash.replace(/^#/, "")).get("setup");
+    const fromHash = fragmentValue(url.hash, "setup");
     const fromQuery = url.searchParams.get("setup");
     const fromUrl = fromHash || fromQuery;
     if (fromUrl) {

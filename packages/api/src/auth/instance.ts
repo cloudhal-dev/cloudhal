@@ -60,12 +60,16 @@ export const INVITATION_FIELDS = {
  */
 export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
   const mode = signUpMode(options);
+  const ipHeader = options.workers ? "cf-connecting-ip" : options.clientAddressHeader;
   const instance = betterAuth({
     // biome-ignore lint/suspicious/noExplicitAny: Better Auth accepts several concrete DB handles
     database: options.database as any,
     baseURL: options.baseURL,
     secret: options.secret,
-    trustedOrigins: [...(options.trustedOrigins ?? [])],
+    trustedOrigins:
+      typeof options.trustedOrigins === "function"
+        ? options.trustedOrigins
+        : [...(options.trustedOrigins ?? [])],
     emailAndPassword: {
       enabled: true,
       disableSignUp: mode === "closed",
@@ -92,7 +96,7 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
           if (!constantTimeEqual(given, options.setupToken))
             throw new APIError("FORBIDDEN", {
               message:
-                "Creating the owner account needs the setup link printed by `cloudhal deploy`.",
+                "Creating the owner account needs the setup link: `cloudhal deploy` prints it, and `cloudhal studio` prints it in its log while nobody has an account.",
             });
         }
       }),
@@ -111,23 +115,31 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
         }
       }),
     },
-    ...(options.workers
+    ...(ipHeader
       ? {
-          // Stored in D1, so each limited call costs a read and a write. Reading the session is
-          // not a brute-force target and Studio asks for it often: it is not limited.
+          // Stored in the database (D1 on Workers, the project's SQLite on Node), so the limit holds
+          // across isolates and does not depend on NODE_ENV=production, Better Auth's default
+          // (#165); each limited call costs a read and a write. Reading the session is not a
+          // brute-force target and Studio asks for it often: it is not limited.
           rateLimit: {
             enabled: true,
             storage: "database" as const,
             customRules: { "/get-session": false as const },
           },
-          advanced: {
-            ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
-            ...(options.workers.waitUntil
-              ? { backgroundTasks: { handler: options.workers.waitUntil } }
-              : {}),
-          },
         }
       : {}),
+    advanced: {
+      // The client's address for rate limits and sessions: the header the runtime vouches for
+      // (Cloudflare's, or the one `serveNode` writes on Node), never a client-sent one (#165).
+      ...(ipHeader ? { ipAddress: { ipAddressHeaders: [ipHeader] } } : {}),
+      // Under NODE_ENV=test Better Auth skips its Origin check; tests of the check turn it on.
+      ...(options.originCheck === "always"
+        ? { disableCSRFCheck: false, disableOriginCheck: false }
+        : {}),
+      ...(options.workers?.waitUntil
+        ? { backgroundTasks: { handler: options.workers.waitUntil } }
+        : {}),
+    },
     plugins: [
       // One organization per deployment (RFC-0005 §11). Used for its tables only: membership
       // changes go through Cloudhal's audited routes; the HTTP endpoints answer 404 (I3).
