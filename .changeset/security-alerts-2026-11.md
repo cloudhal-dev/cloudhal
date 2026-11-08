@@ -1,5 +1,0 @@
----
-"@cloudhal/cli": patch
----
-
-The Studio bundle shipped in `@cloudhal/cli` no longer contains seroval 1.6.8 (a transitive dependency of `@tanstack/react-router`), which GHSA-9wx9-5pv9-3349 and GHSA-f86p-h4j2-7qgj affect: the lockfile now resolves seroval 1.7.9 and seroval-plugins 1.7.8. In the same sweep the monorepo lockfiles move undici to 7.30.2 (an override for the 7.28.0 that Miniflare 4 pins; GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26, GHSA-qrxm-fqhp-jwvm, GHSA-xjj6-f33q-929c, GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3, GHSA-4cwx-7wf7-3272 and the medium/low undici 7.x advisories patched in 7.29.0 to 7.30.1) and 8.12.4 (the same advisories on the 8.x line, through astro's unifont), rustls to 0.23.46 (GHSA-c8m5-c952-6cm4, GHSA-h2v8-394m-p7vv, GHSA-w44r-93j7-qv28, GHSA-vp88-798v-h67f), and, found by `cargo audit`, rustls-webpki to 0.103.16 (RUSTSEC-2026-0382), webpki-root-certs to 1.0.11 (RUSTSEC-2026-0383) and tokio to 1.54.1 (RUSTSEC-2026-0386, unsoundness). undici and rustls are development-time dependencies of this repository only; no published package depends on them.

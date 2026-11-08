@@ -1,5 +1,22 @@
 # @cloudhal/cloudflare
 
+## 0.6.3
+
+### Patch Changes
+
+- 1dd79c2: Dependency updates from the November 2026 Dependabot sweep. `@cloudhal/astro-renderer`, `@cloudhal/cli` and `@cloudhal/cloudflare` use wrangler 4.152.0 (its `createTestHarness` runs Miniflare 5.20261019.2-beta, and `wrangler deploy` uploads source maps by default since 4.150). The Studio shipped in `@cloudhal/cli` is built with Tiptap 3.32.0 and `@codemirror/language` 6.13.1. The Rust crate validates with jsonschema 0.60.2, and the monorepo lints and formats with Biome 2.6.2 (Markdown and YAML formatting stay off).
+- 7dddd88: `@cloudhal/astro-renderer`, `@cloudhal/cli` and `@cloudhal/cloudflare` use wrangler 4.158.0, and `@cloudhal/astro-renderer` uses `@astrojs/cloudflare` 14.4.4, which brings `@cloudflare/vite-plugin` 1.67 (its peer range is wrangler ^4.156.1, so the two move together). `@astrojs/cloudflare` 14.4 needs Astro 7.4, so projects move to Astro 7.4.7: the blog starter asks for it, and the `astro` peer range of `@cloudhal/astro-renderer` and `@cloudhal/cli` is now ^7.4.0 (was ^7.3.0). The blog starter asks for wrangler ^4.158.0.
+- Updated dependencies [bf20e64]
+- Updated dependencies [28e9406]
+  - @cloudhal/api@0.6.3
+  - @cloudhal/agent-runtime@0.6.3
+  - @cloudhal/mcp-server@0.6.3
+  - @cloudhal/analytics@0.6.3
+  - @cloudhal/comments@0.6.3
+  - @cloudhal/core-ts@0.6.3
+  - @cloudhal/schedules@0.6.3
+  - @cloudhal/storage@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

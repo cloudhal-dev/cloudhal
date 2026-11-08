@@ -1,5 +1,11 @@
 # @cloudhal/storage
 
+## 0.6.3
+
+### Patch Changes
+
+- @cloudhal/core-contracts@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

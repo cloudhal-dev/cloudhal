@@ -1,5 +1,13 @@
 # @cloudhal/core-ts
 
+## 0.6.3
+
+### Patch Changes
+
+- @cloudhal/core-contracts@0.6.3
+  - @cloudhal/schedules@0.6.3
+  - @cloudhal/storage@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes

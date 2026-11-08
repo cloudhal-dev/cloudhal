@@ -1,5 +1,24 @@
 # @cloudhal/api
 
+## 0.6.3
+
+### Patch Changes
+
+- bf20e64: MCP OAuth discovery (RFC-0044 §1, phase 1 of #144): with `mcp.oauth` set, the 401 of `/mcp` carries a `WWW-Authenticate` challenge naming the RFC 9728 protected resource metadata and the scopes to request, the metadata is served at both well-known forms, and a token principal calling a tool without a scope its member's role holds gets a `403 insufficient_scope` step-up challenge. Deployments do not set the option yet: the authorization server is phase 2.
+- 28e9406: Self-hosting (#143): `cloudhal studio` can be reached from beyond the machine it runs on. `--host <addr>` (or `CLOUDHAL_HOST`) is the address it listens on (default `127.0.0.1`; `0.0.0.0` in a container), `--base-url <url>` (or `CLOUDHAL_BASE_URL`) the public origin behind a reverse proxy — Better Auth's `baseURL` (its session cookies are `Secure` for https), a trusted origin for the API's CSRF check, and the URL the command prints — and `--behind-proxy` (or `CLOUDHAL_BEHIND_PROXY=1`) makes the server take each request's scheme and host from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host` (`serveNode`'s new `trustProxy`, with `forwardedUrl` / `forwardedRequest` in `@cloudhal/api/node`); without the flag those headers are ignored, as before. `--init-if-empty` (or `CLOUDHAL_INIT=<starter>`, with `--starter`, `--name` / `CLOUDHAL_SITE_NAME`) creates the project the way `cloudhal init` does when the folder has no `cloudhal.json`, so a container starts on an empty volume; a folder with other files is refused, as `init` refuses it. `studio()` returns the bound `port` next to `url`. `cloudhal dev --host` now also takes an address (`--host [<addr>]`; alone it still means every interface).
+- Updated dependencies [1dd79c2]
+- Updated dependencies [7dddd88]
+- Updated dependencies [bf20e64]
+  - @cloudhal/astro-renderer@0.6.3
+  - @cloudhal/agent-runtime@0.6.3
+  - @cloudhal/mcp-server@0.6.3
+  - @cloudhal/analytics@0.6.3
+  - @cloudhal/comments@0.6.3
+  - @cloudhal/core-contracts@0.6.3
+  - @cloudhal/core-ts@0.6.3
+  - @cloudhal/schedules@0.6.3
+  - @cloudhal/storage@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes
