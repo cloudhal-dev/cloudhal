@@ -25,6 +25,7 @@ import type { PeerEdition } from "./locales.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, type Resolution, SiteResolver } from "./resolver.ts";
 import type { GraphSource } from "./source.ts";
+import { markInvalidPreview } from "./status-serve.ts";
 
 /** RFC-0029 §3: `AI_SEARCH`, `SEARCH_BUCKET` and `CLOUDHAL_SEARCH_*` turn on semantic search. */
 export interface SiteWorkerEnv extends AiSearchEnv {
@@ -49,11 +50,20 @@ export interface AstroLike {
  * Worker) around everything the request runs, Astro's render included. Module state, not a header:
  * a client cannot choose it.
  */
-const requestSite = new AsyncLocalStorage<string>();
+const requestSite = new AsyncLocalStorage<{ readonly siteId: string; site?: Site }>();
 
 /** Runs `fn` (and everything it awaits) as a request for `siteId`. */
 export function withRequestSite<T>(siteId: string, fn: () => T): T {
-  return requestSite.run(siteId, fn);
+  return requestSite.run({ siteId }, fn);
+}
+
+/**
+ * RFC-0043 §1.6: the site node this request already read (its name and locales), for the
+ * `error` page; `undefined` before a successful read. Never reads the store: it may be what
+ * failed. Only inside `withRequestSite`.
+ */
+export function loadedSite(): Site | undefined {
+  return requestSite.getStore()?.site;
 }
 
 /**
@@ -73,7 +83,7 @@ export function withRequestStore<T>(store: SiteGraphStore, siteId: string, fn: (
 function siteOf(fallback: string | undefined): string | undefined {
   return (
     requestStore.getStore()?.siteId ??
-    requestSite.getStore() ??
+    requestSite.getStore()?.siteId ??
     (env as unknown as SiteWorkerEnv).CLOUDHAL_SITE_ID ??
     fallback
   );
@@ -153,7 +163,13 @@ const resolutions = new WeakMap<Request, Promise<Resolution>>();
 function resolveRequest(r: SiteResolver, request: Request): Promise<Resolution> {
   let pending = resolutions.get(request);
   if (!pending) {
-    pending = r.resolve(request);
+    const context = requestSite.getStore();
+    pending = r.resolve(request).then((resolution) => {
+      // A preview resolves without reading the site row; anything else just read it.
+      const site = resolution.kind === "preview" ? undefined : r.loadedSite();
+      if (context && site?.id === context.siteId) context.site = site;
+      return resolution;
+    });
     resolutions.set(request, pending);
   }
   return pending;
@@ -335,11 +351,7 @@ export async function getSource(
   h.set("cache-tag", siteCacheTag(siteId));
   h.set("x-cloudhal-mode", "published");
   h.set("x-cloudhal-snapshot", resolution.snapshotId);
-  if (resolution.previewError) {
-    // An invalid preview link must not poison the cache entry for this URL.
-    h.set("cloudflare-cdn-cache-control", "no-store");
-    h.set("x-cloudhal-preview-error", resolution.previewError);
-  }
+  if (resolution.previewError) markInvalidPreview(h);
   return resolution.source;
 }
 
@@ -374,10 +386,7 @@ export async function serveMedia(
     blobs: store.blobs,
     ...(preview && token ? { keepQuery: `${PREVIEW_PARAM}=${encodeURIComponent(token)}` } : {}),
   });
-  if (response && resolution.kind === "published" && resolution.previewError) {
-    // An invalid preview link must not poison the edge cache entry for this URL.
-    response.headers.set("cloudflare-cdn-cache-control", "no-store");
-    response.headers.set("x-cloudhal-preview-error", resolution.previewError);
-  }
+  if (response && resolution.kind === "published" && resolution.previewError)
+    markInvalidPreview(response.headers);
   return response;
 }

@@ -115,6 +115,11 @@ export class SiteResolver {
     return this.#pointer.site;
   }
 
+  /** The site row the last `site()` read, without reading again (`undefined` before one). */
+  loadedSite(): Site | undefined {
+    return this.#pointer?.site;
+  }
+
   snapshot(id: string): Promise<SnapshotSource> {
     let entry = this.#snapshots.get(id);
     if (entry) {

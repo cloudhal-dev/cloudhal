@@ -9,14 +9,14 @@ metadata:
 
 # Translate Studio
 
-Studio's catalogs live in the repo (ADR-0034). **Only English is edited by hand** (`apps/studio/src/i18n/en.ts`, `lazy/<ns>.en.ts`); every other language is generated from translation files by `pnpm i18n:import`, and a hand edit fails `pnpm check`. This skill drafts those translation files. It uploads nothing and never approves anything: people review on the translation platform (or the owner, for now), and only they set `reviewed: true` in `locales.ts`.
+Studio's catalogs live in the repo (ADR-0034), and so does one visitor-facing catalog that goes through the same exchange: the renderer's status pages (`packages/astro-renderer/src/status-strings/`, RFC-0043 §1.5). **Only English is edited by hand** (`apps/studio/src/i18n/en.ts`, `lazy/<ns>.en.ts`, `packages/astro-renderer/src/status-strings/en.ts`); every other language is generated from translation files by `pnpm i18n:import`, and a hand edit fails `pnpm check`. This skill drafts those translation files. It uploads nothing and never approves anything: people review on the translation platform (or the owner, for now), and only they set `reviewed: true` in `locales.ts`.
 
 ## Steps
 
-1. `pnpm i18n:export` writes `.i18n/<locale>/<file>.json` (nested, ICU MessageFormat 1 values) for every language and `.i18n/descriptions.json` (each key's English text and its note). `<file>` is `core` or a namespace.
+1. `pnpm i18n:export` writes `.i18n/<locale>/<file>.json` (nested, ICU MessageFormat 1 values) for every language and `.i18n/descriptions.json` (each key's English text and its note). `<file>` is `core`, a namespace, or `status` (the status pages).
 2. For the target language, translate what is missing or changed — compare `.i18n/en/<file>.json` with `.i18n/<locale>/<file>.json` (a new language: copy the English files and translate every value). Read the key's note in `descriptions.json`.
 3. Write the translated JSON back to `.i18n/<locale>/`. Same keys, same nesting, same order as English.
-4. `pnpm i18n:import --locale <locale>`: checks keys and ICU syntax, rewrites the catalogs, runs `test/i18n.test.tsx` and `test/i18n-messages.test.ts`. Fix what they report and import again.
+4. `pnpm i18n:import --locale <locale>`: checks keys and ICU syntax, rewrites the catalogs (for `status`: `status-strings/<locale>.ts` and the index `status-strings/catalog.ts`), runs `test/i18n.test.tsx` and `test/i18n-messages.test.ts`. After a `status` change also run `pnpm exec vitest run test/status-page.test.ts` in `packages/astro-renderer` (every state in every language within 8 KB, no `plural`/`select`/`number`). Fix what they report and import again.
 5. `pnpm design:lint` and the Studio typecheck must pass; open a PR that says the strings are AI drafts awaiting review.
 
 ## Rules for the messages (DESIGN.md §1 "Message syntax", RFC-0032)
@@ -26,10 +26,11 @@ Studio's catalogs live in the repo (ADR-0034). **Only English is edited by hand*
 - Translate whole sentences; when a word must change with a value, keep or write a `select` with whole sentences — never glue words.
 - A literal `{`, `}` or (inside a plural) `#` is quoted: `'{}'`, `'#'`.
 - Keep product and technical names as they are (Cloudhal, Studio, Snapshot, Release, MCP, Markdown, URL, API, SEO). Use the language's usual UI register (Turkish and German Studio use the informal "sen"/"du"; privacy notices to site visitors are formal).
+- Status-page messages (`status.json`) take simple `{name}` arguments only (`{time}`, `{reference}`): no `plural`, `select` or `number`, since the site Worker substitutes them without a compiler. Site visitors read them, so use the language's neutral public register.
 - An argument the language cannot use at all (a case suffix on an arbitrary name) is declared in that language's `dropped` export, with the reason — the import keeps it.
 
 ## Never
 
-- Edit `apps/studio/src/i18n/<locale>.ts` or `lazy/<ns>.<locale>.ts` by hand for any locale but `en`.
+- Edit `apps/studio/src/i18n/<locale>.ts`, `lazy/<ns>.<locale>.ts` or `packages/astro-renderer/src/status-strings/<locale>.ts` (or its `catalog.ts`) by hand for any locale but `en`.
 - Set `reviewed: true`, or present a draft as reviewed.
 - Upload to a translation platform or send strings outside the repo (platform hosting is the owner's decision, ADR-0034).

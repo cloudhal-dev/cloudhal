@@ -29,11 +29,13 @@ One Weblate component per catalog file, all in the same project:
 | Setting | Value |
 |---|---|
 | File format | JSON nested structure file (`json-nested`) |
-| Monolingual base (template) | `i18n/en/<file>.json`; `<file>` is `core` or a namespace (`analytics`, `comments`, …) |
+| Monolingual base (template) | `i18n/en/<file>.json`; `<file>` is `core`, a namespace (`analytics`, `comments`, …) or `status` |
 | File mask | `i18n/*/<file>.json` |
 | Source language | English |
 | Quality checks (flags) | `icu-message-format` (ICU syntax and placeholders, RFC-0032) |
 | Languages | every language in `apps/studio/src/i18n/locales.ts`: Turkish (reviewed, by you), the others machine drafts for community review |
+
+The `status` component is the one visitor-facing catalog: the site status pages (coming soon, maintenance, unavailable, error, expired preview link) from `packages/astro-renderer/src/status-strings/` (RFC-0043 §1.5), about 14 keys. Its messages take simple `{name}` arguments only, never `plural` or `select`; give it the same flags.
 
 Turn on **reviews** (translated → approved), so "approved by a reviewer" is what makes a language `reviewed: true` in `apps/studio/src/i18n/locales.ts`.
 

@@ -10,7 +10,7 @@
   - XLIFF 2.1: https://docs.oasis-open.org/xliff/xliff-core/v2.1/xliff-core-v2.1.html
 
 ## Context
-Studio's catalogs are TypeScript modules: `apps/studio/src/i18n/<locale>.ts` and `lazy/<ns>.<locale>.ts`.
+Studio's catalogs are TypeScript modules: `apps/studio/src/i18n/<locale>.ts` and `lazy/<ns>.<locale>.ts`. Since RFC-0043 §1.5 the renderer's status-page catalog (`packages/astro-renderer/src/status-strings/<locale>.ts`) goes through the same exchange (see the amendment below).
 - English is the source and the type. The other languages are typed against it, and since ADR-0032 they are ICU MessageFormat 1.
 - Checks guard keys, argument kinds, plural categories, declared forms and drops, unused keys, and English sentences left untranslated (`test/i18n*.test.ts`).
 - German was added as an AI draft (`reviewed: false`). Turkish is maintained by the owner.
@@ -83,6 +83,12 @@ The owner delegated the open questions; decided in the session that coordinates 
 - **Reviewers:** German and Arabic stay `reviewed: false` until community reviewers approve them in Weblate. Turkish stays reviewed (the owner).
 - **Until then:** an AI second-pass consistency review (glossary, register, terms) may correct the drafts through the `translate` skill and `pnpm i18n:import`. It never sets `reviewed: true`.
 - **Visitor-facing strings** (themes, notices) stay out of scope for now. The catalogs remain Studio-only.
+
+### Amendment (2026-11-08, RFC-0043 §1.5)
+- One visitor-facing catalog joins the exchange: the site status pages (`packages/astro-renderer/src/status-strings/`). `pnpm i18n:export` writes it as `.i18n/<locale>/status.json` beside Studio's files, `pnpm i18n:import` writes `status-strings/<locale>.ts` and the index `catalog.ts` with the same hash guard, and only `en.ts` is edited by hand.
+- Its languages are Studio's `LOCALE_REGISTRY`, with the same review state (AI drafts stay `reviewed: false`). It is one more Weblate component (`docs/guides/translations-weblate.md`).
+- Its messages take simple `{name}` arguments only, so the site Worker needs no message compiler.
+- Theme strings and notices stay out of scope.
 
 ## Open questions
 None left from this ADR; the questions below were answered above.

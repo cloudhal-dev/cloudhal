@@ -58,6 +58,11 @@ export function withRequestSite<T>(_siteId: string, fn: () => T): T {
   return fn();
 }
 
+/** RFC-0043 §1.6: the `workerd` build's per-request site; `cloudhal dev` keeps none. */
+export function loadedSite(): Site | undefined {
+  return undefined;
+}
+
 /**
  * RFC-0036 §4: on workerd a playground runs each request over its session's store; `cloudhal dev`
  * renders from the project's local store, so this only runs `fn`.

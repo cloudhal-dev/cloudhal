@@ -18,11 +18,37 @@ export const MACHINE_PATH = /\.(?:xml|txt|json|rss|atom|webmanifest)$/i;
  * operator endpoints, comment endpoints and machine paths keep their own answers.
  */
 export function isStatusPagePath(pathname: string): boolean {
-  if (pathname === "/robots.txt") return false;
-  if (matchMediaRoute(pathname)) return false;
-  if (/^\/(?:_astro|_cloudhal|__cloudhal|\.well-known)\//.test(pathname)) return false;
-  if (isCommentsPath(pathname)) return false;
-  return !MACHINE_PATH.test(pathname);
+  return !keepsOwnAnswer(pathname) && !MACHINE_PATH.test(pathname);
+}
+
+/** `robots.txt`, media, static assets, `/.well-known/`, operator and comment endpoints. */
+function keepsOwnAnswer(pathname: string): boolean {
+  return (
+    pathname === "/robots.txt" ||
+    matchMediaRoute(pathname) !== undefined ||
+    /^\/(?:_astro|_cloudhal|__cloudhal|\.well-known)\//.test(pathname) ||
+    isCommentsPath(pathname)
+  );
+}
+
+/**
+ * How the entry's state step treats a path (§2.3, §2.5): `page` gets the status page, `machine`
+ * (feeds, sitemaps, `llms.txt`, search JSON) a short plain or JSON answer where the state calls
+ * for one, `undefined` keeps its own answer.
+ */
+export function statusPathKind(pathname: string): "page" | "machine" | undefined {
+  if (keepsOwnAnswer(pathname)) return undefined;
+  return MACHINE_PATH.test(pathname) ? "machine" : "page";
+}
+
+/**
+ * Decision 12: a response served despite a preview token that did not verify (media, and paths
+ * the state step leaves to the theme) is kept out of the edge cache and says only that the link
+ * is invalid; why it failed (expired, signature, another site, previews off) is never echoed.
+ */
+export function markInvalidPreview(headers: Headers): void {
+  headers.set("cloudflare-cdn-cache-control", "no-store");
+  headers.set("x-cloudhal-preview-error", "invalid");
 }
 
 /** What choosing the locale needs of a site (`localeRequest` reads nothing else). */
@@ -98,7 +124,9 @@ export function statusInput(
 ): StatusPageInput {
   const site = sites.published ?? sites.live;
   const locale = site ? statusLocale(site, request.host, request.pathname) : "en";
-  if (state === "unavailable" || state === "error" || !site) return { locale, now };
+  if (state === "unavailable" || !site) return { locale, now };
+  // `error`: the name of a site this request already read, nothing else (§1.6).
+  if (state === "error") return { locale, now, site: { name: site.name } };
   const showsBrand = sites.published !== undefined && state !== "not-published";
   return {
     locale,

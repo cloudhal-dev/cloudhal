@@ -3,8 +3,9 @@
  * Worker answers page paths with the renderer's status page (503, `Retry-After`, `no-store`,
  * `noindex`, its own CSP) before Astro runs, restyled by the project's `statusPage` theme hook;
  * machine paths get the starter's plain answer; `/__cloudhal/health` says `not-published`; a
- * preview token that does not verify answers 410 instead of the published page. A publish turns
- * all of it into the real site.
+ * preview token that does not verify answers 410 instead of the published page, on feeds and
+ * the sitemap too; a request that reaches Astro keeps the starter's own 503. A publish turns all
+ * of it into the real site.
  */
 import { appendFile, mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
@@ -111,6 +112,10 @@ describe("Site Worker status pages on workerd (RFC-0043 §1)", () => {
     const head = await get("/", { method: "HEAD" });
     expect(head.status).toBe(503);
     expect(await head.text()).toBe("");
+    // #167: a request that reaches Astro keeps the starter's own 503, never the error page
+    const post = await get("/", { method: "POST" });
+    expect(post.status).toBe(503);
+    expect(post.headers.get("x-cloudhal-state")).toBe("not-published");
   });
 
   it("machine paths and robots.txt keep their own answers", async () => {
@@ -168,5 +173,13 @@ describe("Site Worker status pages on workerd (RFC-0043 §1)", () => {
     const bad = await get("/about?cloudhal-preview=expired");
     expect(bad.status).toBe(410);
     expect(await bad.text()).toContain("Edge Status &lt;Site&gt;");
+    // nor on a feed or the sitemap (decision 12), and no answer says why the token failed
+    for (const p of ["/rss.xml", "/sitemap.xml"]) {
+      const feed = await get(`${p}?cloudhal-preview=expired`);
+      expect(feed.status, p).toBe(410);
+      expect(feed.headers.get("content-type")).toContain("text/plain");
+      expect(feed.headers.get("x-cloudhal-state")).toBe("preview-expired");
+      expect(await feed.text()).not.toMatch(/<rss|<urlset|malformed|signature/i);
+    }
   });
 });
