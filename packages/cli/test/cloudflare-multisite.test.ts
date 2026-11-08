@@ -185,4 +185,33 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
       ].sort(),
     );
   });
+  it("a hostname map it cannot read is unavailable, never the error page (#167)", async () => {
+    const env = (await harness.getWorker().getEnv()) as { DB: D1Database };
+    // the store fails for this table only, as D1 does past the host map's 60 s TTL
+    await env.DB.exec("ALTER TABLE site_hosts RENAME TO site_hosts_down");
+    try {
+      const reset = await harness.fetch("https://en.example.test/__cloudhal/purge", {
+        method: "POST",
+        headers: { authorization: `Bearer ${PURGE_TOKEN}` },
+      });
+      expect(reset.status).toBe(200);
+      const health = await harness.fetch("https://en.example.test/__cloudhal/health");
+      expect(health.status).toBe(503);
+      expect(health.headers.get("cache-control")).toBe("no-store");
+      expect(await health.json()).toEqual({ ok: false });
+      const page = await harness.fetch("https://en.example.test/about");
+      const html = await page.text();
+      expect(page.status, html.slice(0, 200)).toBe(503);
+      expect(page.headers.get("x-cloudhal-state")).toBe("unavailable");
+      expect(page.headers.get("retry-after")).toBe("300");
+      expect(html).toContain('lang="en"');
+      expect(html).not.toContain("English Edition");
+      const feed = await harness.fetch("https://en.example.test/rss.xml");
+      expect(feed.status).toBe(503);
+      expect(feed.headers.get("retry-after")).toBe("300");
+      expect(feed.headers.get("content-type")).toContain("text/plain");
+    } finally {
+      await env.DB.exec("ALTER TABLE site_hosts_down RENAME TO site_hosts");
+    }
+  });
 });

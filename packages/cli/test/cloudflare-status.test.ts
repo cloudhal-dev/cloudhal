@@ -3,10 +3,11 @@
  * Worker answers page paths with the renderer's status page (503, `Retry-After`, `no-store`,
  * `noindex`, its own CSP) before Astro runs, restyled by the project's `statusPage` theme hook;
  * machine paths get the starter's plain answer; `/__cloudhal/health` says `not-published`; a
- * preview token that does not verify answers 410 instead of the published page. A publish turns
- * all of it into the real site.
+ * preview token that does not verify answers 410 instead of the published page, on feeds and
+ * the sitemap too; a request that reaches Astro keeps the starter's own 503. A publish turns all
+ * of it into the real site.
  */
-import { appendFile, mkdtemp, rm, symlink } from "node:fs/promises";
+import { appendFile, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,7 +17,7 @@ import { openLocalStore } from "@cloudhal/core-ts/local";
 import { migrate, migrations } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createTestHarness } from "wrangler";
 import { buildSiteWorker } from "../src/cloudflare/build.ts";
 import { siteConfigPath, siteWorkerConfig, writeWranglerConfig } from "../src/cloudflare/config.ts";
@@ -48,6 +49,11 @@ describe("Site Worker status pages on workerd (RFC-0043 §1)", () => {
     siteId = (await init({ dir: projectDir, name: "Edge Status <Site>" })).siteId;
     await symlink(STARTER_NODE_MODULES, path.join(projectDir, "node_modules"), "dir");
     await appendFile(path.join(projectDir, "src/theme.ts"), THEME_HOOK);
+    // #167: a theme page whose frontmatter throws (Astro then has no 500 page to render)
+    await writeFile(
+      path.join(projectDir, "src/pages/broken.astro"),
+      '---\nthrow new Error("theme crash for #167");\n---\n<p>never</p>\n',
+    );
     await writeWranglerConfig(
       siteConfigPath(projectDir),
       siteWorkerConfig({
@@ -111,6 +117,10 @@ describe("Site Worker status pages on workerd (RFC-0043 §1)", () => {
     const head = await get("/", { method: "HEAD" });
     expect(head.status).toBe(503);
     expect(await head.text()).toBe("");
+    // #167: a request that reaches Astro keeps the starter's own 503, never the error page
+    const post = await get("/", { method: "POST" });
+    expect(post.status).toBe(503);
+    expect(post.headers.get("x-cloudhal-state")).toBe("not-published");
   });
 
   it("machine paths and robots.txt keep their own answers", async () => {
@@ -168,5 +178,31 @@ describe("Site Worker status pages on workerd (RFC-0043 §1)", () => {
     const bad = await get("/about?cloudhal-preview=expired");
     expect(bad.status).toBe(410);
     expect(await bad.text()).toContain("Edge Status &lt;Site&gt;");
+    // nor on a feed or the sitemap (decision 12), and no answer says why the token failed
+    for (const p of ["/rss.xml", "/sitemap.xml"]) {
+      const feed = await get(`${p}?cloudhal-preview=expired`);
+      expect(feed.status, p).toBe(410);
+      expect(feed.headers.get("content-type")).toContain("text/plain");
+      expect(feed.headers.get("x-cloudhal-state")).toBe("preview-expired");
+      expect(await feed.text()).not.toMatch(/<rss|<urlset|malformed|signature/i);
+    }
+  });
+  it("a page that throws answers the error page with a reference, logged (#167)", async () => {
+    harness.clearLogs();
+    const res = await get("/broken");
+    const html = await res.text();
+    expect(res.status, html.slice(0, 300)).toBe(500);
+    expect(res.headers.get("x-cloudhal-state")).toBe("error");
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const reference = /<code>Reference: ([0-9a-f]{16})<\/code>/.exec(html)?.[1];
+    expect(reference, html).toBeDefined();
+    expect(html).not.toContain("theme crash");
+    // the Worker logged the failure with the same reference (Workers Logs)
+    await vi.waitFor(() =>
+      expect(harness.getLogs().map((l) => l.message)).toContainEqual(
+        expect.stringContaining(`cloudhal: request failed (reference ${reference})`),
+      ),
+    );
   });
 });

@@ -2,7 +2,7 @@ import { mintPreviewToken, SiteGraphStore, seedStarterSite } from "@cloudhal/cor
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
-import { PREVIEW_COOKIE, SiteResolver } from "../src/resolver.ts";
+import { PREVIEW_COOKIE, type Resolution, SiteResolver } from "../src/resolver.ts";
 
 const SECRET = "resolver-preview-secret-at-least-32-bytes";
 const actor = { kind: "human" as const, id: "user_resolver01", name: "Halil" };
@@ -131,6 +131,32 @@ describe("SiteResolver", () => {
     const r = await noSecret.resolve(req(`/?cloudhal-preview=${tok}`));
     expect(r.kind).toBe("published");
     expect((r as { previewError?: string }).previewError).toMatch(/not enabled/);
+  });
+
+  it("publicSite names the published site node, never an unpublished rename (RFC-0043 §1.6)", async () => {
+    const before = await resolver.resolve(req("/"));
+    expect((await resolver.publicSite(before))?.name).toBe("Resolver");
+    await publish("v1");
+    const live = await store.getSite(siteId);
+    await store.updateSite({ ...(live as NonNullable<typeof live>), name: "Renamed draft" });
+    clock += 1001;
+    const published = await resolver.resolve(req("/"));
+    expect(published.kind).toBe("published");
+    expect((await resolver.publicSite(published))?.name).toBe("Resolver");
+    const token = await mintPreviewToken(SECRET, { site: siteId, target: "live", now: clock });
+    const preview = await resolver.resolve(req(`/?cloudhal-preview=${token}`));
+    expect(preview.kind).toBe("preview");
+    expect(await resolver.publicSite(preview)).toBeUndefined();
+  });
+
+  it("publicSite is undefined, never a throw, when the snapshot cannot be read", async () => {
+    const unreadable = {
+      kind: "published",
+      source: { site: () => Promise.reject(new Error("R2 down")) },
+      snapshotId: "snap_unreadable",
+      at: clock,
+    } as unknown as Resolution;
+    await expect(resolver.publicSite(unreadable)).resolves.toBeUndefined();
   });
 
   it("caches immutable snapshot sources with an LRU bound", async () => {

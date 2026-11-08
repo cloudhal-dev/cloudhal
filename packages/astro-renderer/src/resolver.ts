@@ -115,6 +115,18 @@ export class SiteResolver {
     return this.#pointer.site;
   }
 
+  /**
+   * RFC-0043 §1.6: the site node a public page may name for `resolution`, never a new store
+   * read: the published snapshot's (already loaded, or loaded for the render anyway) for a
+   * published site, so an unpublished rename or locale never shows; the live row `resolve` just
+   * read before the first publish; nothing for a preview. `undefined` when it cannot be read.
+   */
+  async publicSite(resolution: Resolution): Promise<Site | undefined> {
+    if (resolution.kind === "preview") return undefined;
+    if (resolution.kind === "unpublished") return this.#pointer?.site;
+    return resolution.source.site().catch(() => undefined);
+  }
+
   snapshot(id: string): Promise<SnapshotSource> {
     let entry = this.#snapshots.get(id);
     if (entry) {

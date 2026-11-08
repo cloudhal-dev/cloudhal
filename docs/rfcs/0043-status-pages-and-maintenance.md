@@ -185,7 +185,7 @@ an RFC change, so themes can switch over it exhaustively.
 | `not-published` | the site has no `publishedSnapshotId` and the request carries no valid preview | 503 | `3600` | `noindex` |
 | `maintenance` | §2 is in effect and the request has no valid preview or bypass link | 503 | seconds to the end (≥ 60); `3600` when open-ended | **none** |
 | `unavailable` | the Worker serves no site yet (`siteId` undefined), the site row is missing (deleted, RFC-0034), or the store cannot be read before rendering | 503 | `300` | none |
-| `error` | an exception reached the entry's top-level catch, or Astro answered 5xx with no themed error page | 500 | — | none |
+| `error` | an exception reached the entry's catch, or Astro answered its own 500 page (no status page, no themed error page) | 500 | — | none |
 | `preview-expired` | the URL carries `cloudhal-preview` and the token is expired, forged, for another site, malformed, or previews are off | 410 | — | `noindex` |
 
 - **Every state:** `cache-control: no-store`, `cloudflare-cdn-cache-control: no-store`,
@@ -213,8 +213,11 @@ an RFC change, so themes can switch over it exhaustively.
   end in the past or within a minute gives `60`.
 - **`preview-expired` changes behaviour on purpose:** an invalid preview token no longer falls
   back to the published page. The reviewer learns that the link is dead instead of reviewing the
-  wrong version. `?cloudhal-preview=exit` and the dev preview cookie keep their behaviour; media
-  URLs keep their short plain answers (§1.8), since nobody views an image as a page.
+  wrong version. Feeds, sitemaps, `llms.txt` and JSON paths answer `statusPlain`'s 410 (#167),
+  never the published content. `?cloudhal-preview=exit` and the dev preview cookie keep their
+  behaviour; media URLs keep their short plain answers (§1.8), since nobody views an image as a
+  page: the published file, `no-store`, with `x-cloudhal-preview-error: invalid`. No answer says
+  why a token failed (decision 12).
 
 #### 1.3 Design of the page
 
@@ -346,9 +349,19 @@ export interface StatusContext extends StatusPageInput {
 
 - **Site Worker (`cloudflare-entry.ts`):** a new step between host dispatch and `serveSite`
   decides the state (§2.5 has the order). The whole `route()` is wrapped in `try/catch` →
-  `error`. A 5xx HTML response from Astro is replaced by the `error` page unless the theme
+  `error`. Astro's own 500 (a render that threw: HTML, or its empty fallback with no body and no
+  content type when no `500.astro` renders) is replaced by the `error` page unless the theme
   marked it as its own (`x-cloudhal-error-page: theme`, set by a theme's `500.astro`; no starter
-  has one today). Cloudflare-level failures (CPU limit, out of memory, exception 1101) cannot be
+  has one today). The blog starter's catch-all route rethrows when Astro renders it as the error
+  route (`Astro.props.error`, rendered with the original path), so a crash never becomes its
+  404 for that path. A response that carries `x-cloudhal-state` (the starter's
+  `not-published` 503 for a request that reaches Astro, e.g. a `POST`) and any other 5xx the theme
+  answers on purpose pass unchanged and log nothing (#167). A store that cannot be read in the
+  state step is `unavailable` (503, `Retry-After: 300`), as health reports it. The `error` page
+  uses the locale and name of a site the request has already read (§1.4, §1.6): the published
+  snapshot's site node once published, the live row before, else English. On a multi-site
+  Worker a hostname map that cannot be read is a store failure too: health answers
+  `503 { ok: false }`, page and machine paths the English `unavailable` answer. Cloudflare-level failures (CPU limit, out of memory, exception 1101) cannot be
   caught by the Worker and keep Cloudflare's page. The resolver's verdict (pointer, preview
   token) is memoised per request, so the entry's state step and Astro's `getSource` share one
   pointer read.
@@ -395,6 +408,9 @@ Worker):
   proves that the Worker runs and its store answers. `200` whenever the Worker can answer; `503`
   with `{ "ok": false }` when the store cannot be read. It never exposes snapshot ids, versions,
   hosts or messages.
+- **A host that maps to no site** on a multi-site Worker never reaches health: it gets the plain
+  404 cached for 60 s (`unknownHost()`, RFC-0034 §4; step 3 of §2.5), not `{ ok, state }`. A
+  monitor watches each site's own hostname.
 - **The shape is the admin's `/api/health`** (`{ "ok": true }`, #148) with `state` added, so one
   rule reads both: the Docker image's `HEALTHCHECK`, Caddy, uptime monitors and cloudhal.com's
   post-deploy check look at `ok` and treat any `state` as "up". Rationale: two health endpoints
@@ -915,7 +931,7 @@ contract.
 - **Behaviour changes on upgrade** (changeset for `@cloudhal/astro-renderer`):
   - an unpublished site shows the styled page instead of plain text (same 503);
   - an invalid preview link answers 410 instead of the published page;
-  - Astro 5xx HTML becomes the `error` page;
+  - Astro's own 500 HTML page becomes the `error` page (other 5xx and status pages pass);
   - `/__cloudhal/health` exists.
 - **Themes:** no change needed. Old copies get every status page (the entry answers before
   Astro); their own plain 503s stay as the fallback on Node and static targets. The `statusPage`
