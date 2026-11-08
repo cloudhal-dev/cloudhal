@@ -188,10 +188,14 @@ describe("Site Worker on workerd", () => {
       expect(href).toContain(`cloudhal-preview=${encodeURIComponent(token)}`);
     // without the token: the published version
     expect(await aboutTitle()).toBe("About");
-    // a forged token falls back to published and is not cacheable
+    // a forged token answers the preview-expired page (RFC-0043 §1.2), never the published
+    // page and never cacheable, so a reviewer cannot approve the wrong version
     const forged = await get(`/about?cloudhal-preview=${token.slice(0, -4)}AAAA`);
-    expect(forged.headers.get("x-cloudhal-mode")).toBe("published");
-    expect(forged.headers.get("x-cloudhal-preview-error")).toMatch(/signature/);
+    expect(forged.status).toBe(410);
+    expect(forged.headers.get("x-cloudhal-state")).toBe("preview-expired");
+    expect(forged.headers.get("cache-control")).toBe("no-store");
+    expect(forged.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    expect(await forged.text()).toContain("This preview link has expired");
   });
 
   it("only lets the admin purge", async () => {

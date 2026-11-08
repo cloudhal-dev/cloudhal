@@ -158,5 +158,24 @@ export async function commentsBackend(
   return { store: new SqlCommentStore((await localStore(config.dataDir)).sql) };
 }
 
+/** RFC-0043 §2.5: the `workerd` build's verdict shape, for code importing either build. */
+export type SiteStateResult =
+  | { readonly kind: "serve" }
+  | { readonly kind: "unavailable" }
+  | { readonly kind: "not-published"; readonly site: Site }
+  | {
+      readonly kind: "preview-expired";
+      readonly site: Site;
+      readonly published?: Site | undefined;
+    };
+
+/**
+ * RFC-0043 §1.8: `cloudhal dev` renders the working copy, drafts included, so a request on Node
+ * is always served; the status pages are drawn on demand at `/__cloudhal/status/<state>`.
+ */
+export async function siteState(_request: Request, _siteId?: string): Promise<SiteStateResult> {
+  return { kind: "serve" };
+}
+
 /** Shared with the `workerd` runtime so code importing either build sees the same names. */
 export { CACHE_TAG_PREFIX } from "./cache-tags.ts";

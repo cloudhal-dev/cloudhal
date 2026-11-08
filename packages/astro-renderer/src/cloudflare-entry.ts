@@ -32,17 +32,26 @@
  *   render the section themselves (`loadComments`, `<Comments />`) and set their own CSP when an
  *   open form uses Turnstile; `withSecurityHeaders` keeps it. All of it is off without a usable
  *   `CLOUDHAL_COMMENTS_KEY` (or when the build has no comments module).
+ * - Status pages (RFC-0043 §1): before Astro, the entry decides the site's state — `not-published`
+ *   before the first publish, `preview-expired` for a preview token that does not verify,
+ *   `unavailable` for a Worker that serves no site — and answers page paths with the renderer's
+ *   own page (`status-page.ts`: 503/410, `Retry-After`, `no-store`, its own CSP), restyled by the
+ *   theme's optional `statusPage` hook. A failure anywhere becomes the `error` page (500) with the
+ *   `cf-ray` as its reference. `GET /__cloudhal/health` answers `{ ok, state }` for monitors.
  */
 
 import { cache } from "cloudflare:workers";
 import config from "virtual:cloudhal/config";
+import { loadTheme } from "virtual:cloudhal/theme-hooks";
 import { handle } from "@astrojs/cloudflare/handler";
 import { type WaeDataset, WaeWriter } from "@cloudhal/analytics/wae";
 import {
   analyticsBackend,
   CACHE_TAG_PREFIX,
   resetSource,
+  type SiteStateResult,
   serveMedia,
+  siteState,
   withRequestSite,
 } from "@cloudhal/astro-renderer/runtime";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
@@ -63,6 +72,9 @@ import { hostRedirect, type RedirectEnv } from "./host-redirect.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { SearchLimiter, searchCost } from "./search-limit.ts";
 import { SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
+import { renderStatus, themeStatusHook } from "./status-hook.ts";
+import { type SiteState, statusPage } from "./status-page.ts";
+import { isStatusPagePath, statusInput } from "./status-serve.ts";
 
 interface Env extends RedirectEnv {
   CLOUDHAL_SITE_ID?: string;
@@ -142,6 +154,67 @@ const pendingWrites = new PendingWrites();
 const analyticsBySite = new Map<string, SiteAnalytics>();
 const commentsBySite = new Map<string, SiteComments>();
 let dispatch: SiteDispatch | undefined;
+/** RFC-0043 §1.7: the theme's `statusPage` hook, loaded the first time a status page is drawn. */
+const statusHook = themeStatusHook(loadTheme, (m, e) => console.error(m, e));
+
+/** RFC-0043 §1.3: the `error` page's reference — Cloudflare's ray id, else a random one. */
+function referenceId(request: Request): string {
+  return (
+    request.headers.get("cf-ray") ??
+    Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) =>
+      b.toString(16).padStart(2, "0"),
+    ).join("")
+  );
+}
+
+/** The `error` page (RFC-0043 §1.2): never the theme's hook, nothing read from the store. */
+function errorPage(request: Request, error: unknown): Response {
+  const rayId = referenceId(request);
+  console.error(`cloudhal: request failed (reference ${rayId})`, error);
+  return statusPage("error", { locale: "en", now: Date.now(), rayId }, { method: request.method });
+}
+
+/**
+ * A 5xx HTML answer from Astro becomes the `error` page unless the theme marked it as its own
+ * (`x-cloudhal-error-page: theme`, a theme's `500.astro`).
+ */
+function withErrorPage(response: Response, request: Request): Response {
+  if (
+    response.status < 500 ||
+    !(response.headers.get("content-type") ?? "").includes("text/html") ||
+    response.headers.get("x-cloudhal-error-page") === "theme"
+  )
+    return response;
+  return errorPage(request, new Error(`Astro answered ${response.status}`));
+}
+
+/**
+ * RFC-0043 §1.9: `{ ok, state }`, the admin's `/api/health` shape plus the site's state, so one
+ * monitor rule reads both. Public, never cached, never indexed; reads only the memoised pointer.
+ */
+async function health(request: Request): Promise<Response> {
+  const headers = {
+    "cache-control": "no-store",
+    "cloudflare-cdn-cache-control": "no-store",
+    "x-robots-tag": "noindex",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return Response.json(
+      { error: "method_not_allowed" },
+      { status: 405, headers: { ...headers, allow: "GET" } },
+    );
+  try {
+    const state = await siteState(request);
+    if (state.kind === "unavailable") return Response.json({ ok: false }, { status: 503, headers });
+    return Response.json(
+      { ok: true, state: state.kind === "not-published" ? "not-published" : "published" },
+      { headers },
+    );
+  } catch (error) {
+    console.error("cloudhal: health check could not read the store", error);
+    return Response.json({ ok: false }, { status: 503, headers });
+  }
+}
 
 /** One per isolate: which site a request is for (RFC-0034 §4). */
 function siteDispatch(env: Env, siteIdFromBuild: string | undefined): SiteDispatch {
@@ -504,8 +577,11 @@ async function serveSite(
   const media = siteId ? await serveMedia(request, { siteId }) : undefined;
   const rendered =
     media ??
-    withSecurityHeaders(
-      cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
+    withErrorPage(
+      withSecurityHeaders(
+        cacheOnlySuccess((await handle(request, env as never, ctx)) as unknown as Response),
+      ),
+      request,
     );
   // Server-side render events (§5.4), off the response path: published HTML 200s (cache
   // misses), redirects, 404, 410, 451 and 5xx; never previews or HEAD.
@@ -529,6 +605,44 @@ async function serveSite(
     : stripped;
 }
 
+/**
+ * RFC-0043 §2.5: the status page for a request the site cannot serve, drawn with the site data
+ * the state allows (§1.6) and the theme's hook; counted as a render event like any 5xx (§1.8).
+ */
+async function statusResponse(
+  call: { request: Request; env: Env; ctx: ExecutionContext },
+  state: Exclude<SiteStateResult, { kind: "serve" }>,
+  siteId: string,
+): Promise<Response> {
+  const { request, env, ctx } = call;
+  const url = new URL(request.url);
+  const kind: SiteState = state.kind;
+  const sites =
+    state.kind === "unavailable"
+      ? {}
+      : {
+          live: state.site,
+          published: state.kind === "preview-expired" ? state.published : undefined,
+        };
+  const started = Date.now();
+  const response = await renderStatus(
+    kind,
+    statusInput(kind, sites, { host: url.host, pathname: url.pathname }, started),
+    {
+      hook: await statusHook(),
+      method: request.method,
+      csp: SITE_CSP,
+      onFailure: (m, e) => console.error(m, e),
+    },
+  );
+  const a = state.kind !== "unavailable" ? await siteAnalytics(env, siteId) : undefined;
+  if (a?.available)
+    ctx.waitUntil(
+      a.render(request, response, Date.now() - started).then(() => pendingWrites.settled()),
+    );
+  return response;
+}
+
 export function createSiteWorker(options: { siteId?: string } = {}) {
   const searchLimiter = new SearchLimiter();
   async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -541,15 +655,30 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
     // runs (Astro's render included) then sees that site.
     const choice = await siteDispatch(env, options.siteId).choose(request);
     if (choice.kind === "unknown") return unknownHost();
-    const siteId = choice.siteId;
-    const run = () => serveSite({ request, env, ctx }, siteId, searchLimiter);
-    const response = siteId ? await withRequestSite(siteId, run) : await run();
+    // Without `CLOUDHAL_SITE_ID` a single-site Worker serves the site it was built for, as
+    // Astro's `getSource` always did; `unavailable` is for a site row that is gone (§2.5).
+    const siteId = choice.siteId ?? config.siteId;
+    const call = { request, env, ctx };
+    const run = async () => {
+      if (url.pathname === "/__cloudhal/health") return health(request);
+      const page =
+        (request.method === "GET" || request.method === "HEAD") && isStatusPagePath(url.pathname);
+      const state = page ? await siteState(request) : undefined;
+      if (state && state.kind !== "serve") return statusResponse(call, state, siteId);
+      return serveSite(call, siteId, searchLimiter);
+    };
+    const response = await withRequestSite(siteId, run);
     return choice.noindex ? withNoindex(response) : response;
   }
   return {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
       // #62: the edge cache is shared by every host this Worker answers on, unless told to vary.
-      return varyByHost(await route(request, env, ctx));
+      try {
+        return varyByHost(await route(request, env, ctx));
+      } catch (error) {
+        // RFC-0043 §1.8: whatever failed, the visitor gets a page and a reference to quote.
+        return varyByHost(errorPage(request, error));
+      }
     },
   };
 }

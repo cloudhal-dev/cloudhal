@@ -62,7 +62,11 @@
     "./locales": "./src/locales.ts",
     "./locale-middleware": "./src/locale-middleware.ts",
     "./locale-feeds": "./src/locale-feeds.ts",
-    "./not-found": "./src/not-found.ts"
+    "./not-found": "./src/not-found.ts",
+    "./status-page": "./src/status-page.ts",
+    "./status-hook": "./src/status-hook.ts",
+    "./status-serve": "./src/status-serve.ts",
+    "./status-middleware": "./src/status-middleware.ts"
   },
   "files": [
     "dist",
@@ -296,6 +300,22 @@
       "./not-found": {
         "types": "./dist/src/not-found.d.ts",
         "default": "./dist/src/not-found.js"
+      },
+      "./status-page": {
+        "types": "./dist/src/status-page.d.ts",
+        "default": "./dist/src/status-page.js"
+      },
+      "./status-hook": {
+        "types": "./dist/src/status-hook.d.ts",
+        "default": "./dist/src/status-hook.js"
+      },
+      "./status-serve": {
+        "types": "./dist/src/status-serve.d.ts",
+        "default": "./dist/src/status-serve.js"
+      },
+      "./status-middleware": {
+        "types": "./dist/src/status-middleware.d.ts",
+        "default": "./dist/src/status-middleware.js"
       }
     }
   }

@@ -131,7 +131,12 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
     // a missing build file is a real 404 (never the SPA shell under a script URL)
     expect((await adminFetch("/assets/Old-abc123.js")).status).toBe(404);
     expect((await adminFetch("/api/health")).status).toBe(200);
-    expect((await siteFetch("/")).status).toBe(500); // site row not pushed yet
+    // site row not pushed yet: `unavailable` (RFC-0043 §1.2), not the runtime's default error
+    const missing = await siteFetch("/");
+    expect(missing.status).toBe(503);
+    expect(missing.headers.get("x-cloudhal-state")).toBe("unavailable");
+    expect(missing.headers.get("retry-after")).toBe("300");
+    expect(missing.headers.get("cache-control")).toBe("no-store");
   });
 
   it("pushes the local project, then an agent publishes through MCP with human approval", async () => {
@@ -150,7 +155,10 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
       body: JSON.stringify(bundle),
     });
     expect(pushed.status, await pushed.clone().text()).toBe(200);
-    expect((await siteFetch("/")).status).toBe(503); // pushed, never published
+    // pushed, never published: the not-published page (RFC-0043 §1.2)
+    const unpublished = await siteFetch("/");
+    expect(unpublished.status).toBe(503);
+    expect(unpublished.headers.get("x-cloudhal-state")).toBe("not-published");
 
     // the owner signs up and mints an agent key
     const browser = { origin: "https://admin.example" };

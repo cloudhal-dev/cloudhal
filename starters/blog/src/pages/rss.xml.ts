@@ -4,6 +4,7 @@ import { localeFeedXml } from "@cloudhal/astro-renderer/locale-feeds";
 import { hostLocale } from "@cloudhal/astro-renderer/locales";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
+import { statusPlain } from "@cloudhal/astro-renderer/status-page";
 import type { APIRoute } from "astro";
 
 /**
@@ -13,7 +14,7 @@ import type { APIRoute } from "astro";
 export const GET: APIRoute = async ({ request, url }) => {
   const headers = new Headers();
   const source = await getSource(config, { request, response: { headers } });
-  if (!source) return new Response("This site has not been published yet.", { status: 503 });
+  if (!source) return statusPlain("not-published", { locale: "en", now: Date.now() }, "text");
   const site = await source.site();
   headers.set("content-type", "application/rss+xml; charset=utf-8");
   // Lists every collection's newest entries: any entry change purges it (`cloudhal-list-<site>`).
