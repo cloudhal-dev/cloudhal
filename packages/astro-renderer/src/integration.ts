@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import path from "node:path";
 import type { AstroIntegration } from "astro";
 import type { AnalyticsClient } from "./analytics-client.ts";
 import type { CommentsClient } from "./comments-client.ts";
@@ -61,6 +63,14 @@ const RESOLVED_CLIENT_ID = `\0${CLIENT_ID}`;
 /** Dev only: the built comments module and worker, served from memory by the comments middleware. */
 const COMMENTS_CLIENT_ID = "virtual:cloudhal/comments-client";
 const RESOLVED_COMMENTS_CLIENT_ID = `\0${COMMENTS_CLIENT_ID}`;
+/**
+ * RFC-0043 §1.7: a lazy loader of the project's `src/theme.ts` for the status pages' theme hook
+ * (root-relative, so Vite resolves it in dev and in the Site Worker build), or of an empty module
+ * when the project has no theme module. Evaluated only when a status page is drawn.
+ */
+const THEME_HOOKS_ID = "virtual:cloudhal/theme-hooks";
+const RESOLVED_THEME_HOOKS_ID = `\0${THEME_HOOKS_ID}`;
+const THEME_MODULE = "src/theme.ts";
 
 /** The virtual modules: the project config, and in dev the built analytics and comments clients. */
 function configPlugin(modules: { config: unknown; client: unknown; comments: unknown }) {
@@ -68,27 +78,46 @@ function configPlugin(modules: { config: unknown; client: unknown; comments: unk
     [VIRTUAL_ID]: RESOLVED_ID,
     [CLIENT_ID]: RESOLVED_CLIENT_ID,
     [COMMENTS_CLIENT_ID]: RESOLVED_COMMENTS_CLIENT_ID,
+    [THEME_HOOKS_ID]: RESOLVED_THEME_HOOKS_ID,
   };
   const bodies: Record<string, unknown> = {
     [RESOLVED_ID]: modules.config,
     [RESOLVED_CLIENT_ID]: modules.client,
     [RESOLVED_COMMENTS_CLIENT_ID]: modules.comments,
   };
+  let root = process.cwd();
   return {
     name: "cloudhal-config",
+    configResolved: (config: { root: string }) => {
+      root = config.root;
+    },
     resolveId: (id: string) => (Object.hasOwn(ids, id) ? ids[id] : undefined),
-    load: (id: string) =>
-      Object.hasOwn(bodies, id) ? `export default ${JSON.stringify(bodies[id])};` : undefined,
+    load: (id: string) => {
+      if (id === RESOLVED_THEME_HOOKS_ID)
+        return existsSync(path.join(root, THEME_MODULE))
+          ? `export const loadTheme = () => import("/${THEME_MODULE}");`
+          : "export const loadTheme = () => Promise.resolve({});";
+      return Object.hasOwn(bodies, id)
+        ? `export default ${JSON.stringify(bodies[id])};`
+        : undefined;
+    },
   };
 }
 
 /**
  * What only `cloudhal dev` runs as middleware (the Site Worker's entry and builds do these jobs):
  * the analytics beacon (RFC-0006 §5.1); the click-to-load video player (RFC-0015 §4) and the
- * interaction runtime (RFC-0020 §4), which builds write as files; and the Site Worker's CSP sent
- * report-only, so the console shows what a deploy would block.
+ * interaction runtime (RFC-0020 §4), which builds write as files; the Site Worker's CSP sent
+ * report-only, so the console shows what a deploy would block; and the status pages' preview
+ * route (RFC-0043 §1.8).
  */
-const DEV_MIDDLEWARE = ["analytics-middleware", "embed-middleware", "csp-middleware"].map((m) => ({
+const DEV_MIDDLEWARE = [
+  "analytics-middleware",
+  "embed-middleware",
+  "csp-middleware",
+  // RFC-0043 §1.8: the status pages drawn on demand at `/__cloudhal/status/<state>`.
+  "status-middleware",
+].map((m) => ({
   entrypoint: `@cloudhal/astro-renderer/${m}`,
   order: "pre" as const,
 }));

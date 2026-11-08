@@ -23,7 +23,7 @@ import { usableCommentsKey } from "./comments.ts";
 import type { CloudhalRendererConfig } from "./integration.ts";
 import type { PeerEdition } from "./locales.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
-import { PREVIEW_PARAM, SiteResolver } from "./resolver.ts";
+import { PREVIEW_PARAM, type Resolution, SiteResolver } from "./resolver.ts";
 import type { GraphSource } from "./source.ts";
 
 /** RFC-0029 §3: `AI_SEARCH`, `SEARCH_BUCKET` and `CLOUDHAL_SEARCH_*` turn on semantic search. */
@@ -144,6 +144,66 @@ export function resetSource(siteId?: string): void {
 }
 
 /**
+ * RFC-0043 §1.8: one resolution per request. The entry decides the site's state before Astro
+ * runs and Astro's `getSource` resolves the same request, so the verdict (pointer read, preview
+ * token) is memoised on the request object; a request Astro re-created simply resolves again.
+ */
+const resolutions = new WeakMap<Request, Promise<Resolution>>();
+
+function resolveRequest(r: SiteResolver, request: Request): Promise<Resolution> {
+  let pending = resolutions.get(request);
+  if (!pending) {
+    pending = r.resolve(request);
+    resolutions.set(request, pending);
+  }
+  return pending;
+}
+
+/** RFC-0043 §2.5: what the entry answers for this request, decided before Astro runs. */
+export type SiteStateResult =
+  | { readonly kind: "serve" }
+  /** The site row is missing (deleted, RFC-0034). */
+  | { readonly kind: "unavailable" }
+  /** No published snapshot and no valid preview: `site` is the live node (its name, locales). */
+  | { readonly kind: "not-published"; readonly site: Site }
+  /** A preview token in the URL that does not verify; `published` is the published snapshot's site node, if any. */
+  | {
+      readonly kind: "preview-expired";
+      readonly site: Site;
+      readonly published?: Site | undefined;
+    };
+
+/**
+ * The state of the request's site (RFC-0043 §2.5): `serve` for a published site or a valid
+ * preview, `not-published` before the first publish, `preview-expired` for a token in the URL
+ * that does not verify (§1.2: it no longer falls back to the published page). Shares the
+ * request's resolution with `getSource`.
+ */
+export async function siteState(request: Request, siteId?: string): Promise<SiteStateResult> {
+  const id = siteOf(siteId);
+  if (!id) return { kind: "unavailable" };
+  const r = getResolver(id);
+  let resolution: Resolution;
+  try {
+    resolution = await resolveRequest(r, request);
+  } catch (error) {
+    if (error instanceof Error && /^site .* not found$/.test(error.message))
+      return { kind: "unavailable" };
+    throw error;
+  }
+  if (resolution.kind === "preview") return { kind: "serve" };
+  const fromUrl = new URL(request.url).searchParams.get(PREVIEW_PARAM);
+  if (resolution.previewError && fromUrl && fromUrl !== "exit")
+    return {
+      kind: "preview-expired",
+      site: await r.site(),
+      published: resolution.kind === "published" ? await resolution.source.site() : undefined,
+    };
+  if (resolution.kind === "unpublished") return { kind: "not-published", site: await r.site() };
+  return { kind: "serve" };
+}
+
+/**
  * What site analytics read on the Site Worker (`SiteAnalytics`, RFC-0006 §5.2): D1 for settings and
  * the daily salt, the site row (published pointer, domains) and the isolate's snapshot cache.
  */
@@ -237,7 +297,7 @@ export async function getSource(
   if (!astro) throw new Error("on Cloudflare, pass the Astro global: getSource(config, Astro)");
   const siteId = siteOf(config.siteId) as string;
   const r = getResolver(siteId);
-  const resolution = await r.resolve(astro.request);
+  const resolution = await resolveRequest(r, astro.request);
   const h = astro.response.headers;
   if (resolution.kind === "preview") {
     h.set("cache-control", "private, no-store");
@@ -296,7 +356,7 @@ export async function serveMedia(
   const siteId = siteOf(options.siteId);
   if (!siteId) return undefined;
   const r = getResolver(siteId);
-  const resolution = await r.resolve(request);
+  const resolution = await resolveRequest(r, request);
   if (resolution.kind === "unpublished")
     return new Response("not found", {
       status: 404,

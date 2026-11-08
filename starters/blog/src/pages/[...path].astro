@@ -48,6 +48,7 @@ import {
   siteOrigin,
   withStructuredData,
 } from "@cloudhal/astro-renderer/seo";
+import { statusPage } from "@cloudhal/astro-renderer/status-page";
 import { loadSurfaceSources, surfaceSources } from "@cloudhal/astro-renderer/surfaces";
 import {
   entryTaxonomy,
@@ -114,7 +115,8 @@ export async function getStaticPaths() {
 }
 
 const source = await getSource(config, Astro);
-if (!source) return new Response("This site has not been published yet.", { status: 503 });
+// RFC-0043 §1.8: on Cloudflare and in dev the renderer answers before this; the fallback is its page.
+if (!source) return statusPage("not-published", { locale: "en", now: Date.now() });
 const site = await source.site();
 const requested = Astro.params.path ? `/${Astro.params.path}` : "/";
 // RFC-0033 §4: the locale is in the path prefix or the host; a non-canonical locale URL moves.

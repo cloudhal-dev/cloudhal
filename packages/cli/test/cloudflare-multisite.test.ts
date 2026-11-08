@@ -2,7 +2,9 @@
  * RFC-0034 phase B: one Site Worker serves two sites of an installation, picked by hostname from
  * `site_hosts`, on real workerd (wrangler's test harness) against local D1 + R2. Unknown hosts get
  * a short-cached 404, never another site; the workers.dev host shows the first site, `noindex`; a
- * purge names its site and stays tag-only.
+ * purge names its site and stays tag-only. RFC-0043 §1.2: a third, unpublished site on its own
+ * host gets the status page while its siblings serve, with `no-store` and `Vary: Host`, so the
+ * path-keyed edge cache never hands one host's answer to another.
  */
 import { mkdtemp, rm, symlink } from "node:fs/promises";
 import os from "node:os";
@@ -29,6 +31,7 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
   let tmp: string;
   let english: string;
   let turkish: string;
+  let unpublished: string;
   let harness: ReturnType<typeof createTestHarness>;
 
   beforeAll(async () => {
@@ -56,12 +59,26 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
       const snap = await local.store.createSnapshot(id, { actor: human, reason: "publish" });
       await local.store.publish((await local.store.getSite(id)) as Site, snap.id);
     }
+    // RFC-0043: a third site with a hostname but no publish yet.
+    unpublished = (
+      await seedStarterSite(local.store, {
+        name: "New Edition",
+        slug: "new",
+        locale: "de",
+        projectId: first.projectId,
+      })
+    ).id;
+    const fresh = (await local.store.getSite(unpublished)) as Site;
+    await local.store.updateSite({
+      ...fresh,
+      domains: [{ hostname: "new.example.test", primary: true }],
+    });
     await writeWranglerConfig(
       siteConfigPath(projectDir),
       siteWorkerConfig({
         name: "multi-test",
         siteId: english,
-        siteIds: [english, turkish],
+        siteIds: [english, turkish, unpublished],
         databaseId: "00000000-0000-0000-0000-0000000c0de2",
       }),
       "test",
@@ -78,6 +95,7 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
     // `cloudhal push` of both sites; the import writes their hostnames into site_hosts.
     await copySite(local, target, english);
     await copySite(local, target, turkish);
+    await copySite(local, target, unpublished);
     await local.close();
   }, 600_000);
 
@@ -99,6 +117,37 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
     expect(trHtml).toMatch(/<h1[^>]*>Türkçe Baskı<\/h1>/);
     expect(tr.headers.get("cache-tag")?.split(",")[0]).toBe(`cloudhal-site-${turkish}`);
     expect(trHtml).not.toContain("English Edition");
+  });
+
+  it("gives an unpublished site its own status page, never a sibling's (RFC-0043 §1.2)", async () => {
+    const res = await harness.fetch("https://new.example.test/");
+    const html = await res.text();
+    expect(res.status, html.slice(0, 300)).toBe(503);
+    expect(res.headers.get("x-cloudhal-state")).toBe("not-published");
+    // nothing to key on a path-only edge cache, and a host variant on top
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    expect(res.headers.get("vary")).toBe("Host");
+    expect(html).toContain('<html lang="de"');
+    expect(html).toContain("New Edition");
+    expect(html).not.toContain("English Edition");
+    // the siblings keep serving on their hosts
+    const en = await harness.fetch("https://en.example.test/");
+    expect(en.status).toBe(200);
+    expect(en.headers.get("x-cloudhal-state")).toBeNull();
+    expect(await en.text()).not.toContain("New Edition");
+    expect(
+      await (await harness.fetch("https://new.example.test/__cloudhal/health")).json(),
+    ).toEqual({
+      ok: true,
+      state: "not-published",
+    });
+    expect(await (await harness.fetch("https://tr.example.test/__cloudhal/health")).json()).toEqual(
+      {
+        ok: true,
+        state: "published",
+      },
+    );
   });
 
   it("answers an unknown hostname with a short-cached 404, never another site", async () => {
@@ -129,7 +178,11 @@ describe("multi-site Site Worker on workerd (RFC-0034 §4)", () => {
     // Without a site: every served site's tag, never purgeEverything.
     const all = (await (await purge({})).json()) as { tags?: string[] };
     expect(all.tags?.sort()).toEqual(
-      [`cloudhal-site-${english}`, `cloudhal-site-${turkish}`].sort(),
+      [
+        `cloudhal-site-${english}`,
+        `cloudhal-site-${turkish}`,
+        `cloudhal-site-${unpublished}`,
+      ].sort(),
     );
   });
 });

@@ -19,3 +19,12 @@ declare module "virtual:cloudhal/comments-client" {
   const client: import("./comments-client.ts").CommentsClient | null;
   export default client;
 }
+
+declare module "virtual:cloudhal/theme-hooks" {
+  /**
+   * RFC-0043 §1.7: loads the project's `src/theme.ts` lazily (an empty module when the project
+   * has none), so a status page can ask for the theme's `statusPage` hook without evaluating
+   * the theme on the normal path.
+   */
+  export const loadTheme: () => Promise<Record<string, unknown>>;
+}

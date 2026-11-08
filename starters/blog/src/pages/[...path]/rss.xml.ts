@@ -12,6 +12,7 @@ import { loadAssetIndex } from "@cloudhal/astro-renderer/media";
 import { resolveRoute, staticPaths } from "@cloudhal/astro-renderer/routing";
 import { getSource } from "@cloudhal/astro-renderer/runtime";
 import { siteOrigin } from "@cloudhal/astro-renderer/seo";
+import { statusPlain } from "@cloudhal/astro-renderer/status-page";
 import type { APIRoute } from "astro";
 import { ARCHIVE_PAGE_SIZE } from "../../theme.ts";
 
@@ -46,7 +47,7 @@ export async function getStaticPaths() {
 export const GET: APIRoute = async ({ request, url, params }) => {
   const headers = new Headers();
   const source = await getSource(config, { request, response: { headers } });
-  if (!source) return new Response("This site has not been published yet.", { status: 503 });
+  if (!source) return statusPlain("not-published", { locale: "en", now: Date.now() }, "text");
   const site = await source.site();
   const origin = siteOrigin(site, url);
   const lr = localeRequest(site, url.host, `/${params.path ?? ""}`);
