@@ -163,13 +163,21 @@ const resolutions = new WeakMap<Request, Promise<Resolution>>();
 function resolveRequest(r: SiteResolver, request: Request): Promise<Resolution> {
   let pending = resolutions.get(request);
   if (!pending) {
-    const context = requestSite.getStore();
-    pending = r.resolve(request).then(async (resolution) => {
-      const site = context ? await r.publicSite(resolution) : undefined;
-      if (context && site?.id === context.siteId) context.site = site;
-      return resolution;
-    });
+    pending = r.resolve(request);
     resolutions.set(request, pending);
+    const context = requestSite.getStore();
+    // RFC-0043 §1.6: the `error` page's site, filled in the background, never awaited here (a
+    // published site's node comes with the snapshot load, which a render awaits anyway, so it is
+    // known by the time one fails). Health renders no page and reads only the pointer.
+    if (context && new URL(request.url).pathname !== "/__cloudhal/health")
+      pending
+        .then((resolution) => r.publicSite(resolution))
+        .then(
+          (site) => {
+            if (site?.id === context.siteId) context.site = site;
+          },
+          () => {},
+        );
   }
   return pending;
 }

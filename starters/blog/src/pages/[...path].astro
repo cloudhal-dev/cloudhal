@@ -115,8 +115,8 @@ export async function getStaticPaths() {
 }
 
 // RFC-0043 §1.8 (#167): after a page threw, Astro renders this catch-all as its error route
-// (`/500`). Throw again: Astro then answers an empty 500 that the Site Worker turns into the
-// `error` page with a reference, instead of this route's 404 for `/500`.
+// (`/500` matches it) with the original path. Throw again: Astro then answers an empty 500 that
+// the Site Worker turns into the `error` page with a reference, instead of this route's 404.
 const renderError = (Astro.props as { error?: unknown }).error;
 if (renderError !== undefined) throw renderError;
 const source = await getSource(config, Astro);

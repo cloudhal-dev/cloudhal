@@ -353,7 +353,8 @@ export interface StatusContext extends StatusPageInput {
   content type when no `500.astro` renders) is replaced by the `error` page unless the theme
   marked it as its own (`x-cloudhal-error-page: theme`, set by a theme's `500.astro`; no starter
   has one today). The blog starter's catch-all route rethrows when Astro renders it as the error
-  route (`Astro.props.error`), so a crash never becomes its 404 for `/500`. A response that carries `x-cloudhal-state` (the starter's
+  route (`Astro.props.error`, rendered with the original path), so a crash never becomes its
+  404 for that path. A response that carries `x-cloudhal-state` (the starter's
   `not-published` 503 for a request that reaches Astro, e.g. a `POST`) and any other 5xx the theme
   answers on purpose pass unchanged and log nothing (#167). A store that cannot be read in the
   state step is `unavailable` (503, `Retry-After: 300`), as health reports it. The `error` page

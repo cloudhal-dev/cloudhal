@@ -2,7 +2,7 @@ import { mintPreviewToken, SiteGraphStore, seedStarterSite } from "@cloudhal/cor
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
-import { PREVIEW_COOKIE, SiteResolver } from "../src/resolver.ts";
+import { PREVIEW_COOKIE, type Resolution, SiteResolver } from "../src/resolver.ts";
 
 const SECRET = "resolver-preview-secret-at-least-32-bytes";
 const actor = { kind: "human" as const, id: "user_resolver01", name: "Halil" };
@@ -147,6 +147,16 @@ describe("SiteResolver", () => {
     const preview = await resolver.resolve(req(`/?cloudhal-preview=${token}`));
     expect(preview.kind).toBe("preview");
     expect(await resolver.publicSite(preview)).toBeUndefined();
+  });
+
+  it("publicSite is undefined, never a throw, when the snapshot cannot be read", async () => {
+    const unreadable = {
+      kind: "published",
+      source: { site: () => Promise.reject(new Error("R2 down")) },
+      snapshotId: "snap_unreadable",
+      at: clock,
+    } as unknown as Resolution;
+    await expect(resolver.publicSite(unreadable)).resolves.toBeUndefined();
   });
 
   it("caches immutable snapshot sources with an LRU bound", async () => {
