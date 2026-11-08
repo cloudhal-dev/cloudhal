@@ -3,7 +3,7 @@ name: Template sync
 # Keeps cloudhal-dev/cloudhal-template, the repository the Deploy to Cloudflare button copies
 # (docs/guides/deploy-button.md), on the latest release (issue #111). release.yml calls this after
 # a successful npm publish; to re-sync by hand, run Actions › Template sync › Run workflow with a
-# version npm has.
+# version npm has, or scripts/template-sync.ts from a checkout (CONTRIBUTING.md, Releasing).
 # scripts/template-sync.ts copies src/, public/, astro.config.mjs and tsconfig.json from the blog
 # starter `@cloudhal/cli@<version>` ships and moves @cloudhal/* to ^<version>; the lockfile is
 # refreshed with every @cloudhal/* at exactly <version>, without running package code; then one PR
