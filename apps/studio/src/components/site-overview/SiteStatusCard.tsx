@@ -34,7 +34,7 @@ export function SiteStatusCard({
             {t("overview.live")}
           </Badge>
         ) : (
-          <Badge variant="secondary" appearance="dot">
+          <Badge variant="neutral" appearance="dot">
             {t("overview.notPublished")}
           </Badge>
         )
