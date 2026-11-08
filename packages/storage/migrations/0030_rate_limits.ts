@@ -7,9 +7,11 @@ import type { Migration } from "../src/migrate.ts";
  * deleted the hourly counters too, which let the reset-mail cap restart every minute.
  *
  * `rate_limits`: one row per counter key (`cloudhal:…`), its `count` in the window that began at
- * `window_start` (epoch ms). Nothing prunes it by age; a stale row is reset by the next hit. The
- * old `cloudhal:` rows in `rateLimit` are deleted (Better Auth would prune them anyway), so a
- * counter restarts once at upgrade.
+ * `window_start` and ends at `expires_at` (epoch ms; each counter has its own window length).
+ * Keys come from client addresses and submitted email addresses, so `StaffStore.hit` deletes
+ * expired rows itself, a bounded number at a time, through the `expires_at` index. The old
+ * `cloudhal:` rows in `rateLimit` are deleted (Better Auth would prune them anyway), so a counter
+ * restarts once at upgrade.
  */
 export const migration0030RateLimits: Migration = {
   name: "0030_rate_limits",
@@ -17,8 +19,10 @@ export const migration0030RateLimits: Migration = {
 CREATE TABLE rate_limits (
   key TEXT NOT NULL PRIMARY KEY,
   count INTEGER NOT NULL,
-  window_start INTEGER NOT NULL
+  window_start INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
 );
+CREATE INDEX rate_limits_expires ON rate_limits (expires_at);
 DELETE FROM "rateLimit" WHERE "key" LIKE 'cloudhal:%';
 `,
 };

@@ -8,6 +8,7 @@ import {
   resolveTerm,
   slugify,
   trimChar,
+  trimEndChar,
 } from "../src/names.ts";
 
 const term = (
@@ -57,6 +58,16 @@ describe("foldName", () => {
     expect(trimChar("", "-")).toBe("");
     expect(trimChar("__x_", "_")).toBe("x");
     expect(trimChar(`a${"-".repeat(200_000)}b`, "-")).toBe(`a${"-".repeat(200_000)}b`);
+  });
+
+  it("trimEndChar trims one character at the end only, linearly", () => {
+    expect(trimEndChar("/a/b//", "/")).toBe("/a/b");
+    expect(trimEndChar("///", "/")).toBe("");
+    expect(trimEndChar("/a", "/")).toBe("/a");
+    const inner = `/a${"/".repeat(200_000)}b`;
+    const start = performance.now();
+    expect(trimEndChar(`${inner}/`, "/")).toBe(inner);
+    expect(performance.now() - start).toBeLessThan(1500);
   });
 
   it("slugify trims dashes at both ends and at the 128-character cut (#168)", () => {

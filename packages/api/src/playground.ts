@@ -8,6 +8,7 @@
  * refused as `unclassified`, so a new route is never silently open in a playground.
  */
 import { type Principal, ROLE_SCOPES, type Scope } from "@cloudhal/agent-runtime";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "./context.ts";
 import { matchesRoute, routeFor } from "./scopes.ts";
@@ -220,7 +221,7 @@ const WELL_KNOWN_API = "/.well-known/oauth-protected-resource";
  * the rendered site) is not the API's.
  */
 export function isBlockedInPlayground(method: string, path: string): PlaygroundBlock | undefined {
-  const clean = path.replace(/\/+$/, "") || "/";
+  const clean = trimEndChar(path, "/") || "/";
   if (clean === "/mcp" || clean.startsWith("/mcp/")) return "mcp";
   const wellKnown = clean === WELL_KNOWN_API || clean.startsWith(`${WELL_KNOWN_API}/`);
   if (!clean.startsWith("/api/") && !wellKnown) return undefined;

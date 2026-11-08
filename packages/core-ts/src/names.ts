@@ -40,6 +40,13 @@ export function trimChar(text: string, ch: string): string {
   return start === 0 && end === text.length ? text : text.slice(start, end);
 }
 
+/** `text` without `ch` at its end, linearly: the `/\/+$/` kind of trim, for paths and the like. */
+export function trimEndChar(text: string, ch: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === ch) end--;
+  return end === text.length ? text : text.slice(0, end);
+}
+
 /**
  * Folds a name for comparison: NFKC, Turkish-aware lower-casing (İ, I and ı all become i),
  * diacritics removed, apostrophes and dots dropped (`A.I.` → `ai`), every other run of

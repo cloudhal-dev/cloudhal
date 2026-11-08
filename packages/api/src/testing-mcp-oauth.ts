@@ -245,13 +245,26 @@ export function describeMcpOauthDiscovery(label: string, backend: RolesBackend):
       const entry = await app.request(`${ORIGIN}/mcp`, toolCall("create_entry", entryArgs(siteId)));
       expect(entry.status).toBe(403);
       expect(await entry.json()).toMatchObject({ details: { scope: ["content:draft:own"] } });
-      // Where the same member is an Editor, the challenge names content:write.
+      // An installation Contributor who is an Editor here: consent caps the token at the
+      // Contributor's scopes, so the challenge names what it can issue (content:draft:own), not
+      // content:write, which would come back narrowed and loop. With it the call goes through.
       const editorOn = (siteId: string) =>
         grantPrincipal("contributor", read, { [siteId]: "editor" });
-      expect(await challenged(editorOn, "create_entry", entryArgs)).toEqual(["content:write"]);
+      expect(await challenged(editorOn, "create_entry", entryArgs)).toEqual(["content:draft:own"]);
+      const consented = (siteId: string) =>
+        grantPrincipal("contributor", [...read, "content:draft:own"], { [siteId]: "editor" });
+      expect(await challenged(consented, "create_entry", entryArgs)).toBeUndefined();
       // A site the member cannot open answers not_found from the handler, never a challenge.
       const elsewhere = grantPrincipal("editor", read, { site_other: "editor" });
       expect(await challenged(elsewhere, "create_entry", entryArgs)).toBeUndefined();
+    });
+
+    it("never challenges a plan-mode token for a write plan mode refuses anyway", async () => {
+      const plan: Principal = {
+        ...grantPrincipal("editor", scopesForMode("plan")),
+        mode: "plan",
+      };
+      expect(await challenged(plan, "create_entry", entryArgs)).toBeUndefined();
     });
 
     it("records the step-up 403 in the audit log, like any other denial", async () => {

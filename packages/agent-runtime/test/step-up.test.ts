@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { scopesForMode } from "../src/modes.ts";
 import { type PersonRef, PolicyEngine, type Principal, type Scope } from "../src/policy.ts";
-import type { Role } from "../src/roles.ts";
+import { narrow, type Role, roleScopes } from "../src/roles.ts";
+import { forSite } from "../src/site-access.ts";
 import { stepUpScopes } from "../src/step-up.ts";
 
 const engine = new PolicyEngine([
@@ -93,6 +95,52 @@ describe("stepUpScopes (RFC-0044 §1)", () => {
     expect(stepUpScopes(engine, limited, "publish", { siteId: "site_a" })).toBeUndefined();
     // A site the member cannot open: the handler answers not_found, never a challenge.
     expect(stepUpScopes(engine, limited, "update_entry", { siteId: "site_c" })).toBeUndefined();
+  });
+
+  it("asks only for what both the site role and the installation role give (no loop)", () => {
+    // An installation Contributor who is an Editor on site_b: consent caps the token at the
+    // Contributor's scopes, so asking for content:write would come back as content:draft:own.
+    const contributor = grant("contributor", READ, { site_b: "editor" });
+    const args = { siteId: "site_b" };
+    const asked = stepUpScopes(engine, contributor, "update_entry", args);
+    expect(asked).toEqual(["content:draft:own"]);
+    // After consent (capped by the installation role) the call runs and nothing is asked again.
+    const granted = narrow([...READ, ...(asked ?? [])], roleScopes("contributor"));
+    const after = { ...contributor, scopes: granted, keyScopes: granted };
+    expect(stepUpScopes(engine, after, "update_entry", args)).toBeUndefined();
+    const onSite = forSite(after, "site_b");
+    expect(onSite && engine.evaluate(onSite, "update_entry", { args })).toMatchObject({
+      kind: "allow",
+      limit: { level: "draft" },
+    });
+    // Publishing is neither role's to give on that site through a Contributor's consent.
+    expect(stepUpScopes(engine, contributor, "publish", args)).toBeUndefined();
+  });
+
+  it("never challenges a call that would still be denied after consent", () => {
+    // Plan mode: the token lacks content:write, but plan mode refuses the write anyway.
+    const plan = { ...grant("editor", scopesForMode("plan")), mode: "plan" as const };
+    expect(engine.evaluate(plan, "update_entry")).toMatchObject({ code: "missing_scope" });
+    expect(stepUpScopes(engine, plan, "update_entry")).toBeUndefined();
+    // ... while a propose call, which plan mode may make, is still challenged when it lacks scopes.
+    expect(
+      stepUpScopes(
+        engine,
+        { ...plan, scopes: ["site:read"], keyScopes: ["site:read"] },
+        "edit_body",
+        {
+          mode: "propose",
+        },
+      ),
+    ).toEqual(["content:read", "content:propose"]);
+    // A declared skill that does not cover the tool's scope: the skill check would refuse it.
+    const skilled = {
+      ...grant("editor", READ),
+      skill: { name: "reader", scopes: ["site:read", "content:read"], approval: [] },
+    };
+    expect(stepUpScopes(engine, skilled, "update_entry")).toBeUndefined();
+    const covering = { ...skilled, skill: { ...skilled.skill, scopes: ["content:write"] } };
+    expect(stepUpScopes(engine, covering, "update_entry")).toEqual(["content:write"]);
   });
 
   it("never asks for a person-only scope, and never for a call that is not a scope denial", () => {

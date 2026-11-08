@@ -167,6 +167,14 @@ describe("createApi({ playground })", () => {
     expect(instance.features.mcp).toBe(false);
   });
 
+  it("judges a path with a long run of slashes in linear time (#168)", () => {
+    // `/\/+$/` on the request path took about 150 ms per 16k slashes, on every request.
+    const start = performance.now();
+    expect(isBlockedInPlayground("GET", `/api/${"/".repeat(200_000)}x`)).toBe("unclassified");
+    expect(isBlockedInPlayground("GET", "/api/me///")).toBeUndefined();
+    expect(performance.now() - start).toBeLessThan(1500);
+  });
+
   it("refuses the OAuth discovery documents even when mcp.oauth is configured", async () => {
     const sql = await BetterSqlite3Driver.open(":memory:");
     const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });

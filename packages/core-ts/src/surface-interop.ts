@@ -13,6 +13,7 @@
  */
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { nearestIcon } from "./icon-names.ts";
+import { trimChar } from "./names.ts";
 
 export const A2UI_VERSION = "v0.9";
 export const A2UI_BASIC_CATALOG = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
@@ -50,15 +51,12 @@ class Ids {
   get(raw: string): string {
     const known = this.#map.get(raw);
     if (known) return known;
-    let base =
-      raw === "root"
-        ? "root"
-        : raw
-            .toLowerCase()
-            .replace(/[^a-z0-9-]+/g, "-")
-            .replace(/^[^a-z]+/, "")
-            .replace(/-+$/, "")
-            .slice(0, 36) || "c";
+    // `trimChar`, not `/-+$/`, which backtracks on the "-" runs kept here (js/polynomial-redos).
+    const dashed = raw
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^[^a-z]+/, "");
+    let base = raw === "root" ? "root" : trimChar(dashed, "-").slice(0, 36) || "c";
     if (!ID.test(base)) base = `c-${base}`.slice(0, 36);
     let id = base;
     for (let n = 2; this.#taken.has(id); n++) id = `${base}-${n}`;

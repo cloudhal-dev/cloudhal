@@ -10,6 +10,8 @@ import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { createApi } from "./app.ts";
 import { createAuth } from "./auth.ts";
 import type { MailMessage } from "./mail.ts";
+import { PRUNE_LIMIT } from "./rate-limits.ts";
+import { StaffStore } from "./staff.ts";
 import type { RolesBackend } from "./testing-roles.ts";
 
 const ORIGIN = "http://limits.test";
@@ -93,6 +95,50 @@ export function describeRateLimitCounters(label: string, backend: RolesBackend):
       // An hour after the first mail the address can be mailed again.
       vi.setSystemTime(T0 + 61 * 60_000);
       expect(await askForResets(1)).toBe(4);
+    });
+
+    it("prunes expired counters, which nothing else deletes", async () => {
+      const b = await backend.create();
+      let now = T0;
+      let prune = false;
+      const staff = new StaffStore(
+        b.sql,
+        () => new Date(now),
+        () => prune,
+      );
+      const keys = async () =>
+        (await b.sql.all<{ key: string }>("SELECT key FROM rate_limits ORDER BY key")).map(
+          (r) => r.key,
+        );
+      expect(await staff.hit("cloudhal:minute", 60_000, 3)).toBe(true);
+      expect(await staff.hit("cloudhal:hour", 3_600_000, 2)).toBe(true);
+      now = T0 + 61_000;
+      // A hit that does not prune leaves the stale row; a pruning one removes only expired rows.
+      expect(await staff.hit("cloudhal:other", 60_000, 3)).toBe(true);
+      expect(await keys()).toEqual(["cloudhal:hour", "cloudhal:minute", "cloudhal:other"]);
+      prune = true;
+      expect(await staff.hit("cloudhal:hour", 3_600_000, 2)).toBe(true);
+      expect(await keys()).toEqual(["cloudhal:hour", "cloudhal:other"]);
+      // The hourly counter kept its window: the third hit within the hour is over its max of 2.
+      expect(await staff.hit("cloudhal:hour", 3_600_000, 2)).toBe(false);
+      // A counter whose row was pruned starts again at 1.
+      expect(await staff.hit("cloudhal:minute", 60_000, 1)).toBe(true);
+      // One prune deletes at most PRUNE_LIMIT expired rows; later hits take the rest.
+      await b.sql.batch(
+        Array.from({ length: PRUNE_LIMIT + 5 }, (_, i) => ({
+          sql: "INSERT INTO rate_limits (key, count, window_start, expires_at) VALUES (?, 1, 0, 1)",
+          params: [`cloudhal:stale:${i}`],
+        })),
+      );
+      await staff.hit("cloudhal:other", 60_000, 3);
+      const left = await b.sql.get<{ n: number }>(
+        "SELECT count(*) AS n FROM rate_limits WHERE key LIKE 'cloudhal:stale:%'",
+      );
+      expect(Number(left?.n)).toBe(5);
+      const index = await b.sql.get<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'rate_limits' AND name = 'rate_limits_expires'",
+      );
+      expect(index?.name).toBe("rate_limits_expires");
     });
   });
 }

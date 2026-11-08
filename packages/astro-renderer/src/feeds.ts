@@ -5,6 +5,7 @@
  */
 import type { ContentEntry, Page, Redirect, Site } from "@cloudhal/core-contracts";
 import { collectionSettings, entryPath } from "@cloudhal/core-ts";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import type { ArchiveSummary, ArchiveView } from "./archive.ts";
 import { markdownText, renderBody } from "./markdown.ts";
 import type { AssetIndex } from "./media.ts";
@@ -214,7 +215,7 @@ export function redirectsFile(redirects: readonly Redirect[]): string {
     .sort((a, b) => b.from.length - a.from.length || a.from.localeCompare(b.from));
   const splat = (to: string) => {
     const i = to.search(/[?#]/);
-    const head = (i < 0 ? to : to.slice(0, i)).replace(/\/+$/, "");
+    const head = trimEndChar(i < 0 ? to : to.slice(0, i), "/");
     return `${head}/:splat${i < 0 ? "" : to.slice(i)}`;
   };
   const lines = [

@@ -163,8 +163,13 @@ arguments of the single message a stateless request carries and asks the policy 
 the same rules as the handler's decision: a propose call needs its `proposeScopes`, an own
 variant satisfies a tool that allows one (an Author is asked for `site:publish:own`, a
 Contributor for `content:draft:own`), and the member's role is their role on the call's site
-(RFC-0034 A2), not their installation role. Every other denial (role, mode, `:own`, approvals)
-stays a JSON-RPC result as today. The 403 leaves an audit row like every other denial. Clients then
+(RFC-0034 A2). Only scopes both that site role and the installation role give are asked for,
+because consent caps a token by the installation role and `forSite` then caps it by the site
+role: an installation Contributor who is an Editor on one site is asked for `content:draft:own`
+there, not `content:write`. No challenge is sent when the call would still be denied once the
+token has those scopes (plan mode, a skill that does not cover the tool). Every other denial
+(role, mode, `:own`, approvals) stays a JSON-RPC result as today. The 403 leaves an audit row
+like every other denial. Clients then
 re-authorize with the union of their scopes (the SDK's `computeScopeUnion`; the draft revision
 makes the union normative). A scope the role does not hold is never challenged: the client would
 loop. The challenge is emitted together for all scopes the tool needs ("servers SHOULD include all
