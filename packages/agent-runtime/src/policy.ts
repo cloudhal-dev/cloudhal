@@ -188,6 +188,11 @@ const OWN_VARIANTS: Partial<Record<Scope, readonly { scope: Scope; level: "own" 
   "releases:publish": [{ scope: "releases:publish:own", level: "own" }],
 };
 
+/** The own variants of `scope` that satisfy `tool` with a limit, strongest first (none without `own`). */
+export function ownVariantsOf(tool: ToolPolicy, scope: Scope): Scope[] {
+  return tool.own ? (OWN_VARIANTS[scope] ?? []).map((v) => v.scope) : [];
+}
+
 /**
  * What a call does, decided from its arguments (RFC-0007 §10.2), for tools whose policy depends
  * on them (`moderate_comments` may hide in `edits` mode but never approve):
@@ -307,7 +312,16 @@ export type ApprovalCause = "tool" | "destructive" | "skill" | "manual-mode" | "
 
 export type Decision =
   | { kind: "allow"; limit?: OwnLimit }
-  | { kind: "deny"; reason: string; code?: "missing_scope" | "mode" | "skill" }
+  | {
+      kind: "deny";
+      reason: string;
+      code?: "missing_scope" | "mode" | "skill";
+      /**
+       * `missing_scope` only: the required scopes (`proposeScopes` for a propose call) that
+       * neither the caller's scopes nor an own variant of them satisfy (RFC-0044 §1 step-up).
+       */
+      missing?: Scope[];
+    }
   | {
       kind: "approval-required";
       reason: string;
@@ -379,7 +393,12 @@ export class PolicyEngine {
       missing.push(s);
     }
     if (missing.length > 0)
-      return { kind: "deny", reason: `missing scope ${missing.join(", ")}`, code: "missing_scope" };
+      return {
+        kind: "deny",
+        reason: `missing scope ${missing.join(", ")}`,
+        code: "missing_scope",
+        missing,
+      };
     if (principal.skill) {
       // A skill may only call tools inside the scopes it declared (own variants count).
       const declared = principal.skill.scopes;

@@ -70,8 +70,8 @@ export function clientIp(c: Context<Env>): string {
 }
 
 /**
- * 10 requests per minute per IP on a public token endpoint (RFC-0005 §7.1), counted in Better
- * Auth's `rateLimit` table.
+ * 10 requests per minute per IP on a public token endpoint (RFC-0005 §7.1), counted in Cloudhal's
+ * `rate_limits` table (migration 0030; not Better Auth's `rateLimit`, which it prunes by 60 s).
  */
 export async function limitPublic(c: Context<Env>, bucket: string): Promise<void> {
   const staff = c.get("staff");

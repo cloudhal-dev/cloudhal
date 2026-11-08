@@ -9,6 +9,7 @@
 import type { ContentEntry, Page, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { entryPath, type PermalinkSite, termSlug } from "@cloudhal/core-ts";
 import { localeRouting, localeUrl, localizedPath } from "@cloudhal/core-ts/locale-paths";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import { routableEntries } from "./entry-views.ts";
 import type { HeadMeta } from "./seo.ts";
 import type { GraphSource } from "./source.ts";
@@ -247,7 +248,7 @@ export function localizeLinks(html: string, localize: (path: string) => string):
     const cut = url.search(/[?#]/);
     const path = cut < 0 ? url : url.slice(0, cut);
     const suffix = cut < 0 ? "" : url.slice(cut);
-    return `${head}${localize(path.length > 1 ? path.replace(/\/+$/, "") : path)}${suffix}${tail}`;
+    return `${head}${localize(path.length > 1 ? trimEndChar(path, "/") : path)}${suffix}${tail}`;
   };
   return html
     .replace(/(<(?:a|form)\b[^>]*?\s(?:href|action)=")(\/[^"]*)(")/gi, swap)

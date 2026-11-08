@@ -156,7 +156,7 @@ export function matchDirective(src: string): { directive: Directive; raw: string
 
 /** A whole block's source as a directive, or `undefined` when it is not exactly one. */
 export function parseDirective(markdown: string): Directive | undefined {
-  const source = markdown.replace(/\s+$/, "");
+  const source = markdown.trimEnd(); // not `/\s+$/`: it backtracks on inner whitespace runs
   const m = matchDirective(source);
   return m && m.raw === source ? m.directive : undefined;
 }
@@ -199,7 +199,7 @@ export function writeDirective(
 ): string {
   const attrs = directiveAttrsText(props);
   if (content === undefined) return `::${name}${attrs}`;
-  const inner = content.replace(/\s+$/, "");
+  const inner = content.trimEnd();
   let deepest = 2;
   for (const m of inner.matchAll(/^(:{3,})/gm))
     deepest = Math.max(deepest, (m[1] as string).length);

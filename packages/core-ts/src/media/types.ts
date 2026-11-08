@@ -4,6 +4,7 @@
  * so a client can never pick a kind or an extension (invariant 4). Worker-safe.
  */
 import type { Asset } from "@cloudhal/core-contracts";
+import { trimChar } from "../names.ts";
 
 export type AssetKind = Asset["kind"];
 
@@ -248,14 +249,12 @@ const SPECIAL: Record<string, string> = {
 /** A URL slug from a file name or title: `Boğaz at Dawn (1).JPG` → `bogaz-at-dawn-1`. */
 export function slugifyFilename(name: string | undefined, fallback = "file"): string {
   const base = (name ?? "").replace(/\.[A-Za-z0-9]{1,10}$/, "");
-  const slug = base
+  const dashed = base
     .toLowerCase()
     .replace(/[ıßæœøđðłþ]/g, (c) => SPECIAL[c] ?? c)
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 96)
-    .replace(/-+$/g, "");
+    .replace(/[^a-z0-9]+/g, "-");
+  const slug = trimChar(trimChar(dashed, "-").slice(0, 96), "-");
   return slug || fallback;
 }

@@ -79,6 +79,10 @@ describe("the playground route table", () => {
     ["POST", "/api/agent-keys", "keys"],
     ["POST", "/mcp", "mcp"],
     ["GET", "/mcp/", "mcp"],
+    // RFC-0044 decision 10: no OAuth discovery in a playground, even if `mcp.oauth` were set.
+    ["GET", "/.well-known/oauth-protected-resource", "mcp"],
+    ["HEAD", "/.well-known/oauth-protected-resource/mcp", "mcp"],
+    ["GET", "/.well-known/oauth-protected-resource/other", "unclassified"],
     ["POST", "/api/sites/s1/assets/uploads", "uploads"],
     ["PUT", "/api/sites/s1/assets/uploads/u1", "uploads"],
     ["DELETE", "/api/sites/s1/assets/a1", "uploads"],
@@ -113,6 +117,7 @@ describe("the playground route table", () => {
     // not the API's to judge: Studio and the rendered site
     ["GET", "/studio/members"],
     ["GET", "/s/01J0000000/blog/"],
+    ["GET", "/.well-known/security.txt"],
   ])("allows %s %s", (method, path) => {
     expect(isBlockedInPlayground(method, path)).toBeUndefined();
   });
@@ -160,6 +165,36 @@ describe("createApi({ playground })", () => {
     expect(instance.features.playground).toEqual(info);
     expect(instance.features.members).toBe(false);
     expect(instance.features.mcp).toBe(false);
+  });
+
+  it("judges a path with a long run of slashes in linear time (#168)", () => {
+    // `/\/+$/` on the request path took about 150 ms per 16k slashes, on every request.
+    const start = performance.now();
+    expect(isBlockedInPlayground("GET", `/api/${"/".repeat(200_000)}x`)).toBe("unclassified");
+    expect(isBlockedInPlayground("GET", "/api/me///")).toBeUndefined();
+    expect(performance.now() - start).toBeLessThan(1500);
+  });
+
+  it("refuses the OAuth discovery documents even when mcp.oauth is configured", async () => {
+    const sql = await BetterSqlite3Driver.open(":memory:");
+    const store = new SiteGraphStore({ sql, blobs: new MemoryBlobStore() });
+    await store.init();
+    const app = createApi({
+      store,
+      playground: { info: () => info },
+      mcp: {
+        stateKey: "playground-state-key-0123456789abcdefghij",
+        oauth: { issuer: "http://try.test/api/auth", resource: "http://try.test/mcp" },
+      },
+    });
+    for (const path of [
+      "/.well-known/oauth-protected-resource",
+      "/.well-known/oauth-protected-resource/mcp",
+    ]) {
+      const res = await app.request(`http://try.test${path}`);
+      expect(res.status, path).toBe(403);
+      expect(await res.json()).toMatchObject({ error: "playground", block: "mcp" });
+    }
   });
 
   it("edits, snapshots and publishes", async () => {

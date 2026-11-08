@@ -24,6 +24,12 @@ describe("heading ids (RFC-0018 §3)", () => {
     expect(headingSlug("Café façade — Straße")).toBe("cafe-facade-strasse");
   });
 
+  it("trims dashes at both ends and at the 64-character cut", () => {
+    expect(headingSlug(" — Notes — ")).toBe("notes");
+    expect(headingSlug(`${"a".repeat(63)} b`)).toBe("a".repeat(63));
+    expect(headingSlug("-".repeat(100_000))).toBe("section");
+  });
+
   it("never takes an id Cloudhal's own markup uses, nor starts with a digit", () => {
     expect(headingSlug("Comments")).toBe("h-comments");
     expect(headingSlug("Cloudhal setup")).toBe("h-cloudhal-setup");

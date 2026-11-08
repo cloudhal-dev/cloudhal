@@ -3,6 +3,7 @@ import { type BlockRegistry, createBlockRegistry } from "@cloudhal/core-ts/block
 import { type DirectiveToken, directiveExtension } from "@cloudhal/core-ts/body-blocks";
 import { checkDirective, directiveProps } from "@cloudhal/core-ts/directives";
 import { ASSET_HREF, assetUrl, mediaPath } from "@cloudhal/core-ts/media";
+import { trimChar } from "@cloudhal/core-ts/names";
 import { parseSurfaceFence } from "@cloudhal/core-ts/surfaces";
 import { Marked } from "marked";
 import { builtInBlockHtml, isBuiltInBlock, missingBlockHtml } from "./block-html.ts";
@@ -48,17 +49,14 @@ const RESERVED_ID = /^(?:comment|cloudhal|ch-)/;
  * Latin letters or digits falls back to `section`; repeats get `-2`, `-3`, ….
  */
 export function headingSlug(text: string, taken?: Map<string, number>): string {
-  const base =
-    text
-      .replace(/[ıİşŞğĞ]/g, (c) => TURKISH[c] ?? c)
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .toLowerCase()
-      .replace(/ß/g, "ss")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 64)
-      .replace(/-+$/, "") || "section";
+  const dashed = text
+    .replace(/[ıİşŞğĞ]/g, (c) => TURKISH[c] ?? c)
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-");
+  const base = trimChar(trimChar(dashed, "-").slice(0, 64), "-") || "section";
   const slug = RESERVED_ID.test(base) || /^\d/.test(base) ? `h-${base}` : base;
   if (!taken) return slug;
   const seen = taken.get(slug) ?? 0;

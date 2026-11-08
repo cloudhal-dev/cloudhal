@@ -1,4 +1,5 @@
 import type { PublishStatus } from "@cloudhal/core-contracts";
+import { trimChar } from "@cloudhal/core-ts/names";
 
 /** Allowed editorial transitions (RFC-0001 lifecycle). */
 export const TRANSITIONS: Record<PublishStatus, PublishStatus[]> = {
@@ -18,13 +19,10 @@ export function needsApproval(to: PublishStatus): boolean {
 }
 
 export function slugify(input: string): string {
-  return (
-    input
-      .toLowerCase()
-      .normalize("NFKD")
-      .replace(/[̀-ͯ]/g, "")
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 128) || "untitled"
-  );
+  const dashed = input
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-");
+  return trimChar(dashed, "-").slice(0, 128) || "untitled";
 }

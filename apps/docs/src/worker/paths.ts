@@ -22,13 +22,15 @@ export function pageId(input: string, selfHost?: string): string | undefined {
     if (!HOSTS.has(url.hostname) && url.host !== selfHost) return undefined;
     value = url.pathname;
   }
-  const path = value
+  const stem = value
     .replace(/[?#].*$/, "")
     .replace(/^\/+/, "")
     .replace(/(^|\/)index\.md$/, "")
-    .replace(/\.md$/, "")
-    .replace(/\/+$/, "")
-    .toLowerCase();
+    .replace(/\.md$/, "");
+  // A linear trim of trailing "/" (`/\/+$/` backtracks on a long run of "/" inside the path).
+  let end = stem.length;
+  while (end > 0 && stem[end - 1] === "/") end--;
+  const path = stem.slice(0, end).toLowerCase();
   if (path === "" || path === "index") return "index";
   if (!ID.test(path) || path.split("/").some((s) => s === "." || s === "..")) return undefined;
   return path;

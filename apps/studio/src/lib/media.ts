@@ -15,6 +15,7 @@ import {
   normalizeMediaType,
   RASTER_TYPES,
 } from "@cloudhal/core-ts/media";
+import { trimChar } from "@cloudhal/core-ts/names";
 import { numberFormat } from "@cloudhal/messages/format";
 import { type AssetListItem, type AssetPatch, api } from "./api.ts";
 import { type ImageRef, previewImageUrl } from "./seo.ts";
@@ -389,12 +390,11 @@ export function assetPatch(form: AssetForm, kind: AssetKind): AssetPatch {
 
 /** A URL slug from a file name (lower-case words joined by hyphens), for the slug field. */
 export function slugify(input: string): string {
-  return input
+  const dashed = input
     .toLowerCase()
     .replace(/ı/g, "i")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, ASSET_LIMITS.slug);
+    .replace(/[^a-z0-9]+/g, "-");
+  return trimChar(dashed, "-").slice(0, ASSET_LIMITS.slug);
 }

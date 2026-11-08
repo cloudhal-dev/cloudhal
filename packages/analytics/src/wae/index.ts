@@ -24,9 +24,13 @@ export { WaeWriter } from "./writer.ts";
 
 /** The dataset name for a deployment: `<name>_events`, `-` → `_`, lower case (RFC-0006 §4). */
 export function datasetName(deployment: string): string {
-  const base = deployment
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, "_")
-    .replace(/^_+|_+$/g, "");
+  const underscored = deployment.toLowerCase().replace(/[^a-z0-9_]+/g, "_");
+  // Linear trim: `/^_+|_+$/g` backtracks on a long run of `_` inside the name (CodeQL
+  // js/polynomial-redos), and the replace above keeps runs the name already had.
+  let start = 0;
+  let end = underscored.length;
+  while (start < end && underscored[start] === "_") start++;
+  while (end > start && underscored[end - 1] === "_") end--;
+  const base = underscored.slice(start, end);
   return `${base || "cloudhal"}_events`;
 }

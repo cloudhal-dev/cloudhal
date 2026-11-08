@@ -5,6 +5,7 @@
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { FIELD_LIMITS } from "@cloudhal/core-ts/fields";
+import { trimChar } from "@cloudhal/core-ts/names";
 import {
   type FieldType,
   fieldKeyFrom,
@@ -120,14 +121,15 @@ export function withOptionLabel(
     if (j !== i) return o;
     const value =
       isDefault && !o.valueEdited
-        ? label
-            .toLowerCase()
-            .normalize("NFKD")
-            .replace(/[\u0300-\u036f]/g, "")
-            .replace(/ı/g, "i")
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .slice(0, 128)
+        ? trimChar(
+            label
+              .toLowerCase()
+              .normalize("NFKD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/ı/g, "i")
+              .replace(/[^a-z0-9]+/g, "-"),
+            "-",
+          ).slice(0, 128)
         : o.value;
     return { ...o, value, labels: { ...o.labels, [locale]: label } };
   });

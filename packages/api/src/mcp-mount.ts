@@ -10,6 +10,8 @@ import type { BuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { unauthorized } from "./errors.ts";
 import {
+  assertMcpOauth,
+  MCP_PATH,
   mountProtectedResourceMetadata,
   stepUpChallenge,
   unauthorizedChallenge,
@@ -38,8 +40,11 @@ export function mountMcp(
     schedules: parts.schedules,
   });
   const oauth = deps.mcp.oauth;
-  if (oauth) mountProtectedResourceMetadata(app, oauth);
-  app.all("/mcp", async (c) => {
+  if (oauth) {
+    assertMcpOauth(oauth);
+    mountProtectedResourceMetadata(app, oauth);
+  }
+  app.all(MCP_PATH, async (c) => {
     // DNS-rebinding / cross-site protection: browsers send Origin; it must be this origin.
     const origin = c.req.header("origin");
     if (origin && origin !== new URL(c.req.url).origin)
@@ -59,7 +64,14 @@ export function mountMcp(
         403,
       );
     if (oauth) {
-      const stepUp = await stepUpChallenge(c.req.raw, principal, c.get("policy")(), oauth);
+      const stepUp = await stepUpChallenge({
+        request: c.req.raw,
+        principal,
+        policy: c.get("policy")(),
+        oauth,
+        audit: deps.mcp.audit,
+        now: deps.now,
+      });
       if (stepUp) return stepUp;
     }
     return mcp.fetch(c.req.raw, principal);

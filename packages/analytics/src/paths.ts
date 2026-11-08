@@ -27,7 +27,10 @@ export function normaliseBeaconPath(raw: string): string | undefined {
     return undefined;
   }
   // no query split after decoding: an encoded "?" is part of the path, and the route pattern refuses it
-  const trimmed = decoded.length > 1 ? decoded.replace(/\/+$/, "") || "/" : decoded;
+  // A linear trim of trailing "/" (`/\/+$/` backtracks on a long run of "/" inside the path).
+  let end = decoded.length;
+  while (end > 1 && decoded[end - 1] === "/") end--;
+  const trimmed = decoded.slice(0, end);
   const path = trimmed.toLowerCase();
   return ROUTE_PATH_RE.test(path) ? path : undefined;
 }

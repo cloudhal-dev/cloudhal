@@ -217,7 +217,12 @@ describe("PolicyEngine", () => {
       expect(implies("content:write", "content:propose")).toBe(true);
       expect(
         body.evaluate({ actor: agent, scopes: ["content:read"] }, "edit_body", propose),
-      ).toEqual({ kind: "deny", reason: "missing scope content:propose", code: "missing_scope" });
+      ).toEqual({
+        kind: "deny",
+        reason: "missing scope content:propose",
+        code: "missing_scope",
+        missing: ["content:propose"],
+      });
       // A skill must declare what the call needs.
       const skilled = {
         ...planKey,

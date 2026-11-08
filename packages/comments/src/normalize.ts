@@ -57,17 +57,20 @@ export function cutCodePoints(s: string, max: number): string {
 }
 
 export function normalizeText(raw: string): string {
-  return raw
-    .normalize("NFC")
-    .replace(/\r\n?/g, "\n")
-    .replace(UNSAFE_IN_TEXT, "")
-    .replace(INVISIBLE_RE, "")
-    .replace(LONE_ZWJ_RE, "")
-    .split("\n")
-    .map((line) => line.replace(/[^\S\n]+$/u, ""))
-    .join("\n")
-    .replace(/\n{4,}/g, "\n\n\n")
-    .trim();
+  return (
+    raw
+      .normalize("NFC")
+      .replace(/\r\n?/g, "\n")
+      .replace(UNSAFE_IN_TEXT, "")
+      .replace(INVISIBLE_RE, "")
+      .replace(LONE_ZWJ_RE, "")
+      .split("\n")
+      // `trimEnd`, not `/[^\S\n]+$/u`: the regex backtracks on a long run of spaces inside a line.
+      .map((line) => line.trimEnd())
+      .join("\n")
+      .replace(/\n{4,}/g, "\n\n\n")
+      .trim()
+  );
 }
 
 export function normalizeName(raw: string): string {

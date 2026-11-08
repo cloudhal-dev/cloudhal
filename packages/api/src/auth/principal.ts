@@ -31,7 +31,7 @@ export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
     if (key) {
       const verified = await api.verifyApiKey({ body: { key } });
       if (!verified.valid || !verified.key) return undefined;
-      // A fixed window per key (`rateLimit` table): it resets every window however busy the key is.
+      // A fixed window per key (`rate_limits` table): it resets every window however busy the key is.
       if (
         !(await staffStore.hit(`cloudhal:key:${verified.key.id}`, keyLimit.windowMs, keyLimit.max))
       )

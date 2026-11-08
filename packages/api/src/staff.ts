@@ -9,6 +9,7 @@
  */
 import { isRole, type Role } from "@cloudhal/agent-runtime";
 import type { SqlDriver } from "@cloudhal/storage";
+import { countHit, pruneCounters, randomPrune } from "./rate-limits.ts";
 import {
   allSiteRoles,
   inviteSiteRoles,
@@ -91,10 +92,13 @@ function toMember(r: Row): MemberRow | undefined {
 export class StaffStore {
   readonly #sql: SqlDriver;
   readonly #now: () => Date;
+  readonly #prune: () => boolean;
 
-  constructor(sql: SqlDriver, now: () => Date = () => new Date()) {
+  /** `prune` decides per hit whether to delete expired rate-limit counters (tests pin it). */
+  constructor(sql: SqlDriver, now: () => Date = () => new Date(), prune = randomPrune) {
     this.#sql = sql;
     this.#now = now;
+    this.#prune = prune;
   }
 
   // ───────────────────────────── members ─────────────────────────────
@@ -534,21 +538,15 @@ export class StaffStore {
   // ───────────────────────────── rate limits ─────────────────────────────
 
   /**
-   * Fixed-window counter in Better Auth's `rateLimit` table (migration 0005), under keys of our own
-   * (`cloudhal:…`). Returns false once `max` requests were seen within `windowMs`.
+   * Fixed-window counter under keys of our own (`cloudhal:…`) in `rate_limits` (`./rate-limits.ts`,
+   * #168): one atomic upsert per hit, and now and then a prune of expired counters. Returns false
+   * once `max` requests were seen within `windowMs`.
    */
   async hit(key: string, windowMs: number, max: number): Promise<boolean> {
     const now = this.#now().getTime();
-    const start = now - windowMs;
-    await this.#sql.run(
-      `INSERT INTO "rateLimit" ("id", "key", "count", "lastRequest") VALUES (?, ?, 1, ?) ON CONFLICT ("key") DO UPDATE SET "count" = CASE WHEN "rateLimit"."lastRequest" < ? THEN 1 ELSE "rateLimit"."count" + 1 END, "lastRequest" = CASE WHEN "rateLimit"."lastRequest" < ? THEN excluded."lastRequest" ELSE "rateLimit"."lastRequest" END`,
-      [newRowId(), key, now, start, start],
-    );
-    const row = await this.#sql.get<{ count: number }>(
-      `SELECT "count" FROM "rateLimit" WHERE "key" = ?`,
-      [key],
-    );
-    return Number(row?.count ?? 0) <= max;
+    const count = await countHit(this.#sql, { key, windowMs, now });
+    if (this.#prune()) await pruneCounters(this.#sql, now);
+    return count <= max;
   }
 
   // ───────────────────────────── helpers ─────────────────────────────

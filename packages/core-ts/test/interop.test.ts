@@ -527,4 +527,23 @@ describe("json-render", () => {
       fromJsonRender({ elements: {} }, { sectionId: "sec_x00000001", catalog: catalog.id }),
     ).toThrow(InteropError);
   });
+
+  it("turns an agent's key with a long run of dashes into an id in linear time (#168)", () => {
+    // The old `/-+$/` trim took about 16 s on this key (the replace before it keeps "-" runs).
+    const key = `a${"-".repeat(200_000)}b-`;
+    const start = performance.now();
+    const r = fromJsonRender(
+      {
+        root: "page",
+        elements: {
+          page: { type: "Stack", children: [key] },
+          [key]: { type: "Heading", props: { text: "Hi", level: 2 } },
+        },
+      },
+      { sectionId: "sec_jsonrend02", catalog: catalog.id },
+    );
+    expect(performance.now() - start).toBeLessThan(1500);
+    expect(r.surface.components[1]?.id).toBe(`a${"-".repeat(35)}`);
+    expect(checkSurface(r.surface, catalog).issues).toEqual([]);
+  });
 });

@@ -100,6 +100,13 @@ not apply, cacheable for an hour:
 - `/.well-known/oauth-protected-resource` (root form, the fallback the 2025-11-25 and later
   revisions require clients to probe; Claude's docs probe it too).
 
+Both are served without CORS headers. That matches `/mcp`, which refuses any request whose
+`Origin` is not its own (DNS-rebinding protection): the clients this RFC serves are native apps
+and servers, which do not need CORS, and a browser page on another origin that could read the
+document still could not call `/mcp`. `McpMountOptions.oauth.resource` must be the public URL of
+the mounted `/mcp` (its path ends in `/mcp`; a proxy may add a prefix): `createApi` throws
+otherwise, since every token's audience is bound to it.
+
 ```json
 {
   "resource": "https://studio.example.com/mcp",
@@ -150,9 +157,19 @@ WWW-Authenticate: Bearer error="insufficient_scope", scope="site:publish",
 ```
 
 This is possible without a second policy engine because each tool's scopes are static
-(`toolPolicies(defineTools())`, ADR-0011): the route reads the JSON-RPC method and tool name of
-the single message a stateless request carries and compares the tool's scopes with the token's.
-Every other denial (role, mode, `:own`, approvals) stays a JSON-RPC result as today. Clients then
+(`toolPolicies(defineTools())`, ADR-0011): the route reads the JSON-RPC method, tool name and
+arguments of the single message a stateless request carries and asks the policy engine
+(`stepUpScopes` in `@cloudhal/agent-runtime`) which scopes the denial lacks. The answer follows
+the same rules as the handler's decision: a propose call needs its `proposeScopes`, an own
+variant satisfies a tool that allows one (an Author is asked for `site:publish:own`, a
+Contributor for `content:draft:own`), and the member's role is their role on the call's site
+(RFC-0034 A2). Only scopes both that site role and the installation role give are asked for,
+because consent caps a token by the installation role and `forSite` then caps it by the site
+role: an installation Contributor who is an Editor on one site is asked for `content:draft:own`
+there, not `content:write`. No challenge is sent when the call would still be denied once the
+token has those scopes (plan mode, a skill that does not cover the tool). Every other denial
+(role, mode, `:own`, approvals) stays a JSON-RPC result as today. The 403 leaves an audit row
+like every other denial. Clients then
 re-authorize with the union of their scopes (the SDK's `computeScopeUnion`; the draft revision
 makes the union normative). A scope the role does not hold is never challenged: the client would
 loop. The challenge is emitted together for all scopes the tool needs ("servers SHOULD include all
@@ -409,7 +426,7 @@ attestation, per-grant IP allow-lists.
   `better-call` 1.4.5), because the three plugins peer-depend on `^1.7.18`;
   `test/better-auth-pins.test.ts` keeps the family consistent. New catalog entries:
   `@better-auth/mcp`, `@better-auth/oauth-provider`, `@better-auth/cimd`, `jose`.
-- **`packages/storage/migrations/0030_oauth.ts`**: the DDL for `oauthClient`,
+- **`packages/storage/migrations/0031_oauth.ts`**: the DDL for `oauthClient`,
   `oauthAccessToken`, `oauthRefreshToken`, `oauthConsent`, `oauthClientAssertion`,
   `oauthResource`, `oauthClientResource` and `jwks`, generated with
   `getMigrations(auth.options).compileMigrations()` on 1.7.18 and checked in, as `0002_auth` and
@@ -470,7 +487,7 @@ CREATE INDEX agent_grants_user ON agent_grants (user_id);
 | Phase | Ships | Amends |
 |---|---|---|
 | 1 · Discovery | `WWW-Authenticate` with `resource_metadata` and `scope` on `/mcp` 401; both PRM documents; the 403 step-up challenge; `ApiDeps.mcp.oauth` option (issuer, resource) that turns them on; the suite's discovery cases. Until Phase 2 the issuer answers 404, so clients fail at "authorization server metadata", a diagnosable error | ADR-0004 addendum: "No OAuth provider" gains "superseded by ADR-00NN (RFC-0044)" |
-| 2 · Authorization server | Better Auth bump; `mcp()` + `jwt()` in `createInstance`; migration `0030_oauth`; `agent_grants`; token → `Principal`; consent screen; `/api/agent-grants`; `cloudhal studio` issuer from `--base-url` (#143); shared suite on sqlite + D1 | ADR-0010 "MCP authorization (Sprint 5)" paragraph (DCR fallback, no DPoP in v1); ADR-0011 §5–6 row "OAuth 2.1 … Sprint 6" → done; new ADR-00NN |
+| 2 · Authorization server | Better Auth bump; `mcp()` + `jwt()` in `createInstance`; migration `0031_oauth`; `agent_grants`; token → `Principal`; consent screen; `/api/agent-grants`; `cloudhal studio` issuer from `--base-url` (#143); shared suite on sqlite + D1 | ADR-0010 "MCP authorization (Sprint 5)" paragraph (DCR fallback, no DPoP in v1); ADR-0011 §5–6 row "OAuth 2.1 … Sprint 6" → done; new ADR-00NN |
 | 3 · Registration and Studio | `cimd()` with the two transports; DCR with limits and pruning; "Connected agents"; `McpClientSetup` tab; `docs/guides/mcp-oauth.md` and the docs site's clients page; hardening guide (secret rotation, allow-list, `CLOUDHAL_MCP_DCR`); e2e test; changeset | `packages/mcp-server/README.md` auth section; `docs/guides/cloudflare-hardening.md` |
 
 Each phase is one PR; Phase 1 is independent of the Better Auth bump and can land first.
@@ -577,8 +594,10 @@ sequenceDiagram
   `agent-runtime`, not a contract) gains the optional `grantId`.
 - **Agent keys:** unchanged, `x-api-key` and `Authorization: Bearer <key>` keep working;
   `resolvePrincipal` distinguishes a JWT by shape. The agent-keys suite stays green unchanged.
-- **Data:** additive tables (§7). Existing deployments get the challenge on `/mcp` after Phase 1
-  with no data change; an installation that never enables the AS loses nothing.
+- **Data:** additive tables (§7). Phase 1 ships the challenge behind `McpMountOptions.oauth`,
+  and no runtime sets that option until Phase 2 gives it an issuer; existing deployments get the
+  challenge on `/mcp` once a runtime sets it (Phase 2), with no data change. An installation that
+  never enables the AS loses nothing.
 - **API:** `/api/agent-grants` is new; `/api/instance` `features` gains `mcpOauth: true|false`
   so Studio shows the "Connect by URL" tab only where it works.
 - **CLI:** `cloudhal studio --base-url` (#143) is the dependency; `cloudhal mcp clients create`

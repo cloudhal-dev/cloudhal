@@ -8,6 +8,7 @@
  * refused as `unclassified`, so a new route is never silently open in a playground.
  */
 import { type Principal, ROLE_SCOPES, type Scope } from "@cloudhal/agent-runtime";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "./context.ts";
 import { matchesRoute, routeFor } from "./scopes.ts";
@@ -211,14 +212,19 @@ export function playgroundDenyRule(method: string, pattern: string): PlaygroundB
   return undefined;
 }
 
+/** The API's well-known documents (RFC-0044 §1): judged like `/api/*`, so their rows apply. */
+const WELL_KNOWN_API = "/.well-known/oauth-protected-resource";
+
 /**
  * Why `method path` is refused in playground mode, or undefined when it is allowed. Only API
- * paths (`/api/*`, `/mcp`) are judged; anything else (Studio, the rendered site) is not the API's.
+ * paths (`/api/*`, `/mcp`, the API's well-known documents) are judged; anything else (Studio,
+ * the rendered site) is not the API's.
  */
 export function isBlockedInPlayground(method: string, path: string): PlaygroundBlock | undefined {
-  const clean = path.replace(/\/+$/, "") || "/";
+  const clean = trimEndChar(path, "/") || "/";
   if (clean === "/mcp" || clean.startsWith("/mcp/")) return "mcp";
-  if (!clean.startsWith("/api/")) return undefined;
+  const wellKnown = clean === WELL_KNOWN_API || clean.startsWith(`${WELL_KNOWN_API}/`);
+  if (!clean.startsWith("/api/") && !wellKnown) return undefined;
   const m = method.toUpperCase() === "HEAD" ? "GET" : method.toUpperCase();
   // Prefix rules first, so an undeclared path under a blocked area names its area.
   const route = routeFor(m, clean);

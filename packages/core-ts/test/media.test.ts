@@ -559,6 +559,10 @@ describe("references and URLs", () => {
     expect(slugifyFilename("Boğaz at Dawn (1).JPG")).toBe("bogaz-at-dawn-1");
     expect(slugifyFilename("İstanbul ışıkları.png")).toBe("istanbul-isiklari");
     expect(slugifyFilename("...")).toBe("file");
+    // #168: linear trims, and a cut at 96 characters that lands on a dash drops it.
+    expect(slugifyFilename(`--${"-".repeat(100_000)}--.png`)).toBe("file");
+    expect(slugifyFilename(`${"a".repeat(95)} b.jpg`)).toBe("a".repeat(95));
+    expect(slugifyFilename(" -Hello- .txt")).toBe("hello");
   });
 });
 

@@ -65,6 +65,17 @@ export function describeSqlDriverConformance(label: string, factory: SqlDriverFa
       expect(await driver.get("SELECT v FROM t WHERE id = 999")).toBeUndefined();
     });
 
+    it("get returns the row of a write's RETURNING clause (an upsert's count in one statement)", async () => {
+      const upsert = (v: string) =>
+        driver.get<{ n: number }>(
+          "INSERT INTO t (id, v, n) VALUES (1, ?, 1) ON CONFLICT (id) DO UPDATE SET n = t.n + 1, v = excluded.v RETURNING n",
+          [v],
+        );
+      expect(await upsert("a")).toEqual({ n: 1 });
+      expect(await upsert("b")).toEqual({ n: 2 });
+      expect(await driver.get("SELECT v, n FROM t WHERE id = 1")).toEqual({ v: "b", n: 2 });
+    });
+
     it("batch is atomic: a failing statement rolls back the whole batch", async () => {
       await expect(
         driver.batch([

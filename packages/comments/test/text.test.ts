@@ -40,6 +40,14 @@ describe("normalising (§6.4)", () => {
     );
   });
 
+  it("trims line ends in linear time (#168, CodeQL js/polynomial-redos)", () => {
+    // `/[^\S\n]+$/u` took seconds on a long run of spaces inside one line.
+    const line = `a${" ".repeat(200_000)}b`;
+    const start = performance.now();
+    expect(normalizeText(`${line}  \nnext`)).toBe(`${line}\nnext`);
+    expect(performance.now() - start).toBeLessThan(1500);
+  });
+
   it("removes control characters but tab and line feed, C1 controls and bidi overrides", () => {
     const hostile =
       "a\u0000b\u0007c\u001Bd\u007Fe\u0085f" +

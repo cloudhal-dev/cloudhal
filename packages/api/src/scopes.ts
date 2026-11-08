@@ -14,6 +14,7 @@
  * Agents (API keys) are refused everywhere except `public`/`signed-in`: they work through MCP.
  */
 import { forInstallation, forSite, holds, type Scope } from "@cloudhal/agent-runtime";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "./context.ts";
 import { apiError, missingScope, unauthorized } from "./errors.ts";
@@ -342,7 +343,7 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
 /** Whether `path` fits a `ROUTE_SCOPES` pattern (`:param` one segment, `*` the rest). */
 export function matchesRoute(pattern: string, path: string): boolean {
   const p = pattern.split("/");
-  const s = path.replace(/\/+$/, "").split("/");
+  const s = trimEndChar(path, "/").split("/");
   for (let i = 0; i < p.length; i++) {
     const part = p[i] as string;
     if (part === "*") return s.length > i;

@@ -31,6 +31,14 @@ describe("directive syntax", () => {
     expect(parseDirective("::embed")).toEqual({ name: "embed", attrs: {}, fence: 2 });
   });
 
+  it("trims trailing whitespace in linear time (#168, CodeQL js/polynomial-redos)", () => {
+    // `/\s+$/` took about 6 s on a 100k run of spaces inside an agent's block.
+    const start = performance.now();
+    expect(parseDirective(`::embed${" ".repeat(200_000)}x`)).toBeUndefined();
+    expect(parseDirective("::embed  \n\t ")).toEqual({ name: "embed", attrs: {}, fence: 2 });
+    expect(performance.now() - start).toBeLessThan(1500);
+  });
+
   it("rejects anything that does not parse exactly", () => {
     for (const bad of [
       ":::callout{tone=warning}\nx\n:::", // unquoted value
