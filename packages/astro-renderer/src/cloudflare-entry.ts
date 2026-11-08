@@ -75,8 +75,16 @@ import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { hostRedirect, type RedirectEnv } from "./host-redirect.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { SearchLimiter, searchCost } from "./search-limit.ts";
-import { SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
-import { errorPage, type StatusState, statusStep, withErrorPage } from "./status-entry.ts";
+import { type SiteChoice, SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
+import {
+  errorPage,
+  HEALTH_PATH,
+  health,
+  hostLookupFailed,
+  type StatusState,
+  statusStep,
+  withErrorPage,
+} from "./status-entry.ts";
 import { renderStatus, themeStatusHook } from "./status-hook.ts";
 import type { SiteState } from "./status-page.ts";
 import { statusInput } from "./status-serve.ts";
@@ -161,34 +169,6 @@ const commentsBySite = new Map<string, SiteComments>();
 let dispatch: SiteDispatch | undefined;
 /** RFC-0043 §1.7: the theme's `statusPage` hook, loaded the first time a status page is drawn. */
 const statusHook = themeStatusHook(loadTheme, (m, e) => console.error(m, e));
-
-/**
- * RFC-0043 §1.9: `{ ok, state }`, the admin's `/api/health` shape plus the site's state, so one
- * monitor rule reads both. Public, never cached, never indexed; reads only the memoised pointer.
- */
-async function health(request: Request): Promise<Response> {
-  const headers = {
-    "cache-control": "no-store",
-    "cloudflare-cdn-cache-control": "no-store",
-    "x-robots-tag": "noindex",
-  };
-  if (request.method !== "GET" && request.method !== "HEAD")
-    return Response.json(
-      { error: "method_not_allowed" },
-      { status: 405, headers: { ...headers, allow: "GET" } },
-    );
-  try {
-    const state = await siteState(request);
-    if (state.kind === "unavailable") return Response.json({ ok: false }, { status: 503, headers });
-    return Response.json(
-      { ok: true, state: state.kind === "not-published" ? "not-published" : "published" },
-      { headers },
-    );
-  } catch (error) {
-    console.error("cloudhal: health check could not read the store", error);
-    return Response.json({ ok: false }, { status: 503, headers });
-  }
-}
 
 /** One per isolate: which site a request is for (RFC-0034 §4). */
 function siteDispatch(env: Env, siteIdFromBuild: string | undefined): SiteDispatch {
@@ -618,6 +598,20 @@ async function statusResponse(
   return response;
 }
 
+/** A status page before any site is known (the hostname map failed): English, no site data. */
+async function siteless(request: Request, state: StatusState): Promise<Response> {
+  return renderStatus(
+    state.kind,
+    { locale: "en", now: Date.now() },
+    {
+      hook: await statusHook(),
+      method: request.method,
+      csp: SITE_CSP,
+      onFailure: (m, e) => console.error(m, e),
+    },
+  );
+}
+
 export function createSiteWorker(options: { siteId?: string } = {}) {
   const searchLimiter = new SearchLimiter();
   async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
@@ -628,7 +622,13 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
     if (moved) return moved;
     // RFC-0034 §4: the hostname picks the site on a multi-site Worker; everything the request
     // runs (Astro's render included) then sees that site.
-    const choice = await siteDispatch(env, options.siteId).choose(request);
+    let choice: SiteChoice;
+    try {
+      choice = await siteDispatch(env, options.siteId).choose(request);
+    } catch (error) {
+      // A store that cannot be read is `unavailable` (503), as health says, never `error`.
+      return hostLookupFailed(request, error, { page: (state) => siteless(request, state) });
+    }
     if (choice.kind === "unknown") return unknownHost();
     // Without `CLOUDHAL_SITE_ID` a single-site Worker serves the site it was built for, as
     // Astro's `getSource` always did; `unavailable` is for a site row that is gone (§2.5).
@@ -636,7 +636,7 @@ export function createSiteWorker(options: { siteId?: string } = {}) {
     const call = { request, env, ctx };
     const run = async () => {
       try {
-        if (url.pathname === "/__cloudhal/health") return await health(request);
+        if (url.pathname === HEALTH_PATH) return await health(request, () => siteState(request));
         const status = await statusStep(request, {
           state: () => siteState(request),
           page: (state) => statusResponse(call, state, siteId),

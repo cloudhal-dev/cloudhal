@@ -133,6 +133,22 @@ describe("SiteResolver", () => {
     expect((r as { previewError?: string }).previewError).toMatch(/not enabled/);
   });
 
+  it("publicSite names the published site node, never an unpublished rename (RFC-0043 §1.6)", async () => {
+    const before = await resolver.resolve(req("/"));
+    expect((await resolver.publicSite(before))?.name).toBe("Resolver");
+    await publish("v1");
+    const live = await store.getSite(siteId);
+    await store.updateSite({ ...(live as NonNullable<typeof live>), name: "Renamed draft" });
+    clock += 1001;
+    const published = await resolver.resolve(req("/"));
+    expect(published.kind).toBe("published");
+    expect((await resolver.publicSite(published))?.name).toBe("Resolver");
+    const token = await mintPreviewToken(SECRET, { site: siteId, target: "live", now: clock });
+    const preview = await resolver.resolve(req(`/?cloudhal-preview=${token}`));
+    expect(preview.kind).toBe("preview");
+    expect(await resolver.publicSite(preview)).toBeUndefined();
+  });
+
   it("caches immutable snapshot sources with an LRU bound", async () => {
     const small = new SiteResolver({ store, siteId, snapshotCacheSize: 2 });
     const ids: string[] = [];

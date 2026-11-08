@@ -164,9 +164,8 @@ function resolveRequest(r: SiteResolver, request: Request): Promise<Resolution> 
   let pending = resolutions.get(request);
   if (!pending) {
     const context = requestSite.getStore();
-    pending = r.resolve(request).then((resolution) => {
-      // A preview resolves without reading the site row; anything else just read it.
-      const site = resolution.kind === "preview" ? undefined : r.loadedSite();
+    pending = r.resolve(request).then(async (resolution) => {
+      const site = context ? await r.publicSite(resolution) : undefined;
       if (context && site?.id === context.siteId) context.site = site;
       return resolution;
     });

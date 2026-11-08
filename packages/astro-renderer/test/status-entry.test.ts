@@ -6,9 +6,18 @@
  * never serves the published content, and no answer says why the token failed.
  */
 import type { Site } from "@cloudhal/core-contracts";
+import type { SqlDriver } from "@cloudhal/storage";
 import { describe, expect, it, vi } from "vitest";
 import type { SiteStateResult } from "../src/runtime-workerd.ts";
-import { errorPage, type StatusState, statusStep, withErrorPage } from "../src/status-entry.ts";
+import { SiteDispatch } from "../src/site-dispatch.ts";
+import {
+  errorPage,
+  health,
+  hostLookupFailed,
+  type StatusState,
+  statusStep,
+  withErrorPage,
+} from "../src/status-entry.ts";
 import { statusPage, statusPlain } from "../src/status-page.ts";
 import { markInvalidPreview, statusPathKind } from "../src/status-serve.ts";
 import { en } from "../src/status-strings/en.ts";
@@ -56,6 +65,21 @@ describe("withErrorPage (§1.8)", () => {
     ])
       expect(withErrorPage(res, request("/"), { log })).toBe(res);
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("turns Astro's empty fallback 500 (no body, no type) into the error page", async () => {
+    // Astro 7.4 `renderDefaultError`: the catch-all route matches `/500` and throws again
+    const log = vi.fn();
+    const out = withErrorPage(new Response(null, { status: 500 }), request("/broken"), { log });
+    expect(out.status).toBe(500);
+    expect(out.headers.get("x-cloudhal-state")).toBe("error");
+    expect(out.headers.get("content-type")).toBe("text/html; charset=utf-8");
+    expect(out.headers.get("content-security-policy")).toContain("default-src 'none'");
+    expect(await out.text()).toContain("8f00ray");
+    expect(log).toHaveBeenCalledOnce();
+    // an explicit non-HTML 500 is the theme's own answer
+    const json = Response.json({ error: "x" }, { status: 500 });
+    expect(withErrorPage(json, request("/a.json"), { log })).toBe(json);
   });
 
   it("turns Astro's own 500 page into the error page, logged with the reference", async () => {
@@ -192,5 +216,75 @@ describe("markInvalidPreview (decision 12)", () => {
   it("statusPlain bodies are the same for every failure", async () => {
     const a = await statusPlain("preview-expired", { locale: "en", now: NOW }, "text").text();
     expect(a).not.toMatch(/signature|expired token|another site|not enabled/i);
+  });
+});
+
+describe("health and a failed hostname lookup (§1.9, RFC-0034 §4)", () => {
+  /** A multi-site dispatch whose store is down past the host map's TTL. */
+  const downDispatch = () =>
+    new SiteDispatch({
+      siteId: undefined,
+      siteIds: "site_a,site_b",
+      // every query rejects, as D1 does during an outage
+      sql: () =>
+        new Proxy({} as SqlDriver, {
+          get: () => () => Promise.reject(new Error("D1_ERROR: storage down")),
+        }),
+    });
+  const failed = async (path: string, init?: RequestInit) => {
+    const req = new Request(`https://a.example${path}`, init);
+    const error = await downDispatch()
+      .choose(req)
+      .then(
+        () => undefined,
+        (e: unknown) => e,
+      );
+    expect((error as Error).message).toBe("D1_ERROR: storage down");
+    const page = vi.fn((state: StatusState) =>
+      Promise.resolve(statusPage(state.kind, { locale: "en", now: NOW })),
+    );
+    const log = vi.fn();
+    const res = await hostLookupFailed(req, error, { page, log, now: () => NOW });
+    expect(log).toHaveBeenCalledOnce();
+    return { res, page };
+  };
+
+  it("health answers 503 { ok: false }, never cached", async () => {
+    const { res, page } = await failed("/__cloudhal/health");
+    expect(res.status).toBe(503);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    expect(res.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
+    expect(await res.json()).toEqual({ ok: false });
+    expect(page).not.toHaveBeenCalled();
+  });
+
+  it("pages and machine paths answer unavailable: 503, Retry-After 300, English, no name", async () => {
+    const { res, page } = await failed("/about");
+    expect(page).toHaveBeenCalledWith({ kind: "unavailable" });
+    expect(res.status).toBe(503);
+    expect(res.headers.get("retry-after")).toBe("300");
+    expect(res.headers.get("x-cloudhal-state")).toBe("unavailable");
+    expect(await res.text()).toContain(en.unavailable.title);
+    const feed = (await failed("/rss.xml")).res;
+    expect(feed.status).toBe(503);
+    expect(feed.headers.get("retry-after")).toBe("300");
+    expect(await feed.text()).toBe(`${en.unavailable.title}. ${en.unavailable.body}\n`);
+    const post = (await failed("/", { method: "POST" })).res;
+    expect(post.status).toBe(503);
+    expect(post.headers.get("x-cloudhal-state")).toBe("unavailable");
+  });
+
+  it("health reports the state, and a store failure as 503", async () => {
+    const ok = await health(request("/__cloudhal/health"), () =>
+      Promise.resolve<SiteStateResult>({ kind: "not-published", site }),
+    );
+    expect(await ok.json()).toEqual({ ok: true, state: "not-published" });
+    const down = await health(
+      request("/__cloudhal/health"),
+      () => Promise.reject(new Error("x")),
+      () => {},
+    );
+    expect(down.status).toBe(503);
+    expect(await down.json()).toEqual({ ok: false });
   });
 });

@@ -1,5 +1,6 @@
 /**
- * The Site Worker entry's status step and `error` page (RFC-0043 §1.2, §1.8, §2.5), apart from
+ * The Site Worker entry's status step, `error` page, health endpoint and the answer when the
+ * hostname cannot be mapped to a site (RFC-0043 §1.2, §1.8, §1.9, §2.5), apart from
  * `cloudflare-entry.ts` so unit tests run them: no bindings, no Astro, no `cloudflare:` imports.
  * Worker-safe.
  */
@@ -58,19 +59,22 @@ export function errorPage(
 }
 
 /**
- * §1.8: Astro's own 500 HTML (a render that threw) becomes the `error` page. What the renderer
- * or the theme answered on purpose passes unchanged and logs nothing: a status page
- * (`x-cloudhal-state`, e.g. the starter's `not-published` 503 for a request that reaches Astro),
- * a theme's `500.astro` (`x-cloudhal-error-page: theme`) and any other 5xx.
+ * §1.8: Astro's own 500 (a render that threw) becomes the `error` page — HTML, or Astro's empty
+ * fallback (`new Response(null, { status: 500 })` when no `500.astro` renders: the starter's
+ * catch-all route matches `/500` and throws again). What the renderer or the theme answered on
+ * purpose passes unchanged and logs nothing: a status page (`x-cloudhal-state`, e.g. the
+ * starter's `not-published` 503 for a request that reaches Astro), a theme's `500.astro`
+ * (`x-cloudhal-error-page: theme`), a 500 with an explicit non-HTML type, and any other 5xx.
  */
 export function withErrorPage(
   response: Response,
   request: Request,
   options: ErrorPageOptions = {},
 ): Response {
+  const type = response.headers.get("content-type") ?? "";
   if (
     response.status !== 500 ||
-    !(response.headers.get("content-type") ?? "").includes("text/html") ||
+    (type !== "" && !type.includes("text/html")) ||
     response.headers.has("x-cloudhal-state") ||
     response.headers.get("x-cloudhal-error-page") === "theme"
   )
@@ -122,4 +126,68 @@ export async function statusStep(
   );
   const as = url.pathname.toLowerCase().endsWith(".json") ? "json" : "text";
   return statusPlain(state.kind, input, as, { method: request.method });
+}
+
+export const HEALTH_PATH = "/__cloudhal/health";
+
+const HEALTH_HEADERS = {
+  "cache-control": "no-store",
+  "cloudflare-cdn-cache-control": "no-store",
+  "x-robots-tag": "noindex",
+} as const;
+
+/** §1.9: the store cannot be read, so the site is down for monitors. */
+function healthDown(): Response {
+  return Response.json({ ok: false }, { status: 503, headers: HEALTH_HEADERS });
+}
+
+/**
+ * §1.9: `{ ok, state }`, the admin's `/api/health` shape plus the site's state, so one monitor
+ * rule reads both. Public, never cached, never indexed; reads only the memoised pointer.
+ */
+export async function health(
+  request: Request,
+  state: () => Promise<SiteStateResult>,
+  log: Log = console.error,
+): Promise<Response> {
+  if (request.method !== "GET" && request.method !== "HEAD")
+    return Response.json(
+      { error: "method_not_allowed" },
+      { status: 405, headers: { ...HEALTH_HEADERS, allow: "GET" } },
+    );
+  try {
+    const result = await state();
+    if (result.kind === "unavailable") return healthDown();
+    return Response.json(
+      { ok: true, state: result.kind === "not-published" ? "not-published" : "published" },
+      { headers: HEALTH_HEADERS },
+    );
+  } catch (error) {
+    log("cloudhal: health check could not read the store", error);
+    return healthDown();
+  }
+}
+
+/**
+ * RFC-0034 §4 with §1.2: on a multi-site Worker the hostname map could not be read (the store
+ * failed past the map's TTL), so no site is known. Treated as a store failure, never as `error`:
+ * health answers `503 { ok: false }`; `GET`/`HEAD` page paths the `unavailable` page and machine
+ * paths its plain answer (503, `Retry-After: 300`, English, no site name); anything else a
+ * plain 503.
+ */
+export async function hostLookupFailed(
+  request: Request,
+  error: unknown,
+  options: Pick<StatusStepOptions, "page" | "log" | "now">,
+): Promise<Response> {
+  (options.log ?? console.error)("cloudhal: the site's hostnames could not be read", error);
+  if (new URL(request.url).pathname === HEALTH_PATH) return healthDown();
+  const answer = await statusStep(request, {
+    state: () => Promise.reject(error),
+    page: options.page,
+    log: () => {},
+    now: options.now,
+  });
+  const input = { locale: "en", now: (options.now ?? Date.now)() };
+  return answer ?? statusPlain("unavailable", input, "text", { method: request.method });
 }
