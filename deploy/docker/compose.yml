@@ -12,14 +12,23 @@ services:
     ports:
       - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_PORT:-8787}:8787"
     environment:
-      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:-http://localhost:8787}
-      CLOUDHAL_BEHIND_PROXY: ${CLOUDHAL_BEHIND_PROXY:-0}
-      CLOUDHAL_INIT: ${CLOUDHAL_INIT:-blog}
-      CLOUDHAL_SITE_NAME: ${CLOUDHAL_SITE_NAME:-My site}
-      CLOUDHAL_AUTOMATIONS: ${CLOUDHAL_AUTOMATIONS:-on}
-      CLOUDHAL_TRUSTED_ORIGINS: ${CLOUDHAL_TRUSTED_ORIGINS:-}
-      CLOUDHAL_AI_TOKEN: ${CLOUDHAL_AI_TOKEN:-}
-      CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID:-}
+      # The origin browsers open Studio at, which sign-in is tied to: it changes together with
+      # CLOUDHAL_PORT, and is the public https origin behind a proxy (.env.example).
+      - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL:-http://localhost:8787}
+      - CLOUDHAL_BEHIND_PROXY=${CLOUDHAL_BEHIND_PROXY:-0}
+      - CLOUDHAL_INIT=${CLOUDHAL_INIT:-blog}
+      - CLOUDHAL_SITE_NAME=${CLOUDHAL_SITE_NAME:-My site}
+      # The public site's origin: `site-build` writes its host into canonical links, the sitemap
+      # and feeds (cloudhal.json `domains.site`); with the caddy profile Caddy serves the site there.
+      - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
+      - CLOUDHAL_AUTOMATIONS=${CLOUDHAL_AUTOMATIONS:-on}
+      - CLOUDHAL_TRUSTED_ORIGINS=${CLOUDHAL_TRUSTED_ORIGINS:-}
+      # Secrets. A name without a value is passed through from .env or the shell only when it is
+      # set there, so an unset BETTER_AUTH_SECRET leaves the container with the secret it created
+      # on the volume (/data/.cloudhal/auth-secret). Never set it to an empty value.
+      - BETTER_AUTH_SECRET
+      - CLOUDHAL_AI_TOKEN
+      - CLOUDFLARE_ACCOUNT_ID
     volumes:
       - cloudhal-data:/data
 
@@ -34,16 +43,35 @@ services:
       - "443:443"
       - "443:443/udp"
     environment:
-      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:?set CLOUDHAL_BASE_URL in .env}
-      CLOUDHAL_SITE_URL: ${CLOUDHAL_SITE_URL:?set CLOUDHAL_SITE_URL in .env}
+      - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL:-}
+      - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
+    # Both origins are required for this profile. They are checked here, when Caddy starts, rather
+    # than with `:?` interpolation, which would fail `docker compose up` for everyone who never
+    # uses Caddy.
+    command:
+      - sh
+      - -c
+      - |
+        if [ -z "$$CLOUDHAL_BASE_URL" ] || [ -z "$$CLOUDHAL_SITE_URL" ]; then
+          echo "caddy: the caddy profile needs CLOUDHAL_BASE_URL and CLOUDHAL_SITE_URL in .env (https://… origins)" >&2
+          exit 1
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # the built site (`site-build` writes /data/dist), read-only
+      # the built site: `site-build` puts each build under /data/site and points
+      # /data/site/current at the newest one; read-only here
       - cloudhal-data:/srv/cloudhal:ro
       - caddy-data:/data
       - caddy-config:/config
 
 volumes:
+  # The installation. Named outright, so that this stack, `docker run -v cloudhal-data:/data …` and
+  # the guide's backup commands share one volume whatever the compose project is called. A stack
+  # created with the compose file of 0.6.3 has `<project>_cloudhal-data` (`docker volume ls`): set
+  # CLOUDHAL_VOLUME to that name in .env to keep it (the guide, "Backup and restore"). A second
+  # stack on the same host must set a CLOUDHAL_VOLUME of its own: one volume, one container.
   cloudhal-data:
+    name: ${CLOUDHAL_VOLUME:-cloudhal-data}
   caddy-data:
   caddy-config:

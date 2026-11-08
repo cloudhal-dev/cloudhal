@@ -3,12 +3,13 @@
 # volume. Built from the npm release (`CLOUDHAL_VERSION=x.y.z`), or from packed tarballs in
 # `tarballs/` next to this file for the nightly `edge` tag (.github/workflows/docker.yml).
 #
-#   docker build --build-arg CLOUDHAL_VERSION=0.6.2 -t cloudhal:local deploy/docker
+#   docker build --build-arg CLOUDHAL_VERSION=0.6.3 -t cloudhal:local deploy/docker
 #   docker run --rm -p 127.0.0.1:8787:8787 -v cloudhal-data:/data cloudhal:local
 #
 # No compiler is installed: better-sqlite3 comes as a prebuilt binary for linux/amd64 and
-# linux/arm64. The public site is `cloudhal build` output (`site-build` in the container) that a
-# web server such as the compose file's Caddy serves from the same volume.
+# linux/arm64. The public site is `cloudhal build` output, published by `site-build` under
+# /data/site (the newest build at /data/site/current) for a web server such as the compose file's
+# Caddy to serve from the same volume.
 
 FROM node:24-bookworm-slim AS build
 ARG CLOUDHAL_VERSION=""

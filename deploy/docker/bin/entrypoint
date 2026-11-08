@@ -4,6 +4,9 @@
 # `docker run … cloudhal export` or `docker compose exec cloudhal site-build` work too.
 set -eu
 cd /data
+# An empty BETTER_AUTH_SECRET (a blank value in .env) would be taken as the secret itself: treat it
+# as unset, so the secret created on the volume stays in use.
+if [ -z "${BETTER_AUTH_SECRET-unset}" ]; then unset BETTER_AUTH_SECRET; fi
 if [ "${1:-studio}" = "studio" ]; then
   [ $# -gt 0 ] && shift
   exec cloudhal studio --init-if-empty "$@"
