@@ -534,18 +534,20 @@ export class StaffStore {
   // ───────────────────────────── rate limits ─────────────────────────────
 
   /**
-   * Fixed-window counter in Better Auth's `rateLimit` table (migration 0005), under keys of our own
-   * (`cloudhal:…`). Returns false once `max` requests were seen within `windowMs`.
+   * Fixed-window counter under keys of our own (`cloudhal:…`), in Cloudhal's `rate_limits` table
+   * (migration 0030), not Better Auth's `rateLimit`: Better Auth prunes that by its own 60 s
+   * window, which reset hourly counters every minute (#168). One upsert, so concurrent hits never
+   * lose a count. Returns false once `max` requests were seen within `windowMs`.
    */
   async hit(key: string, windowMs: number, max: number): Promise<boolean> {
     const now = this.#now().getTime();
     const start = now - windowMs;
     await this.#sql.run(
-      `INSERT INTO "rateLimit" ("id", "key", "count", "lastRequest") VALUES (?, ?, 1, ?) ON CONFLICT ("key") DO UPDATE SET "count" = CASE WHEN "rateLimit"."lastRequest" < ? THEN 1 ELSE "rateLimit"."count" + 1 END, "lastRequest" = CASE WHEN "rateLimit"."lastRequest" < ? THEN excluded."lastRequest" ELSE "rateLimit"."lastRequest" END`,
-      [newRowId(), key, now, start, start],
+      "INSERT INTO rate_limits (key, count, window_start) VALUES (?, 1, ?) ON CONFLICT (key) DO UPDATE SET count = CASE WHEN rate_limits.window_start < ? THEN 1 ELSE rate_limits.count + 1 END, window_start = CASE WHEN rate_limits.window_start < ? THEN excluded.window_start ELSE rate_limits.window_start END",
+      [key, now, start, start],
     );
     const row = await this.#sql.get<{ count: number }>(
-      `SELECT "count" FROM "rateLimit" WHERE "key" = ?`,
+      "SELECT count FROM rate_limits WHERE key = ?",
       [key],
     );
     return Number(row?.count ?? 0) <= max;

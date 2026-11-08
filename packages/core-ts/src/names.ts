@@ -28,12 +28,25 @@ const SPECIAL: Record<string, string> = {
 };
 
 /**
+ * `text` without `ch` (one UTF-16 unit, e.g. `-`) at either end, in one linear pass. Use it in
+ * place of a `/^-+|-+$/g` trim: CodeQL reports that pattern as polynomial backtracking
+ * (js/polynomial-redos) on long runs of `ch`.
+ */
+export function trimChar(text: string, ch: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && text[start] === ch) start++;
+  while (end > start && text[end - 1] === ch) end--;
+  return start === 0 && end === text.length ? text : text.slice(start, end);
+}
+
+/**
  * Folds a name for comparison: NFKC, Turkish-aware lower-casing (İ, I and ı all become i),
  * diacritics removed, apostrophes and dots dropped (`A.I.` → `ai`), every other run of
  * non-letters/digits turned into a single `-`. `Yapay Zekâ` → `yapay-zeka`; a folded slug is itself.
  */
 export function foldName(input: string): string {
-  return input
+  const dashed = input
     .normalize("NFKC")
     .replace(/[İIı]/g, "i")
     .toLowerCase()
@@ -41,8 +54,8 @@ export function foldName(input: string): string {
     .replace(/\p{M}+/gu, "")
     .replace(/[øßæœđłþð]/g, (c) => SPECIAL[c] ?? c)
     .replace(/['’‘`ʼ.]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/[^\p{L}\p{N}]+/gu, "-");
+  return trimChar(dashed, "-");
 }
 
 /**
@@ -61,11 +74,8 @@ export function pluralForms(folded: string): string[] {
 
 /** A slug for a free-text name (`Machine Learning` → `machine-learning`); empty when nothing is left. */
 export function slugify(name: string): string {
-  return foldName(name)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 128)
-    .replace(/-+$/, "");
+  const dashed = foldName(name).replace(/[^a-z0-9]+/g, "-");
+  return trimChar(trimChar(dashed, "-").slice(0, 128), "-");
 }
 
 /** `machine-learning` → `Machine learning`. */

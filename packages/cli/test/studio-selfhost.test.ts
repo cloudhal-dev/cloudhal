@@ -257,14 +257,21 @@ describe("studio auth options (#165)", () => {
     expect(() => assertProxyHasBaseUrl({ ...server, hostname: "0.0.0.0" })).not.toThrow();
   });
 
-  it("makes slugs and setup lines in linear time (CodeQL js/polynomial-redos)", () => {
+  it("makes package slugs with no dash at either end or at the 64-character cut", () => {
     expect(slugify("  Hello,  World! ")).toBe("hello-world");
     expect(slugify("---")).toBe("site");
     expect(slugify("a".repeat(70))).toBe("a".repeat(64));
+    // The regex version this replaced cut after the dash and returned 63 a's and a "-".
     expect(slugify(`${"a".repeat(63)} b`)).toBe("a".repeat(63));
-    const start = performance.now();
+    // Long separator runs: behaviour only. The regex version was linear here too (its first
+    // replace collapsed every run before the trim), so no input tells the two apart by time
+    // (#168 item 10); the loop is for CodeQL js/polynomial-redos.
     expect(slugify("-".repeat(100_000))).toBe("site");
     expect(slugify(`x${" -".repeat(100_000)}y`)).toBe("x-y");
+  });
+
+  it("finds the setup fragment in linear time (CodeQL js/polynomial-redos)", () => {
+    const start = performance.now();
     const long = describeSetup({
       url: `http://localhost:8787/login#setup=${"#setup=".repeat(100_000)}`,
       tokenSource: "env",

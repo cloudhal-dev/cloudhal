@@ -7,6 +7,7 @@ import {
   type ResolvableTerm,
   resolveTerm,
   slugify,
+  trimChar,
 } from "../src/names.ts";
 
 const term = (
@@ -47,6 +48,33 @@ describe("foldName", () => {
     expect(foldName("Straße")).toBe("strasse");
     expect(foldName("rock'n'roll")).toBe("rocknroll");
     expect(foldName("machine-learning")).toBe("machine-learning");
+  });
+
+  it("trimChar trims one character at both ends, linearly", () => {
+    expect(trimChar("--a-b--", "-")).toBe("a-b");
+    expect(trimChar("a-b", "-")).toBe("a-b");
+    expect(trimChar("----", "-")).toBe("");
+    expect(trimChar("", "-")).toBe("");
+    expect(trimChar("__x_", "_")).toBe("x");
+    expect(trimChar(`a${"-".repeat(200_000)}b`, "-")).toBe(`a${"-".repeat(200_000)}b`);
+  });
+
+  it("slugify trims dashes at both ends and at the 128-character cut (#168)", () => {
+    expect(slugify("  --Hello, World!--  ")).toBe("hello-world");
+    expect(slugify("---")).toBe("");
+    expect(slugify("-".repeat(100_000))).toBe("");
+    // A cut that lands on a dash drops it; the slug never ends in "-".
+    expect(slugify(`${"a".repeat(127)} b`)).toBe("a".repeat(127));
+    expect(slugify("a".repeat(200))).toBe("a".repeat(128));
+    // The same answers as the regex version it replaced (`/^-+|-+$/g`, then `/-+$/`).
+    const regex = (name: string) =>
+      foldName(name)
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 128)
+        .replace(/-+$/, "");
+    for (const input of ["", "A.I.", " x ", "a--b", "Çağrı & Öz", `${"ab ".repeat(60)}`, "--"])
+      expect(slugify(input), input).toBe(regex(input));
   });
 
   it("slugify, humanizeSlug, pluralForms and editDistance", () => {

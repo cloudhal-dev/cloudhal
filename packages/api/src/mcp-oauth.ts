@@ -10,13 +10,13 @@
  * exist, so clients fail at "authorization server metadata", a diagnosable error (RFC-0044 §9).
  */
 import {
-  holds,
-  isKeyScope,
+  type AuditLog,
+  effectiveMode,
   type PolicyEngine,
   type Principal,
-  roleScopes,
   type Scope,
   scopesForMode,
+  stepUpScopes,
 } from "@cloudhal/agent-runtime";
 import type { Context, Hono } from "hono";
 import type { Env } from "./context.ts";
@@ -51,6 +51,22 @@ export function canonicalResource(resource: string): string {
   const url = new URL(resource);
   url.hash = "";
   return url.href.replace(/\/$/, "");
+}
+
+/** The path `createApi` mounts the MCP endpoint at (ADR-0011). */
+export const MCP_PATH = "/mcp";
+
+/**
+ * Fails `createApi` when `resource` cannot name this endpoint: tokens are bound to it (RFC 8707),
+ * so a resource that does not end in `/mcp` would make every token's audience wrong. A proxy may
+ * put a prefix in front (`https://example.com/studio/mcp`).
+ */
+export function assertMcpOauth(oauth: McpOauthOptions): void {
+  const resource = new URL(canonicalResource(oauth.resource));
+  if (!resource.pathname.endsWith(MCP_PATH) || resource.search)
+    throw new Error(
+      `mcp.oauth.resource must be the public URL of ${MCP_PATH} (e.g. https://studio.example.com${MCP_PATH}), got ${oauth.resource}`,
+    );
 }
 
 /** The URL of the path-aware metadata document, named in every challenge. */
@@ -156,30 +172,42 @@ async function toolCallOf(
   return { name, args: args && typeof args === "object" ? (args as Record<string, unknown>) : {} };
 }
 
+export interface StepUpOptions {
+  readonly request: Request;
+  readonly principal: Principal;
+  readonly policy: PolicyEngine;
+  readonly oauth: McpOauthOptions;
+  /** Where the step-up 403 is recorded, like every other denial (`runTool`). */
+  readonly audit?: AuditLog | undefined;
+  readonly now?: (() => Date) | undefined;
+}
+
 /**
  * RFC-0044 §1 step-up: a token principal (`grantId`) calling a tool whose scopes the token lacks
- * but the member's role holds gets `403 insufficient_scope` naming every missing scope at once,
- * so the client re-authorizes with the union (MCP "Scope Challenge Handling"). Every other denial
- * (role, mode, `:own`, approvals) stays a JSON-RPC result from the handler, and a key principal
- * is never challenged: a key cannot re-authorize.
+ * but the member's role on the call's site gives gets `403 insufficient_scope` naming every
+ * missing scope at once, so the client re-authorizes with the union (MCP "Scope Challenge
+ * Handling"). The set is the policy engine's (`stepUpScopes`): own variants, a propose call's
+ * scopes, the site role. Every other denial (role, mode, `:own`, approvals) stays a JSON-RPC
+ * result from the handler, and a key principal is never challenged: a key cannot re-authorize.
  */
-export async function stepUpChallenge(
-  request: Request,
-  principal: Principal,
-  policy: PolicyEngine,
-  oauth: McpOauthOptions,
-): Promise<Response | undefined> {
+export async function stepUpChallenge(options: StepUpOptions): Promise<Response | undefined> {
+  const { request, principal, policy, oauth } = options;
   if (!principal.grantId || !principal.person) return undefined;
   const call = await toolCallOf(request);
   if (!call) return undefined;
-  const tool = policy.tool(call.name);
-  if (!tool) return undefined;
-  const decision = policy.evaluate(principal, call.name, { args: call.args });
-  if (decision.kind !== "deny" || decision.code !== "missing_scope") return undefined;
-  const missing = tool.scopes.filter((s) => !holds(principal.scopes, s));
-  const role = roleScopes(principal.person.role);
-  // Only scopes a token can carry and the role holds: anything else would make the client loop.
-  if (!missing.length || !missing.every((s) => isKeyScope(s) && holds(role, s))) return undefined;
+  const missing = stepUpScopes(policy, principal, call.name, call.args);
+  if (!missing) return undefined;
+  const reason = `insufficient_scope: this connection needs ${missing.join(", ")}`;
+  await options.audit?.record({
+    at: (options.now?.() ?? new Date()).toISOString(),
+    actor: principal.actor,
+    siteId: typeof call.args.siteId === "string" ? call.args.siteId : undefined,
+    tool: call.name,
+    decision: "deny",
+    reason,
+    mode: effectiveMode(principal),
+    outcome: "error",
+  });
   return Response.json(
     {
       error: "insufficient_scope",

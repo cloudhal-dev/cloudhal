@@ -167,5 +167,16 @@ describe("WaeReader", () => {
   it("names datasets after the deployment", () => {
     expect(datasetName("newsroom")).toBe("newsroom_events");
     expect(datasetName("My-Site 2")).toBe("my_site_2_events");
+    expect(datasetName("__news__room__")).toBe("news__room_events");
+    expect(datasetName("___")).toBe("cloudhal_events");
+  });
+
+  it("trims a dataset name in linear time (#168, CodeQL js/polynomial-redos)", () => {
+    // `/^_+|_+$/g` took about 4 s on a 100k run of `_` inside the name (the replace before it
+    // keeps such runs); the loop takes well under a millisecond.
+    const name = `a${"_".repeat(200_000)}b`;
+    const start = performance.now();
+    expect(datasetName(name)).toBe(`${name}_events`);
+    expect(performance.now() - start).toBeLessThan(1500);
   });
 });

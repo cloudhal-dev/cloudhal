@@ -10,4 +10,5 @@ export * from "./policy.ts";
 export * from "./roles.ts";
 export * from "./site-access.ts";
 export * from "./skills.ts";
+export * from "./step-up.ts";
 export * from "./taxonomy.ts";

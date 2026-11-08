@@ -5,7 +5,7 @@
  * better-sqlite3 and Miniflare D1 (the step-up's key-principal case reads the key from the
  * database).
  */
-import { type Principal, scopesForMode } from "@cloudhal/agent-runtime";
+import { AuditLog, type PersonRef, type Principal, scopesForMode } from "@cloudhal/agent-runtime";
 import { seedStarterSite } from "@cloudhal/core-ts";
 import { afterAll, describe, expect, it } from "vitest";
 import { createApi } from "./app.ts";
@@ -40,6 +40,8 @@ function toolCall(name: string, args: Json): RequestInit {
     }),
   };
 }
+
+const entryArgs = (siteId: string): Json => ({ siteId, slug: "x", title: "X", body: "x" });
 
 export function describeMcpOauthDiscovery(label: string, backend: RolesBackend): void {
   describe(`MCP OAuth discovery: ${label}`, { timeout: 180_000 }, () => {
@@ -84,28 +86,51 @@ export function describeMcpOauthDiscovery(label: string, backend: RolesBackend):
     };
 
     /** A deployment whose principal is injected: a token principal of Phase 2, before Phase 2. */
-    const setupWithPrincipal = async (principal: Principal | undefined) => {
+    const setupWithPrincipal = async (
+      principal: Principal | undefined | ((siteId: string) => Principal),
+    ) => {
       const b = await backend.create();
       const site = await seedStarterSite(b.store, { name: "Blog", slug: "blog" });
+      const audit = new AuditLog(b.sql);
+      const resolved = typeof principal === "function" ? principal(site.id) : principal;
       const deps: ApiDeps = {
         store: b.store,
-        resolvePrincipal: async () => principal,
-        mcp: { stateKey: "mcp-oauth-state-key-0123456789abcdefghij", oauth: OAUTH },
+        resolvePrincipal: async () => resolved,
+        mcp: { stateKey: "mcp-oauth-state-key-0123456789abcdefghij", oauth: OAUTH, audit },
       };
-      return { app: createApi(deps), siteId: site.id };
+      return { app: createApi(deps), siteId: site.id, audit };
     };
 
     const grantPrincipal = (
-      role: "editor" | "contributor",
+      role: PersonRef["role"],
       scopes: Principal["scopes"],
+      sites?: PersonRef["sites"],
     ): Principal => ({
       actor: { kind: "agent", id: "agent_grant0001", name: "Claude" },
       scopes,
       mode: "edits",
       grantId: "grant_0001",
       keyScopes: scopes,
-      person: { id: "user_owner1", userId: "owner1", role, name: "Olive Owner" },
+      person: {
+        id: "user_owner1",
+        userId: "owner1",
+        role,
+        name: "Olive Owner",
+        ...(sites ? { sites } : {}),
+      },
     });
+
+    /** The scopes a step-up 403 names, or undefined when the call was not challenged. */
+    const challenged = async (
+      principal: Principal | ((siteId: string) => Principal),
+      tool: string,
+      args: (siteId: string) => Json,
+    ) => {
+      const { app, siteId } = await setupWithPrincipal(principal);
+      const res = await app.request(`${ORIGIN}/mcp`, toolCall(tool, args(siteId)));
+      if (res.status !== 403) return undefined;
+      return ((await res.json()) as { details: { scope: string[] } }).details.scope;
+    };
 
     it("answers 401 with the RFC 9728 challenge and the scopes to request", async () => {
       const { app } = await setup(OAUTH);
@@ -185,6 +210,85 @@ export function describeMcpOauthDiscovery(label: string, backend: RolesBackend):
       );
       expect(reached.status).not.toBe(403);
       expect(reached.headers.get("www-authenticate")).toBeNull();
+    });
+
+    it("asks for the own variant an Author's or Contributor's role holds", async () => {
+      const read: Principal["scopes"] = ["site:read", "content:read"];
+      expect(await challenged(grantPrincipal("author", read), "create_entry", entryArgs)).toEqual([
+        "content:write:own",
+      ]);
+      expect(
+        await challenged(grantPrincipal("contributor", read), "create_entry", entryArgs),
+      ).toEqual(["content:draft:own"]);
+      expect(
+        await challenged(grantPrincipal("author", read), "publish", (siteId) => ({ siteId })),
+      ).toEqual(["site:publish:own"]);
+    });
+
+    it("asks a propose call for the propose scopes, not the write", async () => {
+      const propose = (siteId: string) => ({ siteId, entryId: "e1", ops: [], mode: "propose" });
+      expect(
+        await challenged(grantPrincipal("editor", ["site:read"]), "edit_body", propose),
+      ).toEqual(["content:read", "content:propose"]);
+    });
+
+    it("judges the member's role on the call's site, not the installation role", async () => {
+      // An Editor of the installation who is a Contributor on this site: no publish to ask for,
+      // and the draft variant (not content:write) for a new entry.
+      const read: Principal["scopes"] = ["site:read", "content:read"];
+      const limited = (siteId: string) =>
+        grantPrincipal("editor", read, { [siteId]: "contributor" });
+      const { app, siteId } = await setupWithPrincipal(limited);
+      const res = await app.request(`${ORIGIN}/mcp`, toolCall("publish", { siteId }));
+      expect(res.status).not.toBe(403);
+      expect(res.headers.get("www-authenticate")).toBeNull();
+      const entry = await app.request(`${ORIGIN}/mcp`, toolCall("create_entry", entryArgs(siteId)));
+      expect(entry.status).toBe(403);
+      expect(await entry.json()).toMatchObject({ details: { scope: ["content:draft:own"] } });
+      // Where the same member is an Editor, the challenge names content:write.
+      const editorOn = (siteId: string) =>
+        grantPrincipal("contributor", read, { [siteId]: "editor" });
+      expect(await challenged(editorOn, "create_entry", entryArgs)).toEqual(["content:write"]);
+      // A site the member cannot open answers not_found from the handler, never a challenge.
+      const elsewhere = grantPrincipal("editor", read, { site_other: "editor" });
+      expect(await challenged(elsewhere, "create_entry", entryArgs)).toBeUndefined();
+    });
+
+    it("records the step-up 403 in the audit log, like any other denial", async () => {
+      const { app, siteId, audit } = await setupWithPrincipal(
+        grantPrincipal("editor", ["site:read", "content:read"]),
+      );
+      const res = await app.request(`${ORIGIN}/mcp`, toolCall("publish", { siteId }));
+      expect(res.status).toBe(403);
+      const rows = await audit.list({ tool: "publish" });
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        actor: { kind: "agent", id: "agent_grant0001" },
+        siteId,
+        tool: "publish",
+        decision: "deny",
+        outcome: "error",
+        reason: "insufficient_scope: this connection needs site:publish",
+      });
+    });
+
+    it("refuses at createApi time an oauth.resource that is not the /mcp endpoint", async () => {
+      const b = await backend.create();
+      const make = (resource: string) =>
+        createApi({
+          store: b.store,
+          mcp: {
+            stateKey: "mcp-oauth-state-key-0123456789abcdefghij",
+            oauth: { issuer: `${ORIGIN}/api/auth`, resource },
+          },
+        });
+      expect(() => make(`${ORIGIN}/`)).toThrow(
+        /mcp\.oauth\.resource must be the public URL of \/mcp/,
+      );
+      expect(() => make(`${ORIGIN}/api/mcp-tools`)).toThrow(/mcp\.oauth\.resource/);
+      expect(() => make(`${ORIGIN}/mcp?x=1`)).toThrow(/mcp\.oauth\.resource/);
+      expect(() => make(`${ORIGIN}/mcp/`)).not.toThrow();
+      expect(() => make("https://example.com/studio/mcp")).not.toThrow();
     });
 
     it("never challenges for a scope the role lacks, and never challenges a key", async () => {
