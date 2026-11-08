@@ -32,6 +32,12 @@ const clip = (text: string) =>
   text.length > SEARCH_TEXT_MAX ? text.slice(0, SEARCH_TEXT_MAX) : text;
 
 /**
+ * A directive line (`::name{…}`, `:::name`). Its braces stay on one line: under `m` every line
+ * terminator starts a line, and `[^\n]*` running across `\r` was quadratic (#174).
+ */
+export const DIRECTIVE_LINE = /^:{2,}[a-z][\w-]*(\{[^\n\r\u2028\u2029]*\})?[ \t]*$/gim;
+
+/**
  * An article body as plain text for the index: code and generated UI dropped, links and images
  * reduced to their words, URLs and markup removed. Directive attributes keep their quoted text
  * (a callout's title, a quote's text).
@@ -42,7 +48,7 @@ export function searchText(body: Pick<ContentEntry["body"], "format" | "value">)
     // fenced code and ```surface fences; linear scanners where a regex would backtrack (#174)
     text = stripFences(text)
       // directive lines: keep the text of quoted attributes
-      .replace(/^:{2,}[a-z][\w-]*(\{[^\n]*\})?[ \t]*$/gim, (_m, attrs: string | undefined) =>
+      .replace(DIRECTIVE_LINE, (_m, attrs: string | undefined) =>
         attrs ? [...attrs.matchAll(/="((?:[^"\\]|\\.)*)"/g)].map((a) => a[1]).join(" ") : " ",
       )
       .replace(/^:{3,}[ \t]*$/gm, " ");

@@ -55,12 +55,15 @@ export function stripFences(text: string): string {
   }
   let out = "";
   let from = 0;
+  // The opening line ends at the next "\n" (not at "\r" or U+2028, which also start lines):
+  // openers come in order, so the answer is kept until an opener passes it.
+  let nl: number | undefined;
   for (const s of starts) {
     if (s < from) continue;
     const f = fenceAt(s);
     if (!f) continue;
-    const nl = text.indexOf("\n", s);
-    if (nl < 0) continue;
+    if (nl === undefined || nl < s) nl = text.indexOf("\n", s);
+    if (nl < 0) break; // no "\n" left: no later opener has a body either
     for (let m = f.length; m >= 3; m--) {
       const t = firstAtLeast(closers.get(f.c + m) ?? [], nl + 1);
       if (t === undefined) continue;

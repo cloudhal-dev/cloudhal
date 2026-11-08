@@ -89,6 +89,13 @@ describe("feed-check scanners (#174 item 4)", () => {
     fast(100, () => mediaUrlValues("<enclosure url= ".repeat(N / 16)));
     fast(100, () => mediaUrlValues(`<enclosure${' url="'.repeat(N / 6)}`));
     fast(100, () => mediaUrlValues('<enclosure url="a">'.repeat(N / 19)));
+    // Per-tag searches for `>` and `url` used to run to the end of the feed for every tag.
+    fast(100, () => mediaUrlValues('<enclosure url="a" '.repeat(N / 19)));
+    fast(100, () => mediaUrlValues("<enclosure>".repeat(N / 11)));
+    fast(100, () =>
+      mediaUrlValues(`${'<enclosure url="a" '.repeat(N / 38)}<![CDATA[${"x".repeat(N / 2)}]]>>`),
+    );
+    expect(mediaUrlValues('<enclosure url="a" '.repeat(3))).toEqual(["a", "a", "a"]);
     fast(100, () => expect(urlPath(`https://x/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
   });
 });

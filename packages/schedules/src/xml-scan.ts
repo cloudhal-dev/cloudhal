@@ -107,6 +107,21 @@ function mediaTagFinder(text: string) {
   };
 }
 
+/**
+ * `indexOf(needle, from)` that keeps its last answer: a query at or after the last one, and not
+ * past the kept position, is answered without searching again (-1 stays -1).
+ */
+function forwardFinder(text: string, needle: string): (from: number) => number {
+  let asked = -1;
+  let found = -1;
+  return (from) => {
+    if (asked >= 0 && from >= asked && (found < 0 || found >= from)) return found;
+    asked = from;
+    found = text.indexOf(needle, from);
+    return found;
+  };
+}
+
 /** At `p`: `url`, optional spaces, `=`, optional spaces, a quote; the value and where it ends. */
 function urlAttribute(text: string, p: number): { value: string; end: number } | undefined {
   if (isWord(text[p - 1]) || !text.startsWith("url", p)) return undefined;
@@ -132,16 +147,16 @@ function urlAttribute(text: string, p: number): { value: string; end: number } |
 export function mediaUrlValues(text: string): string[] {
   const out: string[] = [];
   const nextTag = mediaTagFinder(text);
+  // Tags are visited in order, so the next `>` and the next `url` are each found once and kept
+  // until a query passes them: a per-tag `indexOf` made `<enclosure>` × n quadratic.
+  const nextGt = forwardFinder(text, ">");
+  const nextUrl = forwardFinder(text, "url");
   let from = 0;
   for (let tag = nextTag(from); tag; tag = nextTag(from)) {
-    const gt = text.indexOf(">", tag.nameEnd);
+    const gt = nextGt(tag.nameEnd);
     const stop = gt < 0 ? text.length : gt;
     let found: { value: string; end: number } | undefined;
-    for (
-      let p = text.indexOf("url", tag.nameEnd);
-      p >= 0 && p < stop;
-      p = text.indexOf("url", p + 1)
-    ) {
+    for (let p = nextUrl(tag.nameEnd); p >= 0 && p < stop; p = nextUrl(p + 1)) {
       found = urlAttribute(text, p);
       if (found) break;
     }

@@ -37,19 +37,30 @@ export function joinTarget(to: string, rest: string): string {
   return `${trimEndChar(head, "/")}${rest}${tail}`;
 }
 
+/** The contract's `maxLength` of a redirect's `from` (`redirect.schema.json`). */
+export const REDIRECT_FROM_MAX_LENGTH = 1024;
+
 /**
  * The proper ancestors of a path that a redirect's `from` can be, longest first, including `/`.
- * A `from` has no empty segment, so no ancestor that holds `//` can match: the walk starts below
- * the first `//` (#174; a run of slashes used to yield one useless ancestor per slash).
+ * A `from` is at most `REDIRECT_FROM_MAX_LENGTH` characters and has no empty segment, so the walk
+ * starts at the longest ancestor within that length and below the first `//` (#174: a long
+ * request path used to yield one ancestor per segment, quadratic in size, on every 404).
  */
 export function ancestorPaths(path: string): string[] {
   const out: string[] = [];
   let p = path;
-  const cut = path.indexOf("//");
-  if (cut >= 0) {
-    p = path.slice(0, cut) || "/";
-    out.push(p);
+  let first: string | undefined;
+  if (p.length > REDIRECT_FROM_MAX_LENGTH) {
+    const slash = p.lastIndexOf("/", REDIRECT_FROM_MAX_LENGTH);
+    p = slash > 0 ? p.slice(0, slash) : "/";
+    first = p;
   }
+  const cut = p.indexOf("//");
+  if (cut >= 0) {
+    p = p.slice(0, cut) || "/";
+    first = p;
+  }
+  if (first !== undefined) out.push(first);
   while (p.length > 1) {
     p = p.slice(0, p.lastIndexOf("/")) || "/";
     out.push(p);

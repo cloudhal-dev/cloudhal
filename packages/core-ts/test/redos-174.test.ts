@@ -7,8 +7,14 @@ import type { Redirect } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import { cssUrlValues, stripCssComments, svgPixels } from "../src/media/css-scan.ts";
 import { checkSvg } from "../src/media/svg.ts";
-import { ancestorPaths, joinTarget, matchRedirect, normalisePath } from "../src/redirects.ts";
-import { searchText } from "../src/search-rows.ts";
+import {
+  ancestorPaths,
+  joinTarget,
+  matchRedirect,
+  normalisePath,
+  REDIRECT_FROM_MAX_LENGTH,
+} from "../src/redirects.ts";
+import { DIRECTIVE_LINE, searchText } from "../src/search-rows.ts";
 import { linkTexts, stripFences, stripTags } from "../src/search-text-scan.ts";
 
 /** Deterministic strings: every run of the suite checks the same inputs. */
@@ -54,6 +60,7 @@ describe("redirect paths (#174 item 2)", () => {
   };
   /** What a redirect `from` can be (the contract's pattern). */
   const FROM = /^\/(?:[^\s?#/\\]+(?:\/[^\s?#/\\]+)*)?$/;
+  const validFrom = (a: string) => FROM.test(a) && a.length <= REDIRECT_FROM_MAX_LENGTH;
 
   it("normalisePath and joinTarget answer as before", () => {
     for (const p of strings(["/", "a", "?", "#", "b"], 3000, 12))
@@ -73,7 +80,7 @@ describe("redirect paths (#174 item 2)", () => {
   it("ancestorPaths keeps every ancestor a redirect could match", () => {
     for (const raw of strings(["/", "a", "b"], 3000, 12)) {
       const p = `/${raw}`;
-      expect(ancestorPaths(p), p).toEqual(oldAncestors(p).filter((a) => FROM.test(a)));
+      expect(ancestorPaths(p), p).toEqual(oldAncestors(p).filter(validFrom));
       expect(
         ancestorPaths(p).every((a) => FROM.test(a)),
         p,
@@ -92,6 +99,20 @@ describe("redirect paths (#174 item 2)", () => {
     fast(100, () => expect(normalisePath(`/a${"/".repeat(N)}b/`)).toBe(`/a${"/".repeat(N)}b`));
     fast(100, () => expect(joinTarget(`/t${"/".repeat(N)}`, "/r")).toBe("/t/r"));
     fast(100, () => expect(ancestorPaths(`/a${"/".repeat(N)}b`)).toEqual(["/a", "/"]));
+    // Many short segments: only ancestors within a `from`'s length are listed, so the output
+    // stays bounded (it used to be one ancestor per segment, quadratic in total size).
+    const long = "/a".repeat(N / 2);
+    const ancestors = fast(100, () => ancestorPaths(long));
+    expect(ancestors[0]).toBe("/a".repeat(REDIRECT_FROM_MAX_LENGTH / 2));
+    expect(ancestors).toEqual(oldAncestors(long.slice(0, 4000)).filter(validFrom));
+    expect(ancestors.reduce((n, a) => n + a.length, 0)).toBeLessThanOrEqual(
+      REDIRECT_FROM_MAX_LENGTH * (REDIRECT_FROM_MAX_LENGTH / 2 + 1),
+    );
+    // Long fuzzed paths still give the old answer filtered to what a `from` can be.
+    for (const raw of strings(["/", "a", "bb"], 200, 900)) {
+      const p = `/${raw}`;
+      expect(ancestorPaths(p)).toEqual(oldAncestors(p).filter(validFrom));
+    }
   });
 });
 
@@ -151,10 +172,23 @@ describe("search text (#174 item 4)", () => {
     }
     for (const t of strings(["<", ">", "a", "\n"], 3000, 12))
       expect(stripTags(t), t).toBe(t.replace(/<[^>]*>/g, " "));
+    // The directive pattern now keeps its braces on one line; without "\r" or U+2028/2029 in
+    // the body (markdown from Studio and agents is "\n"-only) it matches as before.
+    const OLD_DIRECTIVE = /^:{2,}[a-z][\w-]*(\{[^\n]*\})?[ \t]*$/gim;
+    for (const t of strings([":", ":", "a", "{", "}", " ", "\n", "x", '"', "="], 4000, 14))
+      expect(t.replace(DIRECTIVE_LINE, "<$1>"), JSON.stringify(t)).toBe(
+        t.replace(OLD_DIRECTIVE, "<$1>"),
+      );
   });
 
   it("stays linear on openers without closers", () => {
     fast(150, () => stripFences("```a\n".repeat(N / 5)));
+    // Line ends without "\n": every opener used to search to the end for one.
+    fast(150, () => stripFences("```a\r".repeat(N / 5)));
+    fast(150, () => stripFences("```a\u2028".repeat(N / 5)));
+    fast(150, () => stripFences(`${"```a\r".repeat(N / 5)}\n`));
+    // Directive lines with CR endings: `[^\n]*` used to run across every following line.
+    fast(150, () => searchText({ format: "markdown", value: "::a{}x\r".repeat(N / 7) }));
     fast(100, () => linkTexts("![a".repeat(N / 3), true));
     fast(100, () => linkTexts("[a](".repeat(N / 4), false));
     fast(100, () => linkTexts("[a]x".repeat(N / 4), false));
