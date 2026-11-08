@@ -1,13 +1,14 @@
 # Caddy for the compose file's `caddy` profile: automatic TLS for both hosts (the DNS of each must
 # point at this machine, ports 80 and 443 open). Studio and the API at CLOUDHAL_BASE_URL, proxied
-# with X-Forwarded-Proto/Host (set CLOUDHAL_BEHIND_PROXY=1); the public site, as `site-build`
-# published it (/data/site/current, a symlink to the newest build), at CLOUDHAL_SITE_URL.
+# with X-Forwarded-Proto/Host/For (set CLOUDHAL_BEHIND_PROXY=1); the public site at
+# CLOUDHAL_SITE_URL, from /data/dist: the built site as `site-build` publishes it (a real folder
+# with the 0.6.3 image; a symlink to /data/site/current, swapped atomically, from 0.6.4 on).
 {$CLOUDHAL_BASE_URL} {
 	reverse_proxy cloudhal:8787
 }
 
 {$CLOUDHAL_SITE_URL} {
-	root * /srv/cloudhal/site/current
+	root * /srv/cloudhal/dist
 	encode zstd gzip
 	# The build's `_headers` file (the security headers of the Cloudflare deployment) is for hosts
 	# that read it; Caddy does not. Media files, Astro's assets and the renderer's scripts are named
@@ -18,8 +19,23 @@
 		file
 	}
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
-	try_files {path} {path}/ {path}.html
-	file_server
+	# A page opened before the last build may still ask for that build's hashed assets: they come
+	# from /data/site/previous, the build before the current one.
+	@previous {
+		path /_astro/* /_cloudhal/* /media/*
+		not file
+		file {
+			root /srv/cloudhal/site/previous
+		}
+	}
+	handle @previous {
+		root * /srv/cloudhal/site/previous
+		file_server
+	}
+	handle {
+		try_files {path} {path}/ {path}.html
+		file_server
+	}
 	handle_errors {
 		# /404.html exists only when the site has a page at /404 (the starter ships none); until
 		# then a miss is Caddy's plain 404.

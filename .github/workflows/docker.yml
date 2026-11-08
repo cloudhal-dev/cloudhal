@@ -23,7 +23,8 @@ name: Docker image
 #   tarballs (scripts/pack-packages.ts) and tagged edge only, never latest;
 # - a pull request that touches the image builds it for linux/amd64 without pushing and runs the
 #   amd64 smoke test and the scan.
-# Versions before 0.6.3 have no `--init-if-empty`: the image needs it.
+# Versions before 0.6.4 cannot pass the gates: the smoke test expects the first owner's setup
+# token (#165), which 0.6.4 brought, and the image needs `--init-if-empty` (0.6.3).
 
 on:
   workflow_call:

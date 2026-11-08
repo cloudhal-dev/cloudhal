@@ -1,13 +1,20 @@
 #!/bin/sh
-# Builds the public site as static HTML and publishes it under /data/site, where a web server (the
-# compose file's Caddy) serves /data/site/current:
+# Builds the public site as static HTML and publishes it on the volume:
 #   docker compose exec cloudhal site-build
-# `cloudhal build` renders into /data/dist, the CLI's fixed output directory, which every build
-# empties first — so the served tree is never the one being written. After a successful build the
-# output moves to /data/site/<build id> and the `current` symlink is replaced with a single rename,
-# which is atomic: visitors see the previous build until the new one is complete, never a 404 or a
-# half-written page, and a failed build changes nothing. The build before it is kept (pages opened
-# from it still load their assets); older ones are removed.
+# The served path is /data/dist, as in 0.6.3, so a web server (the compose file's Caddy, or nginx
+# with root /data/dist) needs no change. It is now a symlink to /data/site/current, which points at
+# the newest build in /data/site/<build id>; /data/site/previous points at the one before.
+#
+# `cloudhal build` always writes <project>/dist and empties it first, so it never runs in /data:
+# the project's own files are copied to /data/.site-build (its node_modules and data directory are
+# symlinks, so the build reads the same store) and the site is built there. Only a finished build
+# is published: it moves to /data/site/<build id>, then `current`, `previous` and `dist` are each
+# replaced with one rename (`ln -sfn` + `mv -T`), which is atomic. Visitors see the previous build
+# until the new one is complete, never a 404 or a half-written page; a failed build changes
+# nothing. The build before the current one is kept (pages opened from it still load their hashed
+# assets, which the Caddyfile serves from `previous`); older ones are removed. Do not run
+# `cloudhal build` in /data by hand: it would empty the served build through the `dist` symlink.
+#
 # The snapshot is the published one, else the latest: before the first publish the site is built
 # from the latest snapshot (RFC-0043's `cloudhal build --published` is not in this version). The
 # project's dependencies are the image's node_modules, linked into the project on first use, so no
@@ -18,7 +25,7 @@ if [ ! -f cloudhal.json ]; then
   echo "site-build: no project in /data yet; start the container once first" >&2
   exit 1
 fi
-# One build at a time: a cron run and a hand-started one would otherwise share /data/dist.
+# One build at a time: a cron run and a hand-started one would otherwise share the staging folder.
 exec 9>/tmp/site-build.lock
 if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
   echo "site-build: another build is running; try again when it is done" >&2
@@ -67,17 +74,46 @@ if [ -n "${CLOUDHAL_SITE_URL:-}" ]; then
   esac
 fi
 
-cloudhal build "$@"
 
-# Publish: /data/dist → /data/site/<build id>, then point `current` at it with one rename.
-prev=$(readlink site/current 2>/dev/null || true)
+# Stage: the project's files, copied; node_modules and the data directory (cloudhal.json
+# `dataDir`, default .cloudhal), linked; the build output, archives and caches, left out.
+data_top=$(node -e '
+  const cfg = JSON.parse(require("node:fs").readFileSync("cloudhal.json", "utf8"));
+  process.stdout.write(String(cfg.dataDir ?? ".cloudhal").replace(/^(\.\/)+/, "").split("/")[0]);
+')
+stage=.site-build
+rm -rf "$stage"
+trap 'rm -rf "/data/$stage"' EXIT
+mkdir "$stage"
+for entry in .[!.]* ..?* *; do
+  [ -e "$entry" ] || [ -L "$entry" ] || continue
+  # (the data directory first: `*.cloudhal`, for archives, would match `.cloudhal` too)
+  case "$entry" in
+    # node_modules is itself a link (to /opt/cloudhal/node_modules): link its target, not a chain
+    node_modules) ln -s "$(readlink -f node_modules)" "$stage/node_modules" ;;
+    "$data_top") ln -s "/data/$entry" "$stage/$entry" ;;
+    "$stage" | site | dist | .astro | .cloudhal-init | ?*.cloudhal | *.tgz) ;;
+    *) cp -a "$entry" "$stage/" ;;
+  esac
+done
+(cd "$stage" && cloudhal build "$@")
+
+# Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"
 mkdir -p site
-mv dist "site/$id"
-rm -f "site/current.$$"
-ln -s "$id" "site/current.$$"
+mv "$stage/dist" "site/$id"
+prev=$(readlink site/current 2>/dev/null || true)
+ln -sfn "$id" "site/current.$$"
 mv -T "site/current.$$" site/current
-# The build before this one stays, so a page opened from it can still load its hashed assets;
-# older builds go.
+if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
+  ln -sfn "$prev" "site/previous.$$"
+  mv -T "site/previous.$$" site/previous
+fi
+# /data/dist, the stable served path. A 0.6.3 volume has a real directory there: it moves aside
+# once (two renames), and every later build only replaces the symlink.
+if [ -d dist ] && [ ! -L dist ]; then mv dist "site/0.6.3-dist.$$"; fi
+ln -sfn site/current "dist.$$"
+mv -T "dist.$$" dist
+# Builds that neither `current` nor `previous` points at.
 find site -mindepth 1 -maxdepth 1 -type d ! -name "$id" ! -name "${prev:-$id}" -exec rm -rf {} +
-echo "site-build: /data/site/current -> $id"
+echo "site-build: /data/dist -> site/current -> $id"

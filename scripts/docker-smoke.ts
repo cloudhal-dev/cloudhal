@@ -25,8 +25,8 @@ const origin = `http://localhost:${port}`;
 const setupToken = `smoke-setup-token-${crypto.randomUUID()}`;
 /** The built home page, as the starter renders the site name. */
 const HOME_H1 = /<h1[^>]*>Smoke Site<\/h1>/;
-/** Where `site-build` publishes the site (a symlink to the newest build). */
-const SITE = "/data/site/current";
+/** The served path: a symlink to /data/site/current, the newest build (#166). */
+const SITE = "/data/dist";
 
 const docker = (args: string[], input?: string): string =>
   execFileSync("docker", args, { encoding: "utf8", ...(input ? { input } : {}) }).trim();
@@ -77,7 +77,9 @@ function expect(ok: boolean, what: string, detail?: unknown): void {
 function siteBuild(which: string): string {
   const r = spawnSync("docker", ["exec", name, "site-build"], { stdio: "inherit" });
   expect(r.status === 0, `site-build (${which}) exited ${r.status}`);
-  return docker(["exec", name, "readlink", SITE]);
+  const served = docker(["exec", name, "readlink", SITE]);
+  expect(served === "site/current", `${SITE} links to site/current`, served);
+  return docker(["exec", name, "readlink", "/data/site/current"]);
 }
 
 docker([
@@ -164,18 +166,26 @@ try {
     HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
     "the built home page shows the site name",
   );
-  step(`site-build published the site: ${SITE} -> ${first}`);
+  step(`site-build published the site: ${SITE} -> site/current -> ${first}`);
 
   // A second build swaps the served tree in one rename and keeps the one before it, whose pages
   // may still load their assets (#166).
   const second = siteBuild("second");
   expect(second !== first, "the second build is a new tree", { first, second });
-  const kept = docker(["exec", name, "sh", "-c", "ls -1 /data/site | grep -v '^current$'"]);
+  const kept = docker([
+    "exec",
+    name,
+    "sh",
+    "-c",
+    "ls -1 /data/site | grep -v -x -e current -e previous",
+  ]);
   expect(
     kept === [first, second].sort().join("\n"),
     "the newest build and the one before it are kept",
     kept,
   );
+  const previous = docker(["exec", name, "readlink", "/data/site/previous"]);
+  expect(previous === first, "site/previous links to the first build", previous);
   expect(
     HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
     "the home page is served after the swap",

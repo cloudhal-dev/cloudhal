@@ -63,8 +63,8 @@ services:
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # the built site: `site-build` puts each build under /data/site and points
-      # /data/site/current at the newest one; read-only here
+      # the built site at /data/dist (from 0.6.4 a symlink to /data/site/current, the newest
+      # build; /data/site/previous is the one before), read-only here
       - cloudhal-data:/srv/cloudhal:ro
       - caddy-data:/data
       - caddy-config:/config
