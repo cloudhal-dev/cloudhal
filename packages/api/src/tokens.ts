@@ -37,7 +37,50 @@ export function hashToken(token: string): Promise<string> {
   return sha256Hex(token);
 }
 
-/** Public token endpoints take JSON bodies only (a cross-site form post needs a preflight). */
+/**
+ * The largest body a public token endpoint reads (#174): an email, a token, a password and a name
+ * fit many times over. Anything larger is refused before it is parsed or checked.
+ */
+export const JSON_BODY_MAX_BYTES = 64 * 1024;
+
+function tooLarge() {
+  return apiError(
+    413,
+    "payload_too_large",
+    `the body must be at most ${JSON_BODY_MAX_BYTES} bytes`,
+  );
+}
+
+/** The body as text, or a 413 once more than `max` bytes arrive (a chunked body has no length). */
+async function cappedText(request: Request, max: number): Promise<string> {
+  if (Number(request.headers.get("content-length") ?? 0) > max) throw tooLarge();
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel().catch(() => undefined);
+      throw tooLarge();
+    }
+    chunks.push(value);
+  }
+  const all = new Uint8Array(size);
+  let at = 0;
+  for (const chunk of chunks) {
+    all.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return new TextDecoder().decode(all);
+}
+
+/**
+ * Public token endpoints take JSON bodies only (a cross-site form post needs a preflight), of at
+ * most `JSON_BODY_MAX_BYTES`.
+ */
 export async function jsonBody(c: Context<Env>): Promise<Record<string, unknown>> {
   if (!(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json"))
     throw apiError(
@@ -45,7 +88,13 @@ export async function jsonBody(c: Context<Env>): Promise<Record<string, unknown>
       "unsupported_media_type",
       "send a JSON body (content-type: application/json)",
     );
-  const body = (await c.req.json().catch(() => undefined)) as unknown;
+  const text = await cappedText(c.req.raw, JSON_BODY_MAX_BYTES);
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    body = undefined;
+  }
   if (!body || typeof body !== "object" || Array.isArray(body))
     throw apiError(400, "bad_request", "the body must be a JSON object");
   return body as Record<string, unknown>;

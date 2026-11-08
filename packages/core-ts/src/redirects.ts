@@ -11,13 +11,14 @@ import {
 } from "@cloudhal/core-contracts";
 import { InvariantError } from "./errors.ts";
 import { ID_PREFIX } from "./ids.ts";
+import { trimEndChar } from "./names.ts";
 import type { OpBatch } from "./node-sql.ts";
 import type { Creatable } from "./nodes.ts";
 
 /** `/a/b/` → `/a/b`; the root stays `/`. Query and fragment are not part of a request path here. */
 export function normalisePath(path: string): string {
   const p = path.split(/[?#]/, 1)[0] ?? "/";
-  return p.length > 1 ? p.replace(/\/+$/, "") || "/" : p || "/";
+  return p.length > 1 ? trimEndChar(p, "/") || "/" : p || "/";
 }
 
 /** A target split into its site path and the `?query#fragment` suffix; `undefined` for https URLs. */
@@ -33,13 +34,36 @@ export function joinTarget(to: string, rest: string): string {
   const i = to.search(/[?#]/);
   const head = i < 0 ? to : to.slice(0, i);
   const tail = i < 0 ? "" : to.slice(i);
-  return `${head.replace(/\/+$/, "")}${rest}${tail}`;
+  return `${trimEndChar(head, "/")}${rest}${tail}`;
 }
 
-/** The proper ancestors of a path, longest first, including `/`. */
+/** The contract's `maxLength` of a redirect's `from` (`redirect.schema.json`), in code points. */
+export const REDIRECT_FROM_MAX_LENGTH = 1024;
+
+/**
+ * The proper ancestors of a path that a redirect's `from` can be, longest first, including `/`.
+ * A `from` has at most `REDIRECT_FROM_MAX_LENGTH` code points, so at most twice that many UTF-16
+ * units, and no empty segment: the walk starts at the longest ancestor within that many units
+ * and below the first `//` (#174: a long request path used to yield one ancestor per segment,
+ * quadratic in size, on every 404).
+ */
 export function ancestorPaths(path: string): string[] {
   const out: string[] = [];
+  const maxUnits = 2 * REDIRECT_FROM_MAX_LENGTH;
+  // The longest ancestor worth walking from ends before `end`.
+  let end = path.length;
+  if (end > maxUnits) {
+    const slash = path.lastIndexOf("/", maxUnits);
+    end = slash > 0 ? slash : 0;
+  }
+  // On the whole path, so a `//` that straddles the cut is found too.
+  const cut = path.indexOf("//");
+  if (cut >= 0 && cut < end) end = cut;
   let p = path;
+  if (end < path.length) {
+    p = path.slice(0, end) || "/";
+    out.push(p);
+  }
   while (p.length > 1) {
     p = p.slice(0, p.lastIndexOf("/")) || "/";
     out.push(p);

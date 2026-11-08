@@ -40,6 +40,7 @@ Commit the regenerated files; CI fails on drift. Add a valid and an invalid fixt
 - Add a changeset (`pnpm changeset`) when a published package changes behaviour.
 - A PR that changes what the renderer gives themes freezes the last released starter in the same PR: copy it under `packages/cli/test/fixtures/theme-v<last release>/` and add that version to `FROZEN` in `packages/cli/test/old-theme-compat.test.ts` (see `theme-v0.5.0/README.md` there), so the release that ships the change is already tested against the theme existing sites have.
 - Keep modules small and single-purpose: [`docs/engineering/code-structure.md`](docs/engineering/code-structure.md) sets file/function limits that `pnpm size:check` enforces with a shrink-only baseline.
+- Regexes over input from outside (requests, agent or editor content, uploads, feeds) must not backtrack: prefer `indexOf` scanners and the linear trims in `@cloudhal/core-ts/names`, check lengths first, and test a rewrite against the old regex plus a 100k-character adversarial input (AGENTS.md rule 13).
 - CI must be green: lint, size check, typecheck, tests (TS + Rust), contract drift.
 
 ## Releasing

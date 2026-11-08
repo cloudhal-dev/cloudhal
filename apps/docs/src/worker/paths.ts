@@ -38,5 +38,9 @@ export function pageId(input: string, selfHost?: string): string | undefined {
 
 export const markdownPath = (id: string) => (id === "index" ? "/index.md" : `/${id}.md`);
 
-/** A path that may be a page: no file extension in its last segment. */
-export const isPagePath = (pathname: string) => !/\.[^/]*$/.test(pathname);
+/**
+ * A path that may be a page: no file extension in its last segment, that is no "." after the last
+ * "/". Two `lastIndexOf`s, not `/\.[^/]*$/`, which backtracks on a long run of dots (#174).
+ */
+export const isPagePath = (pathname: string) =>
+  pathname.lastIndexOf(".") <= pathname.lastIndexOf("/");

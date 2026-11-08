@@ -4,6 +4,7 @@
  * attributes is reported, and the upload is refused with the list. SVG is served under a CSP
  * sandbox as well (§7.2), and only people may upload it in v1 (answer 2). Worker-safe.
  */
+import { cssUrlValues, stripCssComments, svgPixels } from "./css-scan.ts";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const XLINK_NS = "http://www.w3.org/1999/xlink";
@@ -141,29 +142,26 @@ function bump(problems: Map<string, number>, what: string, n = 1): void {
 
 /** CSS (a `style` attribute or element) without imports, expressions or non-fragment URLs. */
 function checkCss(css: string, problems: Map<string, number>): void {
-  const flat = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  const flat = stripCssComments(css);
   if (/\\/.test(flat)) bump(problems, "CSS escapes");
   if (/@import/i.test(flat)) bump(problems, "CSS @import rules");
   if (/expression\s*\(|behavior\s*:|-moz-binding|javascript:/i.test(flat))
     bump(problems, "CSS expressions or script URLs");
-  for (const m of flat.matchAll(/url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi))
-    if (!FRAGMENT.test((m[2] ?? "").trim())) bump(problems, "external references");
+  for (const url of cssUrlValues(flat))
+    if (!FRAGMENT.test(url.trim())) bump(problems, "external references");
   if (/@font-face|@namespace/i.test(flat)) bump(problems, "CSS @font-face or @namespace rules");
 }
 
 function checkValue(name: string, value: string, problems: Map<string, number>): void {
   if (/javascript:|vbscript:|data:text\/html/i.test(value.replace(/\s+/g, "")))
     bump(problems, "script URLs");
-  for (const m of value.matchAll(/url\s*\(\s*(['"]?)([^'")]*)\1\s*\)/gi))
-    if (!FRAGMENT.test((m[2] ?? "").trim())) bump(problems, "external references");
+  for (const url of cssUrlValues(value))
+    if (!FRAGMENT.test(url.trim())) bump(problems, "external references");
   if (name === "style") checkCss(value, problems);
 }
 
-function length(value: string | undefined): number | undefined {
-  if (!value) return undefined;
-  const m = /^\s*([0-9]*\.?[0-9]+)\s*(px)?\s*$/.exec(value);
-  return m ? Number(m[1]) : undefined;
-}
+/** Width and height values: a number, optionally in `px`. */
+const length = svgPixels;
 
 /** Validates an SVG document. Never throws on bad input; read `ok` and `problems`. */
 export function checkSvg(source: string): SvgCheck {

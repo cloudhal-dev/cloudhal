@@ -18,6 +18,7 @@ import type { Actor } from "@cloudhal/core-contracts";
 import { type Context, Hono } from "hono";
 import { actorIdForUser, type StaffService } from "../auth.ts";
 import type { Env } from "../context.ts";
+import { isEmailAddress } from "../email.ts";
 import { apiError, badRequest, notFound } from "../errors.ts";
 import { MailError, type MailSender } from "../mail.ts";
 import { passwordChangedMail, resetMail } from "../mail-messages.ts";
@@ -30,7 +31,6 @@ import {
   RESET_TOKEN_PREFIX,
   studioOrigin,
 } from "../tokens.ts";
-import { EMAIL } from "./invites.ts";
 import { auditEvent, RESET_LINK_MINUTES } from "./members.ts";
 
 /** RFC-0011: reset mails one address can receive per hour, whoever asks. */
@@ -120,7 +120,7 @@ export function passwordResetRoutes(options: {
       await limitPublic(c, "reset-request");
       const raw = (await jsonBody(c)).email;
       const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
-      if (!EMAIL.test(email) || email.length > 254) throw badRequest("a valid email is required");
+      if (!isEmailAddress(email)) throw badRequest("a valid email is required");
       c.get("defer")(
         mailResetLink({
           staff,
