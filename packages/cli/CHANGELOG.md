@@ -1,5 +1,29 @@
 # @cloudhal/cli
 
+## 0.6.3
+
+### Patch Changes
+
+- 1dd79c2: Dependency updates from the November 2026 Dependabot sweep. `@cloudhal/astro-renderer`, `@cloudhal/cli` and `@cloudhal/cloudflare` use wrangler 4.152.0 (its `createTestHarness` runs Miniflare 5.20261019.2-beta, and `wrangler deploy` uploads source maps by default since 4.150). The Studio shipped in `@cloudhal/cli` is built with Tiptap 3.32.0 and `@codemirror/language` 6.13.1. The Rust crate validates with jsonschema 0.60.2, and the monorepo lints and formats with Biome 2.6.2 (Markdown and YAML formatting stay off).
+- 7dddd88: `@cloudhal/astro-renderer`, `@cloudhal/cli` and `@cloudhal/cloudflare` use wrangler 4.158.0, and `@cloudhal/astro-renderer` uses `@astrojs/cloudflare` 14.4.4, which brings `@cloudflare/vite-plugin` 1.67 (its peer range is wrangler ^4.156.1, so the two move together). `@astrojs/cloudflare` 14.4 needs Astro 7.4, so projects move to Astro 7.4.7: the blog starter asks for it, and the `astro` peer range of `@cloudhal/astro-renderer` and `@cloudhal/cli` is now ^7.4.0 (was ^7.3.0). The blog starter asks for wrangler ^4.158.0.
+- b347d4a: Self-hosting (#143): the official Docker image `ghcr.io/cloudhal-dev/cloudhal`, built from this release for linux/amd64 and linux/arm64 (tags `X.Y.Z`, `X.Y`, `latest`; `edge` nightly from `main`). One container runs `cloudhal studio` — Studio, the API and the MCP endpoint — with the project, its SQLite database and media on a `/data` volume; the first start on an empty volume scaffolds the project. `site-build` inside the container writes the public site as static HTML, which the compose file's optional Caddy serves with automatic TLS next to Studio. Guide: docs/guides/self-host.md.
+- f6bb8cb: The Studio bundle shipped in `@cloudhal/cli` no longer contains seroval 1.6.8 (a transitive dependency of `@tanstack/react-router`), which GHSA-9wx9-5pv9-3349 and GHSA-f86p-h4j2-7qgj affect: the lockfile now resolves seroval 1.7.9 and seroval-plugins 1.7.8. In the same sweep the monorepo lockfiles move undici to 7.30.2 (an override for the 7.28.0 that Miniflare 4 pins; GHSA-2m5v-pch6-74hx, GHSA-4w7w-5xrc-9h26, GHSA-qrxm-fqhp-jwvm, GHSA-xjj6-f33q-929c, GHSA-rfgv-xxqx-mfg5, GHSA-w293-vg96-wgc3, GHSA-4cwx-7wf7-3272 and the medium/low undici 7.x advisories patched in 7.29.0 to 7.30.1) and 8.12.4 (the same advisories on the 8.x line, through astro's unifont), rustls to 0.23.46 (GHSA-c8m5-c952-6cm4, GHSA-h2v8-394m-p7vv, GHSA-w44r-93j7-qv28, GHSA-vp88-798v-h67f), and, found by `cargo audit`, rustls-webpki to 0.103.16 (RUSTSEC-2026-0382), webpki-root-certs to 1.0.11 (RUSTSEC-2026-0383) and tokio to 1.54.1 (RUSTSEC-2026-0386, unsoundness). undici and rustls are development-time dependencies of this repository only; no published package depends on them.
+- 28e9406: Self-hosting (#143): `cloudhal studio` can be reached from beyond the machine it runs on. `--host <addr>` (or `CLOUDHAL_HOST`) is the address it listens on (default `127.0.0.1`; `0.0.0.0` in a container), `--base-url <url>` (or `CLOUDHAL_BASE_URL`) the public origin behind a reverse proxy — Better Auth's `baseURL` (its session cookies are `Secure` for https), a trusted origin for the API's CSRF check, and the URL the command prints — and `--behind-proxy` (or `CLOUDHAL_BEHIND_PROXY=1`) makes the server take each request's scheme and host from the proxy's `X-Forwarded-Proto` / `X-Forwarded-Host` (`serveNode`'s new `trustProxy`, with `forwardedUrl` / `forwardedRequest` in `@cloudhal/api/node`); without the flag those headers are ignored, as before. `--init-if-empty` (or `CLOUDHAL_INIT=<starter>`, with `--starter`, `--name` / `CLOUDHAL_SITE_NAME`) creates the project the way `cloudhal init` does when the folder has no `cloudhal.json`, so a container starts on an empty volume; a folder with other files is refused, as `init` refuses it. `studio()` returns the bound `port` next to `url`. `cloudhal dev --host` now also takes an address (`--host [<addr>]`; alone it still means every interface).
+- Updated dependencies [1dd79c2]
+- Updated dependencies [7dddd88]
+- Updated dependencies [bf20e64]
+- Updated dependencies [28e9406]
+  - @cloudhal/cloudflare@0.6.3
+  - @cloudhal/api@0.6.3
+  - @cloudhal/agent-runtime@0.6.3
+  - @cloudhal/mcp-server@0.6.3
+  - @cloudhal/analytics@0.6.3
+  - @cloudhal/comments@0.6.3
+  - @cloudhal/core-contracts@0.6.3
+  - @cloudhal/core-ts@0.6.3
+  - @cloudhal/schedules@0.6.3
+  - @cloudhal/storage@0.6.3
+
 ## 0.6.2
 
 ### Patch Changes
