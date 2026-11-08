@@ -216,8 +216,8 @@ catalogs:
       specifier: 1.2.5
       version: 1.2.5
     '@modelcontextprotocol/client':
-      specifier: 2.3.1
-      version: 2.3.1
+      specifier: 2.4.0
+      version: 2.4.0
     '@modelcontextprotocol/server':
       specifier: 2.3.1
       version: 2.3.1
@@ -397,7 +397,7 @@ importers:
     dependencies:
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.3.1
+        version: 2.4.0
     devDependencies:
       '@cloudhal/agent-runtime':
         specifier: workspace:*
@@ -634,7 +634,7 @@ importers:
         version: 2.1.5(hono@4.13.13)
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.3.1
+        version: 2.4.0
       '@types/better-sqlite3':
         specifier: 'catalog:'
         version: 9.6.0
@@ -753,7 +753,7 @@ importers:
         version: 5.20261007.1
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.3.1
+        version: 2.4.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -966,7 +966,7 @@ importers:
         version: 5.20261007.1
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
-        version: 2.3.1
+        version: 2.4.0
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.5
@@ -2338,12 +2338,16 @@ packages:
   '@marijn/find-cluster-break@1.0.4':
     resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
-  '@modelcontextprotocol/client@2.3.1':
-    resolution: {integrity: sha512-mIGZXpHsjnZ6lD+gD/WCMpR5k8yVQQ8nNFH1N0Srf7AvnwTUMYD6pvTY8ng2+He5FfV7YMZLmrjL7cLa/cc3dQ==}
+  '@modelcontextprotocol/client@2.4.0':
+    resolution: {integrity: sha512-LgrD2OphHuG12vfKFKz6SOnq7bKHQmhGJIAYdD+MZBn2npHEyry6uD8zvktodtl5CQM85MO0anUyD9JwmUmxww==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/core@2.3.1':
     resolution: {integrity: sha512-laVmIhPGpWi7rG9q+0UigblRN0Hws/Yjlb6qLFtVqryXVLkc4h+yN8z731POD2LnAGQlFe7/tXhUm7Bi0YB91g==}
+    engines: {node: '>=20'}
+
+  '@modelcontextprotocol/core@2.4.0':
+    resolution: {integrity: sha512-z8QBKqdfXLPzkLQuG4xp8hrVEMm1PZ1IgxMN2sMbJiFiAKOWXnAzogXn2W4aqIBlP1ea6U5yiqVquvUNM1Cj6Q==}
     engines: {node: '>=20'}
 
   '@modelcontextprotocol/server@2.3.1':
@@ -6055,9 +6059,9 @@ snapshots:
 
   '@marijn/find-cluster-break@1.0.4': {}
 
-  '@modelcontextprotocol/client@2.3.1':
+  '@modelcontextprotocol/client@2.4.0':
     dependencies:
-      '@modelcontextprotocol/core': 2.3.1
+      '@modelcontextprotocol/core': 2.4.0
       cross-spawn: 7.0.6
       eventsource: 3.0.7
       eventsource-parser: 3.1.1
@@ -6066,6 +6070,10 @@ snapshots:
       zod: 4.6.7
 
   '@modelcontextprotocol/core@2.3.1':
+    dependencies:
+      zod: 4.6.7
+
+  '@modelcontextprotocol/core@2.4.0':
     dependencies:
       zod: 4.6.7
 
