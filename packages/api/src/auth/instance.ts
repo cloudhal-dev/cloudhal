@@ -5,11 +5,10 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import type { StaffStore } from "../staff.ts";
+import { cimdGuardFor } from "./cimd-guard.ts";
 import type { GrantStore } from "./grants.ts";
 import { betterAuthLogger, oauthEndpoints, oauthPlugins } from "./oauth.ts";
-import { countCimdClients } from "./oauth-client-rows.ts";
 import { oauthBeforeHook } from "./oauth-hooks.ts";
-import { cimdLimits } from "./oauth-registration.ts";
 import {
   API_KEY_HEADER,
   type AuthOptions,
@@ -75,15 +74,7 @@ export function createInstance(
   const oauth = options.mcpOauth
     ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, {
         grantOf: async (userId, clientId) => (await internal.grants.live(userId, clientId))?.id,
-        cimdGuard: {
-          limits: cimdLimits(options.mcpOauth.registration),
-          clientHosts: options.mcpOauth.registration?.clientHosts,
-          count: () => countCimdClients(options.sql),
-          hit: (key, windowMs, max) => staff.hit(key, windowMs, max),
-          // The runtime's trusted address (#165); without one, one shared bucket as elsewhere.
-          address: (headers) => headers?.get(ipHeader ?? "cf-connecting-ip") ?? "unknown",
-          now: clock,
-        },
+        cimdGuard: cimdGuardFor(options, staff, { now: clock, ipHeader }),
       })
     : [];
   const instance = betterAuth({

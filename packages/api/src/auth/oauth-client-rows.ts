@@ -37,22 +37,41 @@ export async function countCimdClients(sql: SqlDriver): Promise<number> {
   return Number(row?.n ?? 0);
 }
 
+interface PruneKind {
+  readonly where: (alias: string) => string;
+  readonly since: "createdAt" | "updatedAt";
+  readonly cutoff: string;
+  readonly limit: number;
+  /** Document hosts never deleted (`exempt`, the well-known clients and the host list). */
+  readonly exempt?: readonly string[] | undefined;
+}
+
+/** `clientId LIKE` patterns for exempt hosts: the host itself and its subdomains. */
+function exemptPatterns(hosts: readonly string[]): string[] {
+  return hosts.slice(0, 30).flatMap((h) => {
+    const host = h.toLowerCase();
+    if (host.startsWith("*.")) return [`https://%.${host.slice(2)}/%`];
+    return [`https://${host}/%`, `https://%.${host}/%`];
+  });
+}
+
 /**
- * Deletes one kind of unused client, at most `PRUNE_BATCH`: no live connection, no connection
- * made, used or ended since `cutoff`, and the client's own row older than it (`since`: when it
- * was registered, or when its document was last fetched). A client with a live connection is
- * never pruned, however idle: ending it is its member's decision ("Connected agents"). Every row
- * the provider keeps for the client goes in the same atomic batch, each statement selecting the
- * same clients (the predicate reads only `oauthClient` and `agent_grants`, which the batch
- * changes last). Returns how many were deleted.
+ * Deletes unused clients of one kind, at most `limit`: no live connection, no connection made,
+ * used or ended since `cutoff`, and the client's own row older than it (`since`: when it was
+ * registered, or when its document was last fetched). A client with a live connection is never
+ * deleted, however idle: ending it is its member's decision ("Connected agents"). Every row the
+ * provider keeps for the client goes in the same atomic batch, each statement selecting the same
+ * clients (the predicate reads only `oauthClient` and `agent_grants`, which the batch changes
+ * last). Returns how many were deleted.
  */
-async function pruneKind(
-  sql: SqlDriver,
-  kind: { readonly where: (alias: string) => string; readonly since: "createdAt" | "updatedAt" },
-  cutoff: string,
-): Promise<number> {
-  const prunable = `SELECT c."clientId" FROM "oauthClient" c WHERE ${kind.where("c.")} AND c."${kind.since}" < ? AND NOT EXISTS (SELECT 1 FROM agent_grants g WHERE g.client_id = c."clientId" AND (g.revoked_at IS NULL OR g.created_at >= ? OR g.last_used_at >= ? OR g.revoked_at >= ?)) ORDER BY c."${kind.since}", c."clientId" LIMIT ${PRUNE_BATCH}`;
-  const params = [cutoff, cutoff, cutoff, cutoff];
+async function pruneKind(sql: SqlDriver, kind: PruneKind): Promise<number> {
+  const patterns = exemptPatterns(kind.exempt ?? []);
+  const exempt = patterns.length
+    ? ` AND NOT (${patterns.map(() => `c."clientId" LIKE ?`).join(" OR ")})`
+    : "";
+  const prunable = `SELECT c."clientId" FROM "oauthClient" c WHERE ${kind.where("c.")} AND c."${kind.since}" < ?${exempt} AND NOT EXISTS (SELECT 1 FROM agent_grants g WHERE g.client_id = c."clientId" AND (g.revoked_at IS NULL OR g.created_at >= ? OR g.last_used_at >= ? OR g.revoked_at >= ?)) ORDER BY c."${kind.since}", c."clientId" LIMIT ${Math.max(1, Math.floor(kind.limit))}`;
+  const { cutoff } = kind;
+  const params = [cutoff, ...patterns, cutoff, cutoff, cutoff];
   const code = (path: string) =>
     `CASE WHEN json_valid("value") THEN json_extract("value", '${path}') END`;
   const results = await sql.batch([
@@ -69,8 +88,8 @@ async function pruneKind(
   return results.at(-1)?.changes ?? 0;
 }
 
-const cutoffOf = (now: Date, days: number) =>
-  new Date(now.getTime() - days * 86_400_000).toISOString();
+const hoursBefore = (now: Date, hours: number) =>
+  new Date(now.getTime() - hours * 3_600_000).toISOString();
 
 /** Dynamically registered clients unused for `unusedDays` since they registered (§3: 30). */
 export function pruneDcrClients(
@@ -78,19 +97,67 @@ export function pruneDcrClients(
   options: { readonly now: Date; readonly unusedDays?: number },
 ): Promise<number> {
   const days = options.unusedDays ?? DCR_LIMITS.unusedDays;
-  return pruneKind(sql, { where: dcrClient, since: "createdAt" }, cutoffOf(options.now, days));
+  return pruneKind(sql, {
+    where: dcrClient,
+    since: "createdAt",
+    cutoff: hoursBefore(options.now, days * 24),
+    limit: PRUNE_BATCH,
+  });
+}
+
+/** Batches one pruning run deletes document clients in, at most (a burst drains in hours). */
+export const CIMD_PRUNE_BATCHES = 4;
+
+/**
+ * Document clients nobody connected through and nobody fetched for `unusedHours` (default 3),
+ * in up to `CIMD_PRUNE_BATCHES` batches while each comes back full: the next authorization
+ * fetches the document and stores the client again.
+ */
+export async function pruneCimdClients(
+  sql: SqlDriver,
+  options: { readonly now: Date; readonly unusedHours?: number },
+): Promise<number> {
+  const cutoff = hoursBefore(options.now, options.unusedHours ?? CIMD_LIMITS.unusedHours);
+  let total = 0;
+  for (let i = 0; i < CIMD_PRUNE_BATCHES; i++) {
+    const n = await pruneKind(sql, {
+      where: cimdClient,
+      since: "updatedAt",
+      cutoff,
+      limit: PRUNE_BATCH,
+    });
+    total += n;
+    if (n < PRUNE_BATCH) break;
+  }
+  return total;
 }
 
 /**
- * Document clients nobody connected through and nobody fetched for `unusedDays` (default 1): the
- * next authorization fetches the document and stores the client again.
+ * Makes room for one document client (the cap): deletes the oldest one with no live connection
+ * and no use since `before`, never one from an exempt host. How many went (0 or 1).
  */
-export function pruneCimdClients(
+export function evictCimdClient(
   sql: SqlDriver,
-  options: { readonly now: Date; readonly unusedDays?: number },
+  input: { readonly before: Date; readonly exempt: readonly string[] },
 ): Promise<number> {
-  const days = options.unusedDays ?? CIMD_LIMITS.unusedDays;
-  return pruneKind(sql, { where: cimdClient, since: "updatedAt" }, cutoffOf(options.now, days));
+  return pruneKind(sql, {
+    where: cimdClient,
+    since: "updatedAt",
+    cutoff: input.before.toISOString(),
+    limit: 1,
+    exempt: input.exempt,
+  });
+}
+
+/**
+ * Records a failed refetch of a document client on its row: the validation time is cleared, so
+ * the row is never served as fresh or stale again until a fetch succeeds.
+ */
+export async function markCimdFetchFailed(sql: SqlDriver, clientId: string): Promise<void> {
+  await sql.run(
+    `UPDATE "oauthClient" SET "updatedAt" = ? WHERE "clientId" = ? AND ${cimdClient()}`,
+    [new Date(0).toISOString(), clientId],
+  );
 }
 
 /** Both kinds, as the hourly job runs them; how many of each were deleted. */

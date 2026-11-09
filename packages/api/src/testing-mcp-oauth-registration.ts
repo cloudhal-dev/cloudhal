@@ -39,7 +39,7 @@ export const DOC = "https://agents.example.com/oauth/client.json";
 /** A public address the stub resolver answers (TEST-NET-3 is not public: use a real range). */
 const PUBLIC = "93.184.215.14";
 
-interface Served {
+export interface Served {
   readonly status?: number;
   readonly headers?: Record<string, string>;
   readonly body?: string;
@@ -352,14 +352,13 @@ export function describeMcpOauthRegistration(label: string, backend: RolesBacken
         expect(await pruneDcrClients(s.sql, { now: new Date(Date.now() + 29 * DAY) })).toBe(0);
         // The scheduler's hourly job does it (Workers and Node), and says so.
         const lines: string[] = [];
-        // DCR clients go in even UTC hours (document clients in odd ones).
-        const later = new Date(Date.now() + 31 * DAY);
-        later.setUTCHours(later.getUTCHours() + (later.getUTCHours() % 2));
         await oauthClientsPruneJob(s.sql, (l) => lines.push(l)).run({
-          now: later,
+          now: new Date(Date.now() + 31 * DAY),
           trigger: "cron",
         });
-        expect(lines).toEqual(["oauth clients: 2 unused registration(s) deleted"]);
+        expect(lines).toEqual([
+          "oauth clients: 2 unused registration(s), 0 unused document client(s) deleted",
+        ]);
         expect(await clients()).toEqual([s.clientId]);
         const leftovers = await s.sql.get<{ n: number }>(
           `SELECT COUNT(*) AS n FROM "oauthRefreshToken" WHERE "clientId" = ?`,

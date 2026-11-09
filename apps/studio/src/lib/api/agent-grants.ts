@@ -21,10 +21,11 @@ export interface ConsentInfo {
     /** `document`: a metadata-document client, identified by `host`; `self-registered`: DCR. */
     kind: "document" | "self-registered" | "server";
     host?: string;
-    /** A self-registered client's name that contains a well-known client's. */
+    /** The well-known client the name looks like, when this is not that client. */
     lookalike?: string;
   };
-  redirect: { host: string; loopback: boolean };
+  /** `app`: a native app's private-use scheme (no web host). */
+  redirect: { host: string; loopback: boolean; app?: string };
   loopbackOnly: boolean;
   scopes: ConsentScope[];
   offlineAccess: boolean;

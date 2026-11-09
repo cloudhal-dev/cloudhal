@@ -58,7 +58,7 @@ describe("OAuth consent screen", () => {
     );
     renderPage();
     // The document's host is in the title and leads the identity, whatever the name says.
-    expect(await screen.findByText("Connect Claude Code from claude.ai")).toBeTruthy();
+    expect(await screen.findByText("claude.ai: connect Claude Code")).toBeTruthy();
     expect(screen.getByText("Identified by claude.ai")).toBeTruthy();
     expect(screen.getByText(/Every address this agent can send you back to/)).toBeTruthy();
     // The signed request goes to the server untouched.
@@ -98,6 +98,27 @@ describe("OAuth consent screen", () => {
     expect(screen.queryByText("Registered with this Studio")).toBeNull();
     expect(screen.getByText(/The name looks like Claude, but anyone can register/)).toBeTruthy();
     expect(screen.getByText("Sends you back to claude-ai.callback.example")).toBeTruthy();
+  });
+
+  it("shows a private-use redirect as an app on this computer, never as a web host", async () => {
+    serve(
+      ...asRole("owner"),
+      on("GET", "/api/agent-grants/consent", {
+        status: 200,
+        body: {
+          ...INFO,
+          client: { id: "dcr2", name: "Cursor", kind: "self-registered" },
+          redirect: { host: "", loopback: true, app: "cursor" },
+          loopbackOnly: false,
+        },
+      }),
+    );
+    renderPage();
+    expect(
+      await screen.findByText("Sends you back to an app on this computer (cursor:)"),
+    ).toBeTruthy();
+    // Cursor registers itself under its own name: no look-alike warning for it.
+    expect(screen.queryByText(/The name looks like/)).toBeNull();
   });
 
   it("asks for explicit consent before an Auto connection", async () => {

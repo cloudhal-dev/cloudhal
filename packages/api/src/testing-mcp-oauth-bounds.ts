@@ -13,14 +13,19 @@
  *    already have keep working.
  * 6. The consent screen's identity: names made plain and short, the kind, look-alike names.
  */
+
+import type { ClientDiscovery } from "@better-auth/oauth-provider";
+import { APIError } from "better-auth/api";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { clearAccessTokenKeyCache } from "./auth/access-token.ts";
+import { type CimdGuard, guardedResolve } from "./auth/cimd-discovery.ts";
 import { pruneCimdClients } from "./auth/oauth-client-rows.ts";
-import type { OauthRegistration } from "./auth/oauth-registration.ts";
+import { CIMD_LIMITS, type OauthRegistration } from "./auth/oauth-registration.ts";
 import {
   DOC,
   document,
   FETCH_FAILED,
+  type Served,
   stubTransport,
   tryAuthorize,
   withCimd,
@@ -42,6 +47,8 @@ import {
 import type { RolesBackend } from "./testing-roles.ts";
 
 const READ = "site:read content:read";
+/** Claude Code's metadata document (RFC-0044 §3). */
+const CLAUDE_CODE = "https://claude.ai/oauth/claude-code-client-metadata";
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 /** Cursor 3.14.27's registration as observed (forum.cursor.com/t/167608). */
@@ -169,21 +176,150 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
       await ageRow(s, DOC, 2 * HOUR);
       expect(proceeds(await tryAuthorize(w, DOC))).toBe(true);
       expect(fetches()).toBe(2);
-      // The caller's own budget spent too: the stored client is served from its row.
+      // The caller's own budget spent too: that caller is told to wait (429), never served an
+      // outdated row it could make the server use by spending its own budget.
       await ageRow(s, DOC, 2 * HOUR);
       for (let i = 0; i < 4; i++)
         await anonymousAuthorize(w, `https://g${i}.example.com/c.json`, "unknown");
-      const stale = await token(
+      const waiting = await token(
         { ...w, clientId: DOC },
         { grant_type: "refresh_token", refresh_token: refreshed.body.refresh_token as string },
       );
-      expect(stale.status, JSON.stringify(stale.body)).toBe(200);
+      expect(waiting.status).toBe(429);
       expect(fetches()).toBe(2);
-      expect(proceeds(await tryAuthorize(w, DOC))).toBe(true);
-      await (await mcpClient(w.app, stale.body.access_token as string)).listTools();
-      // A new document from that caller is refused while its budget is spent.
+      // A new document from that caller is refused too.
       const blocked = await tryAuthorize(w, "https://agents.example.com/new.json");
       expect(blocked.status).toBe(429);
+    });
+
+    it("keeps a stored client refreshing on the same process after junk URLs on its origin", async () => {
+      // Node keeps one auth instance for the life of the process: no redeploy here.
+      const transport = stubTransport((url) =>
+        url.toString() === CLAUDE_CODE
+          ? { body: document({ client_id: CLAUDE_CODE }) }
+          : { status: 404 },
+      );
+      const s = await setupServer(backend, withCimd(transport));
+      const claude = { ...s, clientId: CLAUDE_CODE };
+      const first = await connect(claude, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      // Two hours later (every cache the old code kept has expired), about 30 a minute of new
+      // URLs on claude.ai, from enough addresses to pass each one's budget.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 2 * HOUR);
+      for (let i = 0; i < 30; i++)
+        await anonymousAuthorize(s, `https://claude.ai/x${i}`, `198.51.100.${i % 10}`);
+      const renewed = await token(claude, {
+        grant_type: "refresh_token",
+        refresh_token: first.refresh ?? "",
+      });
+      expect(renewed.status, JSON.stringify(renewed.body)).toBe(200);
+      expect(transport.requests.filter((u) => u === CLAUDE_CODE).length).toBe(2);
+      expect(proceeds(await tryAuthorize(s, CLAUDE_CODE))).toBe(true);
+    });
+
+    it("follows a changed document after the freshness window and drops a removed one", async () => {
+      let served: Served = { body: document() };
+      const transport = stubTransport(() => served);
+      const s = await setupServer(backend, withCimd(transport));
+      const claude = { ...s, clientId: DOC };
+      const first = await connect(claude, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      // The document moves its callback: once the stored row is older than an hour, only the new
+      // one is accepted.
+      const moved = "http://127.0.0.1/moved";
+      served = { body: document({ redirect_uris: [moved] }) };
+      await ageRow(s, DOC, 2 * HOUR);
+      expect((await tryAuthorize(s, DOC, REDIRECT)).reason).toBe("invalid redirect uri");
+      expect(proceeds(await tryAuthorize(s, DOC, "http://127.0.0.1:5000/moved"))).toBe(true);
+      // The document disappears: after the window the client is refused, at refresh too, and
+      // stays refused (the failure is recorded on the row), whatever budget the caller spends.
+      served = { status: 404 };
+      await ageRow(s, DOC, 2 * HOUR);
+      const gone = await token(claude, {
+        grant_type: "refresh_token",
+        refresh_token: first.refresh ?? "",
+      });
+      expect(gone.status).not.toBe(200);
+      const row = await s.sql.get<{ updatedAt: string }>(
+        `SELECT "updatedAt" FROM "oauthClient" WHERE "clientId" = ?`,
+        [DOC],
+      );
+      expect(Date.parse(row?.updatedAt ?? "")).toBe(0);
+      for (let i = 0; i < 25; i++)
+        await anonymousAuthorize(s, `https://h${i}.example.com/c.json`, "unknown");
+      const again = await token(claude, {
+        grant_type: "refresh_token",
+        refresh_token: first.refresh ?? "",
+      });
+      expect(again.status).not.toBe(200);
+      expect((await tryAuthorize(s, DOC, "http://127.0.0.1:5000/moved")).consentScreen).toBe(false);
+    });
+
+    it("serves a stored row the plugin declines to refetch only within 24 hours, never after a failure", async () => {
+      const failed: string[] = [];
+      const guard: CimdGuard = {
+        limits: CIMD_LIMITS,
+        count: async () => 0,
+        evict: async () => 0,
+        markFailed: async (id) => {
+          failed.push(id);
+        },
+        hit: async () => true,
+        address: () => "203.0.113.9",
+        now: () => new Date(),
+      };
+      const declined = new APIError("TOO_MANY_REQUESTS", { error: "temporarily_unavailable" });
+      const inner = (error: unknown) =>
+        ({
+          id: "cimd",
+          matches: () => true,
+          resolve: async () => {
+            throw error;
+          },
+        }) as unknown as ClientDiscovery;
+      const stored = (hours: number) =>
+        ({ clientId: DOC, updatedAt: new Date(Date.now() - hours * HOUR) }) as never;
+      const ctx = { headers: new Headers() } as never;
+      const run = (error: unknown, hours: number) =>
+        guardedResolve(inner(error), guard, { ctx, clientId: DOC, existing: stored(hours) });
+      expect(await run(declined, 2)).toMatchObject({ clientId: DOC });
+      await expect(run(declined, 25)).rejects.toBe(declined);
+      const fetchFailed = new APIError("BAD_REQUEST", { error: "invalid_client" });
+      await expect(run(fetchFailed, 2)).rejects.toBe(fetchFailed);
+      expect(failed).toEqual([DOC]);
+    });
+
+    it("makes room for a well-known client's first connection when the cap is full of junk", async () => {
+      const transport = stubTransport((url) => ({ body: document({ client_id: url.toString() }) }));
+      const s = await setupServer(backend, withCimd(transport, { cimdLimits: { maxClients: 3 } }));
+      for (let i = 0; i < 3; i++)
+        await anonymousAuthorize(s, `https://junk${i}.example.com/c.json`, `192.0.2.${i}`);
+      // Full, and every junk row was fetched just now: a fourth unknown document waits.
+      const fourth = await anonymousAuthorize(s, "https://junk3.example.com/c.json", "192.0.2.3");
+      expect(fourth.status).toBe(503);
+      // Claude Code's first connection here is exempt from the cap.
+      const first = await connect(
+        { ...s, clientId: CLAUDE_CODE },
+        { cookie: s.owner.cookie, scope: READ },
+      );
+      expect(first.access).toBeTruthy();
+      // Junk older than the eviction window makes way for a new document, one at a time.
+      await s.sql.run(
+        `UPDATE "oauthClient" SET "updatedAt" = ? WHERE "clientId" LIKE 'https://junk%'`,
+        [new Date(Date.now() - HOUR).toISOString()],
+      );
+      expect((await tryAuthorize(s, "https://agents.example.com/new.json")).consentScreen).toBe(
+        true,
+      );
+      const left = await s.sql.get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM "oauthClient" WHERE "clientId" LIKE 'https://junk%'`,
+      );
+      expect(Number(left?.n)).toBe(2);
     });
 
     it("registers Cursor with its real body, and refuses dangerous or unknown schemes", async () => {
@@ -239,6 +375,14 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
       expect((await to("myapp://app/callback")).status).toBe(201);
       expect((await to("cursor://anysphere.cursor-mcp/oauth/callback")).status).toBe(201);
       expect((await to("com.example.app:/oauth/callback")).status).toBe(400);
+      // A web client never gets a private-use redirect, whatever the provider would infer.
+      for (const uri of ["cursor://anysphere.cursor-mcp/oauth/callback", "com.example.app:/cb"]) {
+        const web = await s.call("POST", "/api/auth/oauth2/register", {
+          body: { ...CURSOR_BODY, application_type: "web", redirect_uris: [uri] },
+        });
+        expect(web.status, uri).toBe(400);
+        expect(web.body.error, uri).toBe("invalid_redirect_uri");
+      }
     });
 
     it("applies the client host list at every authorization, to clients registered before it", async () => {
@@ -274,11 +418,21 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
       expect(renewed.status, JSON.stringify(renewed.body)).toBe(200);
     });
 
-    it("shows a client's name plain and short, its kind, and flags look-alike self-registrations", async () => {
-      const name = `Claude‮ edoC​ ${" ".repeat(400)}from claude.ai · sends you back to claude.ai ${"x".repeat(300)}`;
-      const transport = stubTransport(() => ({ body: document({ client_name: name }) }));
-      const s = await setupServer(backend, withCimd(transport));
-      const info = async (clientId: string, redirectUri = REDIRECT) => {
+    it("shows a client's name plain and short, its kind, and flags look-alikes of document clients", async () => {
+      const name = `Claude\u202e edoC\u200b ${"\u2003".repeat(400)}from claude.ai · sends you back to claude.ai ${"x".repeat(300)}`;
+      const transport = stubTransport((url) => ({
+        body: document({
+          client_id: url.toString(),
+          client_name: url.toString() === CLAUDE_CODE ? "Claude Code" : name,
+        }),
+      }));
+      const s = await setupServer(backend, {
+        registration: {
+          ...withCimd(transport).registration,
+          limits: { perAddressPerHour: 100 },
+        },
+      });
+      const consent = async (clientId: string, redirectUri = REDIRECT) => {
         const start = await authorize(s, {
           cookie: s.owner.cookie,
           scope: READ,
@@ -290,17 +444,51 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
           await s.call("GET", `/api/agent-grants/consent?request=${encodeURIComponent(request)}`, {
             cookie: s.owner.cookie,
           })
-        ).body.client as Json;
+        ).body;
       };
+      const info = async (clientId: string) => (await consent(clientId)).client as Json;
       const doc = await info(DOC);
       expect(doc).toMatchObject({ kind: "document", host: "agents.example.com" });
       expect([...(doc.name as string)].length).toBeLessThanOrEqual(100);
-      expect(doc.name).not.toMatch(/[‮​ ]/);
+      expect(doc.name).not.toMatch(/[\u202e\u200b\u2003]/);
       expect(doc.name).toMatch(/^Claude edoC from claude\.ai/);
-      expect(doc.lookalike).toBeUndefined();
-      const fake = await registerClient(s, { client_name: "Claude · Identified by claude.ai" });
-      expect(await info(fake)).toMatchObject({ kind: "self-registered", lookalike: "Claude" });
+      // A document named like Claude on another host is flagged; Claude Code's own is not.
+      expect(doc.lookalike).toBe("Claude");
+      expect(await info(CLAUDE_CODE)).toMatchObject({
+        kind: "document",
+        host: "claude.ai",
+        name: "Claude Code",
+      });
+      expect((await info(CLAUDE_CODE)).lookalike).toBeUndefined();
+      // Self-registered names: confusables are folded before comparing; Cursor's own name is not
+      // a look-alike (Cursor always registers itself).
+      for (const fake of [
+        "Claude · Identified by claude.ai",
+        "\u0421laude",
+        "\uff23\uff4c\uff41\uff55\uff44\uff45",
+        "C1aude",
+        "CIaude",
+        "Chat\u0047\u0420T",
+        "VS \u0421ode",
+      ]) {
+        const id = await registerClient(s, { client_name: fake });
+        expect((await info(id)).lookalike, fake).toBeDefined();
+      }
+      const cursor = await registerClient(s, { client_name: "Cursor" });
+      expect(await info(cursor)).toMatchObject({ kind: "self-registered", name: "Cursor" });
+      expect((await info(cursor)).lookalike).toBeUndefined();
       expect((await info(s.clientId)).lookalike).toBeUndefined(); // "Test Agent"
+      // Stacked combining marks: a few per character at most.
+      const marks = await registerClient(s, { client_name: `Z${"\u0301".repeat(30)}oe` });
+      expect([...((await info(marks)).name as string)].length).toBe(5);
+      // A private-use redirect is an app on this computer, never a web host.
+      const app = "cursor://claude.ai/oauth/callback";
+      const native = await registerClient(s, { client_name: "Cursor", redirect_uris: [app] });
+      expect((await consent(native, app)).redirect).toEqual({
+        host: "",
+        loopback: true,
+        app: "cursor",
+      });
       // The connection keeps the shown name.
       await connect({ ...s, clientId: DOC }, { cookie: s.owner.cookie, scope: READ });
       const grants = (await s.call("GET", "/api/agent-grants", { cookie: s.owner.cookie }))

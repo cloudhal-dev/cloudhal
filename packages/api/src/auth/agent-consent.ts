@@ -49,11 +49,18 @@ export interface ConsentInfo {
     readonly kind: ClientKind;
     /** The `client_id` host of a metadata-document client (`claude.ai`), else absent. */
     readonly host?: string | undefined;
-    /** A self-registered client's name that contains a well-known client's (`Claude`). */
+    /** The well-known client the name looks like, when this is not that client (`Claude`). */
     readonly lookalike?: string | undefined;
   };
-  /** Where the browser is sent back: its host, and whether it is this computer (loopback). */
-  readonly redirect: { readonly host: string; readonly loopback: boolean };
+  /**
+   * Where the browser is sent back: its host, and whether it is this computer (loopback); for a
+   * native app's private-use scheme, `app` (the scheme) and no host.
+   */
+  readonly redirect: {
+    readonly host: string;
+    readonly loopback: boolean;
+    readonly app?: string | undefined;
+  };
   /** Every registered redirect URI is loopback (the spec's extra warning). */
   readonly loopbackOnly: boolean;
   readonly scopes: readonly ConsentScope[];
@@ -79,9 +86,12 @@ interface ClientRow {
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]"]);
 
-function hostOf(uri: string): { host: string; loopback: boolean } | undefined {
+function hostOf(uri: string): { host: string; loopback: boolean; app?: string } | undefined {
   try {
     const url = new URL(uri);
+    // A private-use scheme opens an app on this computer: its "host" is the app's to read.
+    if (url.protocol !== "http:" && url.protocol !== "https:")
+      return { host: "", loopback: true, app: url.protocol.slice(0, -1) };
     return { host: url.host, loopback: LOOPBACK.has(url.hostname) };
   } catch {
     return undefined;
@@ -142,7 +152,7 @@ export async function consentInfo(
   const host = documentHost(client);
   const kind = clientKind(client);
   const name = displayName(client.name, client.clientId);
-  const lookalike = kind === "self-registered" ? lookalikeOf(name) : undefined;
+  const lookalike = lookalikeOf(name, client);
   const sites = who.member.sites ? Object.keys(who.member.sites) : undefined;
   return {
     client: {

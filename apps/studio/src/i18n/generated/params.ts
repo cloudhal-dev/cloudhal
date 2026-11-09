@@ -550,10 +550,11 @@ export interface MessageParams {
   "oauthConsent.scopes.notInRole": { label: string | number };
   "oauthConsent.scopes.sites": { count: number };
   "oauthConsent.title": { client: string | number };
-  "oauthConsent.titleFrom": { client: string | number; host: string | number };
+  "oauthConsent.titleFrom": { host: string | number; client: string | number };
   "oauthConsent.who.fromHost": { host: string | number };
   "oauthConsent.who.lookalike": { client: string | number };
   "oauthConsent.who.sendsBack": { host: string | number };
+  "oauthConsent.who.thisComputerApp": { scheme: string | number };
   "overview.commentsWaiting": { count: number };
   "pageStatus.leftOut": { count: number };
   "pageStatus.publishTitle": { title: string | number };

@@ -6,7 +6,7 @@
 export const messages = {
   oauthConsent: {
     title: "Connect {client}",
-    titleFrom: "Connect {client} from {host}",
+    titleFrom: "{host}: connect {client}",
     description:
       "An agent asks to work in this Studio for you. Check what it may do before you approve.",
     invalid: {
@@ -20,9 +20,10 @@ export const messages = {
       registered: "Registered with this Studio",
       selfRegistered: "Self-registered, not verified",
       lookalike:
-        "The name looks like {client}, but anyone can register a client under any name. Approve only if you started this connection from {client} yourself and the address below is the one it uses.",
+        "The name looks like {client}, but anyone can register a client under any name. Approve only if you started this connection from {client} yourself and the address it sends you back to, shown above, is the one it uses.",
       sendsBack: "Sends you back to {host}",
       thisComputer: "Sends you back to an app on this computer",
+      thisComputerApp: "Sends you back to an app on this computer ({scheme}:)",
       loopbackWarning:
         "Every address this agent can send you back to is on this computer. Approve only if you started the connection from an app here.",
       stepUp: "This agent is already connected and asks for more. What it may do today is ticked.",

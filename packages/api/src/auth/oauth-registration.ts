@@ -35,34 +35,39 @@ export const DCR_LIMITS: DcrLimits = {
 };
 
 export interface CimdLimits {
-  /** Metadata fetches per caller address per minute, whoever the client is. */
+  /** Metadata fetches per caller address per minute, whoever the client is (past it: 429). */
   readonly perAddressPerMinute: number;
   /** Fetches of documents not stored yet, per client origin and in all, per minute. */
   readonly perOriginPerMinute: number;
   readonly perMinute: number;
-  /** Clients from metadata documents that may be stored at once (beyond it 503). */
+  /** Document clients stored at once; a new one beyond it evicts an unused one, or gets 503. */
   readonly maxClients: number;
+  /** A client fetched within this many minutes is never evicted to make room. */
+  readonly evictMinutes: number;
   /** A stored document younger than this is used without fetching it again (minutes). */
   readonly freshMinutes: number;
-  /** A document client with no connection and no fetch for this many days is deleted. */
-  readonly unusedDays: number;
+  /** The oldest a stored row may be served when the fetch is declined (never after a failure). */
+  readonly maxStaleHours: number;
+  /** A document client with no connection and no fetch for this many hours is deleted. */
+  readonly unusedHours: number;
 }
 
 /**
  * Outbound metadata fetches and stored document clients, counted across every isolate in
- * Cloudhal's `rate_limits` (the plugin's own budget lives in one instance, which a Worker rebuilds
- * on every request). A stored client is fetched at most once per `freshMinutes`; only documents
- * not stored yet spend the shared per-origin budget, so anonymous callers cannot starve the
- * clients members already use. The next authorization recreates a pruned client from its
- * document, so unused rows go after a day.
+ * Cloudhal's `rate_limits`. A stored client is fetched at most once per `freshMinutes`; only
+ * documents not stored yet spend the shared per-origin budget, so anonymous callers cannot
+ * starve the clients members already use. The next authorization recreates a pruned or evicted
+ * client from its document, so unused rows go after hours.
  */
 export const CIMD_LIMITS: CimdLimits = {
   perAddressPerMinute: 20,
   perOriginPerMinute: 30,
   perMinute: 120,
   maxClients: 5_000,
+  evictMinutes: 10,
   freshMinutes: 60,
-  unusedDays: 1,
+  maxStaleHours: 24,
+  unusedHours: 3,
 };
 
 export interface OauthRegistration {
