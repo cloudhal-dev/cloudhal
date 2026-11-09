@@ -1,8 +1,8 @@
 import type { Auth } from "better-auth";
 import { createAgentGrantService } from "./auth/agent-grants.ts";
 import { createAgentKeyService } from "./auth/agent-keys.ts";
+import { oauthClientRegistration } from "./auth/dcr-server.ts";
 import { authDeps } from "./auth/deps.ts";
-import { createOauthClient } from "./auth/oauth-clients.ts";
 import { createPrincipalResolver } from "./auth/principal.ts";
 import { createStaffService } from "./auth/staff.ts";
 import { type AuthOptions, type CloudhalAuth, signUpMode } from "./auth/types.ts";
@@ -15,6 +15,13 @@ export {
   type ConsentScope,
   consentScopes,
 } from "./auth/agent-grants.ts";
+export {
+  CIMD_MAX_BYTES,
+  CIMD_TIMEOUT_MS,
+  type CimdFetchOptions,
+  cimdFetch,
+} from "./auth/cimd-fetch.ts";
+export { DCR_MAX_BODY_BYTES, RegistrationError } from "./auth/dcr.ts";
 export { agentIdForGrant } from "./auth/grants.ts";
 export { actorIdForUser, agentIdForKey, agentKeyStateFromSql } from "./auth/key-rows.ts";
 export {
@@ -23,6 +30,15 @@ export {
   OAUTH_SCOPES,
   oauthEndpoints,
 } from "./auth/oauth.ts";
+export {
+  DCR_LIMITS,
+  type DcrLimits,
+  type OauthRegistration,
+  type OauthRegistrationEnv,
+  oauthRegistrationFrom,
+  parseClientHosts,
+  pruneDcrClients,
+} from "./auth/oauth-registration.ts";
 export {
   ADDABLE_KEY_SCOPES,
   AGENT_KEY_RATE_LIMIT,
@@ -75,11 +91,27 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
                     getOAuthServerConfig(): Promise<Record<string, unknown>>;
                   }
                 ).getOAuthServerConfig()) ?? {};
-              return metadata;
+              return narrowAuthMethods(metadata);
             },
-            createClient: (input) => createOauthClient(d, input),
+            ...oauthClientRegistration(d, options.mcpOauth),
           },
         }
       : {}),
+  };
+}
+
+/**
+ * RFC-0044 §2: the token endpoint takes public clients and `private_key_jwt` only. The provider
+ * also lists the shared-secret methods, but no client here ever holds a secret (CIMD and DCR
+ * clients are public or key-bound), so they are not advertised.
+ */
+function narrowAuthMethods(metadata: Record<string, unknown>): Record<string, unknown> {
+  const methods = metadata.token_endpoint_auth_methods_supported;
+  if (!Array.isArray(methods)) return metadata;
+  return {
+    ...metadata,
+    token_endpoint_auth_methods_supported: methods.filter(
+      (m) => m === "none" || m === "private_key_jwt",
+    ),
   };
 }

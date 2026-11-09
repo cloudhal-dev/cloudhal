@@ -24,6 +24,7 @@ import {
   requestRelease,
   type SchedulesDeps,
 } from "@cloudhal/mcp-server/schedules";
+import { defineTools } from "@cloudhal/mcp-server/tools";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { MemoryBlobStore, type SqlDriver } from "@cloudhal/storage";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
@@ -522,6 +523,39 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       const [row] = await audit.list({ siteId: site.id, tool: "schedule.embargo.lift" });
       expect(row).toMatchObject({
         input: { reason: "Press moved", effect: { reason: "Press moved" } },
+      });
+    });
+
+    it("an OAuth connection's set_embargo waits for a person; approving puts it live (RFC-0044)", async () => {
+      const live = (await store.listContentEntries(site.id))[0] as ContentEntry;
+      const setEmbargo = defineTools().find((t) => t.name === "set_embargo");
+      if (!setEmbargo) throw new Error("set_embargo");
+      // A token principal: an agent with a grant and no key, the member behind it an Editor.
+      const editor = person("editor");
+      const principal: Principal = {
+        actor: agent,
+        scopes: ["schedules:write", "content:write", "content:read", "site:read"],
+        mode: "edits",
+        grantId: "grant_desk00000001",
+        ...(editor.person ? { person: editor.person } : {}),
+      };
+      const result = (await setEmbargo.handler(
+        { siteId: site.id, nodeId: live.id, from: plus(5 * HOUR), expectedRev: live.rev },
+        { store, principal, schedules: deps, approvals, now: () => clock.now },
+      )) as { status: string; approvalId: string; release: Release };
+      expect(result.status).toBe("approval-pending");
+      expect(result.release.state).toBe("awaiting_approval");
+      // the people who may decide it are told (§14), the agent's own member included
+      const kinds = ((await call("/api/notifications", "editor")).body.items as Json[]).map(
+        (n) => n.kind,
+      );
+      expect(kinds).toContain("schedule-approval-due");
+      const approved = await post(`${S()}/approvals/${result.approvalId}/approve`, {}, "owner");
+      expect(approved.status, approved.text).toBe(200);
+      expect(await schedules.getRelease(site.id, result.release.id)).toMatchObject({
+        state: "scheduled",
+        when: { kind: "on-approval" },
+        approval: { kind: "person", approvalId: result.approvalId },
       });
     });
 

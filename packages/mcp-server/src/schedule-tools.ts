@@ -33,7 +33,7 @@ import type {
   ScheduleRun,
   Site,
 } from "@cloudhal/core-contracts";
-import { canonicalJson, gateChanges } from "@cloudhal/core-ts";
+import { gateChanges } from "@cloudhal/core-ts";
 import {
   budgetLeft,
   canonicalInstant,
@@ -62,7 +62,8 @@ import {
   type ToolDefinition,
   ToolError,
 } from "./common.ts";
-import { directApproval, keyOf, NO_GRANT_GATES } from "./gate-approval.ts";
+import { directApproval, GRANT_GATE_PENDING, keyOf, NO_GRANT_GATES } from "./gate-approval.ts";
+import { assertOwnNode, gatedNode, gateOnly, writeGates } from "./schedule-gates.ts";
 import {
   approvalProblem,
   autoReleaseVerdict,
@@ -436,66 +437,6 @@ async function releaseFor(
 
 // ───────────────────────────── gates (§7.6, §10.8) ─────────────────────────────
 
-type GatedNode = (ContentEntry | Page) & { kind: "contentEntry" | "page" };
-
-async function gatedNode(ctx: ToolContext, siteId: string, nodeId: string): Promise<GatedNode> {
-  const entry = await ctx.store.getContentEntry(nodeId);
-  if (entry && entry.siteId === siteId) return { ...entry, kind: "contentEntry" };
-  const page = await ctx.store.getPage(nodeId);
-  if (page && page.siteId === siteId) return { ...page, kind: "page" };
-  throw new ToolError("not_found", `no article or page ${nodeId} on this site`);
-}
-
-async function assertOwnNode(ctx: ToolContext, node: GatedNode): Promise<void> {
-  if (ctx.limit?.target !== "release") return;
-  const owned =
-    node.kind === "contentEntry" &&
-    (await (ctx.ownership ?? ACTOR_OWNERSHIP).personOf((node as ContentEntry).author)) ===
-      callerPerson(ctx);
-  if (!owned) throw new ToolError("denied", "your role schedules only your own articles");
-}
-
-/** Writes new gates on the working copy (CAS on `expectedRev`) and snapshots, like any edit. */
-async function writeGates(
-  ctx: ToolContext,
-  node: GatedNode,
-  availability: ContentEntry["availability"],
-  expectedRev: number,
-): Promise<ContentEntry | Page> {
-  if (node.rev !== expectedRev)
-    throw new ToolError(
-      "conflict",
-      `${node.id} is at rev ${node.rev}, you sent ${expectedRev}; read it again`,
-    );
-  const { kind: _k, availability: _a, ...rest } = node;
-  const next = { ...rest, ...(availability ? { availability } : {}) };
-  const saved =
-    node.kind === "contentEntry"
-      ? await ctx.store.updateContentEntry(next as ContentEntry)
-      : await ctx.store.updatePage(next as Page);
-  await ctx.store.createSnapshot(node.siteId, {
-    actor: ctx.principal.actor,
-    reason: "agentMutation",
-    label: `gates by ${ctx.principal.actor.name ?? ctx.principal.actor.id}`,
-  });
-  return saved;
-}
-
-/** True when the working copy differs from the live version only in its gates (a gate-only change). */
-async function gateOnly(ctx: ToolContext, site: Site, node: ContentEntry | Page): Promise<boolean> {
-  const ref = (await liveRefs(ctx.store, site)).find((r) => r.id === node.id);
-  if (!ref) return false;
-  const live = (await ctx.store.readSnapshotNode(ref).catch(() => undefined)) as
-    | (ContentEntry | Page)
-    | undefined;
-  if (!live) return false;
-  const strip = (n: ContentEntry | Page) => {
-    const { availability: _a, rev: _r, updatedAt: _u, ...rest } = n;
-    return canonicalJson(rest);
-  };
-  return strip(live) === strip(node);
-}
-
 /** One node, one `on-approval` release carrying its gate change, scheduled with `approval`. */
 async function gateRelease(
   ctx: ToolContext,
@@ -520,6 +461,47 @@ async function gateRelease(
   });
   const rec = await recordOf(ctx, site.id, pinned.release.id);
   return scheduleWith(ctx, rec, { kind: "on-approval" }, approval);
+}
+
+/** What `set_embargo` answers (`approval-pending`: an OAuth connection's gate, RFC-0044). */
+const EMBARGO_STATUS = ["set", "scheduled", "approval-pending", "with-next-publish"] as const;
+const EMBARGO_RESULT = obj(
+  {
+    node: ANY,
+    release: ANY,
+    status: { type: "string", enum: [...EMBARGO_STATUS] },
+    approvalId: { type: "string" },
+    message: { type: "string" },
+  },
+  ["node", "status"],
+);
+
+/**
+ * An OAuth connection's gate-only change (RFC-0044): it has no approval of its own, so the pinned
+ * release `gateRelease` would schedule is filed as a `schedule_release` request to run on
+ * approval, bound to its `rl1:` hash like every release request (Studio's Approvals, and a
+ * `schedule-approval-due` notification); approving it puts the embargo live. Without out-of-band
+ * approvals the gate waits for the next publish.
+ */
+async function gateRequest(ctx: ToolContext, site: Site, nodeId: string) {
+  if (!ctx.approvals) return { status: "with-next-publish" as const, message: NO_GRANT_GATES };
+  const pinned = await releaseService(deps(ctx), ctx.store, ctx.now).create({
+    siteId: site.id,
+    set: [nodeId],
+    createdBy: ctx.principal.actor,
+    metadata: { [RELEASE_META.source]: "set_embargo", [RELEASE_META.reduce]: "1" },
+  });
+  const rec = await recordOf(ctx, site.id, pinned.release.id);
+  const when = { kind: "on-approval" } as const;
+  const filed = await fileRequest(
+    ctx,
+    rec,
+    when,
+    "schedule_release",
+    "Put the embargo live",
+    "tool",
+  );
+  return { ...filed, message: GRANT_GATE_PENDING };
 }
 
 // ───────────────────────────── runs (§11.2) ─────────────────────────────
@@ -1012,15 +994,7 @@ export function scheduleTools(): ToolDefinition[] {
         { siteId: id, nodeId: id, from: TIMESTAMP, expectedRev: { type: "integer", minimum: 0 } },
         ["siteId", "nodeId", "from", "expectedRev"],
       ),
-      outputSchema: obj(
-        {
-          node: ANY,
-          release: ANY,
-          status: { type: "string", enum: ["set", "scheduled", "with-next-publish"] },
-          message: { type: "string" },
-        },
-        ["node", "status"],
-      ),
+      outputSchema: EMBARGO_RESULT,
       annotations: WRITE,
       scopes: ["schedules:write", "content:write"],
       own: "release",
@@ -1060,7 +1034,7 @@ export function scheduleTools(): ToolDefinition[] {
               "This content has other unpublished edits, so the embargo cannot go live on its own: it is still visible until it is published. Ask a person to publish (or schedule) it.",
           };
         const approval = directApproval(ctx, at);
-        if (!approval) return { node: saved, status: "with-next-publish", message: NO_GRANT_GATES };
+        if (!approval) return { node: saved, ...(await gateRequest(ctx, site, node.id)) };
         const release = await gateRelease(ctx, site, node.id, "set_embargo", approval, true);
         return { node: saved, release, status: "scheduled" };
       },

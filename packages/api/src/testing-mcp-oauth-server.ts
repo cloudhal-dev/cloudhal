@@ -3,8 +3,8 @@
  * API and the token path on `/mcp`, on better-sqlite3 and Miniflare D1. Discovery leads to the
  * AS metadata; the code flow with PKCE (S256 only); the token on `/mcp`; refresh rotation with
  * its reuse window; revocation; `aud` and `iss` bound to the deployment; step-up then a new
- * consent; scopes narrowed by the member's installation role. The client is pre-registered
- * server-side (`OauthServer.createClient`): registration (CIMD, DCR) is Phase 3.
+ * consent; scopes narrowed by the member's installation role. The client registers through DCR
+ * (`registerClient`); registration itself is `testing-mcp-oauth-registration.ts`'s.
  */
 import { narrow, roleScopes, scopesForMode } from "@cloudhal/agent-runtime";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -67,8 +67,11 @@ export function describeMcpOauthServer(label: string, backend: RolesBackend): vo
       expect(meta.authorization_response_iss_parameter_supported).toBe(true);
       expect(meta.grant_types_supported).toEqual(["authorization_code", "refresh_token"]);
       expect(meta.scopes_supported).toEqual(OAUTH_SCOPES);
-      // Phase 2: no registration endpoint yet (CIMD and DCR are Phase 3).
-      expect(meta.registration_endpoint).toBeUndefined();
+      // Phase 3: DCR is on in this deployment (the harness's default), CIMD is not.
+      expect(meta.registration_endpoint).toBe(`${ISSUER}/oauth2/register`);
+      expect(meta.client_id_metadata_document_supported).toBeUndefined();
+      // §2: public clients and private_key_jwt only; no client holds a shared secret.
+      expect(meta.token_endpoint_auth_methods_supported).toEqual(["none", "private_key_jwt"]);
       // Decision 6: the root alias returns the same document.
       const alias = await s.app.request(`${ORIGIN}/.well-known/oauth-authorization-server`);
       expect(await alias.json()).toEqual(meta);
@@ -190,7 +193,9 @@ export function describeMcpOauthServer(label: string, backend: RolesBackend): vo
       for (const path of [
         "/api/auth/oauth2/consent",
         "/api/auth/oauth2/create-client",
-        "/api/auth/oauth2/register",
+        // Only Cloudhal's checked route registers: no variant reaches the provider's own.
+        "/api/auth/oauth2/register/",
+        "/api/auth/oauth2/%72egister",
         "/api/auth/oauth2/get-consents",
         "/api/auth/oauth2/introspect",
         "/api/auth/token",

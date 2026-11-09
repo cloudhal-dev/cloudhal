@@ -38,6 +38,7 @@
     "better-auth": "catalog:",
     "@better-auth/api-key": "catalog:",
     "@better-auth/mcp": "catalog:",
+    "@better-auth/cimd": "catalog:",
     "@better-auth/oauth-provider": "catalog:",
     "@better-auth/core": "catalog:",
     "@better-auth/utils": "catalog:",

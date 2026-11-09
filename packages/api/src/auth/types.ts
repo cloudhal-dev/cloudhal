@@ -156,16 +156,15 @@ export interface OauthServer {
   /** The RFC 8414 authorization server metadata document. */
   readonly metadata: () => Promise<Record<string, unknown>>;
   /**
-   * Server-side only (no HTTP route): a pre-registered public client, created as the signed-in
-   * member `headers` belong to. Phase 2 uses it in tests; Phase 3 adds CIMD, DCR and a CLI.
+   * RFC-0044 §3, with DCR on: registers a public client for an anonymous caller (the body as sent,
+   * the caller's address for the rate limit); throws `RegistrationError`. Absent with DCR off.
    */
-  readonly createClient: (input: OauthClientInput) => Promise<{ clientId: string }>;
-}
-
-export interface OauthClientInput {
-  readonly headers: Headers;
-  readonly name: string;
-  readonly redirectUris: readonly string[];
+  readonly register?:
+    | ((input: {
+        readonly text: string;
+        readonly address: string;
+      }) => Promise<Record<string, unknown>>)
+    | undefined;
 }
 
 export interface AgentKeySummary {

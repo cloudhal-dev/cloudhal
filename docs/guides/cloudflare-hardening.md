@@ -72,3 +72,44 @@ The WAF works only on a zone, so it applies when you serve the site or Studio on
 - Whether it deploys on Workers Free has **not been verified** yet, so it stays opt-in.
 - To try it, set `"rateLimit": true` under `analytics` or `comments` and deploy. If wrangler refuses the binding, remove the key: the app-level checks keep working without it.
 - The binding fails open: when it cannot answer, the request goes through.
+
+## Remote MCP clients (OAuth)
+
+Claude, ChatGPT, Cursor, VS Code and the MCP Inspector connect to `https://<admin host>/mcp` by URL: the admin Worker is their OAuth 2.1 authorization server ([RFC-0044](../rfcs/0044-mcp-oauth-authorization.md), [ADR-0045](../adr/0045-mcp-authorization-server.md)). A member approves each connection on Studio's consent screen, and a connection never holds more than an agent key of that member would. Agent keys keep working next to it.
+
+### The switches
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `CLOUDHAL_MCP_OAUTH` | on | `off` turns the authorization server off: `/mcp` takes agent keys and Studio sessions only. |
+| `CLOUDHAL_MCP_CIMD` | on | `off`: clients can no longer identify themselves with a Client ID Metadata Document (an HTTPS URL as their `client_id`, as Claude Code, Codex and VS Code do). |
+| `CLOUDHAL_MCP_DCR` | on | `off`: no dynamic client registration (`/api/auth/oauth2/register`), and the metadata stops advertising it. Cursor has no metadata document and needs it. |
+| `CLOUDHAL_MCP_CLIENT_HOSTS` | empty | Comma-separated hosts clients may come from, for example `claude.ai,chatgpt.com,vscode.dev,*.cursor.com,localhost`. Empty: any host. |
+
+With CIMD and DCR both off, no client can connect: an unknown `client_id` is refused at `/oauth2/authorize`.
+
+On the admin Worker, set them as secrets, which `cloudhal deploy` keeps (it rewrites the Worker's plain vars on every deploy):
+
+```bash
+npx wrangler secret put CLOUDHAL_MCP_DCR --name <name>-admin
+```
+
+On Node (`cloudhal studio`, the Docker image) they are environment variables; `compose.yml` passes all four through from `.env`.
+
+### What a client can and cannot do
+
+- **Metadata documents (CIMD).** The `client_id` must be an HTTPS URL with a path, and the document there must name exactly that URL as its `client_id`. The server fetches it with the same SSRF-safe fetcher media imports use: HTTPS on port 443, DNS names only (no IP addresses), every resolved address public (on Node the connection is pinned to the checked address), no redirects followed, at most 5 KB, 5 seconds. It never fetches from the admin Worker's own host or a site's domain. Fetches are budgeted across isolates: 30 a minute per client origin and 120 a minute in all.
+- **Dynamic registration (DCR).** Anonymous, so it is limited: 10 registrations per client address per hour and 300 per installation per day (invalid attempts count too), at most 5,000 registered clients (`503` beyond), a body of at most 5 KB. Only public clients register: no client secret is ever issued. A client's name (1–100 characters), up to 10 redirect URIs, and the grant and response types are kept; logos, URIs, contacts and keys are dropped, never stored or shown. A client nobody connected, used or disconnected in 30 days is deleted by the scheduler's hourly job; a client with a live connection is never pruned.
+- **Redirect URIs.** `https://` on a public host, or `http://` on exactly `localhost`, `127.0.0.1` or `[::1]`, where the port may change between runs (RFC 8252 §7.3). Everything else must match the registered URI exactly. Custom schemes (`cursor://…`) are refused.
+- **The host list.** With `CLOUDHAL_MCP_CLIENT_HOSTS` set, a metadata document must be served from a listed host, and a dynamically registered client may redirect only to listed hosts. Loopback redirects then need `localhost` on the list. The list applies to new registrations and to every authorization, so removing a host cuts off its clients at their next sign-in. A list that does not parse turns client registration off, and the log says why.
+- **Turning DCR off.** When every client your members use has a metadata document (Claude, Claude Code, Codex and VS Code do), `CLOUDHAL_MCP_DCR=off` removes the only anonymous write endpoint. Clients registered earlier keep their connections and age out like any other.
+
+### Rotating `BETTER_AUTH_SECRET`
+
+The secret also encrypts the key that signs access tokens. A new secret signs every member out, and the stored signing key can no longer be decrypted, so the server cannot issue tokens until that key is deleted and a new one is created on the next sign-in. After rotating it:
+
+```bash
+npx wrangler d1 execute <name>-db --remote --command 'DELETE FROM jwks'
+```
+
+On Node, run `DELETE FROM jwks` on the project's `data.db`. Access tokens signed with the old key stop verifying at once, so every connected client is asked to sign in again on its next call (one holding a refresh token may get a new token without the member). Connections stay listed under the members who made them, and revoking one still ends it at once.

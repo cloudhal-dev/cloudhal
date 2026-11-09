@@ -79,6 +79,8 @@ All of these are read by `cloudhal studio` in the container, except those marked
 | `CLOUDHAL_SITE_NAME` | `My site` | The name of that first site. |
 | `CLOUDHAL_AUTOMATIONS` | `on` | `off` stops scheduled automations; releases and gates go on ([schedules](schedules.md)). |
 | `CLOUDHAL_TRUSTED_ORIGINS` | empty | Extra origins the API accepts browser requests from, comma-separated. |
+| `CLOUDHAL_MCP_OAUTH`, `CLOUDHAL_MCP_CIMD`, `CLOUDHAL_MCP_DCR` | `on` | `off` turns off OAuth for remote MCP clients, or only one way clients register: metadata documents (CIMD) or dynamic registration (DCR). OAuth needs `CLOUDHAL_BASE_URL`. See [hardening](cloudflare-hardening.md#remote-mcp-clients-oauth). |
+| `CLOUDHAL_MCP_CLIENT_HOSTS` | empty | Hosts OAuth clients may come from, comma-separated (`claude.ai,*.example.com`, `localhost` for loopback redirects). Empty: any host. |
 | `BETTER_AUTH_SECRET` | created on the volume | Better Auth's secret. Unset, the container creates one at first start and keeps it at `/data/.cloudhal/auth-secret`; set it only to supply your own, and never empty. |
 | `CLOUDHAL_AI_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | empty | Workers AI over REST for Build chat (both or neither). The token is kept in the container's memory, never written to the volume. |
 

@@ -7,6 +7,7 @@ import { createAccessControl } from "better-auth/plugins/access";
 import type { StaffStore } from "../staff.ts";
 import type { GrantStore } from "./grants.ts";
 import { betterAuthLogger, oauthEndpoints, oauthPlugins } from "./oauth.ts";
+import { metadataDocumentAllowed } from "./oauth-cimd-policy.ts";
 import { oauthBeforeHook } from "./oauth-hooks.ts";
 import {
   API_KEY_HEADER,
@@ -72,9 +73,9 @@ export function createInstance(
   // RFC-0044 §2: the authorization server, when the runtime has a stable public origin.
   const oauth = options.mcpOauth
     ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, {
-        fromServer: (headers) =>
-          constantTimeEqual(headers.get(SERVER_KEY_HEADER) ?? "", internal.serverKey),
         grantOf: async (userId, clientId) => (await internal.grants.live(userId, clientId))?.id,
+        metadataDocumentAllowed: (url) =>
+          metadataDocumentAllowed(staff, url, options.mcpOauth?.registration?.clientHosts),
       })
     : [];
   const instance = betterAuth({
@@ -110,6 +111,10 @@ export function createInstance(
             throw new APIError("FORBIDDEN", { message: "consent is given on Studio's screen" });
           return;
         }
+        // RFC-0044 §3: clients register through Cloudhal's checked route, which calls the
+        // provider server-side (no request); the provider's endpoint itself is never reached.
+        if (ctx.path === "/oauth2/register" && ctx.request)
+          throw new APIError("NOT_FOUND", { message: "not found" });
         // RFC-0044: stale consent memory, DPoP and the refresh family's absolute lifetime.
         if (options.mcpOauth && OAUTH_HOOK_PATHS.has(ctx.path))
           return oauthBeforeHook(ctx as never, { grants: internal.grants, staff, now: clock });
@@ -198,10 +203,7 @@ export function createInstance(
 
 /** Per-instance secrets of the server's own internal calls (never sent to a client). */
 export interface InternalKeys {
-  /**
-   * Marks calls the server makes to the provider itself: the consent `AgentGrantService.consent`
-   * forwards, and server-side client registration (`OauthServer.createClient`).
-   */
+  /** Marks the server's own call to the provider: the consent `AgentGrantService.consent` forwards. */
   readonly serverKey: string;
   /** The `agent_grants` rows (RFC-0044 §5): the token claim and the authorize checks read them. */
   readonly grants: GrantStore;

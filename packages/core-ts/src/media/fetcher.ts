@@ -79,6 +79,8 @@ export interface SafeFetchResult {
   readonly address?: string;
   /** Bytes received (also when streamed to `onChunk`). */
   readonly size: number;
+  /** The last hop's response headers (RFC-0044 §3: a CIMD document's cache headers). */
+  readonly headers: Headers;
 }
 
 // ───────────────────────────── addresses ─────────────────────────────
@@ -451,6 +453,7 @@ export async function safeFetch(
       return {
         bytes,
         size,
+        headers: res.headers,
         contentType,
         url: url.toString(),
         chain,

@@ -24,7 +24,7 @@
  * `CLOUDHAL_ANALYTICS_CRON=off` / `CLOUDHAL_COMMENTS_CRON=off`; both read as `alarm` until the next
  * `cloudhal deploy` removes them.
  */
-import { releaseApprovalCheck } from "@cloudhal/api";
+import { oauthClientsPruneJob, releaseApprovalCheck } from "@cloudhal/api";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import {
@@ -272,6 +272,7 @@ export function adminSystemJobs(
       },
     },
     listValuesJob(sql, { paid: env.CLOUDHAL_TICK_BUDGET === "paid", log }),
+    oauthClientsPruneJob(sql, log),
   ];
   if (o.commentsOn)
     jobs.push({

@@ -14,7 +14,7 @@
  * (§11.6): automations stop (no occurrences, no windows, automation keys refused); releases and
  * gates go on.
  */
-import { releaseApprovalCheck } from "@cloudhal/api";
+import { oauthClientsPruneJob, releaseApprovalCheck } from "@cloudhal/api";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import {
@@ -108,6 +108,7 @@ export function localSystemJobs(
           o.log(`schedules retention: ${r.runs} run(s), ${r.releases} release(s) deleted`);
       },
     },
+    oauthClientsPruneJob(sql, o.log),
   ];
   if (o.comments)
     jobs.push({
