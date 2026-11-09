@@ -5,6 +5,9 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import type { StaffStore } from "../staff.ts";
+import type { GrantStore } from "./grants.ts";
+import { betterAuthLogger, oauthEndpoints, oauthPlugins } from "./oauth.ts";
+import { oauthBeforeHook } from "./oauth-hooks.ts";
 import {
   API_KEY_HEADER,
   type AuthOptions,
@@ -58,9 +61,22 @@ export const INVITATION_FIELDS = {
  * Typed as Better Auth's base `Auth`: its inferred plugin type cannot be named outside this
  * module, and callers reach the plugin endpoints through `authDeps`'s typed view of `api`.
  */
-export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
+export function createInstance(
+  options: AuthOptions,
+  staff: StaffStore,
+  internal: InternalKeys,
+): Auth {
   const mode = signUpMode(options);
+  const clock = options.now ?? (() => new Date());
   const ipHeader = options.workers ? "cf-connecting-ip" : options.clientAddressHeader;
+  // RFC-0044 §2: the authorization server, when the runtime has a stable public origin.
+  const oauth = options.mcpOauth
+    ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, {
+        fromServer: (headers) =>
+          constantTimeEqual(headers.get(SERVER_KEY_HEADER) ?? "", internal.serverKey),
+        grantOf: async (userId, clientId) => (await internal.grants.live(userId, clientId))?.id,
+      })
+    : [];
   const instance = betterAuth({
     // biome-ignore lint/suspicious/noExplicitAny: Better Auth accepts several concrete DB handles
     database: options.database as any,
@@ -76,6 +92,8 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
       autoSignIn: true,
     },
     telemetry: { enabled: false },
+    // Through Cloudhal's logging; an expected refusal (a wrong API key) is not an error (#159).
+    logger: betterAuthLogger(options.log),
     // Every signed-in API request reads the session; signed into a cookie for 60 s, it costs no
     // D1 round trip. A revoked session or a sign-out on another device takes effect within 60 s
     // (the person's own sign-out clears the cookie at once).
@@ -84,6 +102,17 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
       // Checked before the endpoint runs (outside Better Auth's write transaction, which would
       // deadlock a second query on single-connection SQLite).
       before: createAuthMiddleware(async (ctx) => {
+        // RFC-0044 §4: consent is given through Studio's screen (`/api/agent-grants/consent`),
+        // which narrows the scopes by role and writes the grant; a direct call is refused.
+        if (ctx.path === "/oauth2/consent" && ctx.request) {
+          const given = ctx.headers?.get(SERVER_KEY_HEADER) ?? "";
+          if (!constantTimeEqual(given, internal.serverKey))
+            throw new APIError("FORBIDDEN", { message: "consent is given on Studio's screen" });
+          return;
+        }
+        // RFC-0044: stale consent memory, DPoP and the refresh family's absolute lifetime.
+        if (options.mcpOauth && OAUTH_HOOK_PATHS.has(ctx.path))
+          return oauthBeforeHook(ctx as never, { grants: internal.grants, staff, now: clock });
         if (!ctx.path.startsWith("/sign-up") || mode !== "first-user") return;
         const existing = await ctx.context.adapter.count({ model: "user" });
         if (existing > 0)
@@ -161,10 +190,28 @@ export function createInstance(options: AuthOptions, staff: StaffStore): Auth {
         // had made `maxRequests` calls in total — and the refusal surfaced as "unauthorized".
         rateLimit: { enabled: false },
       }),
+      ...oauth,
     ],
   });
   return instance as unknown as Auth;
 }
+
+/** Per-instance secrets of the server's own internal calls (never sent to a client). */
+export interface InternalKeys {
+  /**
+   * Marks calls the server makes to the provider itself: the consent `AgentGrantService.consent`
+   * forwards, and server-side client registration (`OauthServer.createClient`).
+   */
+  readonly serverKey: string;
+  /** The `agent_grants` rows (RFC-0044 §5): the token claim and the authorize checks read them. */
+  readonly grants: GrantStore;
+}
+
+/** Provider endpoints Cloudhal checks first (`oauth-hooks.ts`). */
+const OAUTH_HOOK_PATHS: ReadonlySet<string> = new Set(["/oauth2/authorize", "/oauth2/token"]);
+
+/** The header that carries `InternalKeys.serverKey`. */
+export const SERVER_KEY_HEADER = "x-cloudhal-server-key";
 
 export function constantTimeEqual(a: string, b: string): boolean {
   const ea = new TextEncoder().encode(a);

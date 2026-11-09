@@ -25,6 +25,7 @@ import type { messages as fields } from "./lazy/fields.en.ts";
 import type { messages as listings } from "./lazy/listings.en.ts";
 import type { messages as media } from "./lazy/media.en.ts";
 import type { messages as menus } from "./lazy/menus.en.ts";
+import type { messages as oauthConsent } from "./lazy/oauthConsent.en.ts";
 import type { messages as readers } from "./lazy/readers.en.ts";
 import type { messages as scheduleSettings } from "./lazy/scheduleSettings.en.ts";
 import type { messages as schedules } from "./lazy/schedules.en.ts";
@@ -47,6 +48,7 @@ export interface NamespaceCatalogs {
   listings: DeepString<(typeof listings)["listings"]>;
   media: DeepString<(typeof media)["media"]>;
   menus: DeepString<(typeof menus)["menus"]>;
+  oauthConsent: DeepString<(typeof oauthConsent)["oauthConsent"]>;
   readers: DeepString<(typeof readers)["readers"]>;
   scheduleSettings: DeepString<(typeof scheduleSettings)["scheduleSettings"]>;
   schedules: DeepString<(typeof schedules)["schedules"]>;

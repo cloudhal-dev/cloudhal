@@ -25,7 +25,7 @@
     "packages/core-ts/src/surface-interop.ts": 1233,
     "packages/core-ts/src/taxonomy.ts": 1718,
     "packages/mcp-server/src/menu-tools.ts": 1058,
-    "packages/mcp-server/src/schedule-tools.ts": 1596,
+    "packages/mcp-server/src/schedule-tools.ts": 1579,
     "packages/mcp-server/src/schedules.ts": 833,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
     "packages/schedules/src/recurrence.ts": 939,
@@ -304,7 +304,7 @@
       "params": 5
     },
     "packages/api/src/app.ts::createApi": {
-      "lines": 173
+      "lines": 160
     },
     "packages/api/src/build-turn.ts::runBuildTurn": {
       "lines": 260
@@ -370,10 +370,10 @@
       "params": 5
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
-      "lines": 272
+      "lines": 262
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker>fetch": {
-      "lines": 209
+      "lines": 199
     },
     "packages/comments/src/client/comments.browser.js::enhance": {
       "lines": 205
@@ -505,7 +505,7 @@
       "params": 5
     },
     "packages/mcp-server/src/schedule-tools.ts::scheduleTools": {
-      "lines": 1017
+      "lines": 1012
     },
     "packages/mcp-server/src/schedules.ts::autoReleaseVerdict": {
       "params": 6

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { takeSetupToken } from "../src/routes/LoginPage.tsx";
+import { oauthRequest, takeSetupToken } from "../src/routes/LoginPage.tsx";
 
 describe("owner setup link", () => {
   afterEach(() => {
@@ -30,5 +30,16 @@ describe("owner setup link", () => {
 
   it("is absent on a normal sign-in", () => {
     expect(takeSetupToken()).toBeUndefined();
+  });
+});
+
+describe("oauthRequest (RFC-0044 §4)", () => {
+  it("is the provider's signed request when the login page was reached from /oauth2/authorize", () => {
+    window.history.replaceState(null, "", "/login?client_id=c1&scope=site%3Aread&sig=abc%3D");
+    expect(oauthRequest()).toBe("client_id=c1&scope=site%3Aread&sig=abc%3D");
+    window.history.replaceState(null, "", "/login?client_id=c1");
+    expect(oauthRequest()).toBeUndefined();
+    window.history.replaceState(null, "", "/login");
+    expect(oauthRequest()).toBeUndefined();
   });
 });

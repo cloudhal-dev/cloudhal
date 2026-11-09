@@ -545,6 +545,13 @@ export interface MessageParams {
   "notifications.roleChanged.title": { role: string | number };
   "notifications.toast.endingBody": { time: string | number; from: string | number };
   "notifications.toast.endingTitle": { name: string | number; mode: string | number; left: string | number };
+  "oauthConsent.scopes.added": { label: string | number };
+  "oauthConsent.scopes.narrowed": { label: string | number; scope: string | number };
+  "oauthConsent.scopes.notInRole": { label: string | number };
+  "oauthConsent.scopes.sites": { count: number };
+  "oauthConsent.title": { client: string | number };
+  "oauthConsent.who.fromHost": { host: string | number };
+  "oauthConsent.who.sendsBack": { host: string | number };
   "overview.commentsWaiting": { count: number };
   "pageStatus.leftOut": { count: number };
   "pageStatus.publishTitle": { title: string | number };

@@ -10,6 +10,7 @@ import type { Actor } from "@cloudhal/core-contracts";
 import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { PrincipalResolver } from "../context.ts";
+import { accessTokenOf } from "./access-token.ts";
 import type { AuthDeps } from "./deps.ts";
 import {
   actorIdForUser,
@@ -20,6 +21,7 @@ import {
   personRef,
   storedScopes,
 } from "./key-rows.ts";
+import { tokenPrincipal } from "./token-principal.ts";
 import { agentKeyFrom } from "./types.ts";
 
 export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
@@ -27,6 +29,10 @@ export function createPrincipalResolver(d: AuthDeps): PrincipalResolver {
   const resolvePrincipal: PrincipalResolver = async (
     c: Context,
   ): Promise<Principal | undefined> => {
+    // RFC-0044 §5: a bearer JWT with `typ: at+jwt` is an OAuth access token, never an agent key
+    // (keys are opaque strings); it never falls through to the key lookup.
+    const token = accessTokenOf(c.req.raw.headers);
+    if (token) return tokenPrincipal(d.tokens, token);
     const key = agentKeyFrom(c.req.raw.headers, c.req.path);
     if (key) {
       const verified = await api.verifyApiKey({ body: { key } });

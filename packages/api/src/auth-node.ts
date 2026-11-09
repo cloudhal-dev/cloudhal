@@ -4,7 +4,12 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { type CloudhalAuth, createAuth, trustedOriginsWithOwn } from "./auth.ts";
+import {
+  type CloudhalAuth,
+  createAuth,
+  type McpOauthServerOptions,
+  trustedOriginsWithOwn,
+} from "./auth.ts";
 import { CLIENT_ADDRESS_HEADER } from "./tokens.ts";
 
 /**
@@ -28,6 +33,8 @@ export async function createAuthFor(options: {
   setupToken?: string | undefined;
   /** `"always"` runs Better Auth's Origin check under `NODE_ENV=test` (`AuthOptions.originCheck`). */
   originCheck?: "always" | undefined;
+  /** RFC-0044: run the OAuth authorization server (`mcpOauthFor` decides). */
+  mcpOauth?: McpOauthServerOptions | undefined;
 }): Promise<CloudhalAuth> {
   const mod = await import("better-sqlite3");
   const { BetterSqlite3Driver } = await import("@cloudhal/storage/sqlite");
@@ -48,6 +55,7 @@ export async function createAuthFor(options: {
     // `serveNode` writes the client's address here; Better Auth's own default is X-Forwarded-For.
     clientAddressHeader: CLIENT_ADDRESS_HEADER,
     originCheck: options.originCheck,
+    mcpOauth: options.mcpOauth,
   });
 }
 

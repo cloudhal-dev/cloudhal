@@ -1194,6 +1194,7 @@ export const en = {
         members: "Team and roles",
         agentKeys: "Agent keys",
         mcp: "MCP server",
+        mcpOauth: "OAuth for MCP clients",
         activity: "Activity log",
         previewLinks: "Preview links",
         deployTransfer: "Deploy and transfer",
@@ -1205,6 +1206,8 @@ export const en = {
           "People join by invite link and work in a role: Owner, Administrator, Editor, Author or Contributor.",
         agentKeys: "Agents and CI jobs sign in with keys you create.",
         mcp: "Agents connect at /mcp.",
+        mcpOauth:
+          "MCP clients registered with this Studio sign in at /mcp with OAuth; you approve each connection.",
         activity: "Every tool call is recorded per site.",
         previewLinks: "Signed links that show drafts on the deployed site.",
         deployTransfer: "cloudhal push and pull can reach this server.",

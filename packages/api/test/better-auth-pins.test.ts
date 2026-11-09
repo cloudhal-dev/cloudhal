@@ -44,4 +44,26 @@ describe("better-auth family pins", () => {
       expect(versions[name], name).toBe(ba.dependencies[name]);
     }
   });
+
+  // RFC-0044 §7: the OAuth plugins peer-depend on exactly this better-auth (`^1.7.18`), and a
+  // second `jose` in the tree resolves a second `@better-auth/core`, whose types no longer match.
+  it("keeps the plugins on better-auth's version and jose on the one better-auth resolves", () => {
+    const versions = catalog();
+    for (const name of [
+      "@better-auth/api-key",
+      "@better-auth/kysely-adapter",
+      "@better-auth/mcp",
+      "@better-auth/oauth-provider",
+    ])
+      expect(versions[name], name).toBe(versions["better-auth"]);
+    let dir = path.dirname(require.resolve("better-auth"));
+    while (path.basename(dir) !== "better-auth") dir = path.dirname(dir);
+    const fromBetterAuth = createRequire(path.join(dir, "package.json"));
+    let jose = path.dirname(fromBetterAuth.resolve("jose"));
+    while (path.basename(jose) !== "jose") jose = path.dirname(jose);
+    const resolved = JSON.parse(readFileSync(path.join(jose, "package.json"), "utf8")) as {
+      version: string;
+    };
+    expect(versions.jose).toBe(resolved.version);
+  });
 });

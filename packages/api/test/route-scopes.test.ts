@@ -26,6 +26,7 @@ async function fullApp() {
     sql,
     baseURL: "http://localhost",
     secret: "route-scopes-secret-0123456789abcdefgh",
+    mcpOauth: { resource: "http://localhost/mcp" },
   });
   // Every optional surface mounted, so every route is enumerated.
   return createApi({
@@ -34,6 +35,7 @@ async function fullApp() {
     authHandler: auth.handler,
     agentKeys: auth.agentKeys,
     staff: auth.staff,
+    oauthServer: auth.oauth,
     mcp: {
       stateKey: "route-scopes-state-key-0123456789abcdefg",
       oauth: { issuer: "http://localhost/api/auth", resource: "http://localhost/mcp" },

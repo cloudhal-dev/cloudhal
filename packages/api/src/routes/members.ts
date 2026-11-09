@@ -203,7 +203,8 @@ export function memberRoutes(options: {
       if (!target) throw notFound("member not found");
       const problem = removalProblem(person, target);
       if (problem) throw rankError(problem);
-      // 1. membership (effective at once: roles are read per request)
+      // 1. membership (effective at once: roles are read per request), and in the same batch their
+      //    OAuth connections (RFC-0044)
       if (!(await staff.store.remove(target.userId)))
         throw apiError(409, "conflict", "the member changed meanwhile; reload and try again");
       // 2. sessions, 3. keys, 4. their pending invites, 5. their agents' pending requests

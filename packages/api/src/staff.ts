@@ -8,7 +8,8 @@
  * Worker-safe: no Node imports.
  */
 import { isRole, type Role } from "@cloudhal/agent-runtime";
-import type { SqlDriver } from "@cloudhal/storage";
+import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
+import { providerRevocation } from "./auth/grants.ts";
 import { countHit, pruneCounters, randomPrune } from "./rate-limits.ts";
 import {
   allSiteRoles,
@@ -211,15 +212,25 @@ export class StaffStore {
 
   /** Deletes a membership (never the Owner's). */
   async remove(userId: string): Promise<boolean> {
+    const gone = ` AND NOT EXISTS (SELECT 1 FROM "member" WHERE "organizationId" = ? AND "userId" = ?)`;
+    const unlessMember = (s: SqlStatement): SqlStatement => ({
+      sql: `${s.sql}${gone}`,
+      params: [...(s.params ?? []), DEPLOYMENT_ORG, userId],
+    });
+    const at = this.#stamp();
     const [r] = await this.#sql.batch([
       {
         sql: `DELETE FROM "member" WHERE "organizationId" = ? AND "userId" = ? AND "role" <> 'owner'`,
         params: [DEPLOYMENT_ORG, userId],
       },
-      {
-        sql: `DELETE FROM site_members WHERE user_id = ? AND NOT EXISTS (SELECT 1 FROM "member" WHERE "organizationId" = ? AND "userId" = ?)`,
-        params: [userId, DEPLOYMENT_ORG, userId],
-      },
+      unlessMember({ sql: "DELETE FROM site_members WHERE user_id = ?", params: [userId] }),
+      // RFC-0044: their OAuth connections end in the same batch (grants, the provider's consent,
+      // refresh tokens and pending codes), so a failure later in the removal leaves none alive.
+      unlessMember({
+        sql: "UPDATE agent_grants SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+        params: [at, userId],
+      }),
+      ...providerRevocation(userId, undefined, at).map(unlessMember),
     ]);
     return r?.changes === 1;
   }

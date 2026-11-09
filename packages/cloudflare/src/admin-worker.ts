@@ -47,7 +47,7 @@ import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlQueryBudget } from "@cloudhal/analytics/sql";
 import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
 import { type AiBinding, AiStore, bindingTransport, createApi } from "@cloudhal/api";
-import { type CloudhalAuth, createAuth } from "@cloudhal/api/auth";
+import { type CloudhalAuth, createAuth, mcpOauthFor } from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { type AiSearchEnv, SiteGraphStore, searchProviderFromEnv } from "@cloudhal/core-ts";
@@ -104,6 +104,36 @@ export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRooms
   BROWSER?: BrowserBinding;
   /** `off` keeps `render_page` unavailable even with a `BROWSER` binding. */
   CLOUDHAL_RENDER?: string;
+  /** `off` turns the OAuth authorization server for remote MCP clients off (RFC-0044 §10). */
+  CLOUDHAL_MCP_OAUTH?: string;
+}
+
+/**
+ * Better Auth for one request: request-scoped state (background tasks, plugin promises) and no
+ * I/O at construction. RFC-0044 §10: the OAuth issuer is the origin the request came to
+ * (`CLOUDHAL_MCP_OAUTH=off` turns the authorization server off).
+ */
+function adminAuth(
+  env: AdminEnv,
+  sql: D1Driver,
+  url: URL,
+  run: { readonly waitUntil: (p: Promise<unknown>) => void; readonly log: (line: string) => void },
+): CloudhalAuth {
+  const oauth = mcpOauthFor(url.origin, env.CLOUDHAL_MCP_OAUTH);
+  return createAuth({
+    database: env.DB,
+    sql,
+    baseURL: url.origin,
+    secret: required(env, "BETTER_AUTH_SECRET"),
+    signUp:
+      env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
+        ? env.CLOUDHAL_SIGNUP
+        : "first-user",
+    setupToken: env.CLOUDHAL_SETUP_TOKEN,
+    workers: { waitUntil: run.waitUntil },
+    log: (level, message) => run.log(`auth ${level}: ${message}`),
+    ...("mcpOauth" in oauth ? { mcpOauth: oauth.mcpOauth } : {}),
+  });
 }
 
 /** Default daily budget of uncached live queries: 80 % of WAE Free's 10,000 (§7.7, A2). */
@@ -426,20 +456,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       });
       if (due) ctx.waitUntil(due);
 
-      // Per request: Better Auth keeps request-scoped state (background tasks, plugin promises),
-      // and its construction does no I/O.
-      const auth: CloudhalAuth = createAuth({
-        database: env.DB,
-        sql,
-        baseURL: url.origin,
-        secret: required(env, "BETTER_AUTH_SECRET"),
-        signUp:
-          env.CLOUDHAL_SIGNUP === "open" || env.CLOUDHAL_SIGNUP === "closed"
-            ? env.CLOUDHAL_SIGNUP
-            : "first-user",
-        setupToken: env.CLOUDHAL_SETUP_TOKEN,
-        workers: { waitUntil: (p) => ctx.waitUntil(p) },
-      });
+      const auth = adminAuth(env, sql, url, { waitUntil: (p) => ctx.waitUntil(p), log });
       const audit = new AuditLog(sql);
       const approvals = new ApprovalStore(sql);
       const mail = adminMail(env);
@@ -452,6 +469,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         staff: auth.staff,
         signUp: auth.signUp,
         audit,
+        oauthServer: auth.oauth,
         // RFC-0011: emailed invites and reset links when `cloudhal deploy` bound a sender.
         ...(mail ? { mail } : {}),
         defer: (task) => ctx.waitUntil(task),
@@ -465,6 +483,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
           approvals,
           // Remote clients must speak the stateless 2026-07-28 protocol or be served statelessly.
           legacy: "stateless",
+          // RFC-0044: discovery names this deployment's authorization server.
+          oauth: auth.oauth && { issuer: auth.oauth.issuer, resource: auth.oauth.resource },
           // fetch_asset_url never reaches this Worker's own host (Studio, API, purge); each site's
           // domains are refused too. Workers cannot pin DNS: see `workersTransport` (RFC-0004 §5.7).
           media: { blockedHosts: [url.hostname] },

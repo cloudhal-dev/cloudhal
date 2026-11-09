@@ -41,6 +41,8 @@ export interface InstanceInfo {
   features: {
     agentKeys: boolean;
     mcp: boolean;
+    /** RFC-0044: remote MCP clients connect by URL through OAuth (the authorization server runs). */
+    mcpOauth: boolean;
     activity: boolean;
     previewLinks: boolean;
     deployTransfer: boolean;

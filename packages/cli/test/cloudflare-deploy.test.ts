@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exportSite } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
+import { D1Driver } from "@cloudhal/storage/d1";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestHarness } from "wrangler";
@@ -385,5 +386,119 @@ describe("Cloudflare deployment (admin + site Workers)", () => {
       body: JSON.stringify({ token, name: "Again", password: "correct horse battery staple" }),
     });
     expect(replay.status).toBe(410);
+  });
+  it("connects a remote MCP client with OAuth on workerd: Ed25519 JWT, D1, consent (RFC-0044 Phase 2)", async () => {
+    const browser = { origin: "https://admin.example" };
+    const signIn = await adminFetch("/api/auth/sign-in/email", {
+      method: "POST",
+      headers: { "content-type": "application/json", ...browser },
+      body: JSON.stringify({
+        email: "owner@example.com",
+        password: "correct horse battery staple",
+      }),
+    });
+    expect(signIn.status, await signIn.clone().text()).toBe(200);
+    const cookie = (signIn.headers.get("set-cookie") ?? "").split(";")[0] as string;
+    // Discovery: the 401 names the metadata, which names this deployment's issuer.
+    const first = await adminFetch("/mcp", { method: "POST" });
+    expect(first.status).toBe(401);
+    expect(first.headers.get("www-authenticate")).toContain(
+      'resource_metadata="https://admin.example/.well-known/oauth-protected-resource/mcp"',
+    );
+    const meta = (await (
+      await adminFetch("/.well-known/oauth-authorization-server/api/auth")
+    ).json()) as Record<string, unknown>;
+    expect(meta.issuer).toBe("https://admin.example/api/auth");
+    // A pre-registered public client (registration is Phase 3), written as the provider stores it.
+    const env = (await harness.getWorker(W.admin).getEnv()) as { DB: D1Database };
+    const db = new D1Driver(env.DB);
+    const now = new Date().toISOString();
+    const redirect = "http://127.0.0.1:41000/callback";
+    await db.batch([
+      {
+        sql: `INSERT INTO "oauthClient" ("id", "clientId", "disabled", "scopes", "createdAt", "updatedAt", "name", "redirectUris", "tokenEndpointAuthMethod", "applicationType", "grantTypes", "responseTypes") VALUES ('wclient', 'workerd-client', 0, '["site:read","content:read","offline_access"]', ?, ?, 'Workerd Agent', ?, 'none', 'native', '["authorization_code","refresh_token"]', '["code"]')`,
+        params: [now, now, JSON.stringify([redirect])],
+      },
+      {
+        sql: `INSERT INTO "oauthClientResource" ("id", "clientId", "resourceId", "createdAt") VALUES ('wlink', 'workerd-client', 'https://admin.example/mcp', ?)`,
+        params: [now],
+      },
+    ]);
+    const verifier = "workerd-verifier-0123456789-abcdefghijklmnopqrstuvwxyz";
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+    const challenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
+      .replaceAll("+", "-")
+      .replaceAll("/", "_")
+      .replaceAll("=", "");
+    const query = new URLSearchParams({
+      response_type: "code",
+      client_id: "workerd-client",
+      redirect_uri: redirect,
+      scope: "site:read content:read",
+      state: "w",
+      code_challenge: challenge,
+      code_challenge_method: "S256",
+      resource: "https://admin.example/mcp",
+    });
+    const start = await adminFetch(`/api/auth/oauth2/authorize?${query}`, {
+      headers: { cookie },
+      redirect: "manual",
+    });
+    // A navigation gets a 302; a fetch without `Accept: text/html` the same URL as JSON.
+    const next = start.headers.get("location") ?? ((await start.json()) as { url: string }).url;
+    const consentPage = new URL(next, "https://admin.example");
+    expect(consentPage.pathname).toBe("/oauth/consent");
+    const approved = await adminFetch("/api/agent-grants/consent", {
+      method: "POST",
+      headers: { "content-type": "application/json", cookie, ...browser },
+      body: JSON.stringify({
+        request: consentPage.search.slice(1),
+        accept: true,
+        scopes: ["site:read", "content:read"],
+        mode: "plan",
+      }),
+    });
+    expect(approved.status, await approved.clone().text()).toBe(200);
+    const code = new URL(
+      ((await approved.json()) as { redirect: string }).redirect,
+    ).searchParams.get("code");
+    const tokenRes = await adminFetch("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        code: code ?? "",
+        redirect_uri: redirect,
+        client_id: "workerd-client",
+        code_verifier: verifier,
+        resource: "https://admin.example/mcp",
+      }).toString(),
+    });
+    expect(tokenRes.status, await tokenRes.clone().text()).toBe(200);
+    const { access_token: access } = (await tokenRes.json()) as { access_token: string };
+    const header = JSON.parse(
+      atob((access.split(".")[0] as string).replaceAll("-", "+").replaceAll("_", "/")),
+    ) as Record<string, unknown>;
+    expect(header).toMatchObject({ alg: "EdDSA", typ: "at+jwt" });
+    const agent = new Client(
+      { name: "oauth-agent", version: "1.0.0" },
+      { capabilities: {}, versionNegotiation: { mode: "auto" } },
+    );
+    await agent.connect(
+      new StreamableHTTPClientTransport(new URL("https://admin.example/mcp"), {
+        requestInit: { headers: { authorization: `Bearer ${access}` } },
+        fetch: async (input, init) => {
+          const req = new Request(input, init as RequestInit);
+          return adminFetch(new URL(req.url).pathname, {
+            method: req.method,
+            headers: Object.fromEntries(req.headers),
+            ...(req.method === "GET" || req.method === "HEAD" ? {} : { body: await req.text() }),
+          });
+        },
+      }),
+    );
+    const mode = await agent.callTool({ name: "get_mode", arguments: {} });
+    expect(JSON.stringify(mode.content)).toContain("plan");
+    await agent.close();
   });
 });

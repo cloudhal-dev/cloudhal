@@ -4,6 +4,7 @@
  * calls stay the same everywhere.
  */
 
+export type { AgentGrantSummary, ConsentInfo, ConsentScope } from "./api/agent-grants.ts";
 export type {
   ActivityPage,
   AgentKeyElevation,
@@ -212,6 +213,7 @@ export type {
 } from "./api/team.ts";
 export type { TranslationRow } from "./api/translations.ts";
 
+import { agentGrantsApi } from "./api/agent-grants.ts";
 import { agentsApi } from "./api/agents.ts";
 import { aiApi } from "./api/ai.ts";
 import { analyticsApi } from "./api/analytics.ts";
@@ -260,6 +262,7 @@ export const api = {
   migrations: taxonomyApi.migrations,
   activity: agentsApi.activity,
   agentKeys: agentsApi.agentKeys,
+  agentGrants: agentGrantsApi,
   assets: mediaApi,
   analytics: analyticsApi,
   comments: commentsApi,

@@ -1,7 +1,10 @@
 import { type AgentMode, isMoreAutonomous, modeCap, type Role } from "@cloudhal/agent-runtime";
+import type { JWK } from "jose";
 import { StaffStore } from "../staff.ts";
+import { GrantStore, newGrantId } from "./grants.ts";
 import { createInstance } from "./instance.ts";
 import { type ApiKeyRow, roleScopesHold, type VerifiedApiKey } from "./key-rows.ts";
+import { oauthDeps } from "./oauth-deps.ts";
 import {
   AGENT_KEY_RATE_LIMIT,
   AuthError,
@@ -13,8 +16,12 @@ export function authDeps(options: AuthOptions) {
   const now = options.now ?? (() => new Date());
   const staffStore = new StaffStore(options.sql, now);
   const keyLimit = options.agentKeyRateLimit ?? AGENT_KEY_RATE_LIMIT;
-  const instance = createInstance(options, staffStore);
+  // Marks the server's own consent call to the provider (`AgentGrantService.consent`).
+  const grants = new GrantStore(options.sql, now);
+  const internal = { serverKey: `${newGrantId()}${newGrantId()}`, grants };
+  const instance = createInstance(options, staffStore, internal);
   const api = instance.api as unknown as {
+    getJwks(): Promise<{ keys: JWK[] }>;
     verifyApiKey(input: { body: { key: string } }): Promise<VerifiedApiKey>;
     createApiKey(input: {
       body: {
@@ -111,9 +118,15 @@ export function authDeps(options: AuthOptions) {
         code: "mode_above_role",
       });
   };
+  const oauth = oauthDeps({ options, api, grants, staffStore, keyLimit, now });
   return {
     now,
+    sql: options.sql,
+    secret: options.secret,
+    ...oauth,
     staffStore,
+    grants,
+    internal,
     keyLimit,
     instance,
     api,

@@ -48,6 +48,7 @@ describe("migrate", () => {
       "0028_site_members",
       "0029_entry_list_values",
       "0030_rate_limits",
+      "0031_oauth",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -81,6 +82,7 @@ describe("migrate", () => {
       "0028_site_members",
       "0029_entry_list_values",
       "0030_rate_limits",
+      "0031_oauth",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -88,6 +90,7 @@ describe("migrate", () => {
     expect(tables.map((t) => t.name)).toEqual([
       "_migrations",
       "account",
+      "agent_grants",
       "agent_owner",
       "ai_settings",
       "ai_usage",
@@ -117,10 +120,18 @@ describe("migrate", () => {
       "entry_list_state",
       "entry_list_values",
       "invitation",
+      "jwks",
       "media_blobs",
       "media_uploads",
       "member",
       "nodes",
+      "oauthAccessToken",
+      "oauthClient",
+      "oauthClientAssertion",
+      "oauthClientResource",
+      "oauthConsent",
+      "oauthRefreshToken",
+      "oauthResource",
       "op_guards",
       "organization",
       "password_reset",
@@ -194,6 +205,7 @@ describe("migrate", () => {
       "0028_site_members",
       "0029_entry_list_values",
       "0030_rate_limits",
+      "0031_oauth",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -226,6 +238,7 @@ describe("migrate", () => {
       "0028_site_members",
       "0029_entry_list_values",
       "0030_rate_limits",
+      "0031_oauth",
     ]);
     await h.dispose();
   });
@@ -265,6 +278,7 @@ describe("migrate", () => {
       "0028_site_members",
       "0029_entry_list_values",
       "0030_rate_limits",
+      "0031_oauth",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();
@@ -325,6 +339,51 @@ describe("0012_roles: existing users become members (RFC-0005 §11)", () => {
           `INSERT INTO "member" ("id", "organizationId", "userId", "role", "createdAt") VALUES ('x', 'deployment', 'userCCCCCC', 'editor', 't')`,
         ),
       ).rejects.toThrow();
+      await (h ? h.dispose() : driver.close());
+    });
+});
+
+describe("0031_oauth: the authorization server's tables (RFC-0044 §7)", () => {
+  const before = migrations.filter((m) => m.name < "0031_oauth");
+  const oauth = migrations.filter((m) => m.name === "0031_oauth");
+  for (const backend of ["better-sqlite3", "D1 (Miniflare)"] as const)
+    it(`applies on a database at 0030, and agent_grants is one row per member and client (${backend})`, async () => {
+      const h = backend === "D1 (Miniflare)" ? await createMiniflareD1() : undefined;
+      const driver = h ? new D1Driver(h.db) : await BetterSqlite3Driver.open(":memory:");
+      await migrate(driver, before);
+      expect((await migrate(driver, oauth)).applied).toEqual(["0031_oauth"]);
+      const tables = await driver.all<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'oauth%' OR name IN ('jwks', 'agent_grants')) ORDER BY name",
+      );
+      expect(tables.map((t) => t.name)).toEqual([
+        "agent_grants",
+        "jwks",
+        "oauthAccessToken",
+        "oauthClient",
+        "oauthClientAssertion",
+        "oauthClientResource",
+        "oauthConsent",
+        "oauthRefreshToken",
+        "oauthResource",
+      ]);
+      const grant = (id: string, user: string, client: string) => ({
+        sql: "INSERT INTO agent_grants (id, user_id, client_id, client_name, scopes, mode, created_at) VALUES (?, ?, ?, 'Claude', '[]', 'edits', 't')",
+        params: [id, user, client],
+      });
+      await driver.batch([
+        grant("g1", "u1", "c1"),
+        grant("g2", "u1", "c2"),
+        grant("g3", "u2", "c1"),
+      ]);
+      await expect(driver.batch([grant("g4", "u1", "c1")])).rejects.toThrow();
+      const index = await driver.get<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'agent_grants_user'",
+      );
+      expect(index?.name).toBe("agent_grants_user");
+      const family = await driver.get<{ sql: string }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'oauthRefreshToken_family_idx'",
+      );
+      expect(family?.sql).toContain('("authorizationCodeId", "createdAt")');
       await (h ? h.dispose() : driver.close());
     });
 });
