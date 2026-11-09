@@ -239,11 +239,20 @@ export function providerRevocation(
   ];
 }
 
-/** A grant id: 24 base62 characters from WebCrypto. */
+const GRANT_ID_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const GRANT_ID_LENGTH = 24;
+/** The largest multiple of 62 below 256: bytes at or above it are dropped, so no bias. */
+const UNBIASED_LIMIT = 256 - (256 % GRANT_ID_ALPHABET.length);
+
+/** A grant id: 24 base62 characters from WebCrypto, by rejection sampling (no modulo bias). */
 export function newGrantId(): string {
-  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(24));
   let out = "";
-  for (const b of bytes) out += alphabet[b % alphabet.length];
+  while (out.length < GRANT_ID_LENGTH) {
+    for (const b of crypto.getRandomValues(new Uint8Array(GRANT_ID_LENGTH))) {
+      if (b >= UNBIASED_LIMIT) continue;
+      out += GRANT_ID_ALPHABET[b % GRANT_ID_ALPHABET.length];
+      if (out.length === GRANT_ID_LENGTH) break;
+    }
+  }
   return out;
 }
