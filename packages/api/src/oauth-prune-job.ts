@@ -13,6 +13,8 @@ import { CIMD_PRUNE_BATCHES, pruneCimdClients, pruneDcrClients } from "./auth/oa
 export function oauthClientsPruneJob(
   sql: SqlDriver,
   log: (line: string) => void,
+  /** The deployment's limits (`DcrLimits.unusedDays`, `CimdLimits.unusedHours`); default theirs. */
+  limits: { readonly dcrUnusedDays?: number; readonly cimdUnusedHours?: number } = {},
 ): SystemJobDefinition {
   return {
     name: "oauth.clients.prune",
@@ -23,8 +25,14 @@ export function oauthClientsPruneJob(
     // plan's tick is full.
     next: hourlyAt(17),
     async run({ now }) {
-      const dcr = await pruneDcrClients(sql, { now });
-      const cimd = await pruneCimdClients(sql, { now });
+      const dcr = await pruneDcrClients(sql, {
+        now,
+        ...(limits.dcrUnusedDays !== undefined ? { unusedDays: limits.dcrUnusedDays } : {}),
+      });
+      const cimd = await pruneCimdClients(sql, {
+        now,
+        ...(limits.cimdUnusedHours !== undefined ? { unusedHours: limits.cimdUnusedHours } : {}),
+      });
       if (dcr + cimd > 0)
         log(
           `oauth clients: ${dcr} unused registration(s), ${cimd} unused document client(s) deleted`,

@@ -57,7 +57,7 @@ export interface CimdGuard {
    * Deletes the oldest document client with no live connection and no use since `before`,
    * whose host is not in `exempt`; how many went (0 or 1).
    */
-  readonly evict: (input: { before: Date; exempt: readonly string[] }) => Promise<number>;
+  readonly evict: (input: { before: Date; isExempt: (host: string) => boolean }) => Promise<number>;
   /** Records a failed refetch on the row (its validation time cleared). */
   readonly markFailed: (clientId: string) => Promise<void>;
   /** One hit of a fixed-window counter (`StaffStore.hit`); false once `max` is passed. */
@@ -83,7 +83,7 @@ export function exemptHosts(guard: Pick<CimdGuard, "clientHosts">): string[] {
   return [...WELL_KNOWN_DOCUMENT_HOSTS, ...(guard.clientHosts ?? [])];
 }
 
-function isExempt(host: string, exempt: readonly string[]): boolean {
+export function isExempt(host: string, exempt: readonly string[]): boolean {
   return exempt.some(
     (p) => hostMatches(host, p) || (!p.startsWith("*.") && hostMatches(host, `*.${p}`)),
   );
@@ -102,7 +102,7 @@ async function admit(guard: CimdGuard, host: string): Promise<void> {
   const exempt = exemptHosts(guard);
   if (isExempt(host, exempt) || (await guard.count()) < guard.limits.maxClients) return;
   const before = new Date(guard.now().getTime() - guard.limits.evictMinutes * 60_000);
-  if ((await guard.evict({ before, exempt })) > 0) return;
+  if ((await guard.evict({ before, isExempt: (h) => isExempt(h, exempt) })) > 0) return;
   throw unavailable(
     "SERVICE_UNAVAILABLE",
     "this server stores no more clients right now; try again later",
@@ -167,7 +167,9 @@ export function guardedCimd(
     metadataProfile: "mcp-2026-07-28",
     // The stored row is the cache (step 2): the plugin's own would outlive a changed document.
     metadataRevalidationInterval: 0,
-    maxCacheEntries: 500,
+    // Also the size of the plugin's per-origin and per-client fetch state, which refuses at
+    // capacity: out of reach too (entries hold at most a 5 KB document and its validators).
+    maxCacheEntries: 10_000,
     // Cloudhal's budgets in `rate_limits` are the only ones (steps 3 and 4): on Node the
     // plugin's windows would last the life of the process and could be drained anonymously.
     metadataFetchPolicy: {

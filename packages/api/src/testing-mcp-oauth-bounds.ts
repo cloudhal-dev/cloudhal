@@ -21,6 +21,7 @@ import { clearAccessTokenKeyCache } from "./auth/access-token.ts";
 import { type CimdGuard, guardedResolve } from "./auth/cimd-discovery.ts";
 import { pruneCimdClients } from "./auth/oauth-client-rows.ts";
 import { CIMD_LIMITS, type OauthRegistration } from "./auth/oauth-registration.ts";
+import { oauthClientsPruneJob } from "./oauth-prune-job.ts";
 import {
   DOC,
   document,
@@ -294,6 +295,78 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
       expect(failed).toEqual([DOC]);
     });
 
+    it("evicts by the client's real host: a path that names a well-known host is still junk", async () => {
+      const transport = stubTransport((url) => ({ body: document({ client_id: url.toString() }) }));
+      const s = await setupServer(backend, withCimd(transport, { cimdLimits: { maxClients: 3 } }));
+      // `%` in SQL LIKE spans `/`: these would pass for claude.ai with a pattern over the URL.
+      for (let i = 0; i < 3; i++)
+        await anonymousAuthorize(
+          s,
+          `https://junk${i}.example.com/x.claude.ai/c.json`,
+          `192.0.2.${i}`,
+        );
+      await s.sql.run(
+        `UPDATE "oauthClient" SET "updatedAt" = ? WHERE "clientId" LIKE 'https://junk%'`,
+        [new Date(Date.now() - HOUR).toISOString()],
+      );
+      // A third-party client (not well-known) still gets its first connection: one junk row goes.
+      expect(
+        (await tryAuthorize(s, "https://agents.example.com/inspector.json")).consentScreen,
+      ).toBe(true);
+      const left = await s.sql.get<{ n: number }>(
+        `SELECT COUNT(*) AS n FROM "oauthClient" WHERE "clientId" LIKE 'https://junk%'`,
+      );
+      expect(Number(left?.n)).toBe(2);
+    });
+
+    it("never evicts a client with a live connection or a well-known host's, however old", async () => {
+      const transport = stubTransport((url) => ({ body: document({ client_id: url.toString() }) }));
+      const s = await setupServer(backend, withCimd(transport, { cimdLimits: { maxClients: 2 } }));
+      await connect({ ...s, clientId: DOC }, { cookie: s.owner.cookie, scope: READ }); // live grant
+      await anonymousAuthorize(s, CLAUDE_CODE, "192.0.2.50"); // stored, no grant, exempt host
+      await s.sql.run(
+        `UPDATE "oauthClient" SET "updatedAt" = ? WHERE "clientDiscoveryId" = 'cimd'`,
+        [new Date(Date.now() - DAY).toISOString()],
+      );
+      const refused = await anonymousAuthorize(s, "https://junk.example.com/c.json", "192.0.2.51");
+      expect(refused.status).toBe(503);
+      const kept = await s.sql.all<{ clientId: string }>(
+        `SELECT "clientId" FROM "oauthClient" WHERE "clientDiscoveryId" = 'cimd' ORDER BY "clientId"`,
+      );
+      expect(kept.map((r) => r.clientId)).toEqual([DOC, CLAUDE_CODE].sort());
+    });
+
+    it("prunes more than one batch of unused document clients in a run, with the operator's hours", async () => {
+      const s = await setupServer(backend);
+      const old = new Date(Date.now() - 2 * HOUR).toISOString();
+      for (let i = 0; i < 120; i++)
+        await s.sql.run(
+          `INSERT INTO "oauthClient" ("id", "clientId", "clientDiscoveryId", "redirectUris", "createdAt", "updatedAt") VALUES (?, ?, 'cimd', '[]', ?, ?)`,
+          [`junk${i}`, `https://junk${i}.example.com/c.json`, old, old],
+        );
+      const count = async () =>
+        Number(
+          (
+            await s.sql.get<{ n: number }>(
+              `SELECT COUNT(*) AS n FROM "oauthClient" WHERE "clientDiscoveryId" = 'cimd'`,
+            )
+          )?.n,
+        );
+      const lines: string[] = [];
+      const run = (limits: { cimdUnusedHours?: number }) =>
+        oauthClientsPruneJob(s.sql, (l) => lines.push(l), limits).run({
+          now: new Date(),
+          trigger: "cron",
+        });
+      await run({}); // two hours old: under the default three
+      expect(await count()).toBe(120);
+      await run({ cimdUnusedHours: 1 });
+      expect(await count()).toBe(0);
+      expect(lines).toEqual([
+        "oauth clients: 0 unused registration(s), 120 unused document client(s) deleted",
+      ]);
+    });
+
     it("makes room for a well-known client's first connection when the cap is full of junk", async () => {
       const transport = stubTransport((url) => ({ body: document({ client_id: url.toString() }) }));
       const s = await setupServer(backend, withCimd(transport, { cimdLimits: { maxClients: 3 } }));
@@ -470,6 +543,11 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
         "CIaude",
         "Chat\u0047\u0420T",
         "VS \u0421ode",
+        "Cl\u00e1ude",
+        "Cla\u0307ude",
+        "\u1d04\u029f\u1d00\u1d1c\u1d05\u1d07",
+        "\u13dflaude",
+        "Cl\u0430\u057dde",
       ]) {
         const id = await registerClient(s, { client_name: fake });
         expect((await info(id)).lookalike, fake).toBeDefined();

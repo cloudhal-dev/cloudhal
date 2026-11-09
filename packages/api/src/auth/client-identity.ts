@@ -10,8 +10,9 @@
  *
  * A name that looks like one of the well-known document clients' (`lookalike`: Claude, Claude
  * Code, ChatGPT, Codex, VS Code) is flagged unless the client is that client's document on its
- * real host. Names are compared after NFKC and a small confusable map (Cyrillic and Greek
- * look-alikes of Latin letters, `0`/`O`, `1`/`l`/`I`); a full UTS #39 skeleton is a follow-up.
+ * real host. Names are compared after NFKD without combining marks and a small confusable map
+ * (Cyrillic, Greek, Armenian and Cherokee look-alikes of Latin letters, Latin small capitals,
+ * `0`/`O`, `1`/`l`/`I`); a full UTS #39 skeleton is a follow-up (#144).
  *
  * Linear only (AGENTS.md rule 13): one pass over the code points; the only pattern tests one
  * character at a time.
@@ -184,6 +185,58 @@ const CONFUSABLE: Readonly<Record<string, string>> = {
   Τ: "t",
   Υ: "y",
   Χ: "x",
+  // Armenian
+  ս: "u",
+  օ: "o",
+  ո: "n",
+  հ: "h",
+  ց: "g",
+  զ: "q",
+  // Latin small capitals and other look-alikes outside a-z
+  ᴀ: "a",
+  ʙ: "b",
+  ᴄ: "c",
+  ᴅ: "d",
+  ᴇ: "e",
+  ɢ: "g",
+  ʜ: "h",
+  ɪ: "i",
+  ᴊ: "j",
+  ᴋ: "k",
+  ʟ: "l",
+  ᴍ: "m",
+  ɴ: "n",
+  ᴏ: "o",
+  ᴘ: "p",
+  ʀ: "r",
+  ꜱ: "s",
+  ᴛ: "t",
+  ᴜ: "u",
+  ᴠ: "v",
+  ᴡ: "w",
+  ʏ: "y",
+  ᴢ: "z",
+  ɑ: "a",
+  ı: "i",
+  ȷ: "j",
+  // Cherokee
+  Ꭺ: "a",
+  Ᏼ: "b",
+  Ꮯ: "c",
+  Ꭰ: "d",
+  Ꭼ: "e",
+  Ꮐ: "g",
+  Ꮋ: "h",
+  Ꭻ: "j",
+  Ꮶ: "k",
+  Ꮮ: "l",
+  Ꮇ: "m",
+  Ꮲ: "p",
+  Ꮪ: "s",
+  Ꭲ: "t",
+  Ꮩ: "v",
+  Ꮃ: "w",
+  Ꮓ: "z",
   // Digits and letters that pass for one another
   "0": "o",
   "1": "l",
@@ -191,10 +244,14 @@ const CONFUSABLE: Readonly<Record<string, string>> = {
   "|": "l",
 };
 
-/** NFKC, confusables mapped, then lower-case letters and digits only (`V S-Code` = `vscode`). */
+/**
+ * NFKD with its combining marks dropped (`Cláude`, `Clȧude` → `Claude`; fullwidth forms fold
+ * too), confusables mapped, then lower-case letters and digits only (`V S-Code` = `vscode`).
+ */
 function folded(text: string): string {
   let out = "";
-  for (const raw of text.normalize("NFKC")) {
+  for (const raw of text.normalize("NFKD")) {
+    if (MARK.test(raw)) continue;
     const ch = (CONFUSABLE[raw] ?? raw).toLowerCase();
     if ((ch >= "a" && ch <= "z") || (ch >= "0" && ch <= "9")) out += ch;
   }

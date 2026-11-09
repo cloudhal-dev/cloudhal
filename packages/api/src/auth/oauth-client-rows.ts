@@ -42,17 +42,8 @@ interface PruneKind {
   readonly since: "createdAt" | "updatedAt";
   readonly cutoff: string;
   readonly limit: number;
-  /** Document hosts never deleted (`exempt`, the well-known clients and the host list). */
-  readonly exempt?: readonly string[] | undefined;
-}
-
-/** `clientId LIKE` patterns for exempt hosts: the host itself and its subdomains. */
-function exemptPatterns(hosts: readonly string[]): string[] {
-  return hosts.slice(0, 30).flatMap((h) => {
-    const host = h.toLowerCase();
-    if (host.startsWith("*.")) return [`https://%.${host.slice(2)}/%`];
-    return [`https://${host}/%`, `https://%.${host}/%`];
-  });
+  /** Only these clients (eviction's pick), each still checked against the predicate. */
+  readonly ids?: readonly string[] | undefined;
 }
 
 /**
@@ -65,13 +56,11 @@ function exemptPatterns(hosts: readonly string[]): string[] {
  * last). Returns how many were deleted.
  */
 async function pruneKind(sql: SqlDriver, kind: PruneKind): Promise<number> {
-  const patterns = exemptPatterns(kind.exempt ?? []);
-  const exempt = patterns.length
-    ? ` AND NOT (${patterns.map(() => `c."clientId" LIKE ?`).join(" OR ")})`
-    : "";
-  const prunable = `SELECT c."clientId" FROM "oauthClient" c WHERE ${kind.where("c.")} AND c."${kind.since}" < ?${exempt} AND NOT EXISTS (SELECT 1 FROM agent_grants g WHERE g.client_id = c."clientId" AND (g.revoked_at IS NULL OR g.created_at >= ? OR g.last_used_at >= ? OR g.revoked_at >= ?)) ORDER BY c."${kind.since}", c."clientId" LIMIT ${Math.max(1, Math.floor(kind.limit))}`;
+  const ids = kind.ids ?? [];
+  const only = ids.length ? ` AND c."clientId" IN (${ids.map(() => "?").join(", ")})` : "";
+  const prunable = `SELECT c."clientId" FROM "oauthClient" c WHERE ${kind.where("c.")} AND c."${kind.since}" < ?${only} AND NOT EXISTS (SELECT 1 FROM agent_grants g WHERE g.client_id = c."clientId" AND (g.revoked_at IS NULL OR g.created_at >= ? OR g.last_used_at >= ? OR g.revoked_at >= ?)) ORDER BY c."${kind.since}", c."clientId" LIMIT ${Math.max(1, Math.floor(kind.limit))}`;
   const { cutoff } = kind;
-  const params = [cutoff, ...patterns, cutoff, cutoff, cutoff];
+  const params = [cutoff, ...ids, cutoff, cutoff, cutoff];
   const code = (path: string) =>
     `CASE WHEN json_valid("value") THEN json_extract("value", '${path}') END`;
   const results = await sql.batch([
@@ -132,21 +121,43 @@ export async function pruneCimdClients(
   return total;
 }
 
+/** How many of the oldest unused document clients eviction looks at for a non-exempt one. */
+export const EVICT_CANDIDATES = 50;
+
 /**
  * Makes room for one document client (the cap): deletes the oldest one with no live connection
- * and no use since `before`, never one from an exempt host. How many went (0 or 1).
+ * and no use since `before` whose **host** is not exempt. The host is read from the URL, never
+ * matched with `LIKE` over the whole `client_id` (`%` also spans `/`, so a path could pass for
+ * an exempt host). The candidates are read first; the pick is deleted in one atomic batch that
+ * checks the predicate again. How many went (0 or 1).
  */
-export function evictCimdClient(
+export async function evictCimdClient(
   sql: SqlDriver,
-  input: { readonly before: Date; readonly exempt: readonly string[] },
+  input: { readonly before: Date; readonly isExempt: (host: string) => boolean },
 ): Promise<number> {
+  const cutoff = input.before.toISOString();
+  const candidates = await sql.all<{ clientId: string }>(
+    `SELECT c."clientId" FROM "oauthClient" c WHERE ${cimdClient("c.")} AND c."updatedAt" < ? AND NOT EXISTS (SELECT 1 FROM agent_grants g WHERE g.client_id = c."clientId" AND (g.revoked_at IS NULL OR g.created_at >= ? OR g.last_used_at >= ? OR g.revoked_at >= ?)) ORDER BY c."updatedAt", c."clientId" LIMIT ${EVICT_CANDIDATES}`,
+    [cutoff, cutoff, cutoff, cutoff],
+  );
+  const victim = candidates.find((r) => !input.isExempt(hostnameOf(r.clientId)));
+  if (!victim) return 0;
   return pruneKind(sql, {
     where: cimdClient,
     since: "updatedAt",
-    cutoff: input.before.toISOString(),
+    cutoff,
     limit: 1,
-    exempt: input.exempt,
+    ids: [victim.clientId],
   });
+}
+
+/** A client id's host name, lower case; "" when it is not a URL (never exempt). */
+function hostnameOf(clientId: string): string {
+  try {
+    return new URL(clientId).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
 }
 
 /**
