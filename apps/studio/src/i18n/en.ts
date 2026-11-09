@@ -1194,7 +1194,7 @@ export const en = {
         members: "Team and roles",
         agentKeys: "Agent keys",
         mcp: "MCP server",
-        mcpOauth: "Connect agents by URL",
+        mcpOauth: "OAuth for MCP clients",
         activity: "Activity log",
         previewLinks: "Preview links",
         deployTransfer: "Deploy and transfer",
@@ -1207,7 +1207,7 @@ export const en = {
         agentKeys: "Agents and CI jobs sign in with keys you create.",
         mcp: "Agents connect at /mcp.",
         mcpOauth:
-          "Claude, ChatGPT and other MCP clients connect with the /mcp address alone; you approve each connection.",
+          "MCP clients registered with this Studio sign in at /mcp with OAuth; you approve each connection.",
         activity: "Every tool call is recorded per site.",
         previewLinks: "Signed links that show drafts on the deployed site.",
         deployTransfer: "cloudhal push and pull can reach this server.",

@@ -208,6 +208,28 @@ export class GrantStore {
   }
 }
 
+/**
+ * The provider's side of ending connections (§2 "Revocation"): its stored consent, so the next
+ * authorization shows Studio's screen again, and its refresh tokens, so no new access token is
+ * minted. For one client, or every client of the member (removal). Plain SQL, so it rides in the
+ * same atomic batch as the grant change and can never leave a consent without a live grant.
+ */
+export function providerRevocation(
+  userId: string,
+  clientId: string | undefined,
+  at: string,
+): SqlStatement[] {
+  const client = clientId === undefined ? "" : ' AND "clientId" = ?';
+  const scope = clientId === undefined ? [userId] : [userId, clientId];
+  return [
+    { sql: `DELETE FROM "oauthConsent" WHERE "userId" = ?${client}`, params: scope },
+    {
+      sql: `UPDATE "oauthRefreshToken" SET "revoked" = ? WHERE "userId" = ?${client} AND "revoked" IS NULL`,
+      params: [at, ...scope],
+    },
+  ];
+}
+
 /** A grant id: 24 base62 characters from WebCrypto. */
 export function newGrantId(): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";

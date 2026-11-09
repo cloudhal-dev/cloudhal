@@ -15,7 +15,7 @@ import {
 } from "@cloudhal/agent-runtime";
 import { consentInfo, giveConsent } from "./agent-consent.ts";
 import type { AuthDeps } from "./deps.ts";
-import { type AgentGrant, agentIdForGrant } from "./grants.ts";
+import { type AgentGrant, agentIdForGrant, providerRevocation } from "./grants.ts";
 import { actorIdForUser, roleScopesHold } from "./key-rows.ts";
 import { AuthError } from "./types.ts";
 
@@ -71,7 +71,7 @@ export function createAgentGrantService(d: AuthDeps) {
     return out;
   };
 
-  /** Ends a connection: the grant row first (authoritative), then the provider's consent and tokens. */
+  /** Ends a connection: the grant row, the provider's consent and refresh tokens, at once. */
   const revoke = async (input: {
     headers: Headers;
     id: string;
@@ -84,9 +84,11 @@ export function createAgentGrantService(d: AuthDeps) {
     // Someone else's connection is invisible without agents:manage (no existence oracle).
     if (!grant || grant.revokedAt || (!mine && !manage))
       throw new AuthError("unknown connection", { status: 404, code: "not_found" });
-    const audit = AuditLog.statement(input.audit(grant));
-    await d.grants.revoke(grant.id, [audit]);
-    await d.revokeProviderGrant(grant.userId, grant.clientId);
+    // One batch: the grant, the provider's consent and refresh tokens, the audit row.
+    await d.grants.revoke(grant.id, [
+      ...providerRevocation(grant.userId, grant.clientId, d.now().toISOString()),
+      AuditLog.statement(input.audit(grant)),
+    ]);
     return grant;
   };
 

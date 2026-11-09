@@ -5,7 +5,9 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { admin, organization } from "better-auth/plugins";
 import { createAccessControl } from "better-auth/plugins/access";
 import type { StaffStore } from "../staff.ts";
+import type { GrantStore } from "./grants.ts";
 import { betterAuthLogger, oauthEndpoints, oauthPlugins } from "./oauth.ts";
+import { oauthBeforeHook } from "./oauth-hooks.ts";
 import {
   API_KEY_HEADER,
   type AuthOptions,
@@ -65,12 +67,15 @@ export function createInstance(
   internal: InternalKeys,
 ): Auth {
   const mode = signUpMode(options);
+  const clock = options.now ?? (() => new Date());
   const ipHeader = options.workers ? "cf-connecting-ip" : options.clientAddressHeader;
   // RFC-0044 §2: the authorization server, when the runtime has a stable public origin.
   const oauth = options.mcpOauth
-    ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, (headers) =>
-        constantTimeEqual(headers.get(SERVER_KEY_HEADER) ?? "", internal.serverKey),
-      )
+    ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, {
+        fromServer: (headers) =>
+          constantTimeEqual(headers.get(SERVER_KEY_HEADER) ?? "", internal.serverKey),
+        grantOf: async (userId, clientId) => (await internal.grants.live(userId, clientId))?.id,
+      })
     : [];
   const instance = betterAuth({
     // biome-ignore lint/suspicious/noExplicitAny: Better Auth accepts several concrete DB handles
@@ -105,6 +110,9 @@ export function createInstance(
             throw new APIError("FORBIDDEN", { message: "consent is given on Studio's screen" });
           return;
         }
+        // RFC-0044: stale consent memory, DPoP and the refresh family's absolute lifetime.
+        if (options.mcpOauth && OAUTH_HOOK_PATHS.has(ctx.path))
+          return oauthBeforeHook(ctx, { grants: internal.grants, staff, now: clock });
         if (!ctx.path.startsWith("/sign-up") || mode !== "first-user") return;
         const existing = await ctx.context.adapter.count({ model: "user" });
         if (existing > 0)
@@ -195,7 +203,12 @@ export interface InternalKeys {
    * forwards, and server-side client registration (`OauthServer.createClient`).
    */
   readonly serverKey: string;
+  /** The `agent_grants` rows (RFC-0044 §5): the token claim and the authorize checks read them. */
+  readonly grants: GrantStore;
 }
+
+/** Provider endpoints Cloudhal checks first (`oauth-hooks.ts`). */
+const OAUTH_HOOK_PATHS: ReadonlySet<string> = new Set(["/oauth2/authorize", "/oauth2/token"]);
 
 /** The header that carries `InternalKeys.serverKey`. */
 export const SERVER_KEY_HEADER = "x-cloudhal-server-key";

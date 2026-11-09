@@ -18,7 +18,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AutoModeConfirm, ModePicker } from "../components/AgentModes.tsx";
 import { useT } from "../i18n/index.tsx";
-import { type AgentScope, api, type ConsentInfo, type KeyMode } from "../lib/api.ts";
+import {
+  type AgentScope,
+  api,
+  type ConsentInfo,
+  type ConsentScope,
+  type KeyMode,
+} from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
 
 /** The signed authorization request, untouched (re-encoding it would break the signature). */
@@ -63,19 +69,43 @@ export function OAuthConsentPage() {
   );
 }
 
+/**
+ * How each requested scope reads, and whether it starts ticked: a step-up starts from what the
+ * connection may do today; what it newly asks for is marked and left unticked.
+ */
+function useScopeLabels(info: ConsentInfo) {
+  const t = useT();
+  const c = useT("oauthConsent");
+  const granted = (s: ConsentScope) =>
+    s.granted !== null && (info.existing?.scopes.includes(s.granted) ?? true);
+  // The scope's description, as the agent-key screens word it (`*` never reaches a token).
+  const label = (scope: AgentScope) =>
+    scope === "*" ? t("agents.fullAccess") : t(`agents.scopes.${scope}`);
+  const scopeLabel = (s: ConsentScope): string => {
+    if (s.granted === null)
+      return c("oauthConsent.scopes.notInRole", { label: label(s.requested) });
+    const text =
+      s.granted !== s.requested
+        ? c("oauthConsent.scopes.narrowed", { label: label(s.requested), scope: s.granted })
+        : label(s.requested);
+    return info.existing && !granted(s) ? c("oauthConsent.scopes.added", { label: text }) : text;
+  };
+  return { granted, scopeLabel };
+}
+
 function ConsentForm({ request, info }: { request: string; info: ConsentInfo }) {
   const t = useT();
   const c = useT("oauthConsent");
   const grantable = info.scopes.filter((s) => s.granted !== null).map((s) => s.requested);
-  const [chosen, setChosen] = useState<AgentScope[]>(grantable);
+  const { granted, scopeLabel } = useScopeLabels(info);
+  const [chosen, setChosen] = useState<AgentScope[]>(
+    info.scopes.filter(granted).map((s) => s.requested),
+  );
   const [mode, setMode] = useState<KeyMode>(info.defaultMode);
   // Auto publishes without a person: explicit consent first, as for a key (DESIGN.md §2g).
   const [autoConfirmed, setAutoConfirmed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const needsConsent = mode === "auto" && info.existing?.mode !== "auto";
-  // The scope's description, as the agent-key screens word it (`*` never reaches a token).
-  const label = (scope: AgentScope) =>
-    scope === "*" ? t("agents.fullAccess") : t(`agents.scopes.${scope}`);
   const decide = useMutation({
     mutationFn: (accept: boolean) =>
       api.agentGrants.consent({ request, accept, scopes: accept ? chosen : [], mode }),
@@ -130,16 +160,7 @@ function ConsentForm({ request, info }: { request: string; info: ConsentInfo }) 
                 key={s.requested}
                 value={s.requested}
                 disabled={s.granted === null}
-                label={
-                  s.granted === null
-                    ? c("oauthConsent.scopes.notInRole", { label: label(s.requested) })
-                    : s.granted !== s.requested
-                      ? c("oauthConsent.scopes.narrowed", {
-                          label: label(s.requested),
-                          scope: s.granted,
-                        })
-                      : label(s.requested)
-                }
+                label={scopeLabel(s)}
               />
             ))}
           </Checkbox.Group>

@@ -9,7 +9,7 @@
  * Worker-safe: `jose` uses WebCrypto.
  */
 import { createLocalJWKSet, decodeProtectedHeader, type JSONWebKeySet, jwtVerify } from "jose";
-import { ACCESS_TOKEN_ALG } from "./oauth.ts";
+import { ACCESS_TOKEN_ALG, GRANT_CLAIM } from "./oauth.ts";
 
 /** A bearer value shaped like an access token: three base64url segments, header `typ: at+jwt`. */
 export function looksLikeAccessToken(value: string): boolean {
@@ -27,8 +27,9 @@ export function looksLikeAccessToken(value: string): boolean {
 
 /** The bearer value of `headers` when it is an access token (`looksLikeAccessToken`). */
 export function accessTokenOf(headers: Headers): string | undefined {
-  const bearer = /^Bearer\s+(\S+)\s*$/i.exec(headers.get("authorization") ?? "")?.[1];
-  return bearer && looksLikeAccessToken(bearer) ? bearer : undefined;
+  const credential = /^(?:Bearer|DPoP)\s+(\S+)\s*$/i.exec(headers.get("authorization") ?? "");
+  const value = credential?.[1];
+  return value && looksLikeAccessToken(value) ? value : undefined;
 }
 
 export interface VerifiedAccessToken {
@@ -36,6 +37,8 @@ export interface VerifiedAccessToken {
   readonly sub: string;
   /** The OAuth client (`client_id`, else `azp`). */
   readonly clientId: string;
+  /** The grant the token was issued for (`cloudhal_grant`, RFC-0044 §5). */
+  readonly grantId: string;
   readonly scopes: string[];
   readonly jti: string | undefined;
   readonly exp: number;
@@ -96,20 +99,31 @@ export function createAccessTokenVerifier(options: AccessTokenVerifierOptions) {
         typ: "at+jwt",
         // The one algorithm the server signs with (`oauthPlugins`): no algorithm confusion.
         algorithms: [ACCESS_TOKEN_ALG],
-        requiredClaims: ["sub", "exp", "iat"],
+        requiredClaims: ["sub", "exp", "iat", GRANT_CLAIM],
         currentDate: new Date(now()),
       });
+      // No DPoP in v1 (ADR-0010): a sender-constrained token (`cnf`, RFC 9449) is refused rather
+      // than accepted as a plain bearer token.
+      if (payload.cnf !== undefined) return undefined;
+      const grantId = payload[GRANT_CLAIM];
       const clientId =
         typeof payload.client_id === "string"
           ? payload.client_id
           : typeof payload.azp === "string"
             ? payload.azp
             : undefined;
-      if (!payload.sub || !clientId || typeof payload.exp !== "number") return undefined;
+      if (
+        !payload.sub ||
+        !clientId ||
+        typeof payload.exp !== "number" ||
+        typeof grantId !== "string"
+      )
+        return undefined;
       const scope = typeof payload.scope === "string" ? payload.scope : "";
       return {
         sub: payload.sub,
         clientId,
+        grantId,
         scopes: scope.split(" ").filter((s) => s.length > 0),
         jti: payload.jti,
         exp: payload.exp,

@@ -44,7 +44,9 @@ export async function tokenPrincipal(
   const claims = await d.verify(token);
   if (!claims) return undefined;
   const grant = await d.grants.live(claims.sub, claims.clientId);
-  if (!grant) return undefined; // inv. 4: revoked, or consent never went through Studio
+  // inv. 4: revoked, consent never went through Studio, or the token belongs to an earlier
+  // grant of the same member and client (revoked, then connected again).
+  if (!grant || grant.id !== claims.grantId) return undefined;
   // The same fixed window as a key (`rate_limits`), per connection.
   if (!(await d.staffStore.hit(`cloudhal:grant:${grant.id}`, d.keyLimit.windowMs, d.keyLimit.max)))
     throw new HTTPException(429, {

@@ -489,6 +489,30 @@ describe("gates over MCP (RFC-0008 §7.6, §10.8)", () => {
     expect(earlier.text).toMatch(/lift_embargo/);
   });
 
+  it("set_embargo through an OAuth connection never records the person's approval (RFC-0044 inv. 5)", async () => {
+    const live = (await s.store.getContentEntry(s.entry.id)) as ContentEntry;
+    // A token principal: an agent with a grant, no key, and the member behind it.
+    const { keyId: _key, ...noKey } = agentKey("edits");
+    const { call } = await connect(s, {
+      ...noKey,
+      grantId: "grant_sched000001",
+      person: { id: "user_sched00001", userId: "sched00001", role: "owner", name: "Halil" },
+    });
+    const hide = await call("set_embargo", {
+      siteId: s.site.id,
+      nodeId: live.id,
+      from: plus(7 * HOUR),
+      expectedRev: live.rev,
+    });
+    expect(hide.isError, hide.text).toBe(false);
+    expect(hide.data?.status).toBe("with-next-publish");
+    expect(hide.data?.release).toBeUndefined();
+    const releases = await s.schedules.listReleases(s.site.id);
+    expect(
+      releases.some((r) => r.approval?.kind === "person" && r.approval.by.id === "user_sched00001"),
+    ).toBe(false);
+  });
+
   it("lift_embargo always waits for a person, with the reason (D8)", async () => {
     const draft = await s.store.createContentEntry({
       siteId: s.site.id,

@@ -66,12 +66,17 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
             resource: options.mcpOauth.resource,
             grants: createAgentGrantService(d),
             // RFC 8414: the server-only `getOAuthServerConfig` endpoint; `createApi` serves it.
-            metadata: async () =>
-              (await (
-                d.instance.api as unknown as {
-                  getOAuthServerConfig(): Promise<Record<string, unknown>>;
-                }
-              ).getOAuthServerConfig()) ?? {},
+            // No DPoP in v1 (ADR-0010): its algorithms are not advertised (the token endpoint
+            // refuses a proof, `oauth-hooks.ts`).
+            metadata: async () => {
+              const { dpop_signing_alg_values_supported: _dpop, ...metadata } =
+                (await (
+                  d.instance.api as unknown as {
+                    getOAuthServerConfig(): Promise<Record<string, unknown>>;
+                  }
+                ).getOAuthServerConfig()) ?? {};
+              return metadata;
+            },
             createClient: (input) => createOauthClient(d, input),
           },
         }

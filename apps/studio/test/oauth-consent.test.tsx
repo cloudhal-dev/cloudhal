@@ -103,6 +103,36 @@ describe("OAuth consent screen", () => {
     expect(bodyOf(fetch, "POST", "/api/agent-grants/consent")).toMatchObject({ mode: "auto" });
   });
 
+  it("starts a step-up from what the connection may do today and marks what is new", async () => {
+    const fetch = serve(
+      ...asRole("editor"),
+      on("GET", "/api/agent-grants/consent", {
+        status: 200,
+        body: {
+          ...INFO,
+          scopes: [
+            { requested: "site:read", granted: "site:read" },
+            { requested: "content:read", granted: "content:read" },
+          ],
+          existing: { scopes: ["site:read"], mode: "edits" },
+        },
+      }),
+      on("POST", "/api/agent-grants/consent", {
+        status: 200,
+        body: { redirect: "http://127.0.0.1:33418/callback?code=x" },
+      }),
+    );
+    renderPage();
+    const added = await screen.findByRole("checkbox", { name: /\(new\)/ });
+    expect(added.getAttribute("aria-checked")).toBe("false");
+    expect(screen.getAllByRole("checkbox", { name: /\(new\)/ })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(assign).toHaveBeenCalled());
+    expect(bodyOf(fetch, "POST", "/api/agent-grants/consent")).toMatchObject({
+      scopes: ["site:read"],
+    });
+  });
+
   it("denies without scopes", async () => {
     const fetch = serve(
       ...asRole("editor"),

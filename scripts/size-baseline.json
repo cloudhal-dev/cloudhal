@@ -25,7 +25,7 @@
     "packages/core-ts/src/surface-interop.ts": 1233,
     "packages/core-ts/src/taxonomy.ts": 1718,
     "packages/mcp-server/src/menu-tools.ts": 1058,
-    "packages/mcp-server/src/schedule-tools.ts": 1596,
+    "packages/mcp-server/src/schedule-tools.ts": 1579,
     "packages/mcp-server/src/schedules.ts": 833,
     "packages/mcp-server/src/taxonomy-tools.ts": 1433,
     "packages/schedules/src/recurrence.ts": 939,
@@ -505,7 +505,7 @@
       "params": 5
     },
     "packages/mcp-server/src/schedule-tools.ts::scheduleTools": {
-      "lines": 1017
+      "lines": 1012
     },
     "packages/mcp-server/src/schedules.ts::autoReleaseVerdict": {
       "params": 6

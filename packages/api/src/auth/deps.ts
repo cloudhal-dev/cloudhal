@@ -17,9 +17,9 @@ export function authDeps(options: AuthOptions) {
   const staffStore = new StaffStore(options.sql, now);
   const keyLimit = options.agentKeyRateLimit ?? AGENT_KEY_RATE_LIMIT;
   // Marks the server's own consent call to the provider (`AgentGrantService.consent`).
-  const internal = { serverKey: `${newGrantId()}${newGrantId()}` };
-  const instance = createInstance(options, staffStore, internal);
   const grants = new GrantStore(options.sql, now);
+  const internal = { serverKey: `${newGrantId()}${newGrantId()}`, grants };
+  const instance = createInstance(options, staffStore, internal);
   const api = instance.api as unknown as {
     getJwks(): Promise<{ keys: JWK[] }>;
     verifyApiKey(input: { body: { key: string } }): Promise<VerifiedApiKey>;
@@ -58,15 +58,6 @@ export function authDeps(options: AuthOptions) {
       where: { field: string; value: unknown }[];
     }): Promise<T | null>;
     delete(input: { model: string; where: { field: string; value: unknown }[] }): Promise<void>;
-    deleteMany(input: {
-      model: string;
-      where: { field: string; value: unknown }[];
-    }): Promise<number>;
-    updateMany(input: {
-      model: string;
-      where: { field: string; value: unknown }[];
-      update: Record<string, unknown>;
-    }): Promise<number>;
   };
   type AuthContextLike = {
     adapter: AdapterLike;
@@ -127,7 +118,7 @@ export function authDeps(options: AuthOptions) {
         code: "mode_above_role",
       });
   };
-  const oauth = oauthDeps({ options, api, context, grants, staffStore, keyLimit, now });
+  const oauth = oauthDeps({ options, api, grants, staffStore, keyLimit, now });
   return {
     now,
     sql: options.sql,

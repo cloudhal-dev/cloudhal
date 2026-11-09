@@ -6,6 +6,7 @@
 import {
   type AgentMode,
   type Approval,
+  agentCredential,
   ELEVATION_MAX_MINUTES,
   ELEVATION_MIN_MINUTES,
   ELEVATION_NOTICE_MINUTES,
@@ -80,7 +81,9 @@ function cannotRequest(ctx: ToolContext): string | undefined {
     return "an automation's key works in the mode its automation allows; ask a person to change the automation";
   if (ctx.principal.local)
     return "this is a local server: restart `cloudhal mcp` with the --mode you need";
-  if (!ctx.principal.keyId) return "elevations apply to API keys; this principal has none";
+  // An OAuth connection (RFC-0044) has no elevations of its own yet (Phase 3).
+  if (agentCredential(ctx.principal)?.kind !== "key")
+    return "elevations apply to API keys; this principal has none";
   if (!ctx.approvals) return "this server has no approvals, so nobody could grant it";
   return undefined;
 }

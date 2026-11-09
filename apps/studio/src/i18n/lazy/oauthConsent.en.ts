@@ -30,8 +30,9 @@ export const messages = {
       legend: "Permissions",
       notInRole: "{label} (not in your role)",
       narrowed: "{label}, only for your own work in your role ({scope})",
+      added: "{label} (new)",
       offline:
-        "It stays connected and renews its access by itself until you disconnect it on the Agents page.",
+        "It stays connected and renews its access by itself, for at most 90 days, until the connection is revoked or your access ends.",
       sites:
         "{count, plural, one {It reaches only the site you work on.} other {It reaches only the # sites you work on.}}",
       none: "Choose at least one permission.",

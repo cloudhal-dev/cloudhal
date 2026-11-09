@@ -86,9 +86,9 @@ export function oauthEndpoints(baseURL: string): { issuer: string; resource: str
 export function oauthPlugins(
   issuer: string,
   options: McpOauthServerOptions,
-  /** True for the server's own calls (`SERVER_KEY_HEADER`): only they may create clients. */
-  fromServer: (headers: Headers) => boolean,
+  hooks: OauthServerHooks,
 ): BetterAuthPlugin[] {
+  const { fromServer, grantOf } = hooks;
   return [
     jwt({
       jwks: { keyPairConfig: { alg: ACCESS_TOKEN_ALG, crv: "Ed25519" } },
@@ -116,8 +116,45 @@ export function oauthPlugins(
       allowUnauthenticatedClientRegistration: false,
       clientPrivileges: ({ headers, action }) => action === "create" && fromServer(headers),
       resourcePrivileges: ({ headers, action }) => action === "link" && fromServer(headers),
+      // Tokens are stored under a hash Cloudhal can compute too, so the refresh path can find a
+      // token's family and enforce the absolute lifetime (`oauth-hooks.ts`).
+      storeTokens: { hash: (token) => hashToken(token) },
+      extensions: [
+        {
+          // The grant an access token belongs to (§5): `/mcp` compares it with the live
+          // `agent_grants` row, so a token issued before a revoke never works for a later grant
+          // of the same member and client. No live grant, no claim: `/mcp` refuses the token.
+          claims: {
+            accessToken: async ({ user, client }) => {
+              const grant = user ? await grantOf(user.id, client.clientId) : undefined;
+              return grant ? { [GRANT_CLAIM]: grant } : {};
+            },
+          },
+        },
+      ],
     }),
   ];
+}
+
+/** What `oauthPlugins` asks of Cloudhal. */
+export interface OauthServerHooks {
+  /** True for the server's own calls (`SERVER_KEY_HEADER`): only they may create clients. */
+  readonly fromServer: (headers: Headers) => boolean;
+  /** The id of the member's live grant for a client, if any. */
+  readonly grantOf: (userId: string, clientId: string) => Promise<string | undefined>;
+}
+
+/** The access-token claim that names the grant (RFC-0044 §5; a private claim name, RFC 7519 §4.3). */
+export const GRANT_CLAIM = "cloudhal_grant";
+
+/** How the provider stores codes and refresh tokens: base64url(SHA-256(token)). */
+export async function hashToken(token: string): Promise<string> {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)),
+  );
+  let s = "";
+  for (const b of digest) s += String.fromCharCode(b);
+  return btoa(s).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
 /** A log line from Better Auth, routed through Cloudhal's logging (`AuthOptions.log`). */

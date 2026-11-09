@@ -27,6 +27,8 @@ export interface DeploymentOptions {
   readonly baseURL?: string;
   /** The `/mcp` resource tokens are bound to. */
   readonly resource?: string;
+  /** The trusted client-address header (`AuthOptions.clientAddressHeader`; turns rate limits on). */
+  readonly clientAddressHeader?: string;
 }
 
 export type Deployment = Awaited<ReturnType<typeof deploy>>;
@@ -94,6 +96,7 @@ export async function deploy(
     secret: SECRET,
     signUp: "first-user",
     mcpOauth: { resource: options.resource ?? `${new URL(baseURL).origin}/mcp` },
+    ...(options.clientAddressHeader ? { clientAddressHeader: options.clientAddressHeader } : {}),
   });
   const server = auth.oauth;
   if (!server) throw new Error("the authorization server did not start");
@@ -141,10 +144,10 @@ export async function deploy(
 }
 
 /** A fresh database with the Owner signed up, a site and the test client. */
-export async function setupServer(backend: RolesBackend) {
+export async function setupServer(backend: RolesBackend, options: DeploymentOptions = {}) {
   const b = await backend.create();
   const site = await seedStarterSite(b.store, { name: "Blog", slug: "blog" });
-  const d = await deploy(b);
+  const d = await deploy(b, options);
   const signUp = await d.call("POST", "/api/auth/sign-up/email", {
     body: { name: "Olive Owner", email: "owner@example.com", password: PASSWORD },
   });
@@ -156,8 +159,9 @@ export async function setupServer(backend: RolesBackend) {
     redirectUris: [REDIRECT],
   });
   /** A member who joined through an invite (RFC-0005 §7), signed in. */
-  const join = async (role: string, extra: Json = {}) => {
-    const email = `${role}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+  /** `email` again: a removed member invited back keeps their account (RFC-0005 §7.4). */
+  const join = async (role: string, extra: Json = {}, again?: string) => {
+    const email = again ?? `${role}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     const inv = await d.call("POST", "/api/invites", {
       cookie: owner.cookie,
       body: { email, role, ...extra },
@@ -169,6 +173,7 @@ export async function setupServer(backend: RolesBackend) {
     });
     expect(accepted.status, JSON.stringify(accepted.body)).toBe(200);
     return {
+      email,
       cookie: cookieOf(accepted.res),
       userId: (accepted.body.user as Json).id as string,
     };

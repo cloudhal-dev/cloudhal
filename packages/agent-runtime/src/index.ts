@@ -4,6 +4,7 @@
  */
 export * from "./approvals.ts";
 export * from "./audit.ts";
+export * from "./credentials.ts";
 export * from "./modes.ts";
 export * from "./ownership.ts";
 export * from "./policy.ts";

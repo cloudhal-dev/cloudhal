@@ -62,6 +62,7 @@ import {
   type ToolDefinition,
   ToolError,
 } from "./common.ts";
+import { directApproval, NO_GRANT_GATES } from "./gate-approval.ts";
 import {
   approvalProblem,
   autoReleaseVerdict,
@@ -519,19 +520,6 @@ async function gateRelease(
   });
   const rec = await recordOf(ctx, site.id, pinned.release.id);
   return scheduleWith(ctx, rec, { kind: "on-approval" }, approval);
-}
-
-/** The approval a gate change carries when no request is needed: the person's, or the key's (reduce). */
-function directApproval(ctx: ToolContext, at: string): Release["approval"] {
-  if (isAgent(ctx) && ctx.principal.keyId && !ctx.principal.local && !ctx.confirmed)
-    return {
-      kind: "auto",
-      by: ctx.principal.actor,
-      keyId: ctx.principal.keyId,
-      at,
-      windowEnds: canonicalInstant(Date.parse(at) + 24 * 3_600_000),
-    };
-  return personApproval(ctx.principal, at);
 }
 
 // ───────────────────────────── runs (§11.2) ─────────────────────────────
@@ -1071,14 +1059,9 @@ export function scheduleTools(): ToolDefinition[] {
             message:
               "This content has other unpublished edits, so the embargo cannot go live on its own: it is still visible until it is published. Ask a person to publish (or schedule) it.",
           };
-        const release = await gateRelease(
-          ctx,
-          site,
-          node.id,
-          "set_embargo",
-          directApproval(ctx, at),
-          true,
-        );
+        const approval = directApproval(ctx, at);
+        if (!approval) return { node: saved, status: "with-next-publish", message: NO_GRANT_GATES };
+        const release = await gateRelease(ctx, site, node.id, "set_embargo", approval, true);
         return { node: saved, release, status: "scheduled" };
       },
     },

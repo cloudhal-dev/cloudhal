@@ -9,6 +9,7 @@
  */
 import { isRole, type Role } from "@cloudhal/agent-runtime";
 import type { SqlDriver } from "@cloudhal/storage";
+import { providerRevocation } from "./auth/grants.ts";
 import { countHit, pruneCounters, randomPrune } from "./rate-limits.ts";
 import {
   allSiteRoles,
@@ -311,13 +312,19 @@ export class StaffStore {
     return rows.map((r) => r.agent_id);
   }
 
-  /** Revokes every OAuth connection of a person (removal; RFC-0044 §5 inv. 4); kept for audit. */
-  async revokeGrantsOf(userId: string): Promise<number> {
-    const r = await this.#sql.run(
-      "UPDATE agent_grants SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-      [this.#stamp(), userId],
-    );
-    return r.changes;
+  /**
+   * Ends every OAuth connection of a person (removal; RFC-0044 §5 inv. 4): their grants (kept for
+   * audit), and on the provider's side their stored consents and refresh tokens, in one batch.
+   */
+  async revokeGrantsOf(userId: string): Promise<void> {
+    const at = this.#stamp();
+    await this.#sql.batch([
+      {
+        sql: "UPDATE agent_grants SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+        params: [at, userId],
+      },
+      ...providerRevocation(userId, undefined, at),
+    ]);
   }
 
   /** Disables every key of a person (removal, RFC-0005 §3); kept for audit, deletable. */

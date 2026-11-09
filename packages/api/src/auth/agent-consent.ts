@@ -152,6 +152,7 @@ async function forward(
   body: Record<string, unknown>,
 ): Promise<string> {
   const origin = new URL(d.endpoints?.issuer ?? "http://invalid").origin;
+  const address = d.addressHeader ? headers.get(d.addressHeader) : null;
   const response = await d.instance.handler(
     new Request(`${d.endpoints?.issuer}/oauth2/consent`, {
       method: "POST",
@@ -161,6 +162,7 @@ async function forward(
         origin,
         cookie: headers.get("cookie") ?? "",
         [SERVER_KEY_HEADER]: d.internal.serverKey,
+        ...(d.addressHeader && address ? { [d.addressHeader]: address } : {}),
       },
       body: JSON.stringify(body),
     }),
@@ -221,14 +223,11 @@ export async function giveConsent(
     ...kept.map((s) => s.requested),
     ...(requested.includes(OFFLINE_ACCESS) ? [OFFLINE_ACCESS] : []),
   ];
-  const redirect = await forward(d, input.headers, {
-    accept: true,
-    scope: providerScopes.join(" "),
-    oauth_query: input.oauthQuery,
-  });
   const now = d.now().toISOString();
-  // One batch: the grant, the person behind the agent actor (RFC-0005 §4, as `recordAgent` does
-  // for a key) and the audit row.
+  // The grant first: the provider's consent runs its authorize step, whose check
+  // (`oauth-hooks.ts`) forgets any stored consent the live grant does not cover. One batch: the
+  // grant, the person behind the agent actor (RFC-0005 §4, as `recordAgent` does for a key) and
+  // the audit row. A failed provider call after it leaves a grant no token can use yet.
   const grant = await d.grants.consent(
     {
       userId: who.userId,
@@ -248,5 +247,10 @@ export async function giveConsent(
       ];
     },
   );
+  const redirect = await forward(d, input.headers, {
+    accept: true,
+    scope: providerScopes.join(" "),
+    oauth_query: input.oauthQuery,
+  });
   return { redirect, grant };
 }
