@@ -119,6 +119,8 @@ export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRooms
   CLOUDHAL_MCP_DCR?: string;
   /** Comma-separated hosts OAuth clients may come from (`claude.ai,*.example.com`); unset: any. */
   CLOUDHAL_MCP_CLIENT_HOSTS?: string;
+  /** Extra private-use redirect schemes of native clients (besides `cursor`, `vscode`). */
+  CLOUDHAL_MCP_REDIRECT_SCHEMES?: string;
 }
 
 /**

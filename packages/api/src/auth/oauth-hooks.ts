@@ -8,6 +8,8 @@
  *   the member sees Studio's consent screen again.
  *   The request's parameters are read from the query, or from the form body of a POST, as the
  *   provider reads them.
+ * - `/oauth2/authorize` with `CLOUDHAL_MCP_DCR=off`: a client dynamic registration made earlier
+ *   is refused (no new authorization; connections it already has keep working until revoked).
  * - `/oauth2/token`: no DPoP in v1 (ADR-0010), so a `DPoP` proof is refused (400) instead of
  *   minting a sender-constrained token `/mcp` would not check, or falling back to Bearer. A refresh
  *   token is refused when its family began before the live grant (a revoke, then a reconnect: the
@@ -28,6 +30,8 @@ export interface OauthHookDeps {
   readonly grants: GrantStore;
   readonly staff: StaffStore;
   readonly now: () => Date;
+  /** Dynamic registration is on (`CLOUDHAL_MCP_DCR`); off, its clients cannot authorize. */
+  readonly dcr: boolean;
 }
 
 type Where = { field: string; value: unknown }[];
@@ -55,7 +59,10 @@ interface HookContext {
 
 /** Runs the checks for `ctx.path`; throws the OAuth error the provider would. */
 export async function oauthBeforeHook(ctx: HookContext, d: OauthHookDeps): Promise<void> {
-  if (ctx.path === "/oauth2/authorize") return forgetStaleConsent(ctx, d);
+  if (ctx.path === "/oauth2/authorize") {
+    await refuseDcrClientWhenOff(ctx, d);
+    return forgetStaleConsent(ctx, d);
+  }
   if (ctx.path === "/oauth2/token") return checkTokenRequest(ctx, d);
 }
 
@@ -75,13 +82,43 @@ export async function consentIsStale(
   });
 }
 
-async function forgetStaleConsent(ctx: HookContext, d: OauthHookDeps): Promise<void> {
-  // Exactly as the provider reads them (`getAuthorizationRequestParameters`): the form body only
-  // for an HTTP `POST /oauth2/authorize`; when it resumes authorize after a sign-in or a consent
-  // (a POST whose body is that request's), the parameters are in the query.
+/**
+ * The authorization request's parameters exactly as the provider reads them
+ * (`getAuthorizationRequestParameters`): the form body only for an HTTP `POST /oauth2/authorize`;
+ * when it resumes authorize after a sign-in or a consent (a POST whose body is that request's),
+ * the query.
+ */
+function authorizeParams(ctx: HookContext): Record<string, unknown> {
   const settings = ctx.authorizeSettings ?? { isAuthorize: true };
   const fromBody = ctx.method === "POST" && settings.isAuthorize === true;
-  const params = (fromBody ? ctx.body : ctx.query) ?? {};
+  return (fromBody ? ctx.body : ctx.query) ?? {};
+}
+
+interface ClientOwnerRow {
+  clientDiscoveryId?: string | null;
+  userId?: string | null;
+  referenceId?: string | null;
+}
+
+/** With DCR off, a client it registered (no discovery source, no owner) starts nothing new. */
+async function refuseDcrClientWhenOff(ctx: HookContext, d: OauthHookDeps): Promise<void> {
+  if (d.dcr) return;
+  const clientId = authorizeParams(ctx).client_id;
+  if (typeof clientId !== "string" || !clientId) return;
+  const row = await ctx.context.adapter.findOne<ClientOwnerRow>({
+    model: "oauthClient",
+    where: [{ field: "clientId", value: clientId }],
+  });
+  if (row && !row.clientDiscoveryId && !row.userId && !row.referenceId)
+    throw new APIError("BAD_REQUEST", {
+      error: "invalid_client",
+      error_description:
+        "dynamic client registration is off on this server, so this client cannot connect",
+    });
+}
+
+async function forgetStaleConsent(ctx: HookContext, d: OauthHookDeps): Promise<void> {
+  const params = authorizeParams(ctx);
   const clientId = params.client_id;
   if (typeof clientId !== "string" || !clientId) return;
   const session = await getSessionFromCtx(ctx as never).catch(() => null);

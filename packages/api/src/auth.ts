@@ -31,13 +31,20 @@ export {
   oauthEndpoints,
 } from "./auth/oauth.ts";
 export {
+  pruneCimdClients,
+  pruneDcrClients,
+  pruneUnusedClients,
+} from "./auth/oauth-client-rows.ts";
+export {
+  CIMD_LIMITS,
+  type CimdLimits,
   DCR_LIMITS,
   type DcrLimits,
   type OauthRegistration,
   type OauthRegistrationEnv,
   oauthRegistrationFrom,
   parseClientHosts,
-  pruneDcrClients,
+  parseRedirectSchemes,
 } from "./auth/oauth-registration.ts";
 export {
   ADDABLE_KEY_SCOPES,

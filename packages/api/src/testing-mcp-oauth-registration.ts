@@ -15,7 +15,8 @@ import type { FetchTransport } from "@cloudhal/core-ts/media";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { clearAccessTokenKeyCache } from "./auth/access-token.ts";
 import { cimdFetch } from "./auth/cimd-fetch.ts";
-import { type OauthRegistration, pruneDcrClients } from "./auth/oauth-registration.ts";
+import { pruneDcrClients } from "./auth/oauth-client-rows.ts";
+import type { OauthRegistration } from "./auth/oauth-registration.ts";
 import { redirectProblem } from "./auth/redirect-policy.ts";
 import { oauthClientsPruneJob } from "./oauth-prune-job.ts";
 import {
@@ -34,7 +35,7 @@ import type { RolesBackend } from "./testing-roles.ts";
 const READ = "site:read content:read";
 const DAY = 86_400_000;
 /** A client metadata document URL (RFC-0044 §3: HTTPS with a path). */
-const DOC = "https://agents.example.com/oauth/client.json";
+export const DOC = "https://agents.example.com/oauth/client.json";
 /** A public address the stub resolver answers (TEST-NET-3 is not public: use a real range). */
 const PUBLIC = "93.184.215.14";
 
@@ -47,7 +48,7 @@ interface Served {
 }
 
 /** A transport that serves documents from the test and records every request. */
-function stubTransport(
+export function stubTransport(
   serve: (url: URL) => Served,
   addresses: readonly string[] = [PUBLIC],
 ): FetchTransport & { readonly requests: string[] } {
@@ -73,7 +74,7 @@ function stubTransport(
   };
 }
 
-function document(overrides: Json = {}): string {
+export function document(overrides: Json = {}): string {
   return JSON.stringify({
     client_id: DOC,
     client_name: "Claude Code",
@@ -86,7 +87,7 @@ function document(overrides: Json = {}): string {
 }
 
 /** CIMD (and DCR, unless turned off) over `transport`, with a short timeout. */
-function withCimd(transport: FetchTransport, extra: Partial<OauthRegistration> = {}) {
+export function withCimd(transport: FetchTransport, extra: Partial<OauthRegistration> = {}) {
   return {
     registration: {
       cimd: cimdFetch({ transport, blockedHosts: ["localhost"], timeoutMs: 200 }),
@@ -97,7 +98,7 @@ function withCimd(transport: FetchTransport, extra: Partial<OauthRegistration> =
 }
 
 /** `authorize` as the member's browser for another client: the consent screen, or the refusal. */
-async function tryAuthorize(s: Server, clientId: string, redirectUri = REDIRECT) {
+export async function tryAuthorize(s: Server, clientId: string, redirectUri = REDIRECT) {
   const r = await authorize(s, { cookie: s.owner.cookie, scope: READ, clientId, redirectUri });
   const consentScreen = r.location?.pathname === "/oauth/consent";
   const text = consentScreen ? "" : await r.res.text();
@@ -106,7 +107,7 @@ async function tryAuthorize(s: Server, clientId: string, redirectUri = REDIRECT)
   return { ...r, consentScreen, status: r.res.status, text, reason };
 }
 
-const FETCH_FAILED = /Failed to fetch metadata document/;
+export const FETCH_FAILED = /Failed to fetch metadata document/;
 
 export function describeMcpOauthRegistration(label: string, backend: RolesBackend): void {
   describe(`MCP OAuth client registration: ${label}`, { timeout: 180_000 }, () => {
@@ -212,17 +213,15 @@ export function describeMcpOauthRegistration(label: string, backend: RolesBacken
         expect((await tryAuthorize(t, DOC)).consentScreen).toBe(true);
       });
 
-      it("uses a document's redirect URIs only as https or loopback http", async () => {
+      it("never uses a document's redirect URI that the redirect rules refuse", async () => {
         const transport = stubTransport(() => ({
           body: document({
-            redirect_uris: ["http://127.0.0.1/callback", "cursor://anysphere.cursor/callback"],
+            redirect_uris: ["http://127.0.0.1/callback", "myapp://app/callback"],
           }),
         }));
         const s = await setupServer(backend, withCimd(transport));
         expect((await tryAuthorize(s, DOC)).consentScreen).toBe(true);
-        expect(
-          (await tryAuthorize(s, DOC, "cursor://anysphere.cursor/callback")).consentScreen,
-        ).toBe(false);
+        expect((await tryAuthorize(s, DOC, "myapp://app/callback")).consentScreen).toBe(false);
       });
     });
 
@@ -252,14 +251,15 @@ export function describeMcpOauthRegistration(label: string, backend: RolesBacken
         await (await mcpClient(s.app, access)).listTools();
       });
 
-      it("takes public clients with https or loopback redirect URIs only", async () => {
+      it("takes public clients with https, loopback or known app redirect URIs only", async () => {
         const s = await setupServer(backend, {
           registration: { dcr: true, limits: { perAddressPerHour: 100 } },
         });
         const refused: [Json, string][] = [
           [{ token_endpoint_auth_method: "client_secret_basic" }, "invalid_client_metadata"],
           [{ redirect_uris: ["http://cursor.example.com/callback"] }, "invalid_redirect_uri"],
-          [{ redirect_uris: ["cursor://anysphere.cursor/callback"] }, "invalid_redirect_uri"],
+          [{ redirect_uris: ["myapp://app/callback"] }, "invalid_redirect_uri"],
+          [{ redirect_uris: [REDIRECT, "javascript://x/%0aalert(1)"] }, "invalid_redirect_uri"],
           [{ redirect_uris: ["https://localhost/callback"] }, "invalid_redirect_uri"],
           [{ redirect_uris: ["https://app.example.com/cb#x"] }, "invalid_redirect_uri"],
           [{ redirect_uris: [] }, "invalid_redirect_uri"],
@@ -352,8 +352,11 @@ export function describeMcpOauthRegistration(label: string, backend: RolesBacken
         expect(await pruneDcrClients(s.sql, { now: new Date(Date.now() + 29 * DAY) })).toBe(0);
         // The scheduler's hourly job does it (Workers and Node), and says so.
         const lines: string[] = [];
+        // DCR clients go in even UTC hours (document clients in odd ones).
+        const later = new Date(Date.now() + 31 * DAY);
+        later.setUTCHours(later.getUTCHours() + (later.getUTCHours() % 2));
         await oauthClientsPruneJob(s.sql, (l) => lines.push(l)).run({
-          now: new Date(Date.now() + 31 * DAY),
+          now: later,
           trigger: "cron",
         });
         expect(lines).toEqual(["oauth clients: 2 unused registration(s) deleted"]);
@@ -422,10 +425,18 @@ export function describeMcpOauthRegistration(label: string, backend: RolesBacken
         expect(redirectProblem("http://user@localhost/cb")).toBeDefined();
         expect(redirectProblem(`https://a.com/${"a".repeat(100_000)}`)).toBeDefined();
         expect(redirectProblem("http://".padEnd(100_000, "["))).toBeDefined();
-        expect(redirectProblem("https://x.cursor.com/cb", ["*.cursor.com"])).toBeUndefined();
-        expect(redirectProblem("https://cursor.com/cb", ["*.cursor.com"])).toBeDefined();
-        expect(redirectProblem("http://localhost:9/cb", ["claude.ai"])).toBeDefined();
-        expect(redirectProblem("http://localhost:9/cb", ["localhost"])).toBeUndefined();
+        expect(
+          redirectProblem("https://x.cursor.com/cb", { clientHosts: ["*.cursor.com"] }),
+        ).toBeUndefined();
+        expect(
+          redirectProblem("https://cursor.com/cb", { clientHosts: ["*.cursor.com"] }),
+        ).toBeDefined();
+        expect(
+          redirectProblem("http://localhost:9/cb", { clientHosts: ["claude.ai"] }),
+        ).toBeDefined();
+        expect(
+          redirectProblem("http://localhost:9/cb", { clientHosts: ["localhost"] }),
+        ).toBeUndefined();
       });
     });
 

@@ -19,11 +19,11 @@
  *
  * Worker-safe: the plugins and `jose` use WebCrypto and no `eval`.
  */
-import { cimd } from "@better-auth/cimd";
 import { mcp } from "@better-auth/mcp";
 import { KEY_SCOPES } from "@cloudhal/agent-runtime";
 import type { BetterAuthPlugin } from "better-auth";
 import { jwt } from "better-auth/plugins";
+import { type CimdGuard, guardedCimd } from "./cimd-discovery.ts";
 import type { OauthRegistration } from "./oauth-registration.ts";
 import { redirectProblem } from "./redirect-policy.ts";
 
@@ -99,8 +99,9 @@ export function oauthPlugins(
   options: McpOauthServerOptions,
   hooks: OauthServerHooks,
 ): BetterAuthPlugin[] {
-  const { grantOf, metadataDocumentAllowed } = hooks;
+  const { grantOf, cimdGuard } = hooks;
   const registration = options.registration;
+  const policy = { clientHosts: registration?.clientHosts, schemes: registration?.redirectSchemes };
   const dcr = registration?.dcr === true;
   return [
     jwt({
@@ -131,10 +132,11 @@ export function oauthPlugins(
       // No member creates, edits or links clients through the session-backed endpoints.
       clientPrivileges: () => false,
       resourcePrivileges: () => false,
-      // §6 "Open redirect": the registered URI must match (loopback without the port) and be
-      // https or loopback http, whichever way the client registered.
+      // §6 "Open redirect": the registered URI must match (loopback without the port, a
+      // private-use scheme exactly) and pass the redirect rules and the host list now, whichever
+      // way and whenever the client registered.
       validateRedirectUri: (uri, _registered, matched) =>
-        matched && redirectProblem(uri) === undefined,
+        matched && redirectProblem(uri, policy) === undefined,
       // Tokens are stored under a hash Cloudhal can compute too, so the refresh path can find a
       // token's family and enforce the absolute lifetime (`oauth-hooks.ts`).
       storeTokens: { hash: (token) => hashToken(token) },
@@ -152,20 +154,10 @@ export function oauthPlugins(
         },
       ],
     }),
-    // §3: CIMD with the runtime's transport and the MCP 2026-07-28 profile (`client_name` and
-    // `redirect_uris` required). Each plugin instance keeps its own bounded cache (per process on
-    // Node; per request on Workers, where nothing async may outlive a request).
-    ...(registration?.cimd
-      ? [
-          cimd({
-            fetchClientMetadataResource: registration.cimd,
-            metadataProfile: "mcp-2026-07-28",
-            metadataRevalidationInterval: "60m",
-            maxCacheEntries: 500,
-            isMetadataDocumentUrlAllowed: (url) => metadataDocumentAllowed(url),
-          }),
-        ]
-      : []),
+    // §3: CIMD with the runtime's transport and the MCP 2026-07-28 profile, inside Cloudhal's
+    // guard: stored clients served from their row within the freshness window, a cap on stored
+    // clients, and fetch budgets that never block a stored client (`cimd-discovery.ts`).
+    ...(registration?.cimd ? [guardedCimd(registration.cimd, cimdGuard)] : []),
   ];
 }
 
@@ -173,11 +165,8 @@ export function oauthPlugins(
 export interface OauthServerHooks {
   /** The id of the member's live grant for a client, if any. */
   readonly grantOf: (userId: string, clientId: string) => Promise<string | undefined>;
-  /**
-   * Before a metadata document is fetched: the host allow-list and the installation-wide fetch
-   * budget (`rate_limits`). False refuses the `client_id`; a 429 error refuses for now.
-   */
-  readonly metadataDocumentAllowed: (url: string) => Promise<boolean>;
+  /** CIMD's bounds: the host list, the cap and the fetch budgets (`cimd-discovery.ts`). */
+  readonly cimdGuard: CimdGuard;
 }
 
 /** The access-token claim that names the grant (RFC-0044 §5; a private claim name, RFC 7519 §4.3). */

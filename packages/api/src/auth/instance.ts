@@ -7,8 +7,9 @@ import { createAccessControl } from "better-auth/plugins/access";
 import type { StaffStore } from "../staff.ts";
 import type { GrantStore } from "./grants.ts";
 import { betterAuthLogger, oauthEndpoints, oauthPlugins } from "./oauth.ts";
-import { metadataDocumentAllowed } from "./oauth-cimd-policy.ts";
+import { countCimdClients } from "./oauth-client-rows.ts";
 import { oauthBeforeHook } from "./oauth-hooks.ts";
+import { cimdLimits } from "./oauth-registration.ts";
 import {
   API_KEY_HEADER,
   type AuthOptions,
@@ -74,8 +75,15 @@ export function createInstance(
   const oauth = options.mcpOauth
     ? oauthPlugins(oauthEndpoints(options.baseURL).issuer, options.mcpOauth, {
         grantOf: async (userId, clientId) => (await internal.grants.live(userId, clientId))?.id,
-        metadataDocumentAllowed: (url) =>
-          metadataDocumentAllowed(staff, url, options.mcpOauth?.registration?.clientHosts),
+        cimdGuard: {
+          limits: cimdLimits(options.mcpOauth.registration),
+          clientHosts: options.mcpOauth.registration?.clientHosts,
+          count: () => countCimdClients(options.sql),
+          hit: (key, windowMs, max) => staff.hit(key, windowMs, max),
+          // The runtime's trusted address (#165); without one, one shared bucket as elsewhere.
+          address: (headers) => headers?.get(ipHeader ?? "cf-connecting-ip") ?? "unknown",
+          now: clock,
+        },
       })
     : [];
   const instance = betterAuth({
@@ -117,7 +125,12 @@ export function createInstance(
           throw new APIError("NOT_FOUND", { message: "not found" });
         // RFC-0044: stale consent memory, DPoP and the refresh family's absolute lifetime.
         if (options.mcpOauth && OAUTH_HOOK_PATHS.has(ctx.path))
-          return oauthBeforeHook(ctx as never, { grants: internal.grants, staff, now: clock });
+          return oauthBeforeHook(ctx as never, {
+            grants: internal.grants,
+            staff,
+            now: clock,
+            dcr: options.mcpOauth.registration?.dcr === true,
+          });
         if (!ctx.path.startsWith("/sign-up") || mode !== "first-user") return;
         const existing = await ctx.context.adapter.count({ model: "user" });
         if (existing > 0)

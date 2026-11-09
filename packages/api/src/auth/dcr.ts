@@ -7,8 +7,9 @@
  * 1. rate limits in `rate_limits` (#173): 10 per client address per hour and 300 per installation
  *    per day, counted for every attempt, valid or not;
  * 2. at most 5,000 registered clients (503 beyond it), pruned after 30 unused days;
- * 3. the metadata: `client_name` 1–100 characters; `redirect_uris` 1–10, each https or loopback
- *    http (and on `CLOUDHAL_MCP_CLIENT_HOSTS` when set); public clients only
+ * 3. the metadata: `client_name` 1–100 characters; `redirect_uris` 1–10, each https, loopback
+ *    http or a native app's private-use scheme (`redirect-policy.ts`; on
+ *    `CLOUDHAL_MCP_CLIENT_HOSTS` when set), one bad entry refusing the whole request; public clients only
  *    (`token_endpoint_auth_method` `none`, also when absent: no secret is ever minted);
  *    `grant_types` ⊆ {`authorization_code`, `refresh_token`} with `authorization_code`;
  *    `response_types` = [`code`]. Only these fields, `application_type` and `scope` reach the
@@ -19,8 +20,9 @@
 
 import type { SqlDriver } from "@cloudhal/storage";
 import type { StaffStore } from "../staff.ts";
-import { countDcrClients, type DcrLimits } from "./oauth-registration.ts";
-import { redirectUrisProblem } from "./redirect-policy.ts";
+import { countDcrClients } from "./oauth-client-rows.ts";
+import type { DcrLimits } from "./oauth-registration.ts";
+import { type RedirectPolicy, redirectUrisProblem } from "./redirect-policy.ts";
 
 /** RFC-0044 §3: "Body ≤ 5 KB". */
 export const DCR_MAX_BODY_BYTES = 5 * 1024;
@@ -46,17 +48,14 @@ const invalid = (description: string) =>
   new RegistrationError(400, "invalid_client_metadata", description);
 
 /** The body the provider registers: the checked fields only. */
-export function registrationBody(
-  raw: unknown,
-  clientHosts: readonly string[] | undefined,
-): Record<string, unknown> {
+export function registrationBody(raw: unknown, policy: RedirectPolicy): Record<string, unknown> {
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw invalid("the body must be a JSON object");
   const m = raw as Record<string, unknown>;
   const name = typeof m.client_name === "string" ? m.client_name.trim() : "";
   if (name.length === 0 || name.length > NAME_MAX)
     throw invalid(`client_name is required (1–${NAME_MAX} characters)`);
-  const redirect = redirectUrisProblem(m.redirect_uris, clientHosts);
+  const redirect = redirectUrisProblem(m.redirect_uris, policy);
   if (redirect) throw new RegistrationError(400, "invalid_redirect_uri", redirect);
   const auth = m.token_endpoint_auth_method ?? "none";
   if (auth !== "none")
@@ -100,7 +99,8 @@ export interface DcrDeps {
   readonly sql: SqlDriver;
   readonly staff: StaffStore;
   readonly limits: DcrLimits;
-  readonly clientHosts?: readonly string[] | undefined;
+  /** Redirect rules: the host list and the extra private-use schemes. */
+  readonly policy: RedirectPolicy;
   /** The provider's server-side `registerOAuthClient` (no HTTP, no session). */
   readonly register: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
@@ -129,7 +129,7 @@ export async function registerDcrClient(
   } catch {
     throw invalid("the body must be JSON");
   }
-  const body = registrationBody(raw, d.clientHosts);
+  const body = registrationBody(raw, d.policy);
   if ((await countDcrClients(d.sql)) >= limits.maxClients)
     throw new RegistrationError(
       503,

@@ -55,7 +55,10 @@ export function oauthClientRegistration(
           sql: d.sql,
           staff: d.staffStore,
           limits: dcrLimits(registration),
-          clientHosts: registration.clientHosts,
+          policy: {
+            clientHosts: registration.clientHosts,
+            schemes: registration.redirectSchemes,
+          },
           register,
         },
         input,
