@@ -87,6 +87,10 @@ export function createAuth(options: AuthOptions): CloudhalAuth {
           oauth: {
             issuer: d.endpoints.issuer,
             resource: options.mcpOauth.resource,
+            registration: {
+              cimd: Boolean(options.mcpOauth.registration?.cimd),
+              dcr: options.mcpOauth.registration?.dcr === true,
+            },
             grants: createAgentGrantService(d),
             // RFC 8414: the server-only `getOAuthServerConfig` endpoint; `createApi` serves it.
             // No DPoP in v1 (ADR-0010): its algorithms are not advertised (the token endpoint

@@ -40,6 +40,7 @@ import {
   type Json,
   mcpClient,
   REDIRECT,
+  RESOURCE,
   registerClient,
   type Server,
   setupServer,
@@ -572,6 +573,29 @@ export function describeMcpOauthBounds(label: string, backend: RolesBackend): vo
       const grants = (await s.call("GET", "/api/agent-grants", { cookie: s.owner.cookie }))
         .body as unknown as Json[];
       expect(grants.find((g) => g.clientId === DOC)?.clientName).toBe(doc.name);
+      // "Connected agents" names a connection as the consent screen did (Phase 3b).
+      expect(grants.find((g) => g.clientId === DOC)?.client).toEqual({
+        kind: "document",
+        host: "agents.example.com",
+        lookalike: "Claude",
+      });
+      const fakeId = await registerClient(s, { client_name: "Claude \u00b7 from claude.ai" });
+      await connect({ ...s, clientId: fakeId }, { cookie: s.owner.cookie, scope: READ });
+      const all = (await s.call("GET", "/api/agent-grants?all=1", { cookie: s.owner.cookie }))
+        .body as unknown as Json[];
+      expect(all.find((g) => g.clientId === fakeId)).toMatchObject({
+        client: { kind: "self-registered", lookalike: "Claude" },
+        owner: { userId: s.owner.userId, role: "owner" },
+      });
+      // Studio's "Connect by URL" notes: the resource and the registrations that work here.
+      const instance = (await s.call("GET", "/api/instance", { cookie: s.owner.cookie })).body as {
+        features: Json;
+      };
+      expect(instance.features.mcpOauthClients).toEqual({
+        resource: RESOURCE,
+        cimd: true,
+        dcr: true,
+      });
       void FETCH_FAILED;
     });
   });

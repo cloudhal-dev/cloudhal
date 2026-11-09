@@ -155,6 +155,8 @@ export interface OauthServer {
   readonly grants: AgentGrantService;
   /** The RFC 8414 authorization server metadata document. */
   readonly metadata: () => Promise<Record<string, unknown>>;
+  /** RFC-0044 §3: which ways clients may register here (Studio's setup notes, §11). */
+  readonly registration: { readonly cimd: boolean; readonly dcr: boolean };
   /**
    * RFC-0044 §3, with DCR on: registers a public client for an anonymous caller (the body as sent,
    * the caller's address for the rate limit); throws `RegistrationError`. Absent with DCR off.

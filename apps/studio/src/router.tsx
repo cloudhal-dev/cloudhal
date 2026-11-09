@@ -29,7 +29,12 @@ const AnalyticsPage = lazyRouteComponent(
 );
 const ActivityPage = lazyRouteComponent(() => import("./routes/ActivityPage.tsx"), "ActivityPage");
 const AgentsPage = lazyRouteComponent(
-  () => withMessages(import("./routes/AgentsPage.tsx"), ["analyticsSettings", "commentsSettings"]),
+  () =>
+    withMessages(import("./routes/AgentsPage.tsx"), [
+      "analyticsSettings",
+      "commentsSettings",
+      "connectedAgents",
+    ]),
   "AgentsPage",
 );
 const ApprovalsPage = lazyRouteComponent(

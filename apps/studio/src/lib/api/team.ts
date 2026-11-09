@@ -16,6 +16,11 @@ export interface InstanceInfo {
     mcp: boolean;
     /** RFC-0044: remote MCP clients connect by URL through OAuth. Older servers omit it. */
     mcpOauth?: boolean;
+    /**
+     * With OAuth on: the `/mcp` resource clients are given and which registrations work here
+     * (RFC-0044 §3, §11: CIMD documents, dynamic client registration).
+     */
+    mcpOauthClients?: { resource: string; cimd: boolean; dcr: boolean };
     activity: boolean;
     previewLinks: boolean;
     deployTransfer: boolean;
@@ -227,7 +232,7 @@ export type SignUpPolicy = InstanceInfo["signUp"];
 /** The on/off features (`analytics` is an object of its own). */
 export type InstanceFeature = Exclude<
   keyof InstanceInfo["features"],
-  "analytics" | "comments" | "schedules" | "ai" | "playground"
+  "analytics" | "comments" | "schedules" | "ai" | "playground" | "mcpOauthClients"
 >;
 
 export const teamApi = {
