@@ -14,6 +14,9 @@ import type { Migration } from "../src/migrate.ts";
  *    screen. It carries what a token does not: the scopes after narrowing by the member's role,
  *    the agent mode, an elevation and the revocation, read on every `/mcp` call (§5).
  *
+ * 3. Cloudhal's index `oauthRefreshToken_family_idx` (not generated): every refresh finds its
+ *    family's first token (`authorizationCodeId`, oldest `createdAt`; rotated rows are kept).
+ *
  * Plain SQL, one atomic batch; additive, so a downgrade ignores the tables (§7 rollback).
  */
 export const migration0031Oauth: Migration = {
@@ -42,6 +45,7 @@ create index "oauthAccessToken_refreshId_idx" on "oauthAccessToken" ("refreshId"
 create index "oauthConsent_clientId_idx" on "oauthConsent" ("clientId");
 create index "oauthConsent_userId_idx" on "oauthConsent" ("userId");
 create unique index "oauthClientResource_clientId_resourceId_uidx" on "oauthClientResource" ("clientId", "resourceId");
+CREATE INDEX "oauthRefreshToken_family_idx" ON "oauthRefreshToken" ("authorizationCodeId", "createdAt");
 CREATE TABLE agent_grants (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,

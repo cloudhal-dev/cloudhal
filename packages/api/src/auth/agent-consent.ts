@@ -224,8 +224,9 @@ export async function giveConsent(
     ...(requested.includes(OFFLINE_ACCESS) ? [OFFLINE_ACCESS] : []),
   ];
   const now = d.now().toISOString();
-  // The grant first: the provider's consent runs its authorize step, whose check
-  // (`oauth-hooks.ts`) forgets any stored consent the live grant does not cover. One batch: the
+  // The grant first: the provider's consent resumes its authorize step, and Cloudhal's check of
+  // that step (`oauth-hooks.ts`, reading the request's query) forgets a stored consent the live
+  // grant does not cover, and the code exchange accepts only codes newer than the live grant. One batch: the
   // grant, the person behind the agent actor (RFC-0005 §4, as `recordAgent` does for a key) and
   // the audit row. If the provider call then fails: a new grant has no token yet; on a step-up of
   // a live grant, the scopes and mode the member approved already apply to the connection's

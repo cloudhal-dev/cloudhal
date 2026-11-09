@@ -380,6 +380,10 @@ describe("0031_oauth: the authorization server's tables (RFC-0044 §7)", () => {
         "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'agent_grants_user'",
       );
       expect(index?.name).toBe("agent_grants_user");
+      const family = await driver.get<{ sql: string }>(
+        "SELECT sql FROM sqlite_master WHERE type = 'index' AND name = 'oauthRefreshToken_family_idx'",
+      );
+      expect(family?.sql).toContain('("authorizationCodeId", "createdAt")');
       await (h ? h.dispose() : driver.close());
     });
 });

@@ -159,7 +159,7 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
       expect(appended.status).toBe(404);
     });
 
-    it("ends a refresh token family 90 days after the member authenticated, however often it rotated", async () => {
+    it("ends a refresh token family 90 days after its first refresh token, however often it rotated", async () => {
       const s = await setupServer(backend);
       let { refresh } = await connect(s, {
         cookie: s.owner.cookie,
@@ -232,6 +232,9 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
       const s = await setupServer(backend);
       const editor = await s.join("editor");
       await connect(s, { cookie: editor.cookie, scope: `${READ} offline_access` });
+      // A pending code (consent memory answers at once), never exchanged.
+      const pending = await authorize(s, { cookie: editor.cookie, scope: READ });
+      expect(pending.location?.searchParams.get("code")).toBeTruthy();
       // Only the membership step of a removal: nothing after it has to succeed.
       expect(await s.auth.staff.store.remove(editor.userId)).toBe(true);
       const count = async (sql: string) =>
@@ -242,6 +245,11 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
         ),
       ).toBe(0);
       expect(await count(`SELECT COUNT(*) AS n FROM "oauthConsent" WHERE "userId" = ?`)).toBe(0);
+      expect(
+        await count(
+          `SELECT COUNT(*) AS n FROM "verification" WHERE "value" LIKE '%authorization_code%' AND instr("value", ?) > 0`,
+        ),
+      ).toBe(0);
       expect(
         await count(
           `SELECT COUNT(*) AS n FROM "oauthRefreshToken" WHERE "userId" = ? AND "revoked" IS NULL`,
@@ -275,6 +283,92 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
       });
       const r = await token(s, { grant_type: "refresh_token", refresh_token: refresh as string });
       expect(r.status, JSON.stringify(r.body)).toBe(200);
+    });
+    it("shows the screen after sign-in when the stored consent is stale", async () => {
+      const s = await setupServer(backend);
+      await connect(s, { cookie: s.owner.cookie, scope: READ });
+      await s.sql.run("UPDATE agent_grants SET revoked_at = ? WHERE user_id = ?", [
+        new Date().toISOString(),
+        s.owner.userId,
+      ]);
+      // Signed out: the provider sends the browser to sign in, then resumes authorize itself.
+      const start = await authorize(s, { cookie: "", scope: READ });
+      expect(start.location?.pathname).toBe("/login");
+      const signIn = await s.call("POST", "/api/auth/sign-in/email", {
+        body: {
+          email: "owner@example.com",
+          password: "correct horse battery staple",
+          oauth_query: (start.location as URL).search.slice(1),
+        },
+      });
+      expect(signIn.status, JSON.stringify(signIn.body)).toBe(200);
+      expect(new URL(signIn.body.url as string, ORIGIN).pathname).toBe("/oauth/consent");
+    });
+
+    it("refuses a code written just after a revoke, once the member connects again", async () => {
+      const s = await setupServer(backend);
+      await connect(s, { cookie: s.owner.cookie, scope: READ });
+      const pending = await authorize(s, { cookie: s.owner.cookie, scope: READ });
+      const code = pending.location?.searchParams.get("code") ?? "";
+      const row = await s.sql.get<Record<string, unknown>>(
+        `SELECT * FROM "verification" WHERE "value" LIKE '%authorization_code%' ORDER BY "createdAt" DESC LIMIT 1`,
+      );
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 5_000);
+      const [grant] = await grantsOf(s, s.owner.cookie);
+      await s.call("DELETE", `/api/agent-grants/${grant?.id}`, {
+        cookie: s.owner.cookie,
+        headers: { origin: s.origin },
+      });
+      // The race: the provider's write of that code lands after the revoke batch.
+      const cols = Object.keys(row ?? {});
+      await s.sql.run(
+        `INSERT INTO "verification" (${cols.map((c) => `"${c}"`).join(", ")}) VALUES (${cols.map(() => "?").join(", ")})`,
+        cols.map((c) => (row?.[c] ?? null) as string),
+      );
+      await connect(s, { cookie: s.owner.cookie, scope: READ });
+      const late = await token(s, {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT,
+        code_verifier: pending.verifier,
+      });
+      expect(late.status, JSON.stringify(late.body)).toBe(400);
+      expect(late.body.error).toBe("invalid_grant");
+    });
+
+    it("refuses a refresh token whose family is unknown (fails closed)", async () => {
+      const s = await setupServer(backend);
+      const { refresh } = await connect(s, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      await s.sql.run(`UPDATE "oauthRefreshToken" SET "authorizationCodeId" = NULL`);
+      const r = await token(s, { grant_type: "refresh_token", refresh_token: refresh as string });
+      expect(r.body.error).toBe("invalid_grant");
+    });
+
+    it("keeps the first refresh token working after a step-up of the live grant", async () => {
+      const s = await setupServer(backend);
+      const { refresh } = await connect(s, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 5_000);
+      await connect(s, { cookie: s.owner.cookie, scope: `${READ} site:publish offline_access` });
+      const r = await token(s, { grant_type: "refresh_token", refresh_token: refresh as string });
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+    });
+
+    it("refuses a JSON body on POST /oauth2/authorize", async () => {
+      const s = await setupServer(backend);
+      const res = await s.app.request(`${ORIGIN}/api/auth/oauth2/authorize`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: s.owner.cookie, origin: ORIGIN },
+        body: JSON.stringify({ client_id: s.clientId, response_type: "code" }),
+      });
+      expect(res.status).toBe(415);
     });
   });
 }

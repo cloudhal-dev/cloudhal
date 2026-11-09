@@ -34,6 +34,8 @@ type Where = { field: string; value: unknown }[];
 interface HookContext {
   path?: string | undefined;
   method?: string | undefined;
+  /** Set when the provider resumes authorize itself (after sign-in, consent, continue). */
+  authorizeSettings?: { isAuthorize?: boolean } | undefined;
   query?: Record<string, unknown> | undefined;
   body?: Record<string, unknown> | undefined;
   headers?: Headers | undefined;
@@ -74,7 +76,12 @@ export async function consentIsStale(
 }
 
 async function forgetStaleConsent(ctx: HookContext, d: OauthHookDeps): Promise<void> {
-  const params = (ctx.method === "POST" ? ctx.body : ctx.query) ?? {};
+  // Exactly as the provider reads them (`getAuthorizationRequestParameters`): the form body only
+  // for an HTTP `POST /oauth2/authorize`; when it resumes authorize after a sign-in or a consent
+  // (a POST whose body is that request's), the parameters are in the query.
+  const settings = ctx.authorizeSettings ?? { isAuthorize: true };
+  const fromBody = ctx.method === "POST" && settings.isAuthorize === true;
+  const params = (fromBody ? ctx.body : ctx.query) ?? {};
   const clientId = params.client_id;
   if (typeof clientId !== "string" || !clientId) return;
   const session = await getSessionFromCtx(ctx as never).catch(() => null);
@@ -102,8 +109,9 @@ const refused = (description: string) =>
   new APIError("BAD_REQUEST", { error: "invalid_grant", error_description: description });
 
 /** When a refresh token's family began: its chain's first `createdAt` (ms). */
-async function familyStart(ctx: HookContext, row: RefreshRow): Promise<number> {
-  if (!row.authorizationCodeId) return new Date(row.createdAt).getTime();
+async function familyStart(ctx: HookContext, row: RefreshRow): Promise<number | undefined> {
+  // Every family the code flow starts has one; without it the start is unknown: fail closed.
+  if (!row.authorizationCodeId) return undefined;
   const [first] = await ctx.context.adapter.findMany<RefreshRow>({
     model: "oauthRefreshToken",
     where: [{ field: "authorizationCodeId", value: row.authorizationCodeId }],
@@ -120,6 +128,8 @@ async function checkTokenRequest(ctx: HookContext, d: OauthHookDeps): Promise<vo
       error_description: DPOP_REFUSED,
     });
   const body = ctx.body ?? {};
+  if (body.grant_type === "authorization_code" && typeof body.code === "string")
+    return checkCode(ctx, d, body.code);
   if (body.grant_type !== "refresh_token" || typeof body.refresh_token !== "string") return;
   const row = await ctx.context.adapter.findOne<RefreshRow>({
     model: "oauthRefreshToken",
@@ -127,12 +137,45 @@ async function checkTokenRequest(ctx: HookContext, d: OauthHookDeps): Promise<vo
   });
   if (!row) return; // the provider answers an unknown token itself
   const began = await familyStart(ctx, row);
+  if (began === undefined)
+    throw refused("this refresh token has no authorization; authorize again");
   const grant = await d.grants.live(row.userId, row.clientId);
-  // Seconds: the provider stamps refresh rows at second resolution, the grant to the millisecond.
-  if (!grant || began < Math.floor(Date.parse(grant.createdAt) / 1000) * 1000)
+  if (!grant || began < wholeSeconds(grant.createdAt))
     throw refused("this connection was revoked; authorize it again");
   if (d.now().getTime() - began > REFRESH_FAMILY_MAX_MS)
     throw refused("this connection is older than 90 days; authorize it again");
+}
+
+/**
+ * Seconds: the provider stamps refresh rows at second resolution, the grant to the millisecond;
+ * a family or code from the second the grant began counts as the grant's.
+ */
+function wholeSeconds(iso: string): number {
+  return Math.floor(Date.parse(iso) / 1000) * 1000;
+}
+
+/**
+ * An authorization code is exchanged only for the live grant it was issued under: one written
+ * just after a revoke (a race with the revoke batch) is older than the grant of a reconnect.
+ */
+async function checkCode(ctx: HookContext, d: OauthHookDeps, code: string): Promise<void> {
+  const row = await ctx.context.adapter.findOne<{ value: string; createdAt: Date | string }>({
+    model: "verification",
+    where: [{ field: "identifier", value: await hashToken(code) }],
+  });
+  if (!row) return; // the provider answers an unknown code itself
+  let value: { type?: unknown; userId?: unknown; query?: { client_id?: unknown } };
+  try {
+    value = JSON.parse(row.value) as typeof value;
+  } catch {
+    return;
+  }
+  if (value.type !== "authorization_code") return;
+  const userId = typeof value.userId === "string" ? value.userId : "";
+  const clientId = typeof value.query?.client_id === "string" ? value.query.client_id : "";
+  const grant = await d.grants.live(userId, clientId);
+  if (!grant || new Date(row.createdAt).getTime() < wholeSeconds(grant.createdAt))
+    throw refused("this authorization was revoked; authorize again");
 }
 
 /** The `error_description` of a refused DPoP proof: a 400, never a fallback to Bearer. */
