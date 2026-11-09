@@ -64,6 +64,8 @@ export const messages = {
       },
       needsDcr:
         "{client} registers itself (dynamic client registration), which is off on this server. Ask its operator to turn CLOUDHAL_MCP_DCR back on, or use an agent key.",
+      needsPublicUrl:
+        "Claude.ai and ChatGPT connect from their own servers, which cannot reach {url}. Start Studio with --base-url set to a public https:// address, or use an app on this computer, such as Claude Code or Codex.",
       unavailable:
         "Neither way an app can identify itself is on here (metadata documents and dynamic registration). Ask this server's operator, or use an agent key.",
     },

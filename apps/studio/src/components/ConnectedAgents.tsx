@@ -91,9 +91,19 @@ export function ConnectedAgents({ all = false }: { all?: boolean }) {
             <Table.Header>
               <Table.Row>
                 <Table.Head>{c("connectedAgents.columns.agent")}</Table.Head>
-                {all && <Table.Head>{c("connectedAgents.columns.owner")}</Table.Head>}
-                <Table.Head>{c("connectedAgents.columns.access")}</Table.Head>
-                <Table.Head>{c("connectedAgents.columns.lastUsed")}</Table.Head>
+                {/* Phones: member, access and last use stack under the agent (`GrantRow`), so a
+                    row fits next to Disconnect without scrolling sideways (MembersPage). */}
+                {all && (
+                  <Table.Head className="hidden sm:table-cell">
+                    {c("connectedAgents.columns.owner")}
+                  </Table.Head>
+                )}
+                <Table.Head className="hidden sm:table-cell">
+                  {c("connectedAgents.columns.access")}
+                </Table.Head>
+                <Table.Head className="hidden sm:table-cell">
+                  {c("connectedAgents.columns.lastUsed")}
+                </Table.Head>
                 <Table.Head sticky="right" className="w-12">
                   <span className="sr-only">{t("site.rowMenu")}</span>
                 </Table.Head>
@@ -142,43 +152,35 @@ function GrantRow({
   all: boolean;
   onDisconnect: () => void;
 }) {
-  const t = useT();
   const c = useT("connectedAgents");
-  const me = useMe().data;
-  const owner = grant.owner;
   return (
     <Table.Row data-grant-id={grant.id} data-client-kind={grant.client.kind}>
-      <Table.Cell className="min-w-44">
-        <ClientIdentity grant={grant} />
-      </Table.Cell>
-      {all && (
-        <Table.Cell className="whitespace-nowrap">
-          <div className="flex items-center gap-2">
-            <Avatar initials={initials(owner?.name ?? "?")} size="sm" />
-            <span className="grid justify-items-start gap-0.5">
-              <Text as="span">
-                {owner?.userId === me?.userId ? t("members.you") : (owner?.name ?? "")}
+      <Table.Cell>
+        <div className="grid min-w-0 gap-2 sm:min-w-44">
+          <ClientIdentity grant={grant} />
+          {/* Below `sm` the other columns are hidden and their content stacks here. */}
+          <div className="grid justify-items-start gap-2 sm:hidden" data-narrow>
+            {all && <GrantOwner grant={grant} />}
+            <GrantAccess grant={grant} />
+            <span className="flex flex-wrap items-center gap-1">
+              <Text variant="secondary" size="sm" as="span">
+                {c("connectedAgents.columns.lastUsed")}
               </Text>
-              {owner?.role && <RoleBadge value={owner.role} />}
+              <GrantLastUsed grant={grant} />
             </span>
           </div>
-        </Table.Cell>
-      )}
-      <Table.Cell>
-        {/* What it may do, then how (its mode): one column, so the table fits beside the aside. */}
-        <div className="grid justify-items-start gap-1.5">
-          <GrantScopes scopes={grant.effectiveScopes} />
-          <ModeBadge mode={grant.effectiveMode} />
         </div>
       </Table.Cell>
-      <Table.Cell className="whitespace-nowrap">
-        {grant.lastUsedAt ? (
-          <RelativeTime iso={grant.lastUsedAt} />
-        ) : (
-          <Text variant="secondary" size="sm" as="span">
-            {c("connectedAgents.never")}
-          </Text>
-        )}
+      {all && (
+        <Table.Cell className="hidden whitespace-nowrap sm:table-cell" data-cell="owner">
+          <GrantOwner grant={grant} />
+        </Table.Cell>
+      )}
+      <Table.Cell className="hidden sm:table-cell" data-cell="access">
+        <GrantAccess grant={grant} />
+      </Table.Cell>
+      <Table.Cell className="hidden whitespace-nowrap sm:table-cell" data-cell="lastUsed">
+        <GrantLastUsed grant={grant} />
       </Table.Cell>
       <Table.Cell sticky="right" className="w-12 text-end">
         <Tooltip
@@ -196,6 +198,45 @@ function GrantRow({
         />
       </Table.Cell>
     </Table.Row>
+  );
+}
+
+/** The member a connection works for (admin view): avatar, name ("You" for oneself), role. */
+function GrantOwner({ grant }: { grant: AgentGrantSummary }) {
+  const t = useT();
+  const me = useMe().data;
+  const owner = grant.owner;
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar initials={initials(owner?.name ?? "?")} size="sm" />
+      <span className="grid justify-items-start gap-0.5">
+        <Text as="span">
+          {owner?.userId === me?.userId ? t("members.you") : (owner?.name ?? "")}
+        </Text>
+        {owner?.role && <RoleBadge value={owner.role} />}
+      </span>
+    </div>
+  );
+}
+
+/** What it may do, then how (its mode): one column, so the table fits beside the aside. */
+function GrantAccess({ grant }: { grant: AgentGrantSummary }) {
+  return (
+    <div className="grid justify-items-start gap-1.5">
+      <GrantScopes scopes={grant.effectiveScopes} />
+      <ModeBadge mode={grant.effectiveMode} />
+    </div>
+  );
+}
+
+function GrantLastUsed({ grant }: { grant: AgentGrantSummary }) {
+  const c = useT("connectedAgents");
+  return grant.lastUsedAt ? (
+    <RelativeTime iso={grant.lastUsedAt} />
+  ) : (
+    <Text variant="secondary" size="sm" as="span">
+      {c("connectedAgents.never")}
+    </Text>
   );
 }
 

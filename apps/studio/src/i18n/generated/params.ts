@@ -231,6 +231,7 @@ export interface MessageParams {
   "connectedAgents.identifiedBy": { host: string | number };
   "connectedAgents.lookalike": { client: string | number };
   "connectedAgents.setup.needsDcr": { client: string | number };
+  "connectedAgents.setup.needsPublicUrl": { url: string | number };
   "coverage.siteLanguage": { site: string | number; language: string | number };
   "diff.assignments.added": { taxonomy: string | number; name: string | number };
   "diff.assignments.primary": { taxonomy: string | number; name: string | number };

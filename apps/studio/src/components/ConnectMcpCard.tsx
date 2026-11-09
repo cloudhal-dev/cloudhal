@@ -29,7 +29,7 @@ export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
     >
       {oauth && <OauthTabs tab={tab} onTab={setTab} />}
       {shown === "url" && oauth ? (
-        <McpOauthSetup resource={oauth.resource} registration={oauth} />
+        <McpOauthSetup server={oauth} />
       ) : (
         <KeySetup endpoint={endpoint} />
       )}

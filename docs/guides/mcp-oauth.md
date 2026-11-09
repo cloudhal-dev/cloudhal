@@ -38,5 +38,7 @@ A connection lasts at most 90 days. After that the client asks you to approve it
 | The client says the server does not support OAuth, or fails at "authorization server metadata" | OAuth is off on this deployment (no `--base-url` on `cloudhal studio`, or `CLOUDHAL_MCP_OAUTH=off`). Use an agent key. |
 | Cursor or the MCP Inspector cannot register | Dynamic client registration is off (`CLOUDHAL_MCP_DCR=off`). Studio's Connect-by-URL tab says so per client. |
 | "invalid redirect uri" | The client's return address is not https, not this computer, not a known app scheme, or not on the operator's host list. |
-| "temporarily_unavailable" | The server is rate-limiting metadata fetches or registrations from your address. Wait a minute. |
+| "rate_limited" (429) when registering | Dynamic registration is limited to 10 registrations per address per hour and 300 per server per day. Wait, or use a client with a metadata document. |
+| "temporarily_unavailable" (429) | The server is limiting metadata-document fetches from your address (20 a minute). Wait a minute and try again. |
+| "temporarily_unavailable" (503) | The server holds as many clients as it allows (5,000 metadata-document clients, 5,000 self-registered ones). Ask its operator; the limits are in [hardening](cloudflare-hardening.md#what-a-client-can-and-cannot-do). |
 | A connected client stops working | It was disconnected, its member left, it reached 90 days, or the operator rotated the secret. Connect it again. |

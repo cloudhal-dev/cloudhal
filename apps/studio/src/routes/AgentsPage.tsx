@@ -4,14 +4,12 @@ import {
   Badge,
   Banner,
   Button,
-  ClipboardText,
   DeleteResource,
   DropdownMenu,
   Empty,
   LayerCard,
   PageLayout,
   Pagination,
-  SectionCard,
   SectionEmpty,
   Table,
   Text,
@@ -24,7 +22,6 @@ import {
   DotsThree,
   Info,
   Key,
-  PlugsConnected,
   Plus,
   Robot,
   SlidersHorizontal,
@@ -67,7 +64,6 @@ import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { initials } from "../lib/account.ts";
 import { ownModeOf, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
-import { apiErrorText } from "../lib/api-errors.ts";
 import { activeElevation, modesAbove } from "../lib/elevation.ts";
 
 const matches = (k: AgentKeySummary, q: string, fold: Fold) =>

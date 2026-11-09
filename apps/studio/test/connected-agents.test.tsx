@@ -3,7 +3,9 @@
  * A connection is named as the consent screen named it (a document client by its host first, a
  * self-registered one as not verified, a look-alike warned about), what it can do reads in words,
  * Disconnect revokes it, the admin view lists every member's; the setup tab shows the deployment's
- * `/mcp` URL and says where a client needs dynamic registration.
+ * `/mcp` URL and says where a client needs dynamic registration, or a public URL (Claude.ai and
+ * ChatGPT connect from their servers). On phones a row's columns stack under the agent; jsdom
+ * applies no CSS, so both copies render here and each check reads its own column (`data-cell`).
  */
 import { TooltipProvider } from "@cloudhal/ui";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -11,19 +13,24 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ConnectedAgents } from "../src/components/ConnectedAgents.tsx";
 import { ConnectMcpCard } from "../src/components/ConnectMcpCard.tsx";
 import type { AgentGrantSummary } from "../src/lib/api.ts";
-import { asRole, INSTANCE, on, serve, wrap } from "./roles-fixtures.tsx";
+import { isPublicMcpUrl, oauthClientStatus } from "../src/lib/oauth-clients.ts";
+import { asRole, INSTANCE, on, serve, testQueryClient, wrap } from "./roles-fixtures.tsx";
 
-const OAUTH = {
+const oauthAt = (resource: string) => ({
   status: 200,
   body: {
     ...INSTANCE,
     features: {
       ...INSTANCE.features,
       mcpOauth: true,
-      mcpOauthClients: { resource: "https://studio.example.com/mcp", cimd: true, dcr: false },
+      mcpOauthClients: { resource, cimd: true, dcr: false },
     },
   },
-};
+});
+const OAUTH = oauthAt("https://studio.example.com/mcp");
+/** One column of a row (`GrantRow` renders a phone-only copy under the agent too). */
+const cell = (row: HTMLElement, name: string) =>
+  row.querySelector(`[data-cell="${name}"]`) as HTMLElement;
 
 const GRANT: AgentGrantSummary = {
   id: "g1",
@@ -68,11 +75,17 @@ describe("Connected agents", () => {
     const row = (await screen.findByText("Identified by claude.ai")).closest("tr") as HTMLElement;
     expect(row).toHaveAttribute("data-client-kind", "document");
     expect(within(row).getByText("Claude Code")).toBeInTheDocument();
-    // What it can do, in words: one pill per group (its scopes in the tooltip).
-    expect(within(row).getByText("Read")).toBeInTheDocument();
-    expect(within(row).getByText("Write")).toBeInTheDocument();
-    expect(within(row).queryByText("Publish and roll back")).toBeNull();
-    expect(within(row).getByText("Never")).toBeInTheDocument();
+    // What it can do, in words: one pill per group (its scopes in the tooltip), then its mode.
+    const access = cell(row, "access");
+    expect(within(access).getByText("Read")).toBeInTheDocument();
+    expect(within(access).getByText("Write")).toBeInTheDocument();
+    expect(within(access).queryByText("Publish and roll back")).toBeNull();
+    expect(within(access).getByText("Edits")).toBeInTheDocument();
+    expect(within(cell(row, "lastUsed")).getByText("Never")).toBeInTheDocument();
+    // The phone copy stacks the same under the agent: access, then last use.
+    const narrow = row.querySelector("[data-narrow]") as HTMLElement;
+    expect(within(narrow).getByText("Write")).toBeInTheDocument();
+    expect(within(narrow).getByText("Last used")).toBeInTheDocument();
     fireEvent.click(within(row).getByRole("button", { name: "Disconnect Claude Code" }));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getByRole("textbox"), { target: { value: "Claude Code" } });
@@ -100,15 +113,36 @@ describe("Connected agents", () => {
     ) as HTMLElement;
     expect(within(row).getByText("Claude")).toBeInTheDocument();
     expect(within(row).getByText("Looks like Claude, not verified as it")).toBeInTheDocument();
-    expect(within(row).getByText("Eda Editor")).toBeInTheDocument();
-    expect(within(row).getByText("Publish and roll back")).toBeInTheDocument();
+    expect(within(cell(row, "owner")).getByText("Eda Editor")).toBeInTheDocument();
+    expect(within(cell(row, "access")).getByText("Publish and roll back")).toBeInTheDocument();
+    // On phones the member stacks under the agent too.
+    const narrow = row.querySelector("[data-narrow]") as HTMLElement;
+    expect(within(narrow).getByText("Eda Editor")).toBeInTheDocument();
     expect(screen.getByText("Everyone's connected agents")).toBeInTheDocument();
   });
 
   it("stays out of the way where the server runs no OAuth and nothing is connected", async () => {
-    serve(...asRole("owner"), on("GET", "/api/agent-grants", { status: 200, body: [] }));
-    const { container } = show(<ConnectedAgents />);
-    await waitFor(() => expect(container.querySelector("#connected-agents")).toBeNull());
+    serve(
+      on("GET", "/api/instance", { status: 200, body: INSTANCE }),
+      ...asRole("owner"),
+      on("GET", "/api/agent-grants", { status: 200, body: [] }),
+    );
+    const qc = testQueryClient();
+    const { container } = render(
+      wrap(
+        <TooltipProvider>
+          <ConnectedAgents />
+        </TooltipProvider>,
+        "en",
+        qc,
+      ),
+    );
+    // Both answers in (OAuth off, nothing connected) before checking the card is absent.
+    await waitFor(() => {
+      expect(qc.getQueryState(["instance"])?.status).toBe("success");
+      expect(qc.getQueryState(["agent-grants", "mine"])?.status).toBe("success");
+    });
+    expect(container.querySelector("#connected-agents")).toBeNull();
     expect(screen.queryByText("Connected agents")).toBeNull();
   });
 });
@@ -131,6 +165,56 @@ describe("Connect by URL", () => {
     // The key tab stays.
     fireEvent.click(screen.getByRole("tab", { name: "With an agent key" }));
     expect(await screen.findByTestId("mcp-client-setup")).toBeInTheDocument();
+  });
+
+  it("starts on Claude Code and warns about hosted clients where /mcp is local", async () => {
+    serve(on("GET", "/api/instance", oauthAt("http://localhost:8787/mcp")), ...asRole("owner"));
+    show(<ConnectMcpCard endpoint="http://localhost:8787/mcp" />);
+    const setup = await screen.findByTestId("mcp-oauth-setup");
+    expect(setup).toHaveAttribute("data-client", "claudeCode");
+    expect(setup).toHaveAttribute("data-status", "ok");
+    // Claude.ai connects from its own servers: it cannot reach localhost.
+    fireEvent.click(within(setup).getByRole("combobox"));
+    const claudeAi = await screen.findByRole("option", { name: "Claude.ai, Desktop and mobile" });
+    fireEvent.pointerDown(claudeAi, { pointerType: "mouse" });
+    fireEvent.click(claudeAi);
+    expect(
+      await within(setup).findByText(/connect from their own servers, which cannot reach/),
+    ).toBeInTheDocument();
+    expect(within(setup).getByText(/--base-url/)).toBeInTheDocument();
+    expect(setup).toHaveAttribute("data-status", "needsPublicUrl");
+  });
+
+  it("tells hosted clients from local ones by the /mcp URL", () => {
+    const both = { cimd: true, dcr: true };
+    for (const url of [
+      "http://localhost:8787/mcp",
+      "https://localhost/mcp",
+      "https://studio.localhost/mcp",
+      "https://127.0.0.1/mcp",
+      "https://192.168.1.20/mcp",
+      "https://10.0.0.5/mcp",
+      "https://172.20.0.2/mcp",
+      "https://[::1]/mcp",
+      "https://[fd00::1]/mcp",
+      "https://nas.local/mcp",
+      "https://intranet/mcp",
+      "http://studio.example.com/mcp",
+      "not a url",
+    ]) {
+      expect(isPublicMcpUrl(url), url).toBe(false);
+      expect(oauthClientStatus("claudeAi", { resource: url, ...both }), url).toBe("needsPublicUrl");
+      expect(oauthClientStatus("codex", { resource: url, ...both }), url).toBe("needsPublicUrl");
+      expect(oauthClientStatus("claudeCode", { resource: url, ...both }), url).toBe("ok");
+    }
+    for (const url of [
+      "https://studio.example.com/mcp",
+      "https://172.32.0.1/mcp",
+      "https://[2001:db8::1]/mcp",
+    ]) {
+      expect(isPublicMcpUrl(url), url).toBe(true);
+      expect(oauthClientStatus("claudeAi", { resource: url, ...both }), url).toBe("ok");
+    }
   });
 
   it("shows only the key setup where OAuth is off", async () => {

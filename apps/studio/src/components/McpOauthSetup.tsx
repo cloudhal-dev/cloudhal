@@ -3,9 +3,11 @@ import { Warning } from "@phosphor-icons/react";
 import { useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import {
+  defaultOauthClient,
   OAUTH_CLIENTS,
   type OauthClient,
-  type OauthRegistration,
+  type OauthClientStatus,
+  type OauthServerInfo,
   oauthClientStatus,
   oauthSnippet,
   oauthSnippetLang,
@@ -15,24 +17,28 @@ import { CodeHighlighted } from "./CodeHighlighted.tsx";
 /**
  * "Connect by URL" (RFC-0044 §4, §11): the deployment's `/mcp` URL and, for one client at a time,
  * what to paste and where. No key: the client opens Studio to sign in and approve. A client that
- * cannot connect with this server's registration switches says so (Cursor needs DCR).
+ * cannot connect says so: Cursor needs DCR, and Claude.ai and ChatGPT cannot reach a local or
+ * plain-http URL (the picker then starts on Claude Code).
  */
 export function McpOauthSetup({
-  resource,
-  registration,
+  server,
 }: {
-  /** The `/mcp` resource tokens are bound to (`features.mcpOauthClients.resource`). */
-  resource: string;
-  registration: OauthRegistration;
+  /** `features.mcpOauthClients`: the `/mcp` resource tokens are bound to, and the switches. */
+  server: OauthServerInfo;
 }) {
   const t = useT();
   const c = useT("connectedAgents");
-  const [client, setClient] = useState<OauthClient>("claudeAi");
+  const resource = server.resource;
+  const [client, setClient] = useState<OauthClient>(() => defaultOauthClient(resource));
   const snippet = oauthSnippet(client, resource);
-  const status = oauthClientStatus(client, registration);
-  const name = c(`connectedAgents.setup.clients.${client}`);
+  const status = oauthClientStatus(client, server);
   return (
-    <div className="grid min-w-0 gap-4" data-testid="mcp-oauth-setup" data-client={client}>
+    <div
+      className="grid min-w-0 gap-4"
+      data-testid="mcp-oauth-setup"
+      data-client={client}
+      data-status={status}
+    >
       <div className="grid gap-1.5">
         <Text size="sm" bold as="span">
           {c("connectedAgents.setup.url")}
@@ -64,18 +70,27 @@ export function McpOauthSetup({
         <Text variant="secondary" size="sm">
           {c(`connectedAgents.setup.hints.${client}`)}
         </Text>
-        {status !== "ok" && (
-          <Banner
-            variant="alert"
-            icon={<Warning size={16} />}
-            description={
-              status === "needsDcr"
-                ? c("connectedAgents.setup.needsDcr", { client: name })
-                : c("connectedAgents.setup.unavailable")
-            }
-          />
-        )}
+        {status !== "ok" && <StatusBanner status={status} client={client} resource={resource} />}
       </div>
     </div>
   );
+}
+
+function StatusBanner({
+  status,
+  client,
+  resource,
+}: {
+  status: Exclude<OauthClientStatus, "ok">;
+  client: OauthClient;
+  resource: string;
+}) {
+  const c = useT("connectedAgents");
+  const name = c(`connectedAgents.setup.clients.${client}`);
+  const text = {
+    needsDcr: () => c("connectedAgents.setup.needsDcr", { client: name }),
+    needsPublicUrl: () => c("connectedAgents.setup.needsPublicUrl", { url: resource }),
+    unavailable: () => c("connectedAgents.setup.unavailable"),
+  }[status]();
+  return <Banner variant="alert" icon={<Warning size={16} />} description={text} />;
 }
