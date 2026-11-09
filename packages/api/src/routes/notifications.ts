@@ -12,7 +12,7 @@
  *   (the daily cap was reached), `comments-purge-waiting` (a takedown has waited over 2 minutes for
  *   the live page) and `comments-approval` (an agent's comment request this person can decide).
  * - schedules (RFC-0008 §14): `schedule-approval-due` (a release awaiting approval runs within 60
- *   minutes; for people who may decide it), `schedule-upcoming` (within 15 minutes) and
+ *   minutes, or runs on approval and waits for it; for people who may decide it), `schedule-upcoming` (within 15 minutes) and
  *   `schedule-published` (the last 24 hours) for its creator and approver; `schedule-conflict`,
  *   `schedule-missed`, `schedule-expired` and `schedule-failed` (the last 7 days) for them and for
  *   Editors; `scheduler-stalled` for Administrators and anyone with a release due within 24 hours;
@@ -327,6 +327,15 @@ async function commentNotifications(c: Context<Env>, now: Date): Promise<Notific
 const MINUTE = 60_000;
 const DAY = 24 * 60 * MINUTE;
 
+/**
+ * When a release awaiting approval is due for the people who may decide it: within 60 minutes of
+ * its time, or, for an `on-approval` release (an OAuth connection's embargo, RFC-0044), for as
+ * long as its request waits.
+ */
+function approvalDue(r: { when?: { kind: string } | undefined }, due: number, t: number): boolean {
+  return r.when?.kind === "on-approval" || (due - t <= 60 * MINUTE && due >= t);
+}
+
 /** The schedule kinds (RFC-0008 §14), computed from state; nothing is stored. */
 async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notification[]> {
   const deps = c.get("schedules");
@@ -366,7 +375,7 @@ async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notifi
       }
       switch (r.state) {
         case "awaiting_approval":
-          if (due - t <= 60 * MINUTE && due >= t) {
+          if (approvalDue(r, due, t)) {
             const decides =
               !roles ||
               (r.createdBy.id !== principal.actor.id &&

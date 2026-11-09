@@ -545,7 +545,9 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       )) as { status: string; approvalId: string; release: Release };
       expect(result.status).toBe("approval-pending");
       expect(result.release.state).toBe("awaiting_approval");
-      // the people who may decide it are told (§14), the agent's own member included
+      // the people who may decide it are told (§14), the agent's own member included, for as
+      // long as the request waits (not only in the minute it was filed)
+      clock.now = new Date(NOW.getTime() + 3 * HOUR);
       const kinds = ((await call("/api/notifications", "editor")).body.items as Json[]).map(
         (n) => n.kind,
       );
