@@ -21,6 +21,13 @@ import {
   roleScopes,
   type Scope,
 } from "@cloudhal/agent-runtime";
+import {
+  type ClientKind,
+  clientKind,
+  displayName,
+  documentHost,
+  lookalikeOf,
+} from "./client-identity.ts";
 import type { AuthDeps } from "./deps.ts";
 import { type AgentGrant, agentIdForGrant } from "./grants.ts";
 import { SERVER_KEY_HEADER } from "./instance.ts";
@@ -36,9 +43,14 @@ export interface ConsentScope {
 export interface ConsentInfo {
   readonly client: {
     readonly id: string;
+    /** The self-asserted name, made safe to show (`displayName`: plain, at most 100). */
     readonly name: string;
+    /** How the server knows the client (`client-identity.ts`). */
+    readonly kind: ClientKind;
     /** The `client_id` host of a metadata-document client (`claude.ai`), else absent. */
     readonly host?: string | undefined;
+    /** A self-registered client's name that contains a well-known client's (`Claude`). */
+    readonly lookalike?: string | undefined;
   };
   /** Where the browser is sent back: its host, and whether it is this computer (loopback). */
   readonly redirect: { readonly host: string; readonly loopback: boolean };
@@ -58,6 +70,9 @@ export interface ConsentInfo {
 interface ClientRow {
   clientId: string;
   name?: string | null;
+  clientDiscoveryId?: string | null;
+  userId?: string | null;
+  referenceId?: string | null;
   redirectUris?: string[] | string | null;
   disabled?: boolean | null;
 }
@@ -124,15 +139,18 @@ export async function consentInfo(
   const registered = listOf(client.redirectUris);
   const existing = await d.grants.live(who.userId, client.clientId);
   const cap = modeCap(who.member.role);
-  const documentHost = client.clientId.startsWith("https://")
-    ? hostOf(client.clientId)?.host
-    : undefined;
+  const host = documentHost(client);
+  const kind = clientKind(client);
+  const name = displayName(client.name, client.clientId);
+  const lookalike = kind === "self-registered" ? lookalikeOf(name) : undefined;
   const sites = who.member.sites ? Object.keys(who.member.sites) : undefined;
   return {
     client: {
       id: client.clientId,
-      name: client.name?.trim() || client.clientId,
-      ...(documentHost ? { host: documentHost } : {}),
+      name,
+      kind,
+      ...(host ? { host } : {}),
+      ...(lookalike ? { lookalike } : {}),
     },
     redirect,
     loopbackOnly: registered.length > 0 && registered.every((u) => hostOf(u)?.loopback),
@@ -235,7 +253,7 @@ export async function giveConsent(
     {
       userId: who.userId,
       clientId: client.clientId,
-      clientName: (client.name?.trim() || client.clientId).slice(0, 100),
+      clientName: displayName(client.name, client.clientId),
       scopes: effective,
       mode: input.mode,
     },

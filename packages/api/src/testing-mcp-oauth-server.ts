@@ -88,7 +88,11 @@ export function describeMcpOauthServer(label: string, backend: RolesBackend): vo
         { cookie: s.owner.cookie },
       );
       expect(info.status, JSON.stringify(info.body)).toBe(200);
-      expect(info.body.client).toEqual({ id: s.clientId, name: "Test Agent" });
+      expect(info.body.client).toEqual({
+        id: s.clientId,
+        name: "Test Agent",
+        kind: "self-registered",
+      });
       expect(info.body.redirect).toEqual({ host: "127.0.0.1:33418", loopback: true });
       expect(info.body.loopbackOnly).toBe(true);
       expect(info.body.scopes).toEqual([
