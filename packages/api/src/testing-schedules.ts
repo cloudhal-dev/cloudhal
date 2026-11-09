@@ -561,6 +561,32 @@ export function describeSchedulesApi(label: string, factory: SchedulesApiFactory
       });
     });
 
+    it("stops telling deciders about an OAuth connection's embargo once its request expired", async () => {
+      const live = (await store.listContentEntries(site.id))[0] as ContentEntry;
+      const setEmbargo = defineTools().find((t) => t.name === "set_embargo");
+      if (!setEmbargo) throw new Error("set_embargo");
+      const editor = person("editor");
+      const principal: Principal = {
+        actor: agent,
+        scopes: ["schedules:write", "content:write", "content:read", "site:read"],
+        mode: "edits",
+        grantId: "grant_desk00000002",
+        ...(editor.person ? { person: editor.person } : {}),
+      };
+      const result = (await setEmbargo.handler(
+        { siteId: site.id, nodeId: live.id, from: plus(30 * HOUR), expectedRev: live.rev },
+        { store, principal, schedules: deps, approvals, now: () => clock.now },
+      )) as { status: string; approvalId: string };
+      expect(result.status).toBe("approval-pending");
+      const kinds = async () =>
+        ((await call("/api/notifications", "editor")).body.items as Json[]).map((n) => n.kind);
+      clock.now = new Date(NOW.getTime() + 23 * HOUR);
+      expect(await kinds()).toContain("schedule-approval-due");
+      // The request lives 24 hours; after that nobody can approve it, so nobody is told to.
+      clock.now = new Date(NOW.getTime() + 25 * HOUR);
+      expect(await kinds()).not.toContain("schedule-approval-due");
+    });
+
     it("automations: built-ins and agent tasks with their key; pause, resume, delete; preview", async () => {
       const builtin = await post(`${S()}/automations`, {
         name: "Links",

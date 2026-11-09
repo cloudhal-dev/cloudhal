@@ -329,11 +329,19 @@ const DAY = 24 * 60 * MINUTE;
 
 /**
  * When a release awaiting approval is due for the people who may decide it: within 60 minutes of
- * its time, or, for an `on-approval` release (an OAuth connection's embargo, RFC-0044), for as
- * long as its request waits.
+ * its time; or, for an `on-approval` release (an OAuth connection's embargo, RFC-0044), while its
+ * request is pending and has not expired (after that nobody can approve it, only cancel it).
  */
-function approvalDue(r: { when?: { kind: string } | undefined }, due: number, t: number): boolean {
-  return r.when?.kind === "on-approval" || (due - t <= 60 * MINUTE && due >= t);
+async function approvalDue(
+  c: Context<Env>,
+  r: { siteId: string; id: string; when?: { kind: string } | undefined },
+  times: { due: number; t: number },
+): Promise<boolean> {
+  const { due, t } = times;
+  if (r.when?.kind !== "on-approval") return due - t <= 60 * MINUTE && due >= t;
+  const rec = await c.get("schedules")?.store.getReleaseRecord(r.siteId, r.id);
+  const request = rec?.requestId ? await c.get("approvals")?.get(rec.requestId) : undefined;
+  return request?.status === "pending" && Date.parse(request.expiresAt) > t;
 }
 
 /** The schedule kinds (RFC-0008 §14), computed from state; nothing is stored. */
@@ -375,7 +383,7 @@ async function scheduleNotifications(c: Context<Env>, now: Date): Promise<Notifi
       }
       switch (r.state) {
         case "awaiting_approval":
-          if (approvalDue(r, due, t)) {
+          if (await approvalDue(c, r, { due, t })) {
             const decides =
               !roles ||
               (r.createdBy.id !== principal.actor.id &&
