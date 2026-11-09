@@ -49,6 +49,7 @@ describe("migrate", () => {
       "0029_entry_list_values",
       "0030_rate_limits",
       "0031_oauth",
+      "0032_oauth_client_kind_index",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -83,6 +84,7 @@ describe("migrate", () => {
       "0029_entry_list_values",
       "0030_rate_limits",
       "0031_oauth",
+      "0032_oauth_client_kind_index",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -206,6 +208,7 @@ describe("migrate", () => {
       "0029_entry_list_values",
       "0030_rate_limits",
       "0031_oauth",
+      "0032_oauth_client_kind_index",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -239,6 +242,7 @@ describe("migrate", () => {
       "0029_entry_list_values",
       "0030_rate_limits",
       "0031_oauth",
+      "0032_oauth_client_kind_index",
     ]);
     await h.dispose();
   });
@@ -279,6 +283,7 @@ describe("migrate", () => {
       "0029_entry_list_values",
       "0030_rate_limits",
       "0031_oauth",
+      "0032_oauth_client_kind_index",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();
@@ -386,4 +391,18 @@ describe("0031_oauth: the authorization server's tables (RFC-0044 §7)", () => {
       expect(family?.sql).toContain('("authorizationCodeId", "createdAt")');
       await (h ? h.dispose() : driver.close());
     });
+});
+
+describe("0032_oauth_client_kind_index (RFC-0044 §3, review of #178)", () => {
+  it("indexes document clients by kind and validation time, so the cap count reads the index", async () => {
+    const driver = await BetterSqlite3Driver.open(":memory:");
+    await migrate(driver, migrations);
+    const plan = await driver.all<{ detail: string }>(
+      `EXPLAIN QUERY PLAN SELECT COUNT(*) FROM "oauthClient" WHERE "clientDiscoveryId" = 'cimd'`,
+    );
+    expect(plan.map((p) => p.detail).join(" ")).toContain(
+      "oauthClient_clientDiscoveryId_updatedAt_idx",
+    );
+    await driver.close();
+  });
 });

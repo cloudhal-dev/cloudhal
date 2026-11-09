@@ -12,7 +12,7 @@ import { asRole, bodyOf, on, serve, wrap } from "./roles-fixtures.tsx";
 
 const SIGNED = "client_id=c1&scope=site%3Aread+content%3Awrite+site%3Apublish&sig=abc";
 const INFO: ConsentInfo = {
-  client: { id: "c1", name: "Claude Code", host: "claude.ai" },
+  client: { id: "c1", name: "Claude Code", kind: "document", host: "claude.ai" },
   redirect: { host: "127.0.0.1:33418", loopback: true },
   loopbackOnly: true,
   scopes: [
@@ -57,7 +57,8 @@ describe("OAuth consent screen", () => {
       }),
     );
     renderPage();
-    expect(await screen.findByText("Connect Claude Code")).toBeTruthy();
+    // The document's host is in the title and leads the identity, whatever the name says.
+    expect(await screen.findByText("claude.ai: connect Claude Code")).toBeTruthy();
     expect(screen.getByText("Identified by claude.ai")).toBeTruthy();
     expect(screen.getByText(/Every address this agent can send you back to/)).toBeTruthy();
     // The signed request goes to the server untouched.
@@ -76,6 +77,48 @@ describe("OAuth consent screen", () => {
       scopes: ["site:read", "content:write"],
       mode: "edits",
     });
+  });
+
+  it("labels a self-registered client as not verified and warns about a well-known name", async () => {
+    serve(
+      ...asRole("owner"),
+      on("GET", "/api/agent-grants/consent", {
+        status: 200,
+        body: {
+          ...INFO,
+          client: { id: "dcr1", name: "Claude", kind: "self-registered", lookalike: "Claude" },
+          redirect: { host: "claude-ai.callback.example", loopback: false },
+          loopbackOnly: false,
+        },
+      }),
+    );
+    renderPage();
+    expect(await screen.findByText("Connect Claude")).toBeTruthy();
+    expect(screen.getByText("Self-registered, not verified")).toBeTruthy();
+    expect(screen.queryByText("Registered with this Studio")).toBeNull();
+    expect(screen.getByText(/The name looks like Claude, but anyone can register/)).toBeTruthy();
+    expect(screen.getByText("Sends you back to claude-ai.callback.example")).toBeTruthy();
+  });
+
+  it("shows a private-use redirect as an app on this computer, never as a web host", async () => {
+    serve(
+      ...asRole("owner"),
+      on("GET", "/api/agent-grants/consent", {
+        status: 200,
+        body: {
+          ...INFO,
+          client: { id: "dcr2", name: "Cursor", kind: "self-registered" },
+          redirect: { host: "", loopback: true, app: "cursor" },
+          loopbackOnly: false,
+        },
+      }),
+    );
+    renderPage();
+    expect(
+      await screen.findByText("Sends you back to an app on this computer (cursor:)"),
+    ).toBeTruthy();
+    // Cursor registers itself under its own name: no look-alike warning for it.
+    expect(screen.queryByText(/The name looks like/)).toBeNull();
   });
 
   it("asks for explicit consent before an Auto connection", async () => {

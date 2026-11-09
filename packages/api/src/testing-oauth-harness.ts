@@ -1,15 +1,16 @@
 /**
- * Test harness for RFC-0044 Phase 2: a deployment that runs the authorization server, a
- * pre-registered public client (Phase 2 has no registration endpoint; `OauthServer.createClient`
- * is server-side only), and the browser and client halves of the code flow with PKCE, driven
- * with `app.request` and a signed-in session cookie. Used by `testing-mcp-oauth-server.ts`.
+ * Test harness for RFC-0044: a deployment that runs the authorization server, a public client
+ * registered the way a client without a metadata document registers (DCR, `POST
+ * /api/auth/oauth2/register`; CIMD clients are `testing-mcp-oauth-registration.ts`'s), and the
+ * browser and client halves of the code flow with PKCE, driven with `app.request` and a signed-in
+ * session cookie. Used by `testing-mcp-oauth-server.ts` and the registration suite.
  */
 import { AuditLog } from "@cloudhal/agent-runtime";
 import { seedStarterSite } from "@cloudhal/core-ts";
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { expect } from "vitest";
 import { createApi } from "./app.ts";
-import { createAuth } from "./auth.ts";
+import { createAuth, type OauthRegistration } from "./auth.ts";
 import type { RolesBackend } from "./testing-roles.ts";
 
 export type Json = Record<string, unknown>;
@@ -29,6 +30,8 @@ export interface DeploymentOptions {
   readonly resource?: string;
   /** The trusted client-address header (`AuthOptions.clientAddressHeader`; turns rate limits on). */
   readonly clientAddressHeader?: string;
+  /** CIMD and DCR (default: DCR on, CIMD off). */
+  readonly registration?: OauthRegistration;
 }
 
 export type Deployment = Awaited<ReturnType<typeof deploy>>;
@@ -95,7 +98,10 @@ export async function deploy(
     baseURL,
     secret: SECRET,
     signUp: "first-user",
-    mcpOauth: { resource: options.resource ?? `${new URL(baseURL).origin}/mcp` },
+    mcpOauth: {
+      resource: options.resource ?? `${new URL(baseURL).origin}/mcp`,
+      registration: options.registration ?? { dcr: true },
+    },
     ...(options.clientAddressHeader ? { clientAddressHeader: options.clientAddressHeader } : {}),
   });
   const server = auth.oauth;
@@ -153,11 +159,10 @@ export async function setupServer(backend: RolesBackend, options: DeploymentOpti
   });
   expect(signUp.status, JSON.stringify(signUp.body)).toBe(200);
   const owner = { cookie: cookieOf(signUp.res), userId: (signUp.body.user as Json).id as string };
-  const { clientId } = await d.server.createClient({
-    headers: new Headers({ cookie: owner.cookie }),
-    name: "Test Agent",
-    redirectUris: [REDIRECT],
-  });
+  const clientId =
+    options.registration?.dcr === false
+      ? ""
+      : await registerClient(d, { client_name: "Test Agent" });
   /** A member who joined through an invite (RFC-0005 §7), signed in. */
   /** `email` again: a removed member invited back keeps their account (RFC-0005 §7.4). */
   const join = async (role: string, extra: Json = {}, again?: string) => {
@@ -183,10 +188,28 @@ export async function setupServer(backend: RolesBackend, options: DeploymentOpti
 
 export type Server = Awaited<ReturnType<typeof setupServer>>;
 
+/** RFC 7591 registration as an MCP client sends it; the new `client_id`. */
+export async function registerClient(d: Deployment, metadata: Json = {}): Promise<string> {
+  const res = await d.call("POST", "/api/auth/oauth2/register", {
+    body: {
+      client_name: "Test Agent",
+      redirect_uris: [REDIRECT],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+      ...metadata,
+    },
+  });
+  expect(res.status, JSON.stringify(res.body)).toBe(201);
+  return res.body.client_id as string;
+}
+
 export interface AuthorizeOptions {
   readonly cookie: string;
   readonly scope: string;
   readonly clientId?: string;
+  /** Default `REDIRECT`. */
+  readonly redirectUri?: string;
   readonly challengeMethod?: string | null;
   readonly resource?: string;
   /** `POST`: the parameters as a form body (the provider accepts both). */
@@ -199,7 +222,7 @@ export async function authorize(s: Server, o: AuthorizeOptions) {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: o.clientId ?? s.clientId,
-    redirect_uri: REDIRECT,
+    redirect_uri: o.redirectUri ?? REDIRECT,
     scope: o.scope,
     state: "st4te",
     resource: o.resource ?? RESOURCE,
@@ -255,9 +278,16 @@ export async function token(s: Server, form: Record<string, string>) {
 /** The whole flow: authorize, consent with every requested scope, exchange the code. */
 export async function connect(
   s: Server,
-  o: { cookie: string; scope: string; mode?: string; keep?: readonly string[] },
+  o: {
+    cookie: string;
+    scope: string;
+    mode?: string;
+    keep?: readonly string[];
+    redirectUri?: string;
+  },
 ) {
-  const start = await authorize(s, { cookie: o.cookie, scope: o.scope });
+  const redirectUri = o.redirectUri ?? REDIRECT;
+  const start = await authorize(s, { cookie: o.cookie, scope: o.scope, redirectUri });
   expect(start.location?.pathname, start.location?.href).toBe("/oauth/consent");
   const request = consentRequest(start.location as URL);
   const approved = await consent(s, o.cookie, request, {
@@ -272,7 +302,7 @@ export async function connect(
   const tokens = await token(s, {
     grant_type: "authorization_code",
     code,
-    redirect_uri: REDIRECT,
+    redirect_uri: redirectUri,
     code_verifier: start.verifier,
   });
   expect(tokens.status, JSON.stringify(tokens.body)).toBe(200);

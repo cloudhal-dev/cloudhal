@@ -47,11 +47,18 @@ import { AnalyticsService } from "@cloudhal/analytics/service";
 import { SqlQueryBudget } from "@cloudhal/analytics/sql";
 import { DATASET_RE, WaeReader } from "@cloudhal/analytics/wae";
 import { type AiBinding, AiStore, bindingTransport, createApi } from "@cloudhal/api";
-import { type CloudhalAuth, createAuth, mcpOauthFor } from "@cloudhal/api/auth";
+import {
+  type CloudhalAuth,
+  cimdFetch,
+  createAuth,
+  mcpOauthFor,
+  oauthRegistrationFrom,
+} from "@cloudhal/api/auth";
 import { PURGE_LIMITS } from "@cloudhal/comments";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { type AiSearchEnv, SiteGraphStore, searchProviderFromEnv } from "@cloudhal/core-ts";
 import { type BlockType, createBlockRegistry, type PropsSchema } from "@cloudhal/core-ts/blocks";
+import { workersTransport } from "@cloudhal/core-ts/media";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { migrate, migrations, type SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
@@ -106,20 +113,41 @@ export interface AdminEnv extends CommentsEnv, SchedulerEnv, MailEnv, BuildRooms
   CLOUDHAL_RENDER?: string;
   /** `off` turns the OAuth authorization server for remote MCP clients off (RFC-0044 §10). */
   CLOUDHAL_MCP_OAUTH?: string;
+  /** `off`: no Client ID Metadata Documents (RFC-0044 §3). */
+  CLOUDHAL_MCP_CIMD?: string;
+  /** `off`: no dynamic client registration (RFC-0044 §3; Cursor needs it). */
+  CLOUDHAL_MCP_DCR?: string;
+  /** Comma-separated hosts OAuth clients may come from (`claude.ai,*.example.com`); unset: any. */
+  CLOUDHAL_MCP_CLIENT_HOSTS?: string;
+  /** Extra private-use redirect schemes of native clients (besides `cursor`, `vscode`). */
+  CLOUDHAL_MCP_REDIRECT_SCHEMES?: string;
 }
 
 /**
  * Better Auth for one request: request-scoped state (background tasks, plugin promises) and no
  * I/O at construction. RFC-0044 §10: the OAuth issuer is the origin the request came to
- * (`CLOUDHAL_MCP_OAUTH=off` turns the authorization server off).
+ * (`CLOUDHAL_MCP_OAUTH=off` turns the authorization server off). §3: client metadata documents
+ * are fetched with the media import's Workers transport, never from this Worker's own host or a
+ * site's domain (read only when a document is fetched).
  */
 function adminAuth(
   env: AdminEnv,
   sql: D1Driver,
   url: URL,
-  run: { readonly waitUntil: (p: Promise<unknown>) => void; readonly log: (line: string) => void },
+  run: {
+    readonly waitUntil: (p: Promise<unknown>) => void;
+    readonly log: (line: string) => void;
+    readonly store: Pick<SiteGraphStore, "listSites">;
+  },
 ): CloudhalAuth {
-  const oauth = mcpOauthFor(url.origin, env.CLOUDHAL_MCP_OAUTH);
+  const ownHosts = async () => [
+    url.hostname,
+    ...(await run.store.listSites()).flatMap((site) => site.domains.map((d) => d.hostname)),
+  ];
+  const cimd = cimdFetch({ transport: workersTransport(), blockedHosts: ownHosts });
+  const registration = oauthRegistrationFrom(env, cimd);
+  if (registration.problem) run.log(`OAuth client registration is off: ${registration.problem}`);
+  const oauth = mcpOauthFor(url.origin, env.CLOUDHAL_MCP_OAUTH, registration);
   return createAuth({
     database: env.DB,
     sql,
@@ -456,7 +484,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       });
       if (due) ctx.waitUntil(due);
 
-      const auth = adminAuth(env, sql, url, { waitUntil: (p) => ctx.waitUntil(p), log });
+      const auth = adminAuth(env, sql, url, { waitUntil: (p) => ctx.waitUntil(p), log, store });
       const audit = new AuditLog(sql);
       const approvals = new ApprovalStore(sql);
       const mail = adminMail(env);

@@ -13,7 +13,7 @@ import { type BuildHub, createBuildHub } from "./build.ts";
 import type { ApiDeps, Env } from "./context.ts";
 import { errorHandler } from "./errors.ts";
 import { mountMcp } from "./mcp-mount.ts";
-import { fencedOauthPath, mountOauthServer } from "./oauth-server.ts";
+import { fencedOauthPath, mountClientRegistration, mountOauthServer } from "./oauth-server.ts";
 import { PLAYGROUND_PRINCIPAL, playgroundGuard } from "./playground.ts";
 import { activity, deploymentActivity } from "./routes/activity.ts";
 import { mountAdmin } from "./routes/admin-mount.ts";
@@ -163,7 +163,7 @@ export function createApi(deps: ApiDeps) {
     setContext(c, deps, shared);
     // The fenced Better Auth endpoints never reach credential resolution.
     // Raw and decoded: whichever form Better Auth or Hono would dispatch on is fenced.
-    if (fencedAuthPath(new URL(c.req.url).pathname) || fencedAuthPath(c.req.path))
+    if (fencedAuthPath(new URL(c.req.url).pathname, deps) || fencedAuthPath(c.req.path, deps))
       return c.json({ error: "not_found", message: "not found" }, 404);
     const principal = await resolvePrincipal(c, deps);
     c.set("principal", principal);
@@ -185,10 +185,7 @@ export function createApi(deps: ApiDeps) {
 
   const problems = mountAdmin(app, deps);
   app.get("/api/health", (c) => c.json(problems.length ? { ok: true, problems } : { ok: true }));
-  if (deps.authHandler) {
-    const handler = deps.authHandler;
-    app.on(["GET", "POST"], "/api/auth/*", (c) => handler(c.req.raw));
-  }
+  mountAuthHandler(app, deps);
 
   app.get("/api/me", meHandler(membership));
 
@@ -269,8 +266,16 @@ export function createApi(deps: ApiDeps) {
 }
 
 /** Better Auth paths HTTP callers never reach (raw and decoded forms are both checked). */
-function fencedAuthPath(path: string): boolean {
-  return FENCED_AUTH_PATHS.test(path) || fencedOauthPath(path);
+function fencedAuthPath(path: string, deps: ApiDeps): boolean {
+  const open = { register: Boolean(deps.oauthServer?.register) };
+  return FENCED_AUTH_PATHS.test(path) || fencedOauthPath(path, open);
+}
+
+/** Better Auth's routes; RFC-0044 §3: DCR is Cloudhal's route, ahead of the catch-all. */
+function mountAuthHandler(app: Hono<Env>, deps: ApiDeps): void {
+  if (deps.oauthServer?.register) mountClientRegistration(app, deps.oauthServer.register);
+  const handler = deps.authHandler;
+  if (handler) app.on(["GET", "POST"], "/api/auth/*", (c) => handler(c.req.raw));
 }
 
 /**

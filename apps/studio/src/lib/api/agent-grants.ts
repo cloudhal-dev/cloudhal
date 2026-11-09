@@ -14,8 +14,18 @@ export interface ConsentScope {
 
 /** What the consent screen shows (`GET /api/agent-grants/consent`). */
 export interface ConsentInfo {
-  client: { id: string; name: string; host?: string };
-  redirect: { host: string; loopback: boolean };
+  client: {
+    id: string;
+    /** Self-asserted, made safe to show by the server (plain text, at most 100 characters). */
+    name: string;
+    /** `document`: a metadata-document client, identified by `host`; `self-registered`: DCR. */
+    kind: "document" | "self-registered" | "server";
+    host?: string;
+    /** The well-known client the name looks like, when this is not that client. */
+    lookalike?: string;
+  };
+  /** `app`: a native app's private-use scheme (no web host). */
+  redirect: { host: string; loopback: boolean; app?: string };
   loopbackOnly: boolean;
   scopes: ConsentScope[];
   offlineAccess: boolean;

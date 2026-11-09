@@ -10,8 +10,12 @@
  * - Tokens: RFC 9068 JWT access tokens (`typ: at+jwt`) for 1 h, `aud` = the `/mcp` resource, `iss`
  *   = the issuer; refresh tokens for 30 d, rotated on every use with `mcp()`'s 30 s reuse window
  *   (Decision 2).
- * - Registration: none in Phase 2 (CIMD and DCR are Phase 3); clients are created server-side
- *   (`adminCreateOAuthClient`), and the session-backed client CRUD endpoints are refused.
+ * - Registration (Phase 3, `oauth-registration.ts`): Client ID Metadata Documents through
+ *   `cimd()` and the runtime's SSRF-safe transport, and dynamic registration, which Cloudhal
+ *   checks and limits first (`dcr.ts`) and then hands to the provider server-side. Redirect URIs
+ *   are matched exactly (loopback without the port, RFC 8252 §7.3) and must be https or loopback
+ *   http (`redirect-policy.ts`). No member creates or edits clients: the session-backed client
+ *   CRUD endpoints are refused here and fenced in `createApi`.
  *
  * Worker-safe: the plugins and `jose` use WebCrypto and no `eval`.
  */
@@ -19,6 +23,9 @@ import { mcp } from "@better-auth/mcp";
 import { KEY_SCOPES } from "@cloudhal/agent-runtime";
 import type { BetterAuthPlugin } from "better-auth";
 import { jwt } from "better-auth/plugins";
+import { type CimdGuard, guardedCimd } from "./cimd-discovery.ts";
+import type { OauthRegistration } from "./oauth-registration.ts";
+import { redirectProblem } from "./redirect-policy.ts";
 
 /** `offline_access` asks for a refresh token (the plugin issues one only then). */
 export const OFFLINE_ACCESS = "offline_access";
@@ -49,6 +56,8 @@ export interface McpOauthServerOptions {
    * only (the plugin refuses anything else).
    */
   readonly resource: string;
+  /** RFC-0044 §3 (Phase 3): CIMD and DCR. Absent: neither; only clients already stored connect. */
+  readonly registration?: OauthRegistration | undefined;
 }
 
 /**
@@ -60,6 +69,7 @@ export interface McpOauthServerOptions {
 export function mcpOauthFor(
   baseURL: string | undefined,
   setting?: string | undefined,
+  registration?: OauthRegistration | undefined,
 ): { readonly mcpOauth: McpOauthServerOptions } | { readonly off: string } {
   if (setting?.trim().toLowerCase() === "off") return { off: "CLOUDHAL_MCP_OAUTH=off" };
   if (!baseURL)
@@ -70,7 +80,8 @@ export function mcpOauthFor(
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !loopback)
     return { off: `the base URL ${url.origin} is plain HTTP outside loopback; use https` };
-  return { mcpOauth: { resource: oauthEndpoints(url.origin).resource } };
+  const resource = oauthEndpoints(url.origin).resource;
+  return { mcpOauth: { resource, ...(registration ? { registration } : {}) } };
 }
 
 /** Issuer and resource of a deployment, both derived from its public base URL (§10). */
@@ -88,7 +99,10 @@ export function oauthPlugins(
   options: McpOauthServerOptions,
   hooks: OauthServerHooks,
 ): BetterAuthPlugin[] {
-  const { fromServer, grantOf } = hooks;
+  const { grantOf, cimdGuard } = hooks;
+  const registration = options.registration;
+  const policy = { clientHosts: registration?.clientHosts, schemes: registration?.redirectSchemes };
+  const dcr = registration?.dcr === true;
   return [
     jwt({
       jwks: { keyPairConfig: { alg: ACCESS_TOKEN_ALG, crv: "Ed25519" } },
@@ -109,13 +123,20 @@ export function oauthPlugins(
       refreshTokenExpiresIn: REFRESH_TOKEN_TTL_S,
       refreshTokenReuseInterval: REFRESH_REUSE_WINDOW_S,
       codeExpiresIn: AUTHORIZATION_CODE_TTL_S,
-      // Registration is Phase 3: no DCR, and no member may create or edit clients through the
-      // session-backed endpoints (they are also fenced in `createApi`); only the server itself
-      // (`OauthServer.createClient`) creates a pre-registered client.
-      allowDynamicClientRegistration: false,
-      allowUnauthenticatedClientRegistration: false,
-      clientPrivileges: ({ headers, action }) => action === "create" && fromServer(headers),
-      resourcePrivileges: ({ headers, action }) => action === "link" && fromServer(headers),
+      // §3: DCR is anonymous and public-only. The HTTP endpoint is Cloudhal's (`dcr.ts` checks
+      // and limits the request, then calls the provider server-side without a session); the
+      // provider's own route stays fenced. A loopback redirect makes the client `native`.
+      allowDynamicClientRegistration: dcr,
+      allowUnauthenticatedClientRegistration: dcr,
+      clientRegistrationDefaultApplicationType: "infer",
+      // No member creates, edits or links clients through the session-backed endpoints.
+      clientPrivileges: () => false,
+      resourcePrivileges: () => false,
+      // §6 "Open redirect": the registered URI must match (loopback without the port, a
+      // private-use scheme exactly) and pass the redirect rules and the host list now, whichever
+      // way and whenever the client registered.
+      validateRedirectUri: (uri, _registered, matched) =>
+        matched && redirectProblem(uri, policy) === undefined,
       // Tokens are stored under a hash Cloudhal can compute too, so the refresh path can find a
       // token's family and enforce the absolute lifetime (`oauth-hooks.ts`).
       storeTokens: { hash: (token) => hashToken(token) },
@@ -133,15 +154,19 @@ export function oauthPlugins(
         },
       ],
     }),
+    // §3: CIMD with the runtime's transport and the MCP 2026-07-28 profile, inside Cloudhal's
+    // guard: stored clients served from their row within the freshness window, a cap on stored
+    // clients, and fetch budgets that never block a stored client (`cimd-discovery.ts`).
+    ...(registration?.cimd ? [guardedCimd(registration.cimd, cimdGuard)] : []),
   ];
 }
 
 /** What `oauthPlugins` asks of Cloudhal. */
 export interface OauthServerHooks {
-  /** True for the server's own calls (`SERVER_KEY_HEADER`): only they may create clients. */
-  readonly fromServer: (headers: Headers) => boolean;
   /** The id of the member's live grant for a client, if any. */
   readonly grantOf: (userId: string, clientId: string) => Promise<string | undefined>;
+  /** CIMD's bounds: the host list, the cap and the fetch budgets (`cimd-discovery.ts`). */
+  readonly cimdGuard: CimdGuard;
 }
 
 /** The access-token claim that names the grant (RFC-0044 §5; a private claim name, RFC 7519 §4.3). */

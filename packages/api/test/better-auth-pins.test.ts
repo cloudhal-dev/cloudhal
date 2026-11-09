@@ -51,6 +51,7 @@ describe("better-auth family pins", () => {
     const versions = catalog();
     for (const name of [
       "@better-auth/api-key",
+      "@better-auth/cimd",
       "@better-auth/kysely-adapter",
       "@better-auth/mcp",
       "@better-auth/oauth-provider",

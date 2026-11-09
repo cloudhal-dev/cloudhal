@@ -2,8 +2,14 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { ApprovalStore, AuditLog, loadSkills } from "@cloudhal/agent-runtime";
 import { AiStore, type CloudhalApi, createApi, restTransport } from "@cloudhal/api";
-import { mcpOauthFor, type OauthServer } from "@cloudhal/api/auth";
+import {
+  cimdFetch,
+  mcpOauthFor,
+  type OauthServer,
+  oauthRegistrationFrom,
+} from "@cloudhal/api/auth";
 import { CLIENT_ADDRESS_HEADER, serveNode } from "@cloudhal/api/node";
+import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
@@ -170,7 +176,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
   };
   let firstOwner: SetupToken | undefined;
   // RFC-0044 §10: the issuer is the public base URL; without one, OAuth stays off.
-  const oauth = mcpOauthFor(server.baseUrl, env.CLOUDHAL_MCP_OAUTH);
+  const oauth = studioOauth(server.baseUrl, env, { store: local.store, log: options.log });
   if (setup) {
     const { createAuthFor } = await import("@cloudhal/api/auth/node");
     const auth = await createAuthFor({
@@ -222,6 +228,26 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
       await local.close();
     },
   };
+}
+
+/**
+ * The authorization server's options (RFC-0044 §10). §3: client metadata documents come through
+ * the media import's pinning Node transport, never from this Studio's own host or a site's
+ * domain; `CLOUDHAL_MCP_CIMD`, `_DCR` and `_CLIENT_HOSTS` switch registration.
+ */
+function studioOauth(
+  baseUrl: string | undefined,
+  env: Readonly<Record<string, string | undefined>>,
+  o: { store: Pick<SiteGraphStore, "listSites">; log: ((line: string) => void) | undefined },
+): ReturnType<typeof mcpOauthFor> {
+  const ownHosts = async () => [
+    ...(baseUrl ? [new URL(baseUrl).hostname] : []),
+    ...(await o.store.listSites()).flatMap((s) => s.domains.map((d) => d.hostname)),
+  ];
+  const cimd = cimdFetch({ transport: nodeTransport(), blockedHosts: ownHosts });
+  const registration = oauthRegistrationFrom(env, cimd);
+  if (registration.problem) o.log?.(`OAuth client registration is off: ${registration.problem}`);
+  return mcpOauthFor(baseUrl, env.CLOUDHAL_MCP_OAUTH, registration);
 }
 
 /** Logs why remote MCP clients cannot connect by URL (RFC-0044 §10); nothing when they can. */

@@ -42,6 +42,7 @@ export {
 export type { ActorResolver, ApiDeps } from "./context.ts";
 export type { ApiErrorBody } from "./errors.ts";
 export { MailError, type MailMessage, type MailSender } from "./mail.ts";
+export { oauthClientsPruneJob } from "./oauth-prune-job.ts";
 export {
   isBlockedInPlayground,
   PLAYGROUND_ALLOW,

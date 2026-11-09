@@ -24,6 +24,13 @@ services:
       - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
       - CLOUDHAL_AUTOMATIONS=${CLOUDHAL_AUTOMATIONS:-on}
       - CLOUDHAL_TRUSTED_ORIGINS=${CLOUDHAL_TRUSTED_ORIGINS:-}
+      # Remote MCP clients (RFC-0044; docs/guides/mcp-oauth.md): `off` turns OAuth, metadata
+      # documents or dynamic registration off; the host list limits where clients come from.
+      - CLOUDHAL_MCP_OAUTH=${CLOUDHAL_MCP_OAUTH:-on}
+      - CLOUDHAL_MCP_CIMD=${CLOUDHAL_MCP_CIMD:-on}
+      - CLOUDHAL_MCP_DCR=${CLOUDHAL_MCP_DCR:-on}
+      - CLOUDHAL_MCP_CLIENT_HOSTS=${CLOUDHAL_MCP_CLIENT_HOSTS:-}
+      - CLOUDHAL_MCP_REDIRECT_SCHEMES=${CLOUDHAL_MCP_REDIRECT_SCHEMES:-}
       # Secrets. A name without a value is passed through from .env or the shell only when it is
       # set there, so an unset BETTER_AUTH_SECRET leaves the container with the secret it created
       # on the volume (/data/.cloudhal/auth-secret). Never set it to an empty value.

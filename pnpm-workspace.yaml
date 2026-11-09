@@ -56,6 +56,7 @@ catalog:
   "@better-auth/core": 1.7.18
   "@better-auth/oauth-provider": 1.7.18
   "@better-auth/mcp": 1.7.18
+  "@better-auth/cimd": 1.7.18
   jose: 6.2.12
   "@better-auth/utils": 0.5.1
   better-call: 1.4.5

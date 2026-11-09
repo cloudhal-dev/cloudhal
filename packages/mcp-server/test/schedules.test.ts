@@ -489,7 +489,7 @@ describe("gates over MCP (RFC-0008 §7.6, §10.8)", () => {
     expect(earlier.text).toMatch(/lift_embargo/);
   });
 
-  it("set_embargo through an OAuth connection never records the person's approval (RFC-0044 inv. 5)", async () => {
+  it("set_embargo through an OAuth connection files the gate for a person, never approves it (RFC-0044 inv. 5)", async () => {
     const live = (await s.store.getContentEntry(s.entry.id)) as ContentEntry;
     // A token principal: an agent with a grant, no key, and the member behind it.
     const { keyId: _key, ...noKey } = agentKey("edits");
@@ -505,8 +505,28 @@ describe("gates over MCP (RFC-0008 §7.6, §10.8)", () => {
       expectedRev: live.rev,
     });
     expect(hide.isError, hide.text).toBe(false);
-    expect(hide.data?.status).toBe("with-next-publish");
-    expect(hide.data?.release).toBeUndefined();
+    // RFC-0044 Phase 3: the gate-only release waits for a person, who approves it in Studio.
+    expect(hide.data).toMatchObject({
+      status: "approval-pending",
+      node: { availability: { from: plus(7 * HOUR) } },
+    });
+    const release = hide.data?.release as Release;
+    expect(release).toMatchObject({
+      state: "awaiting_approval",
+      when: { kind: "on-approval" },
+      metadata: { "cloudhal.source": "set_embargo", "cloudhal.reduce": "1" },
+    });
+    expect(release.approval ?? null).toBeNull();
+    const request = await s.approvals.get(hide.data?.approvalId as string);
+    expect(request).toMatchObject({
+      tool: "schedule_release",
+      status: "pending",
+      cause: "tool",
+      releaseId: release.id,
+      actor: { kind: "agent" },
+      input: { siteId: s.site.id, releaseId: release.id, when: { kind: "on-approval" } },
+    });
+    expect(request?.stateHash).toMatch(/^rl1:/);
     const releases = await s.schedules.listReleases(s.site.id);
     expect(
       releases.some((r) => r.approval?.kind === "person" && r.approval.by.id === "user_sched00001"),

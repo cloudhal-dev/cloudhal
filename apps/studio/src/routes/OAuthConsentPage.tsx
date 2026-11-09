@@ -43,11 +43,16 @@ export function OAuthConsentPage() {
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const name = info.data?.client.name ?? "";
+  const client = info.data?.client;
+  const name = client?.name ?? "";
+  // A metadata-document client's host is its identity: it stays in view whatever the name says.
+  const title = client?.host
+    ? c("oauthConsent.titleFrom", { client: name, host: client.host })
+    : c("oauthConsent.title", { client: name });
   return (
     <PageLayout
       icon={<PlugsConnected size={24} />}
-      title={c("oauthConsent.title", { client: name })}
+      title={title}
       description={c("oauthConsent.description")}
       loading={info.isPending && request.length > 0}
       width="narrow"
@@ -115,33 +120,7 @@ function ConsentForm({ request, info }: { request: string; info: ConsentInfo }) 
   return (
     <div className="grid gap-6">
       {decide.isError && <Banner variant="error" description={apiErrorText(t, decide.error)} />}
-      <SectionCard icon={<Globe size={16} />} title={c("oauthConsent.who.title")}>
-        <div className="grid gap-3">
-          <InsetPanel>
-            <div className="grid gap-1.5">
-              <Text>{info.client.name}</Text>
-              <Text variant="secondary" size="sm">
-                {info.client.host
-                  ? c("oauthConsent.who.fromHost", { host: info.client.host })
-                  : c("oauthConsent.who.registered")}
-              </Text>
-              <Text variant="secondary" size="sm">
-                {info.redirect.loopback
-                  ? c("oauthConsent.who.thisComputer")
-                  : c("oauthConsent.who.sendsBack", { host: info.redirect.host })}
-              </Text>
-            </div>
-          </InsetPanel>
-          {info.loopbackOnly && (
-            <Banner
-              variant="alert"
-              icon={<Desktop size={16} />}
-              description={c("oauthConsent.who.loopbackWarning")}
-            />
-          )}
-          {info.existing && <Banner description={c("oauthConsent.who.stepUp")} />}
-        </div>
-      </SectionCard>
+      <WhoIsAsking info={info} />
       <SectionCard
         icon={<ShieldCheck size={16} />}
         title={c("oauthConsent.scopes.title")}
@@ -230,5 +209,55 @@ function ConsentForm({ request, info }: { request: string; info: ConsentInfo }) 
         </div>
       </SectionCard>
     </div>
+  );
+}
+
+/**
+ * Who is asking (§4 item 1): a document client's host first, the self-asserted name, how the
+ * server knows the client, where the browser goes back to, and the warnings.
+ */
+function WhoIsAsking({ info }: { info: ConsentInfo }) {
+  const c = useT("oauthConsent");
+  return (
+    <SectionCard icon={<Globe size={16} />} title={c("oauthConsent.who.title")}>
+      <div className="grid gap-3">
+        <InsetPanel>
+          <div className="grid gap-1.5">
+            {info.client.host && (
+              <Text bold>{c("oauthConsent.who.fromHost", { host: info.client.host })}</Text>
+            )}
+            <Text>{info.client.name}</Text>
+            {!info.client.host && (
+              <Text variant="secondary" size="sm">
+                {info.client.kind === "self-registered"
+                  ? c("oauthConsent.who.selfRegistered")
+                  : c("oauthConsent.who.registered")}
+              </Text>
+            )}
+            <Text variant="secondary" size="sm">
+              {info.redirect.app
+                ? c("oauthConsent.who.thisComputerApp", { scheme: info.redirect.app })
+                : info.redirect.loopback
+                  ? c("oauthConsent.who.thisComputer")
+                  : c("oauthConsent.who.sendsBack", { host: info.redirect.host })}
+            </Text>
+          </div>
+        </InsetPanel>
+        {info.client.lookalike && (
+          <Banner
+            variant="alert"
+            description={c("oauthConsent.who.lookalike", { client: info.client.lookalike })}
+          />
+        )}
+        {info.loopbackOnly && (
+          <Banner
+            variant="alert"
+            icon={<Desktop size={16} />}
+            description={c("oauthConsent.who.loopbackWarning")}
+          />
+        )}
+        {info.existing && <Banner description={c("oauthConsent.who.stepUp")} />}
+      </div>
+    </SectionCard>
   );
 }
