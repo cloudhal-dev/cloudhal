@@ -38,6 +38,9 @@ const OPEN_OAUTH_PATHS = new Set([
 export function fencedOauthPath(pathname: string): boolean {
   const path = trimEndChar(pathname, "/");
   if (path === "/api/auth/token") return true;
+  // The provider also answers its metadata under the issuer (`/api/auth/.well-known/…`), with
+  // DPoP listed; clients use the RFC 8414 documents `createApi` serves at the root.
+  if (path.startsWith("/api/auth/.well-known")) return true;
   return path.startsWith("/api/auth/oauth2") && !OPEN_OAUTH_PATHS.has(path);
 }
 

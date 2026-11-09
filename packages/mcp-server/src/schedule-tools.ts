@@ -62,7 +62,7 @@ import {
   type ToolDefinition,
   ToolError,
 } from "./common.ts";
-import { directApproval, NO_GRANT_GATES } from "./gate-approval.ts";
+import { directApproval, keyOf, NO_GRANT_GATES } from "./gate-approval.ts";
 import {
   approvalProblem,
   autoReleaseVerdict,
@@ -307,7 +307,7 @@ async function decideRelease(
           release: await scheduleWith(ctx, record, when, {
             kind: "auto",
             by: ctx.principal.actor,
-            keyId: ctx.principal.keyId as string,
+            keyId: keyOf(ctx),
             at,
             windowEnds: verdict.windowEnds,
           }),

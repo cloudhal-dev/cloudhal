@@ -112,7 +112,7 @@ export function createInstance(
         }
         // RFC-0044: stale consent memory, DPoP and the refresh family's absolute lifetime.
         if (options.mcpOauth && OAUTH_HOOK_PATHS.has(ctx.path))
-          return oauthBeforeHook(ctx, { grants: internal.grants, staff, now: clock });
+          return oauthBeforeHook(ctx as never, { grants: internal.grants, staff, now: clock });
         if (!ctx.path.startsWith("/sign-up") || mode !== "first-user") return;
         const existing = await ctx.context.adapter.count({ model: "user" });
         if (existing > 0)

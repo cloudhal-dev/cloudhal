@@ -7,12 +7,20 @@
 import { agentCredential } from "@cloudhal/agent-runtime";
 import type { Release } from "@cloudhal/core-contracts";
 import { canonicalInstant } from "@cloudhal/schedules";
-import type { ToolContext } from "./common.ts";
+import { type ToolContext, ToolError } from "./common.ts";
 import { personApproval } from "./schedules.ts";
 
 /** What `set_embargo` answers an OAuth connection on live content. */
 export const NO_GRANT_GATES =
   "The embargo is saved, but an OAuth connection cannot put it live on its own: the content stays visible until a person publishes it (or an agent key sets the embargo).";
+
+/** The agent key of a call that passed `autoReleaseVerdict` (which refuses anything else). */
+export function keyOf(ctx: ToolContext): string {
+  const credential = agentCredential(ctx.principal);
+  if (credential?.kind !== "key")
+    throw new ToolError("denied", "auto-mode releases need an API key");
+  return credential.id;
+}
 
 /** The approval, or `undefined` when the caller is an OAuth connection (it waits for a person). */
 export function directApproval(ctx: ToolContext, at: string): Release["approval"] | undefined {

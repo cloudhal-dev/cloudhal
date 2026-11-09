@@ -5,6 +5,7 @@
  */
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { clearAccessTokenKeyCache } from "./auth/access-token.ts";
+import { DPOP_REFUSED } from "./auth/oauth-hooks.ts";
 import {
   authorize,
   connect,
@@ -13,6 +14,7 @@ import {
   mcpCall,
   mcpClient,
   ORIGIN,
+  REDIRECT,
   setupServer,
   token,
 } from "./testing-oauth-harness.ts";
@@ -145,7 +147,16 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
         }),
       });
       expect(res.status).toBe(400);
-      expect(((await res.json()) as Json).error).toBe("invalid_dpop_proof");
+      // Cloudhal's own refusal, not the provider's verdict on a malformed proof.
+      expect(await res.json()).toEqual({
+        error: "invalid_dpop_proof",
+        error_description: DPOP_REFUSED,
+      });
+      // The provider's own issuer-appended document (which lists DPoP) is not served.
+      const appended = await s.app.request(
+        `${ORIGIN}/api/auth/.well-known/oauth-authorization-server`,
+      );
+      expect(appended.status).toBe(404);
     });
 
     it("ends a refresh token family 90 days after the member authenticated, however often it rotated", async () => {
@@ -169,6 +180,101 @@ export function describeMcpOauthHardening(label: string, backend: RolesBackend):
       });
       expect(late.status).toBe(400);
       expect(late.body.error).toBe("invalid_grant");
+    });
+    it("never exchanges a code issued before a revoke, after the member connects again", async () => {
+      const s = await setupServer(backend);
+      await connect(s, { cookie: s.owner.cookie, scope: READ });
+      // Consent memory: a second authorization gets a code at once, before the revoke.
+      const pending = await authorize(s, { cookie: s.owner.cookie, scope: READ });
+      const code = pending.location?.searchParams.get("code") ?? "";
+      expect(code).toBeTruthy();
+      const [grant] = await grantsOf(s, s.owner.cookie);
+      await s.call("DELETE", `/api/agent-grants/${grant?.id}`, {
+        cookie: s.owner.cookie,
+        headers: { origin: s.origin },
+      });
+      await connect(s, { cookie: s.owner.cookie, scope: READ });
+      const late = await token(s, {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: REDIRECT,
+        code_verifier: pending.verifier,
+      });
+      expect(late.status, JSON.stringify(late.body)).toBe(400);
+      expect(late.body.error).toBe("invalid_grant");
+    });
+
+    it("never refreshes a family from before a revoke, even one that escaped the revoke batch", async () => {
+      const s = await setupServer(backend);
+      const { refresh } = await connect(s, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      // Refresh rows are stamped in whole seconds: the reconnect comes a little later.
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 5_000);
+      const [grant] = await grantsOf(s, s.owner.cookie);
+      await s.call("DELETE", `/api/agent-grants/${grant?.id}`, {
+        cookie: s.owner.cookie,
+        headers: { origin: s.origin },
+      });
+      // A rotation that raced the revoke: its child was written after the batch.
+      await s.sql.run(`UPDATE "oauthRefreshToken" SET "revoked" = NULL WHERE "userId" = ?`, [
+        s.owner.userId,
+      ]);
+      await connect(s, { cookie: s.owner.cookie, scope: `${READ} offline_access` });
+      const old = await token(s, { grant_type: "refresh_token", refresh_token: refresh as string });
+      expect(old.status, JSON.stringify(old.body)).toBe(400);
+      expect(old.body.error).toBe("invalid_grant");
+    });
+
+    it("ends the connections in the same batch as the membership", async () => {
+      const s = await setupServer(backend);
+      const editor = await s.join("editor");
+      await connect(s, { cookie: editor.cookie, scope: `${READ} offline_access` });
+      // Only the membership step of a removal: nothing after it has to succeed.
+      expect(await s.auth.staff.store.remove(editor.userId)).toBe(true);
+      const count = async (sql: string) =>
+        (await s.sql.get<{ n: number }>(sql, [editor.userId]))?.n ?? -1;
+      expect(
+        await count(
+          "SELECT COUNT(*) AS n FROM agent_grants WHERE user_id = ? AND revoked_at IS NULL",
+        ),
+      ).toBe(0);
+      expect(await count(`SELECT COUNT(*) AS n FROM "oauthConsent" WHERE "userId" = ?`)).toBe(0);
+      expect(
+        await count(
+          `SELECT COUNT(*) AS n FROM "oauthRefreshToken" WHERE "userId" = ? AND "revoked" IS NULL`,
+        ),
+      ).toBe(0);
+    });
+
+    for (const method of ["GET", "POST"] as const)
+      it(`shows the screen for a stored consent with no live grant (${method} authorize)`, async () => {
+        const s = await setupServer(backend);
+        await connect(s, { cookie: s.owner.cookie, scope: READ });
+        // The grant ends, the provider's consent stays (as before this check existed).
+        await s.sql.run("UPDATE agent_grants SET revoked_at = ? WHERE user_id = ?", [
+          new Date().toISOString(),
+          s.owner.userId,
+        ]);
+        const start = await authorize(s, { cookie: s.owner.cookie, scope: READ, method });
+        expect(start.location?.pathname, start.location?.href).toBe("/oauth/consent");
+      });
+
+    it("refreshes a new connection of a member whose Studio session is older than 90 days", async () => {
+      const s = await setupServer(backend);
+      const long = new Date(Date.now() - 120 * DAY).toISOString();
+      await s.sql.run(`UPDATE "session" SET "createdAt" = ? WHERE "userId" = ?`, [
+        long,
+        s.owner.userId,
+      ]);
+      const { refresh } = await connect(s, {
+        cookie: s.owner.cookie,
+        scope: `${READ} offline_access`,
+      });
+      const r = await token(s, { grant_type: "refresh_token", refresh_token: refresh as string });
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
     });
   });
 }

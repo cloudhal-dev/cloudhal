@@ -189,6 +189,8 @@ export interface AuthorizeOptions {
   readonly clientId?: string;
   readonly challengeMethod?: string | null;
   readonly resource?: string;
+  /** `POST`: the parameters as a form body (the provider accepts both). */
+  readonly method?: "GET" | "POST";
 }
 
 /** `GET /oauth2/authorize` as the member's browser: where it is sent next. */
@@ -206,9 +208,20 @@ export async function authorize(s: Server, o: AuthorizeOptions) {
     params.set("code_challenge", challenge);
     params.set("code_challenge_method", o.challengeMethod ?? "S256");
   }
-  const res = await s.app.request(`${ISSUER}/oauth2/authorize?${params}`, {
-    headers: { cookie: o.cookie },
-  });
+  const res =
+    o.method === "POST"
+      ? await s.app.request(`${ISSUER}/oauth2/authorize`, {
+          method: "POST",
+          headers: {
+            cookie: o.cookie,
+            origin: ORIGIN,
+            "content-type": "application/x-www-form-urlencoded",
+          },
+          body: params,
+        })
+      : await s.app.request(`${ISSUER}/oauth2/authorize?${params}`, {
+          headers: { cookie: o.cookie },
+        });
   const location = res.headers.get("location") ?? "";
   return { res, location: location ? new URL(location, ORIGIN) : undefined, verifier };
 }

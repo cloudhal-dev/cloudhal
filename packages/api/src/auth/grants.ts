@@ -210,9 +210,10 @@ export class GrantStore {
 
 /**
  * The provider's side of ending connections (§2 "Revocation"): its stored consent, so the next
- * authorization shows Studio's screen again, and its refresh tokens, so no new access token is
- * minted. For one client, or every client of the member (removal). Plain SQL, so it rides in the
- * same atomic batch as the grant change and can never leave a consent without a live grant.
+ * authorization shows Studio's screen again; its refresh tokens, so no new access token is
+ * minted; and its pending authorization codes (5 min), so none is exchanged after a reconnect. For
+ * one client, or every client of the member (removal). Plain SQL, so it rides in the same atomic
+ * batch as the grant change and can never leave a consent without a live grant.
  */
 export function providerRevocation(
   userId: string,
@@ -221,11 +222,19 @@ export function providerRevocation(
 ): SqlStatement[] {
   const client = clientId === undefined ? "" : ' AND "clientId" = ?';
   const scope = clientId === undefined ? [userId] : [userId, clientId];
+  // Codes are verification rows whose value is the provider's JSON; other rows may not be JSON.
+  const code = (path: string) =>
+    `CASE WHEN json_valid("value") THEN json_extract("value", '${path}') END`;
+  const codeClient = clientId === undefined ? "" : ` AND ${code("$.query.client_id")} = ?`;
   return [
     { sql: `DELETE FROM "oauthConsent" WHERE "userId" = ?${client}`, params: scope },
     {
       sql: `UPDATE "oauthRefreshToken" SET "revoked" = ? WHERE "userId" = ?${client} AND "revoked" IS NULL`,
       params: [at, ...scope],
+    },
+    {
+      sql: `DELETE FROM "verification" WHERE "value" LIKE '%authorization_code%' AND ${code("$.type")} = 'authorization_code' AND ${code("$.userId")} = ?${codeClient}`,
+      params: scope,
     },
   ];
 }

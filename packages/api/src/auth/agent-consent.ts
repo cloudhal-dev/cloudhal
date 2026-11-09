@@ -227,7 +227,9 @@ export async function giveConsent(
   // The grant first: the provider's consent runs its authorize step, whose check
   // (`oauth-hooks.ts`) forgets any stored consent the live grant does not cover. One batch: the
   // grant, the person behind the agent actor (RFC-0005 §4, as `recordAgent` does for a key) and
-  // the audit row. A failed provider call after it leaves a grant no token can use yet.
+  // the audit row. If the provider call then fails: a new grant has no token yet; on a step-up of
+  // a live grant, the scopes and mode the member approved already apply to the connection's
+  // existing tokens, which their own `scope` claims still cap (no scope they were not issued).
   const grant = await d.grants.consent(
     {
       userId: who.userId,
