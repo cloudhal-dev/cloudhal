@@ -204,7 +204,7 @@ export function createApi(deps: ApiDeps) {
         features: {
           agentKeys: Boolean(deps.agentKeys),
           mcp: Boolean(deps.mcp),
-          mcpOauth: Boolean(deps.oauthServer && deps.mcp?.oauth),
+          ...oauthFeatures(deps),
           activity: Boolean(deps.audit ?? deps.mcp?.audit),
           previewLinks: Boolean(deps.preview),
           deployTransfer: Boolean(deps.admin) && problems.length === 0,
@@ -263,6 +263,21 @@ export function createApi(deps: ApiDeps) {
     c.json({ error: "not_found", message: `no route for ${c.req.method} ${c.req.path}` }, 404),
   );
   return app;
+}
+
+/**
+ * RFC-0044: whether remote MCP clients connect by URL (OAuth), and how: the `/mcp` resource they
+ * are given and which registrations work here (Studio's "Connect by URL" notes, §11).
+ */
+function oauthFeatures(deps: ApiDeps) {
+  const server = deps.oauthServer;
+  const on = Boolean(server && deps.mcp?.oauth);
+  return {
+    mcpOauth: on,
+    ...(on && server
+      ? { mcpOauthClients: { resource: server.resource, ...server.registration } }
+      : {}),
+  };
 }
 
 /** Better Auth paths HTTP callers never reach (raw and decoded forms are both checked). */

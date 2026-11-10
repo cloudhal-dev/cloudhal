@@ -4,14 +4,12 @@ import {
   Badge,
   Banner,
   Button,
-  ClipboardText,
   DeleteResource,
   DropdownMenu,
   Empty,
   LayerCard,
   PageLayout,
   Pagination,
-  SectionCard,
   SectionEmpty,
   Table,
   Text,
@@ -24,7 +22,6 @@ import {
   DotsThree,
   Info,
   Key,
-  PlugsConnected,
   Plus,
   Robot,
   SlidersHorizontal,
@@ -38,6 +35,8 @@ import { HowModesWorkCard } from "../components/AgentModes.tsx";
 import { AllowAnalytics } from "../components/AnalyticsKeyAccess.tsx";
 import { ChangeAgentModeDialog } from "../components/ChangeAgentModeDialog.tsx";
 import { AllowComments } from "../components/CommentKeyAccess.tsx";
+import { ConnectedAgents } from "../components/ConnectedAgents.tsx";
+import { ConnectMcpCard } from "../components/ConnectMcpCard.tsx";
 import { CreateAgentKeyDialog } from "../components/CreateAgentKeyDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
@@ -51,7 +50,6 @@ import {
 } from "../components/Elevation.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ListToolbar } from "../components/ListToolbar.tsx";
-import { McpClientSetup } from "../components/McpClientSetup.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RoleBadge } from "../components/Roles.tsx";
 import { ScopeBadge } from "../components/ScopeBadge.tsx";
@@ -66,7 +64,6 @@ import { listOf, useI18n, useT } from "../i18n/index.tsx";
 import { initials } from "../lib/account.ts";
 import { ownModeOf, sameScopes, sortScopes } from "../lib/agents.ts";
 import { type AgentKeySummary, api, isNotEnabled, mcpEndpoint } from "../lib/api.ts";
-import { apiErrorText } from "../lib/api-errors.ts";
 import { activeElevation, modesAbove } from "../lib/elevation.ts";
 
 const matches = (k: AgentKeySummary, q: string, fold: Fold) =>
@@ -143,50 +140,6 @@ function KeyScopes({ agentKey }: { agentKey: AgentKeySummary }) {
         <ScopeBadge key={s} scope={s} />
       ))}
     </div>
-  );
-}
-
-/** The "Connect an MCP client" card: endpoint, header and ready-to-paste client config. */
-export function ConnectMcpCard({ endpoint }: { endpoint: string }) {
-  const t = useT();
-  return (
-    <SectionCard
-      title={t("agents.connect.title")}
-      icon={<PlugsConnected size={16} />}
-      description={t("agents.connect.description")}
-    >
-      <dl className="grid gap-4">
-        <div className="grid gap-1.5">
-          <dt>
-            <Text size="sm" bold as="span">
-              {t("agents.connect.endpoint")}
-            </Text>
-          </dt>
-          <dd className="min-w-0">
-            <ClipboardText
-              size="base"
-              text={endpoint}
-              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
-            />
-          </dd>
-        </div>
-        <div className="grid gap-1.5">
-          <dt>
-            <Text size="sm" bold as="span">
-              {t("agents.connect.header")}
-            </Text>
-          </dt>
-          <dd className="min-w-0">
-            <ClipboardText
-              size="base"
-              text="Authorization: Bearer"
-              tooltip={{ text: t("common.copy"), copiedText: t("common.copied") }}
-            />
-          </dd>
-        </div>
-      </dl>
-      <McpClientSetup endpoint={endpoint} local />
-    </SectionCard>
   );
 }
 
@@ -465,6 +418,153 @@ function AllKeys({ onRevoke, now }: { onRevoke: (key: AgentKeySummary) => void; 
   );
 }
 
+/** The person's own keys: the table, its empty state and paging (DESIGN.md §2a). */
+function MyKeysTable({
+  keys,
+  paging,
+  now,
+  asks,
+  onCreate,
+  onChangeMode,
+  onElevate,
+  onEndElevation,
+  onRevoke,
+}: {
+  keys: { data: AgentKeySummary[] | undefined; isPending: boolean };
+  paging: ReturnType<typeof usePaging<AgentKeySummary>>;
+  now: number;
+  asks: ReturnType<typeof usePendingElevations>;
+  onCreate: () => void;
+  onChangeMode: (key: AgentKeySummary) => void;
+  onElevate: (key: AgentKeySummary) => void;
+  onEndElevation: (key: AgentKeySummary) => void;
+  onRevoke: (key: AgentKeySummary) => void;
+}) {
+  const { t, locale } = useI18n();
+  return (
+    <>
+      {keys.data?.length === 0 ? (
+        <Empty
+          icon={<Key size={48} className="text-kumo-inactive" />}
+          title={t("agents.empty")}
+          description={t("agents.emptyDescription")}
+          commandLine="cloudhal mcp"
+          contents={
+            <Button variant="secondary" icon={<Plus />} onClick={onCreate}>
+              {t("agents.createKey")}
+            </Button>
+          }
+        />
+      ) : (
+        <LayerCard className="overflow-x-auto p-0">
+          <Table>
+            <Table.Header>
+              <Table.Row>
+                <Table.Head>{t("agents.columns.name")}</Table.Head>
+                <Table.Head>{t("agents.columns.mode")}</Table.Head>
+                <Table.Head>{t("agents.columns.scopes")}</Table.Head>
+                <Table.Head>{t("agents.columns.created")}</Table.Head>
+                <Table.Head>{t("agents.columns.status")}</Table.Head>
+                <Table.Head sticky="right" className="w-12">
+                  <span className="sr-only">{t("site.rowMenu")}</span>
+                </Table.Head>
+              </Table.Row>
+            </Table.Header>
+            {keys.isPending ? (
+              <TableSkeleton columns={6} rows={3} />
+            ) : paging.pageItems.length === 0 ? (
+              <Table.Body>
+                <Table.Row>
+                  <Table.Cell colSpan={6}>
+                    <SectionEmpty
+                      icon={<Key size={32} className="text-kumo-inactive" />}
+                      title={t("agents.noMatches", { query: paging.search })}
+                    />
+                  </Table.Cell>
+                </Table.Row>
+              </Table.Body>
+            ) : (
+              <Table.Body>
+                {paging.pageItems.map((k) => (
+                  <Table.Row key={k.id} data-key-id={k.id}>
+                    <Table.Cell className="whitespace-nowrap">
+                      <div className="grid gap-0.5">
+                        <Text bold as="span">
+                          {k.name ?? t("agents.unnamed")}
+                        </Text>
+                        {k.start && (
+                          <Text variant="mono-secondary" as="span">
+                            {t("agents.keyPrefix", { start: k.start })}
+                          </Text>
+                        )}
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="grid gap-1.5">
+                        <KeyScopes agentKey={k} />
+                        <AllowAnalytics agentKey={k} />
+                        <AllowComments agentKey={k} />
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      <div className="grid gap-0.5">
+                        <RelativeTime iso={k.createdAt} />
+                        <Text variant="secondary" size="sm" as="span">
+                          {k.expiresAt
+                            ? t("agents.expires", {
+                                when: formatDate(locale, k.expiresAt, NUMERIC_DATE),
+                              })
+                            : t("agents.never")}
+                        </Text>
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="whitespace-nowrap">
+                      {k.enabled ? (
+                        <Badge variant="success" appearance="dot">
+                          {t("agents.active")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral" appearance="dot">
+                          {t("agents.disabled")}
+                        </Badge>
+                      )}
+                    </Table.Cell>
+                    <Table.Cell sticky="right" className="w-12 text-end">
+                      <KeyMenu
+                        agentKey={k}
+                        elevated={
+                          activeElevation({ mode: ownModeOf(k), elevation: k.elevation }, now) !==
+                          undefined
+                        }
+                        onChangeMode={() => onChangeMode(k)}
+                        onElevate={() => onElevate(k)}
+                        onEndElevation={() => onEndElevation(k)}
+                        onRevoke={() => onRevoke(k)}
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            )}
+          </Table>
+        </LayerCard>
+      )}
+      {paging.total > paging.perPage && (
+        <Pagination
+          page={paging.page}
+          perPage={paging.perPage}
+          totalCount={paging.total}
+          setPage={paging.setPage}
+          controls="simple"
+        />
+      )}
+    </>
+  );
+}
+
 /** Account-level agent credentials (DESIGN.md §2a list + §2g one-time secret). */
 export function AgentsPage() {
   const { t, locale } = useI18n();
@@ -551,7 +651,10 @@ export function AgentsPage() {
       }
     >
       {view === "all" && seesAll ? (
-        <AllKeys onRevoke={setToRevoke} now={now} />
+        <>
+          <AllKeys onRevoke={setToRevoke} now={now} />
+          <ConnectedAgents all />
+        </>
       ) : (
         <>
           {notEnabled ? (
@@ -583,126 +686,20 @@ export function AgentsPage() {
             onExtend={(targets) => extendElevation.mutate({ targets })}
             extending={extendElevation.isPending}
           />
-          {notEnabled ? null : keys.data?.length === 0 ? (
-            <Empty
-              icon={<Key size={48} className="text-kumo-inactive" />}
-              title={t("agents.empty")}
-              description={t("agents.emptyDescription")}
-              commandLine="cloudhal mcp"
-              contents={
-                <Button variant="secondary" icon={<Plus />} onClick={() => setCreateOpen(true)}>
-                  {t("agents.createKey")}
-                </Button>
-              }
-            />
-          ) : (
-            <LayerCard className="overflow-x-auto p-0">
-              <Table>
-                <Table.Header>
-                  <Table.Row>
-                    <Table.Head>{t("agents.columns.name")}</Table.Head>
-                    <Table.Head>{t("agents.columns.mode")}</Table.Head>
-                    <Table.Head>{t("agents.columns.scopes")}</Table.Head>
-                    <Table.Head>{t("agents.columns.created")}</Table.Head>
-                    <Table.Head>{t("agents.columns.status")}</Table.Head>
-                    <Table.Head sticky="right" className="w-12">
-                      <span className="sr-only">{t("site.rowMenu")}</span>
-                    </Table.Head>
-                  </Table.Row>
-                </Table.Header>
-                {keys.isPending ? (
-                  <TableSkeleton columns={6} rows={3} />
-                ) : paging.pageItems.length === 0 ? (
-                  <Table.Body>
-                    <Table.Row>
-                      <Table.Cell colSpan={6}>
-                        <SectionEmpty
-                          icon={<Key size={32} className="text-kumo-inactive" />}
-                          title={t("agents.noMatches", { query: paging.search })}
-                        />
-                      </Table.Cell>
-                    </Table.Row>
-                  </Table.Body>
-                ) : (
-                  <Table.Body>
-                    {paging.pageItems.map((k) => (
-                      <Table.Row key={k.id} data-key-id={k.id}>
-                        <Table.Cell className="whitespace-nowrap">
-                          <div className="grid gap-0.5">
-                            <Text bold as="span">
-                              {k.name ?? t("agents.unnamed")}
-                            </Text>
-                            {k.start && (
-                              <Text variant="mono-secondary" as="span">
-                                {t("agents.keyPrefix", { start: k.start })}
-                              </Text>
-                            )}
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="whitespace-nowrap">
-                          <KeyModeCell agentKey={k} now={now} asks={asks.get(k.id)} />
-                        </Table.Cell>
-                        <Table.Cell>
-                          <div className="grid gap-1.5">
-                            <KeyScopes agentKey={k} />
-                            <AllowAnalytics agentKey={k} />
-                            <AllowComments agentKey={k} />
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="whitespace-nowrap">
-                          <div className="grid gap-0.5">
-                            <RelativeTime iso={k.createdAt} />
-                            <Text variant="secondary" size="sm" as="span">
-                              {k.expiresAt
-                                ? t("agents.expires", {
-                                    when: formatDate(locale, k.expiresAt, NUMERIC_DATE),
-                                  })
-                                : t("agents.never")}
-                            </Text>
-                          </div>
-                        </Table.Cell>
-                        <Table.Cell className="whitespace-nowrap">
-                          {k.enabled ? (
-                            <Badge variant="success" appearance="dot">
-                              {t("agents.active")}
-                            </Badge>
-                          ) : (
-                            <Badge variant="neutral" appearance="dot">
-                              {t("agents.disabled")}
-                            </Badge>
-                          )}
-                        </Table.Cell>
-                        <Table.Cell sticky="right" className="w-12 text-end">
-                          <KeyMenu
-                            agentKey={k}
-                            elevated={
-                              activeElevation(
-                                { mode: ownModeOf(k), elevation: k.elevation },
-                                now,
-                              ) !== undefined
-                            }
-                            onChangeMode={() => setToChange(k)}
-                            onElevate={() => setToElevate(k)}
-                            onEndElevation={() => endElevation.mutate([k])}
-                            onRevoke={() => setToRevoke(k)}
-                          />
-                        </Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                )}
-              </Table>
-            </LayerCard>
-          )}
-          {paging.total > paging.perPage && (
-            <Pagination
-              page={paging.page}
-              perPage={paging.perPage}
-              totalCount={paging.total}
-              setPage={paging.setPage}
-              controls="simple"
+          {!notEnabled && (
+            <MyKeysTable
+              keys={keys}
+              paging={paging}
+              now={now}
+              asks={asks}
+              onCreate={() => setCreateOpen(true)}
+              onChangeMode={setToChange}
+              onElevate={setToElevate}
+              onEndElevation={(k) => endElevation.mutate([k])}
+              onRevoke={setToRevoke}
             />
           )}
+          <ConnectedAgents />
         </>
       )}
       <CreateAgentKeyDialog open={createOpen} onOpenChange={setCreateOpen} endpoint={endpoint} />

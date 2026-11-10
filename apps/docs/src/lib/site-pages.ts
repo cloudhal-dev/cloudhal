@@ -81,6 +81,7 @@ const docsIndex: SitePage = {
 
 - [Agents and MCP](/docs/agents): local and remote servers, modes, approvals, skills.
 - [Connect an agent](/docs/agents/clients): Claude Code, Codex, Cursor, VS Code, Claude Desktop and more.
+- [Remote MCP clients by URL](/docs/guides/mcp-oauth): connect Claude, ChatGPT or Cursor without a key, see and disconnect connected agents, and the operator switches.
 - [Docs for agents](/docs/agents/docs-for-agents): Markdown pages, \`llms.txt\` and the docs MCP server.
 - [Harden a Cloudflare deployment](/docs/guides/cloudflare-hardening).
 

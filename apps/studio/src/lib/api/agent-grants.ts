@@ -5,6 +5,7 @@
  */
 import type { AgentScope, KeyMode } from "./agents.ts";
 import { json, listOf, request } from "./http.ts";
+import type { Role } from "./team.ts";
 
 /** One requested scope and what the member's role turns it into (`null`: not in the role). */
 export interface ConsentScope {
@@ -39,14 +40,23 @@ export interface AgentGrantSummary {
   id: string;
   agentId: string;
   clientId: string;
+  /** Self-asserted, made safe to show by the server (plain text, at most 100 characters). */
   clientName: string;
+  /** How the server knows the client, as the consent screen showed it. */
+  client: {
+    kind: "document" | "self-registered" | "server";
+    /** A metadata-document client's host: its identity. */
+    host?: string;
+    /** The well-known client the name looks like, when this is not that client. */
+    lookalike?: string;
+  };
   scopes: AgentScope[];
   effectiveScopes: AgentScope[];
   mode: KeyMode;
   effectiveMode: KeyMode;
   createdAt: string;
   lastUsedAt: string | null;
-  owner?: { userId: string; name: string | null };
+  owner?: { userId: string; name: string | null; role: Role | null };
 }
 
 export const agentGrantsApi = {
@@ -60,6 +70,9 @@ export const agentGrantsApi = {
       ...json(input),
     }),
   list: () => request<AgentGrantSummary[]>("/api/agent-grants").then(listOf<AgentGrantSummary>),
+  /** Every member's connections, with their owner (`agents:manage`). */
+  listAll: () =>
+    request<AgentGrantSummary[]>("/api/agent-grants?all=1").then(listOf<AgentGrantSummary>),
   revoke: (id: string) =>
     request<void>(`/api/agent-grants/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

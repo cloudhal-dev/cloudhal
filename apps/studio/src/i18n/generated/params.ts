@@ -226,6 +226,12 @@ export interface MessageParams {
   "common.deleteResource.typeToConfirm": { name: string | number };
   "common.deleteResource.warning": { name: string | number; type: string | number };
   "common.rev": { rev: string | number };
+  "connectedAgents.disconnectLabel": { client: string | number };
+  "connectedAgents.disconnectedDescription": { client: string | number };
+  "connectedAgents.identifiedBy": { host: string | number };
+  "connectedAgents.lookalike": { client: string | number };
+  "connectedAgents.setup.needsDcr": { client: string | number };
+  "connectedAgents.setup.needsPublicUrl": { url: string | number };
   "coverage.siteLanguage": { site: string | number; language: string | number };
   "diff.assignments.added": { taxonomy: string | number; name: string | number };
   "diff.assignments.primary": { taxonomy: string | number; name: string | number };

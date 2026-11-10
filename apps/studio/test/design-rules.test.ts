@@ -156,12 +156,28 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Empty",
     "Pagination",
     "DeleteResource",
-    "ClipboardText",
-    "McpClientSetup",
+    "ConnectMcpCard",
+    "ConnectedAgents",
     "CreateAgentKeyDialog",
   ],
   // Per-client MCP setup (docs/agents/clients.md), on the page and in the one-time key reveal.
   "components/McpClientSetup.tsx": ["Select", "CodeHighlighted"],
+  // RFC-0044 §4, §11: connecting by URL next to the key setup, and the connections it made.
+  "components/ConnectMcpCard.tsx": [
+    "SectionCard",
+    "Tabs",
+    "ClipboardText",
+    "McpClientSetup",
+    "McpOauthSetup",
+  ],
+  "components/McpOauthSetup.tsx": ["ClipboardText", "Select", "CodeHighlighted", "Banner"],
+  "components/ConnectedAgents.tsx": [
+    "SectionCard",
+    "Table",
+    "SectionEmpty",
+    "DeleteResource",
+    "ModeBadge",
+  ],
   // Navigation menus (§2t, RFC-0003 §8): the MenuTree editor with its preview, picker and delta.
   "routes/NavigationPage.tsx": [
     "PageLayout",
@@ -244,7 +260,8 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "Table",
   ],
   // Side panels are SectionCards; summaries inside dialogs are InsetPanels (DESIGN.md §1).
-  "routes/AgentsPage.tsx#layout": ["Crumbs", "SectionCard", "SectionEmpty"],
+  // Its SectionCards live in ConnectMcpCard and ConnectedAgents (required there).
+  "routes/AgentsPage.tsx#layout": ["Crumbs", "SectionEmpty"],
   "routes/SkillsPage.tsx#layout": ["Crumbs", "SectionCard", "SectionEmpty"],
   "components/CreateAgentKeyDialog.tsx#layout": ["InsetPanel"],
   "components/ChangeAgentModeDialog.tsx#layout": ["InsetPanel"],
