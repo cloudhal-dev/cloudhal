@@ -71,7 +71,7 @@ describe("corrections", () => {
     const html = renderInlineMarkdown(
       "<script>alert(1)</script> [x](javascript:alert(1)) ![pixel](https://evil.example/p.gif)\n\n# Not a heading",
     );
-    expect(html).not.toMatch(/<script|<img|<h1|javascript:|<p>/);
+    expect(html).not.toMatch(/<script|<img|<h1|javascript:|<p>/i);
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("pixel");
   });

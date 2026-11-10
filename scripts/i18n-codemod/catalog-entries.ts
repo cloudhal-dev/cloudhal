@@ -17,6 +17,25 @@ export interface CatalogEntry {
   comment?: string;
 }
 
+/**
+ * The body of a string literal (either quote) as the body of a JSON string: `\'` becomes `'`, a bare `"`
+ * is escaped, every other escape (`\\`, `\"`, `\n`, `\u…`) stays as written. One pass, so an
+ * escaped backslash before a quote is never taken apart (the replace chain it replaced turned
+ * `'a\\"b'`'s `\"` into `\\"`, which ends the JSON string early).
+ */
+export function stringBodyAsJson(body: string): string {
+  let out = "";
+  for (let k = 0; k < body.length; k++) {
+    const c = body[k] as string;
+    if (c === "\\") {
+      const next = body[k + 1] ?? "";
+      out += next === "'" ? "'" : `\\${next}`;
+      k++;
+    } else out += c === '"' ? '\\"' : c;
+  }
+  return out;
+}
+
 class Scanner {
   i = 0;
   readonly src: string;
@@ -53,9 +72,8 @@ class Scanner {
     while (this.src[j] !== quote) j += this.src[j] === "\\" ? 2 : 1;
     const body = this.src.slice(this.i + 1, j);
     this.i = j + 1;
-    return quote === '"'
-      ? (JSON.parse(`"${body}"`) as string)
-      : JSON.parse(`"${body.replace(/\\'/g, "'").replace(/"/g, '\\"')}"`);
+    // Either quote: `\'` is legal in a double-quoted literal too, and not in JSON.
+    return JSON.parse(`"${stringBodyAsJson(body)}"`) as string;
   }
 
   key(): string {
