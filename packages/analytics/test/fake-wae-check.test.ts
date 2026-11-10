@@ -33,6 +33,10 @@ describe("weightsBesideLiteralZero", () => {
     const start = performance.now();
     expect(weightsBesideLiteralZero("quantileWeighted(".repeat(10_000))).toBe(false);
     expect(weightsBesideLiteralZero(`quantileWeighted(${"if(".repeat(50_000)}`)).toBe(false);
+    // every `if(` shares one comma followed by a long run the probe has to scan
+    const shared = `quantileWeighted(${"if(".repeat(50_000)}x,${" ".repeat(50_000)}y`;
+    expect(weightsBesideLiteralZero(shared)).toBe(false);
+    expect(weightsBesideLiteralZero(`${shared.slice(0, -1)}double1,`)).toBe(true);
     expect(performance.now() - start).toBeLessThan(1500);
   });
 });

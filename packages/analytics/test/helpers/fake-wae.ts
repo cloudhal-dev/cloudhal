@@ -155,16 +155,33 @@ export class FakeWae implements WaeSqlBinding {
   }
 }
 
-const WEIGHT_ARG = /\s*double\d+\s*,/y;
+const isSpace = (c: string | undefined) => c !== undefined && /\s/.test(c);
+const isDigit = (c: string | undefined) => c !== undefined && c >= "0" && c <= "9";
+
+/** Whether `\s*double\d+\s*,` matches at `at`, scanned by hand (no regex to rescan). */
+function weightArgAt(q: string, at: number): boolean {
+  let i = at;
+  while (isSpace(q[i])) i++;
+  if (!q.startsWith("double", i)) return false;
+  i += 6;
+  const digits = i;
+  while (isDigit(q[i])) i++;
+  if (i === digits) return false;
+  while (isSpace(q[i])) i++;
+  return q[i] === ",";
+}
 
 /**
  * Whether `q` has `quantileWeighted(…if(<cond>, doubleN, …` before the next `;`: what
  * `/quantileWeighted\([^;]*?if\([^,]+,\s*double\d+\s*,/` tested, in one pass (that regex rescanned
  * from every `quantileWeighted(` and `if(`; CodeQL alert 8). A `quantileWeighted(` with no match
- * before its `;` means none of the later ones before that `;` match either.
+ * before its `;` means none of the later ones before that `;` match either, and each comma is
+ * probed once however many `if(` share it.
  */
 export function weightsBesideLiteralZero(q: string): boolean {
   let comma = -1;
+  // The last comma probed: a probe that matched returned at once, so a repeat can only fail.
+  let probed = -1;
   for (let at = q.indexOf("quantileWeighted("); at !== -1; ) {
     const semi = q.indexOf(";", at);
     const end = semi === -1 ? q.length : semi;
@@ -172,9 +189,9 @@ export function weightsBesideLiteralZero(q: string): boolean {
       // `[^,]+`: the condition runs to the first comma after `if(`, at least one character.
       if (comma < k + 3) comma = q.indexOf(",", k + 3);
       if (comma === -1) return false;
-      if (comma === k + 3) continue;
-      WEIGHT_ARG.lastIndex = comma + 1;
-      if (WEIGHT_ARG.test(q)) return true;
+      if (comma === k + 3 || comma === probed) continue;
+      probed = comma;
+      if (weightArgAt(q, comma + 1)) return true;
     }
     if (semi === -1) return false;
     at = q.indexOf("quantileWeighted(", semi + 1);

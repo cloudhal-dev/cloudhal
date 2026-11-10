@@ -1,4 +1,8 @@
-/** Alert 37: the i18n codemod decodes string literals of either quote without breaking escapes. */
+/**
+ * Alert 37: the i18n codemod (scripts/i18n-codemod, tested here with the other scripts, whose
+ * files this package's tsconfig covers) decodes string literals of either quote without breaking
+ * escapes.
+ */
 import { describe, expect, it } from "vitest";
 import { stringBodyAsJson } from "../../../scripts/i18n-codemod/catalog-entries.ts";
 
