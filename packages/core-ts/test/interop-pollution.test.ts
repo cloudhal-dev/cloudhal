@@ -116,6 +116,35 @@ describe("A2UI inputs whose component id is a reserved key", () => {
   );
 });
 
+describe("an A2UI input whose component id is __proto__", () => {
+  it("converts: the id is folded to a plain one, and so is its data key", () => {
+    const r = fromA2ui(
+      [
+        { version: v, createSurface: { surfaceId: "s", catalogId: A2UI_BASIC_CATALOG } },
+        {
+          version: v,
+          updateComponents: {
+            surfaceId: "s",
+            components: [
+              { id: "root", component: "Column", children: ["__proto__"] },
+              { id: "__proto__", component: "TextField", label: "Name", text: "Ada" },
+            ],
+          },
+        },
+      ],
+      { sectionId: "sec_pollute004", catalog: catalog.id },
+    );
+    expect(r.surface.data).toEqual({ proto: "Ada" });
+    expect(Object.getPrototypeOf(r.surface.data)).toBe(Object.prototype);
+    expect(r.surface.components.find((c) => c.component === "TextField")).toMatchObject({
+      id: "proto",
+      props: { value: { path: "/proto" } },
+    });
+    expect(({} as Record<string, unknown>).Ada).toBeUndefined();
+    expect(checkSurface(r.surface, catalog).issues).toEqual([]);
+  });
+});
+
 describe("surface pointers with reserved keys", () => {
   const surface = (data: unknown, components: unknown[]) =>
     ({ id: "sec_pollute002", kind: "surface", catalog: catalog.id, data, components }) as never;

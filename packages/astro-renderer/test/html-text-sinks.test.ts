@@ -7,18 +7,22 @@
  * Callers → sinks: `markdownText` → archive `description` → `<meta name=description>`,
  * `og:description`, `twitter:description` (Astro attributes) and JSON-LD (`jsonLdText`), and the
  * archive feed's RSS `<description>` (`xml()`); `inlineMarkdownText` → correction notes in JSON-LD;
- * `tableOfContents` → TOC labels (Astro text, `{item.text}`). Search snippets and `llms.txt` do
+ * `tableOfContents` → TOC labels (Astro text, `{item.text}`); Studio's archive preview
+ * (`renderArchivePreview`) → its `<meta name=description>` (`esc()`). Search snippets and `llms.txt` do
  * not go through `htmlText`; the snippet's own sink (`snippetHtml`, inserted as HTML) is checked
  * here too, and `llms.txt` is Markdown served as `text/plain`.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
-import { MARK_CLOSE, MARK_OPEN } from "@cloudhal/core-ts";
+import { MARK_CLOSE, MARK_OPEN, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { MemoryBlobStore } from "@cloudhal/storage";
+import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { addAttribute, escapeHTML } from "astro/runtime/server/index.js";
 import { type DefaultTreeAdapterMap, parse, parseFragment } from "parse5";
 import { describe, expect, it } from "vitest";
 import { archiveFeedXml } from "../src/feeds.ts";
 import { tableOfContents } from "../src/kit.ts";
 import { markdownText, renderMarkdown } from "../src/markdown.ts";
+import { renderArchivePreview } from "../src/preview.ts";
 import { snippetHtml } from "../src/search.ts";
 import { archiveHead, entryHead, jsonLdText } from "../src/seo.ts";
 
@@ -123,7 +127,7 @@ describe("htmlText's sinks with decoded markup in the text (alert 41)", () => {
       expect(headMarkup(html)).toEqual(["script"]);
       expect(JSON.parse(text)).toEqual(JSON.parse(JSON.stringify(doc)));
     }
-    expect(JSON.stringify(head.jsonLd)).toContain(DECODED.replace(/"/g, '\\"'));
+    expect(JSON.stringify(head.jsonLd)).toContain(JSON.stringify(DECODED).slice(1, -1));
   });
 
   it("correction notes (inlineMarkdownText) in the article's JSON-LD", () => {
@@ -174,5 +178,50 @@ describe("htmlText's sinks with decoded markup in the text (alert 41)", () => {
   it("search snippets (not htmlText, but inserted as HTML): only the <mark>s are markup", () => {
     const html = snippetHtml(`a ${MARK_OPEN}${DECODED}${MARK_CLOSE} b`);
     expect(fragmentMarkup(html)).toEqual(["mark"]);
+  });
+
+  it("Studio's archive preview: the description meta through esc(), the intro as rendered markdown", async () => {
+    const store = new SiteGraphStore({
+      sql: await BetterSqlite3Driver.open(":memory:"),
+      blobs: new MemoryBlobStore(),
+    });
+    await store.init();
+    const seeded = await seedStarterSite(store, { name: "Archive", slug: "archive" });
+    const terms = await store.listTerms(seeded.id);
+    const news = terms.find((t) => t.slug === "news") as (typeof terms)[0];
+    const locale = seeded.defaultLocale;
+    const intro = `Intro ${ATTACK}`;
+    const doc = renderArchivePreview(seeded, {
+      taxonomies: await store.listTaxonomies(seeded.id),
+      terms: terms.map((t) =>
+        t.id === news.id
+          ? {
+              ...t,
+              labels: {
+                ...t.labels,
+                [locale]: { ...(t.labels[locale] as object), name: "News", description: intro },
+              },
+            }
+          : t,
+      ),
+      termId: news.id,
+      entries: await store.listContentEntries(seeded.id, {}),
+    });
+    const tree = parse(doc.html) as unknown as Node;
+    const meta = firstElement(tree, "meta");
+    expect(meta).toBeDefined();
+    const description = [tree]
+      .flatMap(function all(n: Node): Node[] {
+        return [n, ...("childNodes" in n ? n.childNodes.flatMap((c) => all(c as Node)) : [])];
+      })
+      .find(
+        (n) =>
+          "tagName" in n &&
+          n.tagName === "meta" &&
+          n.attrs.some((a) => a.name === "name" && a.value === "description"),
+      ) as DefaultTreeAdapterMap["element"] | undefined;
+    expect(description?.attrs.find((a) => a.name === "content")?.value).toBe(`Intro ${DECODED}`);
+    const found = markup(tree);
+    for (const tag of ["script", "img", "svg", "#comment"]) expect(found, tag).not.toContain(tag);
   });
 });
