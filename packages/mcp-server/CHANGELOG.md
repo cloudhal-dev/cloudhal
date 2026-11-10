@@ -1,5 +1,24 @@
 # @cloudhal/mcp-server
 
+## 0.7.0
+
+### Patch Changes
+
+- d363160: Remote MCP clients can now register themselves (RFC-0044 Phase 3a, ADR-0045). Clients that name an HTTPS Client ID Metadata Document as their `client_id` (Claude Code, Codex, VS Code) are accepted through `@better-auth/cimd`, fetched with the media import's SSRF-safe transport (pinned on Node, DoH-checked on Workers; https only, public addresses only, no redirects, 5 KB, 5 s). Clients without one (Cursor) use dynamic client registration at `/api/auth/oauth2/register`: public clients only, rate-limited per address and per day, capped at 5,000, and pruned by the scheduler after 30 unused days. Document clients are fetched at most hourly per client, with budgets in Cloudhal's own counters that never lock out stored clients, a cap of 5,000 that evicts unused clients (the well-known clients' hosts are exempt), pruning after three hours unused, and a failed refetch that refuses the client; migration `0032_oauth_client_kind_index` indexes them. Redirect URIs must be https, loopback http (any port) or a native app's private-use scheme (`cursor`, `vscode`, reverse-domain, `CLOUDHAL_MCP_REDIRECT_SCHEMES`), and the client host list applies at every authorization. With DCR off, the clients it registered earlier cannot start new authorizations. The consent screen shows client names plain and short, a document client's host first, and marks self-registered clients as unverified. `CLOUDHAL_MCP_CIMD=off`, `CLOUDHAL_MCP_DCR=off`, `CLOUDHAL_MCP_CLIENT_HOSTS` and `CLOUDHAL_MCP_REDIRECT_SCHEMES` control it on both runtimes, and the Docker compose file passes them through. The Phase 2 server-side test client (`OauthServer.createClient`) is removed. `set_embargo` through an OAuth connection now files the gate for a person's approval instead of leaving it unapplied, and the request is notified while it waits. `safeFetch` results carry the response headers.
+- e6fe6eb: Studio shows "Connected agents" and how to connect an MCP client by URL (RFC-0044 Phase 3b). On `/agents`, each member sees the apps they connected through OAuth. A client is named as the consent screen named it: a metadata document's host first, a self-registered client as not verified, a name that looks like a well-known client with a warning. Each row shows what the connection can do in words, its mode and when it was last used, and has Disconnect, which uses the existing revoke. Administrators see every member's connections under **All keys**. "Connect an MCP client" gains a **Connect by URL** tab: the deployment's `/mcp` URL, steps for Claude, Claude Code, ChatGPT and Codex, Cursor, VS Code and the MCP Inspector, and a note where a client needs dynamic client registration that is off.
+  
+  `GET /api/agent-grants` now returns `client` (`kind`, a document client's `host`, `lookalike`) with the name sanitized, and with `?all=1` each owner's `role`. `/api/instance` reports `features.mcpOauthClients`: the `/mcp` resource, and whether metadata documents and dynamic registration are on. The new guide is `docs/guides/mcp-oauth.md`, and the MCP server README has an Authentication section.
+- Updated dependencies [6057871]
+- Updated dependencies [d363160]
+  - @cloudhal/storage@0.7.0
+  - @cloudhal/core-ts@0.7.0
+  - @cloudhal/agent-runtime@0.7.0
+  - @cloudhal/analytics@0.7.0
+  - @cloudhal/astro-renderer@0.7.0
+  - @cloudhal/comments@0.7.0
+  - @cloudhal/schedules@0.7.0
+  - @cloudhal/core-contracts@0.7.0
+
 ## 0.6.5
 
 ### Patch Changes
