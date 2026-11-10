@@ -1,6 +1,6 @@
 # RFC-0045: Collections stage 4: reference fields and repeaters
 
-- Status: Draft (revised five times on 2026-11-10, after an independent review of PR #193 and four verification passes; the review log and the implementation watch list are at the end)
+- Status: Draft (revised six times on 2026-11-10, after an independent review of PR #193 and five verification passes; the fifth revision departed from the PM's index-mode request for purges, see "Owner decisions"; the review log and the implementation watch list are at the end)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-10
 - Related:
   - [#114](https://github.com/cloudhal-dev/cloudhal/issues/114) (this stage); #71 (the collections plan).
@@ -20,6 +20,22 @@
       - [OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs): types plus `anyOf`; no `allOf`/`not`/`if`; "Root objects must not be `anyOf`"; every property required, optional ones as a `null` union; up to 5,000 properties, 10 levels of nesting and 1,000 enum values; recursion allowed; `oneOf` not mentioned.
       - [Anthropic](https://platform.claude.com/docs/en/build-with-claude/structured-outputs): `anyOf`, and `$defs`/`$ref` without recursion; no `minimum`/`maximum`/`minLength`/`maxLength`; `minItems` only 0 or 1; per request at most 20 strict tools, 24 optional parameters, and 16 parameters with union types (`anyOf` or type arrays).
 
+## Owner decisions
+
+The verification passes left these for the owner to ratify explicitly:
+
+1. **Purges read the two snapshots, not the index.** Every publish path computes referrer purges from the immutable `from` and `to` bodies: one bundle plus the missing hashes (§2, Purges point 4). It is exact by construction. An index probe cannot see a referrer edited away or deleted after the snapshot, which is why the fifth revision departed from the PM's index-mode request; the verifiers confirmed that departure.
+   - **Cost:** on a 5,000-entry site, about 25 shard reads and 21 MB per publish that touches references, adding roughly 0.5 to 1.5 s to the publish response.
+   - **Short-circuit:** sites without reference definitions skip it entirely.
+   - **Fallback:** without either bundle, or past the read, byte or node budgets, the publish purges the whole site cache. That is safe, but it spends a purge.
+2. **Archiving a group's last member does not release a lock.** While a published entry shows a reference, the group's last member (not archived, in an allowed collection) cannot be deleted, moved away or relinked. Archiving it first is allowed but does not help. Unpublish or edit the referrers, as the delete dialog says (§2.2, §5).
+3. **Phase 2 changes behaviour on every existing site**, before the types exist (Compatibility):
+   - `translation_group_in_use`;
+   - the `readsOriginal`/`originalOf` tightening (OQ 14);
+   - the group check on group-only changes;
+   - canonical import bodies;
+   - the always-on collections anchor.
+
 ## Summary
 
 Two new field types join RFC-0041's nine:
@@ -34,7 +50,7 @@ A reverse index, `entry_refs`, holds one row per stored value, whatever the targ
 
 Archiving or unpublishing a target is always allowed. The renderer resolves only what the published snapshot shows *at that instant*, gates included, so an unresolved reference renders as nothing, and publish warns but never fails. Assets used inside repeaters count in `asset_refs`, like any field's assets.
 
-Resolution is breadth-first, at most two levels deep, under a budget per page. A publish purges referrers' own pages, found through `entry_refs`, whenever a target group changes, becomes visible, or changes its cover. This needs no new cache tags and no theme code.
+Resolution is breadth-first, at most two levels deep, under a budget per page. A publish purges referrers' own pages, found from the published and the previous snapshot's bodies, whenever a target group changes, becomes visible, or changes its cover. This needs no new cache tags and no theme code.
 
 Studio gets an entry picker and nested repeater forms from new `@cloudhal/ui` blocks. The four field operations learn the new types.
 
@@ -253,7 +269,7 @@ CREATE INDEX entry_refs_target ON entry_refs (site_id, target_id, source_status)
 
 **Invariant (the index).** `entry_refs` holds exactly one row per `(node, field path, stored group id)`, whatever the target's state: present, missing, archived or foreign. Rows depend on the holder's body and on its collection's definitions (`localized` decides `shared`). Nothing changes them except a write of the holder, its deletion, a rebuild, or `set_field_localized`'s phase A (§7).
 - **No cross-tenant pinning.** Every guard and lookup filters `r.site_id` (the holder's site) and `n.site_id` (the member's site). A row naming another tenant's id pins nothing there and never resolves.
-- **Repeats.** A target named in two repeater items (a host who also gives a talk) is one row: the writer deduplicates `(field, target)` pairs, and the writer's `INSERT` is a **plain** `INSERT`. The anchored `DELETE` runs first in the same batch, so no key conflict remains to ignore, and any constraint failure fails the batch.
+- **Repeats.** A target named in two repeater items (a host who also gives a talk) is one row: the writer deduplicates `(field, target)` pairs *after* canonicalizing member ids to group ids, so two members of one group in two items are one pair. The writer's `INSERT` is a **plain** `INSERT`. The anchored `DELETE` runs first in the same batch, so no key conflict remains to ignore, and any constraint failure fails the batch.
 - **`shared`** is a pure function of the definition: 1 for `localized: false`, 2 for `localized: true`. It no longer encodes the holder's role, which the first revision computed at write time and which went stale when a node changed group.
   - *Who* inherits is decided at batch time by the fragment below, exactly as `readsOriginal` decides it (`fields/resolve.ts:37-41`): members `m` of this site whose `translation.group` is the holder's id, who are not the holder, and whose own `translation.source` is not in another site.
   - A translation's own value, and any value held in an edition site (where no node has the group's id, `originalOf`, `store/entry-fields.ts:54-62`), therefore inherits to nobody, whatever its `shared` (open question 12).
@@ -309,13 +325,16 @@ The member probe uses `nodes_translation_locale` (migration 0025: `site_id, kind
               FROM nodes s, json_each(json_extract(s.body, ?)) d          -- ? = '$.collections."<key>".fields'
              WHERE s.id = ? AND s.kind = 'site'
                AND (json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
-                    OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))),
+                    OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))
+             ORDER BY json_extract(d.value, '$.key') = json_extract(p.value, '$.k') DESC LIMIT 1),
            ?
     FROM json_each(?) p WHERE <anchor>
     ```
   - Batches run one at a time, so the row reflects the site either before phase A, which phase A's `UPDATE` then corrects, or after it.
   - **During a rename.** `rename_field`'s phase A renames the definition and keeps the old key in `migration.fromKey` (`fields-operations/plan.ts:131-139`). A holder write planned before phase A, which changes no fields and so carries no definitions anchor, still finds its definition through `fromKey`. `rename_field` does not change `localized`, so the value is right.
-  - **A key with no definition at all** at batch time yields `NULL`. With a plain `INSERT`, the `NOT NULL` column then fails the whole batch, which the store maps to a `ConflictError`, and the caller retries under the current definitions. (The fourth revision's `INSERT OR IGNORE` would have skipped the row silently: SQLite's conflict clause covers `NOT NULL` too. A verifier confirmed this in sqlite3.)
+    - A new field may reuse a running rename's old key once phase B has emptied it. Then both definitions match, and the exact key wins (`ORDER BY … DESC LIMIT 1`).
+  - **A key with no definition at all** at batch time yields `NULL`. With a plain `INSERT`, the `NOT NULL` column then fails the whole batch, which the store maps to a `ConflictError`, and the caller retries under the current definitions.
+    - The mapping matches only `NOT NULL constraint failed: entry_refs.shared`, by message, as `errors.ts:51` already matches `UNIQUE constraint failed`. Any other constraint failure still surfaces as an error, never as an endless 409 loop. (The fourth revision's `INSERT OR IGNORE` would have skipped the row silently: SQLite's conflict clause covers `NOT NULL` too. A verifier confirmed this in sqlite3.)
 
 A target deleted or moved between check and batch fails the guard, and `diagnose()` names it (`unknown_entry`, `reference_target_moved`). One bound parameter carries the whole list (D1 allows 100 parameters), and 100 group ids stay far below 100 KB per statement.
 
@@ -334,7 +353,7 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
                          AND r.source_collection || '.' || r.field NOT IN (SELECT value FROM json_each(:P))) )
     ```
     The second `NOT EXISTS` makes a blocking row from a field the plan did not see, committed in between, fail the batch, so the write retries and re-plans with that field. The first revision's form let it through: `events.venue` allows `[places, halls]` and `talks.room` allows `[places]`; a talk published meanwhile with `room` = G is stranded once the last member in `places` goes.
-  - **The collections anchor**, `json((SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)`, bound with the canonical JSON of `site.collections` of the `Site` object the write planned with.
+  - **The collections anchor**, `json((SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)`, bound with the canonical JSON of `site.collections` of the `Site` object the write planned with. When the planned site has no `collections`, the write binds SQL `NULL`, never the string `'null'` (`json('null') IS NULL` is false), so `NULL IS NULL` holds.
     - It holds every collection's definitions and every field-operation marker, so it covers the referrer fields whose allowed collections the guard used (R4) and the markers `field_operation_running` reads (R12).
     - Unlike the site hash used in the fourth revision, it ignores `publishedSnapshotId`, theme, menus and other settings, so a publish no longer makes concurrent deletes and moves answer 409.
     - Canonical bodies (§2.1, §2.4) keep the comparison live.
@@ -368,7 +387,8 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
 | R7 | a referrer becoming published ↔ deleting its target | the publish re-checks all own values with the target guard. The delete sees the referrer's new `source_status`, because its rows are rewritten in the same batch. |
 | R8 | publishing a translation that *inherits* the value ↔ deleting the target | when the publish is first, the delete's fragment reads member status at batch time. When the delete is first, nothing published showed the value at that moment. **Accepted:** the translation goes live with a warning and renders nothing; no guard can refuse a write the translator cannot fix. |
 | R9 | field-operation phase B ↔ deleting a target | the target guard ANDed into each rewritten entry's CAS (point 6) |
-| R10 | import, restore or sync ↔ anything | one atomic batch with the index rebuilt in it (point 4) |
+| R10 | import, restore or sync ↔ anything | one atomic batch with the index rebuilt in it, *only* when that batch writes the node set. An `unchanged` import rebuilds nothing, so it cannot overwrite a concurrent writer's rows (point 4). |
+| R17 | the step-7 job ↔ a referrer write | the job's per-node statements are anchored on each node's read hash, and a node that moved is skipped, because its writer already wrote fresh rows (point 4) |
 | R11 | a member reappearing (a new translation or edition member) | rows are kept whatever the membership (the invariant), so nothing needs re-creating |
 | R12 | a reference shown only through an in-flight text → reference conversion ↔ deleting its target, including a delete planned *before* phase A commits | `field_operation_running` refuses the delete until the marker is gone. The collections anchor, on every delete, move and group change, fails a batch planned before the marker. Purges of a snapshot carrying any marker purge everything (§2, Purges). |
 | R13 | a blocking row from a field the plan did not see ↔ delete, move or group change | the unseen-field `NOT EXISTS` with the planned pairs `P` |
@@ -377,14 +397,20 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
 | R16 | a status-only or title-only write of a holder ↔ `set_field_localized` or `rename_field` phase A | `shared` is read from the site row inside the plain `INSERT … SELECT` at batch time, matched by `key` or `migration.fromKey`. Phase A's `UPDATE` corrects rows written before it. A missing definition fails the batch (`ConflictError`, retry) instead of dropping rows (§2.1). |
 
 **4. Rebuilds** run in the same batch as the node set: `importSite`/`pull`/`push` (`sync-plan.ts:308`), `cloudhal import --replace` and `--revert`, and snapshot restores.
+- **Only when the batch writes the node set.** `nodeBatch` (`sync-plan.ts:295-308`) adds the node `DELETE`/`INSERT` only when `!changes.unchanged && !changes.conflict`. `entryRefsRebuild` is emitted under exactly that condition.
+  - On an import planned `unchanged` it is skipped. Its rows would come from bodies read at plan time, and they could overwrite a writer's fresher rows that committed between plan and batch. The writers' own rows are already current there.
+  - **`refsRebuild` for `asset_refs` has the same hole on main today**: it is pushed unconditionally at `sync-plan.ts:308`. Step 0 fixes it the same way (tracked in its own issue).
 - `entryRefsRebuild(siteId, rows)` builds the rows from the bodies, with the site's definitions from the site row, as `refsRebuild` does (`media/refs-rebuild.ts:12-37`), and `DELETE`s and `INSERT`s them under `site_id = ?`.
   - It computes `shared` in JS from the same site row, so no `NULL` can arise.
   - It reads body keys through any `migration.fromKey` the site row carries, as `resolveFields` does. A bundle exported mid-operation then keeps rows for the entries that were not yet rewritten.
 - There is no membership join: the invariant keeps rows for every stored value, and the site filters keep them harmless.
 - The `INSERT` is chunked so each statement stays below 90 KB, inside the one atomic batch.
 - **Statement budget.** The chunked `INSERT`s count against the import batch's 1,000-statement cap (`sync-plan.ts:311`), like every other statement there.
-- **Step 7** also runs a one-time `entryRefsRebuild` per site as an admin job, the pattern of `lists.backfill`. Each site's rebuild is **one atomic batch**: the `DELETE` and its chunked `INSERT`s together, so there is never a window without rows.
-  - A site too large for one batch gets `INSERT OR IGNORE` chunks only, with no `DELETE`, resumable by cursor. That is safe, because it can only add missing rows, and its `shared` is computed in JS, so it is never `NULL`.
+- **Step 7** also runs a one-time per-site rebuild as an admin job, the pattern of `lists.backfill`, whose chunks are guarded on the hash each row was computed from (`list-values/backfill.ts`).
+  - It never does a site-wide `DELETE`. For each entry node read with hash *h*, it emits one pair, `DELETE FROM entry_refs WHERE source_id = ? AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = :h)` and the node's `INSERT … WHERE EXISTS (… hash = :h)`, in chunks, resumable by cursor.
+  - A node whose hash moved since the read matches nothing and is skipped: its writer has already rewritten its rows.
+  - Rows of nodes that no longer exist go with `DELETE FROM entry_refs WHERE site_id = ? AND source_id NOT IN (SELECT id FROM nodes WHERE site_id = ?)`.
+  - Its `shared` is computed in JS from the site row read with the chunk, and each chunk also carries the collections anchor, so a definitions change between read and batch fails the chunk, which is retried.
   - **Canonical rows, from phase 2, not step 7.** The anchors ship in phase 2, so phase 2 also ships an admin job that rewrites existing node rows canonically. It is per row and guarded by CAS (`UPDATE nodes SET body = ? WHERE id = ? AND hash = ?`, hash unchanged, rule 4), so it cannot race a write. That covers rows imported verbatim before phase 2, and imports that planned `unchanged` (`sync-plan.ts:257, 295`), so the anchors are live on every collection. Step 7 runs it once more.
   - It is a safety net: the gate (§1) means it should find nothing.
 
@@ -447,22 +473,38 @@ R8 and R14 are the accepted exceptions, both warned (open question 13). Dangling
    - hop 2: the referrers of the groups of the hop-1 referrers.
 
    Each page reached adds the node tags of its referrer and of every member of that referrer's group, so all of its language versions go. The walk takes referrers from **both** snapshots' bodies, whatever their status: over-purging is cheap, and a page cached from `from` is reached even when `to` no longer shows the reference.
-3. **"Used by" pages.** For every changed, added or removed entry, the planner also adds the node tags of the members of every group its before *or* after **resolved** values name. Resolution uses `resolveFields` with the same-site original read from the same snapshot, so a translation that only inherits its original's `venue` counts too.
+3. **"Used by" pages.** For every changed, added or removed entry, and every entry the asset rule reaches (its cover changed), the planner also adds the node tags of the members of every group its before *or* after **resolved** values name. Resolution uses `resolveFields` with the same-site original read from the same snapshot, so a translation that only inherits its original's `venue` counts too.
    - A venue page that renders `referencedBy` ("events here") is purged when an event naming it appears, disappears or changes, with no theme code, because the target's page carries its own node tag.
    - `referencedBy` results are drawn as cards: title, URL, summary and cover. Drawing *their* fields and references on the target page is outside the purge guarantee, and `docs/guides/fields.md` says so.
-4. **One mode, exact by construction: the snapshots' own bodies.** The planner never consults the working copy for referrers.
+4. **One mode, exact by construction: the snapshots' own bodies.** The planner never consults the working copy or `entry_refs` for referrers.
    - Referrers, both hops, inheriting members (`COALESCE(translation.group, id)`) and "used by" are all computed from the immutable `from` and `to` entry bodies: each body's resolved reference values (`fieldsReferences(defs, body)`, through that snapshot's own definitions, with its same-site original for inheritance).
-   - It reads both snapshots' **bundles** (RFC-0010: 256 bodies per shard, `bundles.ts`). Every snapshot made to be published gets one (`snapshots.ts:102-110`), and the live one has one, so a 10,000-entry site costs about 80 shard reads. A missing bundle falls back to node-by-node reads.
-   - This covers every publish path alike: the default path, an older snapshot, an approved request (`approvals.ts:343-356`), a rollback, a release run (re-planned at run time, not replayed from `releases.ts:154`), and a restore or import that moves the pointer. `PublishChange` stays `{from, to}`.
+   - **Short-circuit.** When neither snapshot's site node defines a `reference` field, or a repeater with a `reference` sub-field, the referrer closure is skipped entirely. Sites without references keep today's purge cost, and phase 3 costs nothing anywhere until step 7 enables the types.
+   - **One hash-keyed body cache over both snapshots.** The planner already keeps one: `bodies`, keyed by content hash (`cache-purge.ts:122-131`).
+     - It loads **one** bundle: `to`'s when it exists, otherwise `from`'s (RFC-0010, 256 bodies per shard, `bundles.ts:65-114`).
+     - It then reads only the hashes still missing, one node each. Those are typically the `before` bodies of the diff, which today's planner reads anyway. Only those reads count against `maxReads`.
+     - Bundles are not guaranteed. A bundle is written only for reason `publish`, best effort (`snapshots.ts:104-107`). Release runs' `scheduled` snapshots get none (`release-apply.ts:224`). The `bundles/` prefix expires after 30 days (RFC-0010 Retention). A live snapshot regains one only when the site Worker reads through (`source.ts:390`).
+     - The cache covers all of these. A release run costs the live snapshot's bundle plus its items, an approval of a manual snapshot costs `from`'s bundle plus the diff, and only a far rollback with neither bundle falls back.
+   - **Streaming.** Shards are parsed one at a time. From each body the planner keeps only what the closure needs: id, group, collection, status, and the resolved reference values. The full body is dropped, except for the few the rest of the planner reads.
+   - This covers every publish path alike: the default path, an older snapshot, an approved request (`approvals.ts:343-356`), a rollback, a release run, and a restore or import that moves the pointer. `PublishChange` stays `{from, to}`.
+     - Release runs re-plan at run time: the executor calls `planCachePurge({ from: baseSnapshotId, to: snapshotId })` after `publishRelease` commits, instead of replaying the stored plan (`releases.ts:146-157`).
+     - `RELEASE_EXECUTOR_COST` (`releases.ts:124`, 16 today) rises by the re-plan's statements: two `getSnapshot` reads plus its node reads, budgeted by `maxReads`. Its comment says so.
    - **Any field-operation marker on `from`'s or `to`'s site node purges everything.** That covers text → reference conversions in flight and renames. Operations are rare, so this is cheap, and it is obviously safe.
    - `entry_refs` stays the source for guards, Studio's "Used by", `list_references` and the live `referencedBy`, never for purges.
-   - **Why not the index on the default path?** The PM's decision for this round proposed index mode there, with a freshness check inside each hop's `SELECT`. It is not exact. A probe returns only rows that *still* name the target, so a referrer in `to` that was edited to stop naming it, or deleted, after the snapshot is never returned, and its hash cannot be compared. Detecting that needs a whole-site change check. The cheap ones are not sound: `count(*)` with `sum(rev)` and `max(rowid)` misses a delete of the newest row followed by an insert that reuses its rowid (`nodes` has no `AUTOINCREMENT`, migration 0001). Reading the bodies the snapshot already holds is both simpler and exact.
+   - **Why not the index on the default path?** The PM's decision for the fifth round proposed index mode there, with a freshness check inside each hop's `SELECT`. It is not exact. A probe returns only rows that *still* name the target, so a referrer in `to` that was edited to stop naming it, or deleted, after the snapshot is never returned, and its hash cannot be compared. Detecting that needs a whole-site change check. The cheap ones are not sound: `count(*)` with `sum(rev)` and `max(rowid)` misses a delete of the newest row followed by an insert that reuses its rowid (`nodes` has no `AUTOINCREMENT`, migration 0001). Reading the bodies the snapshot already holds is both simpler and exact. The verification of d8a436cc confirmed this.
 5. **Every path that changes visibility** purges by point 4: publish (any snapshot), rollback, release run, and an import or restore that moves the published pointer. Archive, delete and unpublish change only the working copy and go live through one of these.
    - Time-based visibility (an embargo opening, `availability.until`, a derived `hide`/`unlist` expiry) needs no purge: the gate-index TTL expires the page at that instant (`availability.ts:94-95`).
 6. **Bounds and fallback.**
-   - Each bundle shard read, and each node read where no bundle exists, counts against `maxReads` (2,000). Tags stop being collected at `maxTags + 1` (300 tags). Exceeding either purges everything, as any large diff does today (`cache-purge.ts`, "Falls back to purging everything").
-   - With bundles, a site of up to about 250,000 entries stays within `maxReads`. Without them, about 1,000 entries per snapshot do.
-   - The work is in memory, linear in the entries, as the snapshot source already does when it loads (`source.ts` `#load`). `SnapshotReader` gains `readSnapshotBundle` (`store.ts:949`).
+   - **Reads:** node reads beyond the one bundle count against `maxReads` (2,000), and so do bundle shard reads.
+   - **Size:** a byte budget on the bodies loaded (`maxBodyBytes`, default 32 MB) and a node budget (`maxNodes`, default 50,000) are checked *before* each shard is parsed.
+   - **Tags:** collection stops at `maxTags + 1` (300 tags).
+   - **The fallback:** exceeding any budget purges everything, as any large diff does today (`cache-purge.ts`, "Falls back to purging everything").
+   - **Why the size budgets exist.** The purge runs inside the awaited publish request (`admin-worker.ts:453-468`, `store.ts:1107`). An isolate that runs out of memory would never reach the planner's `catch` and would skip the purge silently. The budgets turn that into an explicit purge-everything.
+   - **Cost on a realistic site** (5,000 entries, about 6,250 nodes, depth 2), as the verifier measured it:
+     - about 25 shard reads for one bundle, 6 at a time (`BLOB_CONCURRENCY`), against about 207 node reads one after another today;
+     - about 21 MB of JSON read;
+     - roughly 0.5 to 1.5 s more on the publish response, and 100 to 200 ms of CPU.
+
+     Purge-everything does not become the common case. As a side benefit, the asset rule, which today reads every entry, page and term body one by one (`cache-purge.ts:222-231`), now reads from the cache.
 7. **Compatibility.** `isCloudhalCacheTag` (`cache-tags.ts:48`) and the site Worker's purge endpoint (`cloudflare-entry.ts:312-325`) are unchanged, so an older site Worker accepts every purge, and no id of an unresolved target reaches any header.
    - `SnapshotReader.readSnapshotBundle` is the one reader addition. The store has it already, and the release executor's run-time reader gets it too.
    - The first revision's `cloudhal-ref-<group>` tags are dropped. Existing themes build their own tag lists (`starters/blog/src/pages/[...path].astro:261-321`), new prefixes would make older site Workers answer 400, and ids in headers relied on unverified stripping.
@@ -534,7 +576,7 @@ interface GraphSource {
   - per entry: 100 reference values (code, §1);
   - per render: **200 resolved targets**, shared by every `entryFields` call of one request (`MediaContext.budget` already carries per-request budgets).
 
-  Over budget, the remaining targets resolve to nothing with one `console.warn`, never an error. Purges do not depend on what rendered: they go through the index (§2, Purges). A listing of 20 events at depth 1 costs 20.
+  Over budget, the remaining targets resolve to nothing with one `console.warn`, never an error. Purges do not depend on what rendered: they read the snapshots' bodies (§2, Purges). A listing of 20 events at depth 1 costs 20.
 - **Batching.**
   - The snapshot source does no store reads: every lookup is in memory, and bundles (RFC-0010) need nothing new.
   - The live source (`cloudhal dev`, previews) makes one store read per level: `getGroupMembers(siteId, ids)`, a `json_each` IN list with §2's membership form, served by `nodes_translation_locale` and the primary key.
@@ -745,10 +787,10 @@ New rows of the closed table (`conversions.ts:38`):
 
 | Threat | Mitigation | Test |
 |---|---|---|
-| **A draft, archived, embargoed or hidden target leaks through a published referrer** (the snapshot holds drafts, and `Loaded` holds published entries before gates) | Resolution filters through the view's gates at its instant (§4); only gate-independent card parts are cached. A card carries only the member's public title, summary, URL and cover image, the image through the view's asset gates. Unresolved values render nothing: no id, no `data-` attribute, no empty link. JSON-LD's `reference` source uses the same cards. | RFC-0008's route sweep (extended by RFC-0042) gains a published referrer pointing at a draft, an archived, an embargoed and a `hide`-expired target, before and after their instants. No id, slug, title or asset of a hidden target may appear in HTML, JSON-LD, feeds, the sitemap, search, `llms.txt`, status pages or response headers. Purges go through the index, so no header carries target ids (§2). |
+| **A draft, archived, embargoed or hidden target leaks through a published referrer** (the snapshot holds drafts, and `Loaded` holds published entries before gates) | Resolution filters through the view's gates at its instant (§4); only gate-independent card parts are cached. A card carries only the member's public title, summary, URL and cover image, the image through the view's asset gates. Unresolved values render nothing: no id, no `data-` attribute, no empty link. JSON-LD's `reference` source uses the same cards. | RFC-0008's route sweep (extended by RFC-0042) gains a published referrer pointing at a draft, an archived, an embargoed and a `hide`-expired target, before and after their instants. No id, slug, title or asset of a hidden target may appear in HTML, JSON-LD, feeds, the sitemap, search, `llms.txt`, status pages or response headers. Purges read snapshot bodies and add only existing node tags, so no header carries target ids (§2). |
 | **IDOR in the picker and on write** | Pick and references routes run under the `/sites/:siteId` membership check and query by `site_id`. The target guard requires a member with `n.site_id = ?` (§2.1). An id of another site gets the same `unknown_entry` as an id that does not exist. Editions copy only ids the edition site can resolve (§3). | A shared-suite case: another site's entry or group id in `create_entry`, `update_entry`, the API and `push` is refused identically; the pick route with another site's id answers 404. |
 | **An imported or pushed archive pins another tenant's entries or assets** | Rows are site-scoped, and every guard filters both the row's `site_id` and the member's (§2). `asset_refs` gets the same filter as a phase-2 prerequisite (§2.5). | An archive referencing site Y's entry or asset, imported into site X, must not block Y's delete or move, and must not list X's titles to Y. |
-| **Lock-out by low-privilege actors** (`content:draft:own`, `content:write:own`) | Only what a published entry shows blocks, by the `shared` rule (§2): a translation's own value is never inherited. Contributors cannot publish; drafts, review and archived entries never lock. | Policy-suite cases that must *not* block: a contributor's draft; an author's review entry; a draft translation's `localized: true` value while its original is published; a draft edition member whose edition translations are published (edition translations never inherit). Cases that must block: an author's published entry, an edition member's included; a published translation inheriting its original's `localized: false` value. |
+| **Lock-out by low-privilege actors** (`content:draft:own`, `content:write:own`) | Only what a published entry shows blocks, by the `shared` rule (§2): a translation's own value is never inherited. Contributors cannot publish; drafts, review and archived entries never lock on their own. | Policy-suite cases that must *not* block: a contributor's draft; an author's review entry; a draft translation's `localized: true` value while its original is published; a draft edition member whose edition translations are published (edition translations never inherit). Cases that must block: an author's published entry, an edition member's included; a published translation inheriting its original's `localized: false` value. |
 | **Fan-out DoS on render** | Caps of 50 per field, 50 items and 10 sub-fields (contract); 100 reference values per entry (code); depth ≤ 2 with a visited set; 200 targets per page; ≤ 2 live reads per page, 0 for snapshots; `referencedBy` ≤ 100. | A property test: random graphs with cycles and 10× the caps resolve within budget, never throw, and cost at most `depth` live reads. |
 | **Write amplification and slow guards** | Each guard is one indexed probe on `(site_id, target_id)` or one `json_each` count; members are found through `nodes_translation_locale`. Delete, move and group change cost one probe each, plus the collections anchor, always. The purge planner reads the two snapshots' bundles. Rebuilds are chunked inside one batch. | RFC-0042's benchmark (#105), extended to 10,000 events × 3 references on Miniflare D1, reports the write, delete and move guard costs. |
 | **Picker search abuse** | `q` ≤ 100 characters, a substring match with no regex (rule 13), ≤ 20 results, and a per-member rate window. | A 100k-character `q` is refused before it is read. |
@@ -767,12 +809,12 @@ New rows of the closed table (`conversions.ts:38`):
 
 0. **Prerequisite: `asset_refs` by site** (§2.5).
    - `deleteAsset`'s guard filters by site;
-   - `refsRebuild` joins same-site assets and chunks its `INSERT`;
+   - `refsRebuild` joins same-site assets, chunks its `INSERT`, and is emitted only when its import batch writes the node set, which closes the existing hole where an `unchanged` push overwrites fresh `asset_refs` rows (`sync-plan.ts:308`; separate issue);
    - the purge planner's asset rule reads field assets;
    - the `unused` asset listing filter (`assets.ts:322`) filters by site, since a foreign archive can hide an asset from its own site's list today;
    - size ratchet (rule 12): the asset rule moves out of `planCachePurge` (a baselined 233-line function) into `core-ts/src/cache-purge-assets.ts`. The edits to `assets.ts` (1,370 lines) and `store.ts` (1,212), both baselined, add no net lines.
 
-   It is independent of this RFC's types, and fixes three existing gaps.
+   It is independent of this RFC's types, and fixes four existing gaps: the unscoped guard, the unscoped rebuild, field assets missing from purges, and the `unchanged`-import overwrite.
 1. **Contract and pure core:**
    - the §1 diff, fixtures and `pnpm gen` through `contract-change`;
    - the gate: `checkFieldDefinitions` **and** `checkBundle`'s `assertFieldTypes` refuse both types (`fields_unsupported`), so a phase-1 server takes no such definition from Studio, MCP, the API, import, sync, push, pull or restore;
@@ -844,6 +886,12 @@ New rows of the closed table (`conversions.ts:38`):
   - a status-only holder write planned before `rename_field` phase A and batched after it keeps its rows, through `migration.fromKey`; a key with no definition fails the batch instead of dropping rows (R16);
   - a publish concurrent with a delete or move does not make it answer 409 (the collections anchor ignores `publishedSnapshotId`);
   - a translation becoming its own original is not refused by the written-group guard;
+  - a referrer write landing between an `unchanged` push's plan and its batch keeps its rows: no rebuild runs (R10);
+  - the step-7 job racing a referrer write: the moved node is skipped, and its fresh rows stay (R17);
+  - a delete or move on a site with no `collections` (the anchor binds SQL `NULL`);
+  - a new field reusing a running rename's old key: the exact key wins in `shared`;
+  - two members of one group in two repeater items: one row, no constraint error;
+  - an unrelated constraint failure is not turned into a `ConflictError`;
   - a status-only holder write racing `set_field_localized` phase A leaves the right `shared` (R16);
   - a group-only `translation.group` change racing a relink (R15);
   - publish re-checks;
@@ -876,7 +924,7 @@ New rows of the closed table (`conversions.ts:38`):
 - **Renderer:**
   - identical cards and `referencedBy` on the snapshot and live sources, for a snapshot of the working copy;
   - gate instants;
-  - purge plans with a theme that emits no new tags: a target retitled, unpublished, newly published, newly translated and with a changed cover; a depth-2 page (A → B → C with C unpublished purges A); a "used by" page when a referrer appears or goes; a rollback whose referrer was since edited to draft; a release pinned before a referrer was published; **an approved request publishing an older snapshot after the referrer was edited, then the target unpublished: the referrer's page is purged**; a referrer write landing between `createSnapshot` and `publish`; a translation that only inherits the reference appearing on a "used by" page; **a referrer edited to stop naming the target, or deleted, between snapshot and purge, still purged from `to`'s bodies**; a translation in `to` that only inherits and was deleted since; a snapshot without a bundle (node reads, then the `maxReads` fallback); **any field-operation marker on `from` or `to` purges everything**; the `maxTags` and `maxReads` fallbacks;
+  - purge plans with a theme that emits no new tags: a target retitled, unpublished, newly published, newly translated and with a changed cover; a depth-2 page (A → B → C with C unpublished purges A); a "used by" page when a referrer appears or goes; a rollback whose referrer was since edited to draft; a release pinned before a referrer was published; **an approved request publishing an older snapshot after the referrer was edited, then the target unpublished: the referrer's page is purged**; a referrer write landing between `createSnapshot` and `publish`; a translation that only inherits the reference appearing on a "used by" page; **a referrer edited to stop naming the target, or deleted, between snapshot and purge, still purged from `to`'s bodies**; a translation in `to` that only inherits and was deleted since; a release run whose `scheduled` snapshot has no bundle (one bundle plus its items, no purge-everything); an approval of a manual snapshot without a bundle; a site without reference definitions (no bundle read at all); the byte and node budgets falling back to purge-everything; **any field-operation marker on `from` or `to` purges everything**; the `maxTags` and `maxReads` fallbacks;
   - the live-versus-snapshot `referencedBy` comparison runs with no field-operation marker active.
 - **Studio:** block tests (keyboard, focus after add and remove, live region), `design:shots` at both widths, `design:lint`.
 
@@ -884,14 +932,14 @@ New rows of the closed table (`conversions.ts:38`):
 
 | Option | Pros | Cons | Why not |
 |---|---|---|---|
-| Store a per-collections anchor member's id instead of the group id | No foreign ids in values | Editions need an id rewrite per site; the anchor changes when the original is deleted; every lookup maps member → anchor | The group id is project-stable and already indexed (§1) |
+| Store a per-site anchor member's id instead of the group id | No foreign ids in values | Editions need an id rewrite per site; the anchor changes when the original is deleted; every lookup maps member → anchor | The group id is project-stable and already indexed (§1) |
 | Anchor every entry write on the site hash | Simple | Any site edit (theme, menus) conflicts every concurrent entry write | Anchor on the collection's definitions only (§2.1) |
 | Every reference locks, drafts included (Sanity's strong default) | Strictest | Contributors pin others' entries; abandoned drafts pin forever | Only what a published entry shows locks, by the `shared` rule (§2.2) |
 | Weak references (no locking at all) | No refusals | Live pages silently lose venues on delete; "used by" still needs the index | Lock where the live site depends |
 | Cascade or "unlink and delete" | One click | Rewrites other people's entries as a side effect | Refuse and list; open question 1 |
 | Block publish or fail the build on unresolved references | Strict | Publish is a site snapshot; one draft venue blocks every fix | Warn (§2) |
 | References as release dependencies (today's generic extractor) | A scheduled event takes its venue live with it | Locks every member of the target until the run; edition group ids fail runs; hard, where render is soft | Kind-aware `depsOf` drops them (§2.7) |
-| `cloudhal-ref-<group>` cache tags on referrer responses (first revision) | Purges by group | Themes build tags themselves, so existing themes would never emit them; older site Workers answer 400 to new prefixes and every publish purges everything; ids in headers rest on unverified stripping; header budget | The purge planner adds referrers' existing node tags through `entry_refs` (§2, Purges) |
+| `cloudhal-ref-<group>` cache tags on referrer responses (first revision) | Purges by group | Themes build tags themselves, so existing themes would never emit them; older site Workers answer 400 to new prefixes and every publish purges everything; ids in headers rest on unverified stripping; header budget | The purge planner adds referrers' existing node tags, found from the snapshots' bodies (§2, Purges) |
 | Store something immutable (a new `refId` per entry) instead of the group id | Survives group changes | A new identity on every entry, its own index, migrations and editions mapping; translations still need group resolution | Group ids, with group changes guarded like deletes (§2.2) |
 | Rewrite referrers when a target changes group | Group changes always succeed | Rewrites other people's published entries as a side effect of a translation link | Refuse while shown by a published entry (§2.2) |
 | Keep rows only while the target has a member (first revision) | Smaller table | Nothing re-creates rows when a member reappears; cleanup on last-member delete is fiddly | Rows for every stored value; the site filter is the isolation (§2) |
@@ -951,7 +999,7 @@ New rows of the closed table (`conversions.ts:38`):
 12. **Edition chains and non-localized values:** inside an edition site, the edition node's translations do not inherit its non-localized values of any type, as RFC-0041 behaves today (`originalOf`). References follow that rule: the fragment finds no inheriting member there. *Recommended:* keep it in stage 4, and fix it for every field type in its own change, defining the in-site root as the member with no same-site source.
 13. **R8 and R14** (a translation published just after its inherited target was deleted; a held node published at its live version): accept both with a warning. *Recommended*, because refusing would block a translator over a value they cannot edit. The alternative is to refuse the publish until the original's value is fixed.
 14. **Tightening `readsOriginal`/`originalOf`** (an original must have its own id as its group): legacy data relinked before this RFC stops inheriting non-localized values. *Recommended*, because it is the only reading under which an original belongs to exactly one group. Phase 2 reports such nodes in `cloudhal import --dry-run` and on Studio's collection screen, beside `referenceIssues`.
-15. **Depth-2 purges** cost a second index probe per publish. *Recommended* as specified. The alternative, dropping depth 2 until themes tag cards, was rejected because the index makes it theme-independent.
+15. **Depth-2 purges** cost a second hop over bodies already in the cache, so nothing extra is read. *Recommended* as specified. The alternative, dropping depth 2 until themes tag cards, was rejected: reading the snapshots' bodies makes it theme-independent.
 
 ## Implementation watch list
 
@@ -963,12 +1011,20 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - **The delete, move and group-change condition.** The blocking-rows fragment, the planned pairs `:P` with the unseen-field `NOT EXISTS`, and "another member, not archived, in `A`".
    - **The rows `INSERT`.** It is a plain `INSERT`, never `OR IGNORE` on the writer path; `shared` is read in SQL by `key` or `migration.fromKey`; a `NULL` must fail the batch and map to `ConflictError`.
    - **The written-group guard.** Present on every group or source change, absent when the group is the node's own id.
-   - **What breaks the index invariant silently.** Any `OR IGNORE`, any value bound from the plan where the batch should read it, and any probe without `site_id`.
+   - **What breaks the index invariant silently.** Any `OR IGNORE` on the writer path, any value bound from the plan where the batch should read it, and any probe without `site_id`.
+   - **Deduplication.** The writer deduplicates `(field, target)` *after* canonicalizing to group ids.
+   - **The `ConflictError` mapping** matches only the `entry_refs.shared` `NOT NULL` message.
+   - **The collections anchor** binds SQL `NULL` for an absent `collections`.
+   - **Rebuilds** never run beside an unchanged node set. The step-7 job is per node and anchored on each node's read hash; it never does a site-wide `DELETE`.
 2. **Purge reads** (phase 3).
    - Purges read only the immutable `from`/`to` bodies (bundles first), never the working copy or `entry_refs`.
    - Any marker on either snapshot purges everything.
    - Release runs re-plan at run time.
    - The `maxReads`/`maxTags` fallbacks are exercised by tests, including a snapshot without a bundle.
+   - One hash-keyed cache, one bundle, then the missing hashes only.
+   - Shards are streamed, and the byte and node budgets are checked before each parse, so an out-of-memory isolate can never skip a purge silently.
+   - The short-circuit for sites without reference definitions.
+   - `RELEASE_EXECUTOR_COST` is updated for the re-plan.
 3. **Marker interplay** (phases 2 to 4).
    - `rename_field`'s `root_key` and `fromKey` lag in the fragment (over-blocks only) and in the rows `INSERT` (`fromKey` match).
    - Text → reference conversion: readers convert on the fly, `field_operation_running` refuses target deletes, moves and group changes, and any marker on `from` or `to` purges everything.
@@ -1090,4 +1146,21 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | An archived-only member cannot be deleted while referenced | Stated in the delete dialog and the guide (§5). |
 | Liveness of the always-on anchor | Narrowed by the collections anchor; on the watch list. |
 | Riskiest SQL | The new "Implementation watch list" section, which every phase PR's review checks. |
+
+### Sixth round (2026-11-10, final verification of d8a436cc)
+
+| Finding | Decision |
+|---|---|
+| Rebuilds from rows read before their batch can overwrite a writer's fresh rows: the `unchanged` import path and the step-7 job (blocking) | `entryRefsRebuild` is emitted only when its batch writes the node set (`sync-plan.ts:295-308`, R10). The step-7 job is per node, anchored on each node's read hash like `lists.backfill`, with no site-wide `DELETE` (R17). The same `asset_refs` hole on main is fixed in step 0 (separate issue). |
+| The fifth revision's departure from index mode | Confirmed by the verifiers, and put to the owner in "Owner decisions". |
+| Purge cost: bundles are often missing (release runs, manual snapshots, expired prefixes) | One hash-keyed body cache over both snapshots: one bundle (`to`'s first), then only the missing hashes, counted. The re-plan is reflected in `RELEASE_EXECUTOR_COST` (§2, Purges points 4 and 6). |
+| Memory, and an out-of-memory isolate silently skipping the purge | Per-shard streaming, with byte (`maxBodyBytes`) and node (`maxNodes`) budgets checked before each parse, falling back to purge-everything. |
+| Cost for sites without references | Short-circuit: no bundle reads when neither snapshot defines a reference field; phase 3 costs nothing before step 7. |
+| `shared` subquery ambiguity | The exact key match wins (`ORDER BY … = k DESC LIMIT 1`). |
+| NULL → `ConflictError` too broad | Only the `entry_refs.shared` `NOT NULL` failure, by message (`errors.ts:51` precedent). |
+| Deduplication | After canonicalization to group ids. |
+| An absent `collections` | The anchor binds SQL `NULL`. |
+| Rule 3 and the asset rule | "Used by" also covers entries the asset rule reaches. |
+| Stale index-era wording (Summary, §4, §8, Alternatives, OQ 15), "per-collections", the bundle claim | All corrected. |
+| An owner summary | The new "Owner decisions" section near the top. |
 
