@@ -1,6 +1,6 @@
 # RFC-0045: Collections stage 4: reference fields and repeaters
 
-- Status: Draft (revised 2026-11-10 after an independent review of PR #193; the review log is at the end)
+- Status: Draft (revised twice on 2026-11-10, after an independent review of PR #193 and a verification pass; the review log is at the end)
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-10
 - Related:
   - [#114](https://github.com/cloudhal-dev/cloudhal/issues/114) (this stage); #71 (the collections plan).
@@ -26,11 +26,17 @@ Two new field types join RFC-0041's nine:
 - A **`reference`** field points to entries of one to five declared collections of the same site, one target or up to fifty. It stores the target's **translation group id**, the same id in every site of a project. It always resolves to that group's member in this site and in the page's language.
 - A **`repeater`** field is an ordered list of up to fifty items, each of up to ten flat sub-fields. A repeater cannot contain a repeater, so every agent-facing schema has a fixed depth and no recursion.
 
-References are strong where it matters: a target cannot be deleted or moved while a published entry shows it. A reverse index, `entry_refs`, is written in each entry's own batch, anchored on the entry's new content hash and on its collection's definitions as read, scoped by site like every other guard. References from drafts never lock anything. Archiving or unpublishing a target is always allowed: the renderer resolves only what the published snapshot shows *at that instant*, gates included, so an unresolved reference renders as nothing and publish warns but never fails. Assets used inside repeaters count in `asset_refs`, like any field's assets.
+References are strong where it matters. A target cannot be deleted, moved, or taken out of its translation group while a published entry shows it, exactly as `resolveFields` would show it. References held by drafts, by entries in review, or by archived entries never lock anything.
 
-Resolution is breadth-first, at most two levels deep, under a budget per page. Referrer pages are purged whenever a target group changes, and a target that becomes visible counts as a change. Studio gets an entry picker and nested repeater forms from new `@cloudhal/ui` blocks. The four field operations learn the new types.
+A reverse index, `entry_refs`, holds one row per stored value, whatever the target's state. It is written in each entry's own batch, anchored on the entry's new content hash and on its collection's definitions *as planned*. Every guard filters it by site.
 
-Nothing goes live until the index, the guards, the renderer, the operations and Studio have all shipped: the two types stay refused until a final enabling step.
+Archiving or unpublishing a target is always allowed. The renderer resolves only what the published snapshot shows *at that instant*, gates included, so an unresolved reference renders as nothing, and publish warns but never fails. Assets used inside repeaters count in `asset_refs`, like any field's assets.
+
+Resolution is breadth-first, at most two levels deep, under a budget per page. A publish purges referrers' own pages, found through `entry_refs`, whenever a target group changes, becomes visible, or changes its cover. This needs no new cache tags and no theme code.
+
+Studio gets an entry picker and nested repeater forms from new `@cloudhal/ui` blocks. The four field operations learn the new types.
+
+Nothing goes live until the index, the guards, the renderer, the operations and Studio have all shipped. The two types stay refused on every write path (interactive writes, import, sync, push, pull and restore) until a final enabling step.
 
 ## Motivation
 
@@ -46,6 +52,8 @@ Nothing goes live until the index, the guards, the renderer, the operations and 
 ### 1. Contract
 
 All additions are optional variants and `$defs` in `site.schema.json`. `content-entry.schema.json` changes only its `fields` description. There is no `schemaVersion` bump and no new root type.
+
+Phase 8 adds one more variant, `ReferenceValueSource`, and the named enum `ReferenceValueProperty` to `StructuredDataSource`. That is a contract change of its own, listed with its diff in §4.
 
 ```jsonc
 // site.schema.json $defs.FieldDefinition.oneOf (line 274): two variants appended after SelectField (line 542)
@@ -158,12 +166,13 @@ All additions are optional variants and `$defs` in `site.schema.json`. `content-
   | Type | Value | Checked on write |
   |---|---|---|
   | `reference` | a group id `"entry_…"`, or with `multiple` a list of them, no repeats, at most `maxItems` | see §2.1: the group has a member in this site in one of `collections`; it is not the entry's own group; it meets `where`. Checked for changed keys, and for every own value when the entry becomes published (§2.2). A member's id is canonicalized to its group id (`translation.group ?? id`), as `canonicalImageRefs` canonicalizes asset references. |
-  | `repeater` | a list of at most `maxItems` objects. Each holds only sub-field keys, with RFC-0041 §2's values for its type. No empty item. | each item against the sub-fields. `requiredToPublish` sub-fields need a value in every item of an entry in review or published. Image and rich-text sub-values are checked and recorded as assets (§2.4). |
+  | `repeater` | a list of at most `maxItems` objects. Each holds only sub-field keys, with RFC-0041 §2's values for its type. No empty item. | each item against the sub-fields. `requiredToPublish` sub-fields need a value in every item of an entry in review or published. Image and rich-text sub-values are checked and recorded as assets (§2.5). |
 
 - **Why a group id.** `Translation.group` is "the original node's id … May cross sites in one project" (`common.schema.json:121-124`).
   - A language edition's entries carry their source site's group id (`editions.ts:121-125`; `checkTranslationLinks` requires a member's group to be its source's, `store/translations.ts:131`).
   - The group id is therefore the one identity that is the same for every language version in every site. "The original in this site" is undefined in an edition site, where no member is the group's node.
   - The group id is used as a *key*: it is never read as a node of another site. A reference resolves, and is guarded, only through members whose `site_id` is this site (§2, §3).
+  - **A node's group can change.** `checkTranslationLinks` (`store/translations.ts:107-145`) accepts a new `translation.source`, and with it a new group, and `PUT …/entries/:id` (`api/routes/entries.ts:138-175`) passes the whole entry. A stored id therefore stays valid only because §2.2 guards group changes exactly like deletes: leaving a referenced group is leaving it.
   - It is a bare id, not `{collection, id}` as in Payload's polymorphic values: it keeps a reference what an image field already is, and the store checks the collection on every write.
 - **Why flat items.** Repeater items are flat objects of scalars, which is exactly ADR-0030's `ArrayPropSchema` with `FlatObjectPropSchema` items (`blocks.ts:55-68`).
   - `fieldPropSchema` compiles a repeater into the subset, and `validateProps` checks it unchanged, eval-free (rule 6).
@@ -179,7 +188,15 @@ All additions are optional variants and `$defs` in `site.schema.json`. `content-
   - sub-fields count toward the per-site cap of 200 (`FIELD_LIMITS`, `types.ts:32`);
   - at most 100 reference values per entry, across fields and items (`too_many_references`).
 
-  **Until the enabling step (§9 step 7), `checkFieldDefinitions` refuses both types** (`fields_unsupported`). The contract can thus ship first without anyone being able to create a value that has no index rows.
+- **The gate.** Until the enabling step (§9 step 7), both types are refused (`fields_unsupported`) on every path that writes a site node:
+  - **Interactive writes.** `checkFieldDefinitions`, called from `store/site-fields.ts:87` and `fields-operations/state.ts:94`.
+  - **Rows.** `checkBundle` (`sync-checks.ts:254-271`) gains `assertFieldTypes(siteId, bundle, support)` beside `assertGates`. That one function covers `importSite`, `pull`, `push`, `cloudhal import --replace` and `--revert`, and snapshot restores, all of which go through `importSite` (`sync-restore.ts:4`). Today `checkBundle` validates the schema only (`assertValidRows`, `:130-158`), which accepts the new variants as soon as phase 1 runs `pnpm gen`.
+
+  `support` is the same capability object for both:
+  - the shared suites' store option (`SiteGraphStoreOptions.fieldTypes`);
+  - after step 7, the site Worker's `fields: 2`, through the `GateSupport` pattern (`availability.ts:235-237`).
+
+  A server at phases 1 to 6 therefore refuses the types from Studio, MCP, the API and every bundle alike, so no value can exist without index rows.
 - **Adding a reference or repeater field is a free edit**, except over a key some entry already holds (`field_key_in_use`, one `json_type` count). The count races with entry writes in that collection; the definitions anchor of §2.1 closes the race.
 - **Rule 2 holds:**
   - `oneOf` with inline variants and the one-value `type` discriminator (ADR-0043);
@@ -212,118 +229,171 @@ All additions are optional variants and `$defs` in `site.schema.json`. `content-
 ### 2. Cross-node integrity
 
 ```sql
--- packages/storage/migrations/0033_entry_refs.ts (new; DDL only: no value can exist before §9 step 7)
+-- packages/storage/migrations/0033_entry_refs.ts (new; DDL only: no value can exist before §9 step 7, on any path, §1)
 CREATE TABLE entry_refs (
   site_id TEXT NOT NULL,
-  target_id TEXT NOT NULL,          -- the referenced translation group id
-  source_id TEXT NOT NULL,          -- the node holding the value (an original for localized: false)
-  source_group TEXT NOT NULL,       -- that node's group id (translation.group ?? id), to reach members that inherit the value
+  target_id TEXT NOT NULL,          -- the referenced translation group id, as stored
+  source_id TEXT NOT NULL,          -- the node holding the value
   source_collection TEXT NOT NULL,
   field TEXT NOT NULL,              -- "venue", or "speakers.person" inside a repeater
+  root_key TEXT NOT NULL,           -- the top-level field key ("speakers")
+  shared INTEGER NOT NULL,          -- who else shows the value (below): 0 nobody, 1 every inheriting member, 2 inheriting members without their own value
   source_status TEXT NOT NULL,      -- the holding node's own status
   PRIMARY KEY (source_id, field, target_id)
 );
 CREATE INDEX entry_refs_target ON entry_refs (site_id, target_id, source_status);
 ```
 
-**Invariant (the index):** `entry_refs` holds exactly one row per `(node, field path, target group)` whose value is stored on that node and whose target group has a member in the node's site.
-- A target named in two repeater items (a host who also gives a talk) is one row: the writer deduplicates the pairs, and the `INSERT` is `INSERT OR IGNORE`.
-- Every statement below filters on `site_id`, so it uses `entry_refs_target` and stays inside its tenant.
+**Invariant (the index).** `entry_refs` holds exactly one row per `(node, field path, stored group id)`, whatever the target's state: present, missing, archived or foreign. Rows depend only on the holder's own body, so nothing re-creates or deletes them except a write of the holder, its deletion, or a rebuild.
+- **No cross-tenant pinning.** Every guard and lookup filters `r.site_id` (the holder's site) and `n.site_id` (the member's site). A row naming another tenant's id pins nothing there and never resolves.
+- **Repeats.** A target named in two repeater items (a host who also gives a talk) is one row: the writer deduplicates `(field, target)` pairs, and the `INSERT` is `INSERT OR IGNORE`.
+- **`shared`** mirrors `resolveFields` (`fields/resolve.ts:37-65`). Only the group's same-site original, the node whose `id` is the group id, passes values on, and only to members of that group in the same site whose own `translation.source` is not in another site (`readsOriginal`). Hence:
+  - `shared = 1`: the holder is that original and the field is `localized: false`;
+  - `shared = 2`: the holder is that original and the field is `localized: true` (members without their own value fall back to it, `fromOriginal`);
+  - `shared = 0`: everything else. That covers a translation's own value, and any node of an edition site whose group lives in another site: `originalOf` returns nothing there (`store/entry-fields.ts:54-62`), so no edition member inherits (open question 12).
+
+**"Shown by a published entry"** is one SQL fragment. The guards, the live `referencedBy` and the purge planner all use it, so they mean the same as the snapshot's resolved values:
+
+```sql
+-- rows of site S naming group G that a published entry shows
+SELECT r.* FROM entry_refs r WHERE r.site_id = ? AND r.target_id = ?
+  AND (r.source_status = 'published' OR (r.shared > 0 AND EXISTS (
+    SELECT 1 FROM nodes m WHERE m.site_id = r.site_id AND m.kind = 'contentEntry'
+      AND json_extract(m.body, '$.translation.group') = r.source_id AND m.id <> r.source_id
+      AND json_extract(m.body, '$.translation.source.siteId') IS NULL
+      AND json_extract(m.body, '$.status') = 'published'
+      AND (r.shared = 1 OR json_type(m.body, '$.fields.' || r.root_key) IS NULL))))
+```
+
+The member probe uses `nodes_translation_locale` (migration 0025: `site_id, kind, json_extract(body, '$.translation.group')`; its partial `WHERE … IS NOT NULL` is implied by the equality).
 
 **1. Writing a referrer** (`EntryEngine.write`, `store/entries.ts:30`). `planEntryFields` returns three more parts:
-- **The target guard**, ANDed into the entry's CAS (`entries.ts:104`). Every target group has a member in this site in one of the field's allowed collections. It is one count over a JSON list of `{t: group, c: [collections]}` pairs, like the asset guard (`entry-fields.ts:163`). The members are found through `nodes_translation_locale` (migration 0025: `site_id, kind, json_extract(body, '$.translation.group')`), or by id for an untranslated original:
+- **The target guard**, ANDed into the entry's CAS (`entries.ts:104`), for changed reference keys, and for every own reference value when the entry becomes published (point 2). Every named group must have a member in this site, in one of the field's allowed collections, that is not archived (for a newly chosen group). It is one count over a JSON list of `{t: group, c: [collections]}` pairs, like the asset guard (`entry-fields.ts:163`):
   ```sql
   (SELECT count(*) FROM json_each(?) p WHERE EXISTS (
      SELECT 1 FROM nodes n WHERE n.site_id = ? AND n.kind = 'contentEntry'
        AND (n.id = json_extract(p.value, '$.t') OR json_extract(n.body, '$.translation.group') = json_extract(p.value, '$.t'))
        AND json_extract(n.body, '$.collection') IN (SELECT value FROM json_each(json_extract(p.value, '$.c'))))) = ?
   ```
-- **The definitions anchor.** The allowed collections and the set of reference keys come from the site row the writer read, and a site-side refusal (`field_key_in_use`, removing an allowed collection) only counts entries already committed. Every entry write that changes `fields` or `collection` therefore also guards on its collection's definitions as read:
+- **The definitions anchor**, on every entry write that changes `fields` or `collection`. The writer binds its collection's definitions *as planned*: the canonical JSON of `site.collections[c].fields` from the very `Site` object it planned with (`entries.ts:39-41`), so there is no second read and no gap.
   ```sql
-  (SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site') IS ?
+  json((SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)
   ```
-  Here `?` is `$.collections."<key>".fields`, and the text is read with the same expression while planning: one primary-key read, `NULL` for a collection without definitions. It conflicts only when that collection's definitions change, never on other site edits, unlike the site hash. A writer that loses retries under the new definitions, and `field_key_in_use` then sees its value. This is the same idea as RFC-0042's list-value rows, which are valid only "under the fingerprint they were built with" (`list-values/fingerprint.ts`).
-- **The rows**, anchored on the entry's new hash: `DELETE FROM entry_refs WHERE source_id = ? AND <anchor>`, then one `INSERT OR IGNORE … SELECT … FROM json_each(?) WHERE <anchor>`, appended to `own` (`entries.ts:110`).
+  The path is `$.collections."<key>".fields`, and both sides are normalized by `json()`. `NULL IS NULL` holds for a collection without definitions. A unit test round-trips every fixture definition through the stored form (fractional bounds included), so text equality is exact.
 
-A target deleted or moved between check and batch fails the guard, and `diagnose()` names it (`unknown_entry`, `reference_target_moved`). One bound parameter carries the whole list, so D1's 100-parameter limit does not apply, and 100 group ids stay far below its 100 KB per statement.
+  The anchor conflicts only when that collection's definitions change, never on other site edits. The loser retries under the new definitions, where `field_key_in_use` then sees its value. This is RFC-0042's rule that list-value rows are valid only "under the fingerprint they were built with" (`list-values/fingerprint.ts`), applied to writes.
+- **The rows**, anchored on the entry's new hash: `DELETE FROM entry_refs WHERE source_id = ? AND <anchor>`, then one `INSERT OR IGNORE … SELECT … FROM json_each(?) WHERE <anchor>`, appended to `own` (`entries.ts:110`). Every write of the holder rewrites all its rows, so `source_status` and `shared` stay current.
 
-**2. Deleting and moving a target: who can lock what.**
-- A reference **blocks** only while a *published* entry shows it: the holding node is published, or a published member of its group inherits the value (`localized: false`).
-- Drafts, entries in review and archived entries never lock anything. A contributor (`content:draft:own`, `roles.ts`) can therefore never pin someone else's entry. An author pins only through their own published entries, which the live site really depends on, and an editor can unpublish them.
-- The holding node's status is in the row. A member that inherits the value is reached through `source_group`, using the same translation index:
-  ```sql
-  -- "blocking rows" for group G in site S
-  SELECT 1 FROM entry_refs r WHERE r.site_id = ? AND r.target_id = ?
-    AND (r.source_status = 'published' OR EXISTS (
-      SELECT 1 FROM nodes m WHERE m.site_id = r.site_id AND m.kind = 'contentEntry'
-        AND json_extract(m.body, '$.translation.group') = r.source_group
-        AND json_extract(m.body, '$.status') = 'published'))
-  ```
-- **Delete** (`EntryEngine.delete`, `entries.ts:162`). The node's `DELETE`, already scoped by `site_id` (`entries.ts:168`), gains `AND (NOT EXISTS <blocking rows> OR EXISTS <another member of G in S, id <> ?>)`. Only removing a group's *last* member in this site can strand a reference. Deleting a translation, or an original that still has translations, never blocks, and references keep resolving to the remaining members.
-  - A refusal answers `409 entry_referenced`, with up to 20 published referrers (id, title, collection, field) and the total.
-  - When the last member does go, its remaining non-blocking rows are deleted in the same batch, guarded on the node being gone, as `dropRefsStatement` (`assets.ts:1015`). The draft referrers keep a dangling id, which their editor shows as "Not found". Their own rows go with their delete.
-- **Publishing a referrer.** A write that makes an entry published re-checks *every* own reference value, not just changed keys. A dangling id is refused (`unknown_entry`: remove or replace it), so a draft that lost its target cannot go live pointing at nothing.
-  - Inherited values are not the translation's to fix. A translation that goes live while its original holds a dangling id gets a warning, not a refusal, and the reference renders as nothing.
-- **Move** (`entersCollection`, `entries.ts:101`). Moving *any* member of group G from C to D is refused while a blocking row comes from a field that allows C but not D: `NOT EXISTS (<blocking rows> AND source_collection || '.' || field NOT IN (SELECT value FROM json_each(?)))`. The JSON list holds the `"<collection>.<field>"` pairs that allow D, computed from the site as read, and the write carries the definitions anchor of its own collection.
-  - Refused: `409 reference_target_moved`, naming the fields.
-  - During a field operation, the pairs include the marker's `fromKey`.
-  - Members of a group may still sit in different collections, as today (`checkTranslationLinks` has no collection rule). Resolution and `referenceIssues` filter members by the field's `collections` (§3), so a stray member never renders under a field that does not allow it.
-- **Archiving and unpublishing** a target are allowed and write nothing to `entry_refs`. The picker hides archived entries, and a *newly* chosen group needs a member that is not archived (the `retired` rule of `planRefs`).
+A target deleted or moved between check and batch fails the guard, and `diagnose()` names it (`unknown_entry`, `reference_target_moved`). One bound parameter carries the whole list (D1 allows 100 parameters), and 100 group ids stay far below 100 KB per statement.
 
-**3. Rebuilds** run in the same batch as the node set: `importSite`/`pull`/`push` (`sync-plan.ts:308`), `cloudhal import --replace` and `--revert`, and snapshot restores. `entryRefsRebuild(siteId, rows)` builds the rows from the bodies, then `INSERT`s only rows whose target group has a member *in the same site*: it joins `nodes` with `site_id = ?`.
-- An archive or push naming another tenant's entry id therefore pins nothing anywhere. The id stays in the value, never resolves, and is reported (`referenceIssues`).
+**2. Who can lock what: delete, move, leaving a group, publishing.**
+- **The policy.** A reference blocks only while a *published* entry shows it, as `resolveFields` would show it: its own value, or one inherited from its same-site original (the fragment above).
+  - Drafts, entries in review and archived entries never lock anything.
+  - A contributor (`content:draft:own`, `roles.ts`) cannot publish, so nothing a contributor writes locks on its own. A value it holds locks only once someone with publish rights publishes an entry that shows it, such as a translation inheriting it. That person's publish is the decision.
+  - An author pins only through what published entries show, which the live site really depends on.
+  - An editor can always unpublish to release a lock.
+- **Writes that make a group lose a member in this site.** That is a delete, a move to a collection no blocking field allows, or a change of `translation.group` (including dropping `translation`, `store/translations.ts:107-145`). Each such write of member X of group G carries:
+  - `NOT EXISTS (<blocking rows of G>) OR EXISTS (<another member of G in S, id <> X, not archived, in a collection every blocking row's field allows>)`. The allowed set is the intersection of those fields' `collections`, computed from the site as planned.
+  - **The site anchor**, `EXISTS (SELECT 1 FROM nodes WHERE id = ? AND kind = 'site' AND hash = ?)`, with the hash of the `Site` object the write planned with. The allowed collections come from *referrer* collections' definitions, so anchoring only the target's own collection (the first draft) left a race (R4).
+
+    These writes are rare, so whole-site anchoring costs nothing in practice. It is added only when the plan saw blocking rows. Without them, the write carries only `NOT EXISTS (<blocking rows of G>)`, which is safe on its own: at worst it over-refuses.
+  - A refusal answers `409 entry_referenced`, with up to 20 published referrers (id, title, collection, field) and the total. For a group change, it also names the group.
+  - Deleting a translation, or an original that still has another usable member, never blocks. References keep resolving to the remaining members (§3).
+- **Moving a member** from C to D additionally refuses while a blocking row's field allows C but not D, and no other usable member remains (`409 reference_target_moved`). During a field operation, the pairs include the marker's `fromKey`.
+- **Publishing a referrer.** A write that makes an entry published runs the target guard over *every* own reference value. A dangling id is refused (`unknown_entry`: remove or replace it), so a draft that lost its target cannot go live pointing at nothing.
+  - Inherited values are not the translation's to fix. A translation that goes live while its original holds a dangling id gets a warning, and the reference renders as nothing (R8).
+- **Archiving and unpublishing** a target are allowed, and write nothing to `entry_refs`. The picker hides archived entries.
+- Members of a group may sit in different collections, as today (`checkTranslationLinks` has no collection rule). Resolution, the guards and `referenceIssues` count only members in the field's `collections`.
+
+**3. Races.** Every interleaving that could leave a published reference stranded, and the guard that catches it. "Second" is whichever batch commits later; it fails and retries or refuses.
+
+| # | Interleaving | Caught by |
+|---|---|---|
+| R1 | referrer write ↔ deleting the target's last usable member | the referrer's target guard (members at batch time), or the delete's `NOT EXISTS <blocking rows>` (rows at batch time) |
+| R2 | referrer write ↔ moving the target to a disallowed collection | the target guard (collection at batch time), or the move's blocking-row check |
+| R3 | referrer write ↔ adding a reference field over its key, or removing an allowed collection | the definitions anchor, bound as planned (point 1). `field_key_in_use` counts committed values. The collection refusal counts values whose group has a member in the removed collection. |
+| R4 | moving a member ↔ narrowing a referrer field's `collections` | the move's site anchor. The narrowing's count sees the member once it has moved. |
+| R5 | delete ↔ any change to the definitions a blocking row's field depends on | the delete's site anchor |
+| R6 | changing a member's group ↔ referrer write | the group change carries the delete guard and site anchor for its old group; the referrer's target guard checks membership at batch time |
+| R7 | a referrer becoming published ↔ deleting its target | the publish re-checks all own values with the target guard. The delete sees the referrer's new `source_status`, because its rows are rewritten in the same batch. |
+| R8 | publishing a translation that *inherits* the value ↔ deleting the target | when the publish is first, the delete's fragment reads member status at batch time. When the delete is first, nothing published showed the value at that moment. **Accepted:** the translation goes live with a warning and renders nothing; no guard can refuse a write the translator cannot fix. |
+| R9 | field-operation phase B ↔ deleting a target | the target guard ANDed into each rewritten entry's CAS (point 6) |
+| R10 | import, restore or sync ↔ anything | one atomic batch with the index rebuilt in it (point 4) |
+| R11 | a member reappearing (a new translation or edition member) | rows are kept whatever the membership (the invariant), so nothing needs re-creating |
+
+**4. Rebuilds** run in the same batch as the node set: `importSite`/`pull`/`push` (`sync-plan.ts:308`), `cloudhal import --replace` and `--revert`, and snapshot restores.
+- `entryRefsRebuild(siteId, rows)` builds the rows from the bodies, with the site's definitions from the site row, as `refsRebuild` does (`media/refs-rebuild.ts:12-37`), and `DELETE`s and `INSERT`s them under `site_id = ?`.
+- There is no membership join: the invariant keeps rows for every stored value, and the site filters keep them harmless.
 - The `INSERT` is chunked so each statement stays below 90 KB, inside the one atomic batch.
+- **Step 7** also runs a one-time, budgeted, resumable `entryRefsRebuild` per site as an admin job, the pattern of `lists.backfill`. It is idempotent, and is a safety net: the gate (§1) means it should find nothing.
 
-**4. Assets inside repeaters.** `fieldAssetRefs` (`media/field-refs.ts:17-36`) reads only top-level string values today (`if (typeof value !== "string") continue;`), so it would skip a repeater's items.
-- It gains a walk over each item's `image` and `richText` sub-values, recorded under `fields.<key>.<sub>`.
-- The same function feeds all of these, so each follows without further change:
-  - the write guard (`refsPlan`) and `fieldAssetIssues`: the asset exists in this site, is an image, and is not newly retired;
-  - field-operation rewrites (`fields-operations/rewrite.ts:150-158`);
-  - `refsRebuild` (`media/refs-rebuild.ts:22-24`);
-  - the purge planner's asset rule.
-- An asset used only in a speaker's photo can therefore not be deleted or collected while used. Editions copy such assets already (`cross-site.ts` `assetIdsOf` scans the whole node).
+**5. Assets inside repeaters.** Each of these needs its own change, because none follows from the others:
+- **`fieldAssetRefs`** (`media/field-refs.ts:17-36`) reads only top-level string values (`if (typeof value !== "string") continue;`). It gains a walk over items. It records `fields.<key>.<sub>` in `asset_refs.field` (no index: the row is per asset and field), and returns each use's item path (`fields/<key>/<i>/<sub>`) beside it.
+- **`fieldAssetIssues`** (`field-refs.ts:87-91`) maps definitions by top-level key (`types = new Map(defs.map(d => [d.key, d.type]))`). It gains a lookup of `<key>.<sub>` to the sub-field's type, so the image-kind check applies (a PDF in an image sub-field is refused). It reports issues at the item path, so Studio maps them to controls (§5), and its `skip` set uses item paths too.
+- **`refsRebuild`** and field-operation rewrites (`fields-operations/rewrite.ts:150-158`) call `fieldAssetRefs`, so they follow the walk.
+- **The purge planner's asset rule** (`cache-purge.ts:205-232`) uses `assetRefsOf` (`media/refs.ts:113`), which knows neither field images nor item images. **This is an existing gap for top-level image fields too.** It gains `fieldAssetRefs` with the target snapshot's site definitions. Entries it reaches also bring their referrers through the referrer rule (Purges, below), so a target's changed cover purges the cards that show it.
+- Editions copy item assets already: `assetIdsOf` (`cross-site.ts:17`) scans the whole node.
+- **A prerequisite, decided, not optional:** before phase 2 widens what feeds `asset_refs`, a small PR scopes it by site.
+  - `deleteAsset`'s guard (`assets.ts:867`) becomes `NOT EXISTS (SELECT 1 FROM asset_refs WHERE site_id = ? AND asset_id = ?)`.
+  - `refsRebuild` inserts only rows whose asset is a node of the same site, via a join.
+  - The rebuild's `INSERT` is chunked below 90 KB.
+  - Its tests: an archive in site X naming site Y's asset does not block Y's delete; a large rebuild stays under the statement limit.
 
-**5. Field operations** (`fields-operations/rewrite.ts:150`). From phase 2, `statementsOf` emits each rewritten entry's `entry_refs` rows next to its asset rows. It ANDs the target guard into the entry's CAS whenever the entry's reference values change, so a target deleted between plan and batch skips the entry for the next pass, like a concurrent edit. Operations that *name* a reference or repeater field are refused (`field_operation_unsupported`) until phase 4 implements them (§7).
+**6. Field operations** (`fields-operations/rewrite.ts:150`). From phase 2, `statementsOf` emits each rewritten entry's `entry_refs` rows next to its asset rows. It ANDs the target guard into the entry's CAS whenever the entry's reference values change, so a target deleted between plan and batch skips the entry for the next pass, like a concurrent edit (R9). Operations that *name* a reference or repeater field are refused (`field_operation_unsupported`) until phase 4 (§7).
 
-**6. Releases** (RFC-0008 §6). Today's dependency extractor treats every string matching `NODE_REF` at any depth as a dependency (`schedules/src/release.ts:268-289`), and core-ts passes it as `depsOf` (`core-ts/src/releases.ts:566`). Group ids in field values would therefore be pulled into a release's closure and locked (`assertUnlocked`). An edition's group id names a node of another site, so it would also fail as `dependency_missing` (`release.ts:416`).
-- **Decision: references are not release dependencies.** Phase 2 replaces `depsOf` with a kind-aware extractor that drops reference values (top-level and inside items, by the site's definitions as pinned) before calling `referencedNodeIds`.
-- A scheduled event whose venue is not live renders without it, exactly as after a publish, and the release's approval text carries `referenceIssues`.
-- Rationale: closure dependencies are hard (they lock nodes and fail runs); references are soft at render. Holding every language version of a venue for an event's release would surprise its editors.
+**7. Releases** (RFC-0008 §6). Today's dependency extractor treats every string matching `NODE_REF` at any depth as a dependency (`schedules/src/release.ts:268-289`), and core-ts passes it as `depsOf` (`core-ts/src/releases.ts:566`).
+- Without a change, group ids in field values would be pulled into a release's closure and locked (`assertUnlocked`). An edition's foreign group id would also fail the run as `dependency_missing` (`release.ts:416`).
+- **Decision: references are not release dependencies.** Phase 2 replaces `depsOf` with a kind-aware extractor that drops reference values (top-level and inside items, by the site's definitions as pinned) before `referencedNodeIds`.
+- A scheduled event whose venue is not live renders without it, as after a publish, and the release's approval text carries `referenceIssues`.
+- Rationale: closure dependencies are hard (they lock and fail), while references are soft at render.
 
-**7. Definition changes** (`fieldDefinitionChanges`, `definitions.ts:135`) add these refusals:
-- removing a collection from `collections` while a value points into it (an `entry_refs` join count);
+**8. Definition changes** (`fieldDefinitionChanges`, `definitions.ts:135`) add these refusals:
+- removing a collection from `collections` while a value's group has a member in it (an `entry_refs` join on members);
 - turning `multiple` off;
 - removing or retyping a sub-field that holds values.
 
 Each refusal names the operation to use (§7).
 
-**The invariant restated.** The store never lets a *published* entry show a reference whose target group has no member in its site, and never leaves the index out of step with stored values.
+**9. Site deletion.** `entry_refs` joins `SITE_TABLES` (`site-delete.ts:16`) in phase 2. The existing test fails on a `site_id` table missing from that list.
 
-Dangling ids can still exist, and every reader treats them as unresolved without throwing:
-- in drafts whose target was deleted;
+**The invariant restated.**
+- No write lets a group lose its last usable member in a site while a published entry there shows a reference to it.
+- No write stores a new own reference to a group without such a member.
+- The index always matches the stored values.
+
+R8 is the one accepted exception, and it is warned. Dangling ids can still exist, and every reader treats them as unresolved without throwing:
+- in drafts whose target went;
 - in hand-made or foreign archives;
 - in publish snapshots composed with holds, which leave out a held node that is not live (`store/snapshots.ts:29-37`);
 - after a release removes a target.
 
 **Snapshots, publish and rollback:**
-- A snapshot is the whole working copy at one read (`snapshots.ts:23`). Rollback moves the pointer to an ancestor (`store.ts:1127`), which is just as consistent, and restores rebuild the index (point 3).
-- **Visibility decides.** A snapshot holds drafts and archived entries. `Loaded.reachable` is the published entries *before gates* (`astro-renderer/src/source.ts:147-155`), and the gated set exists only per view instant (`#current()`, `source.ts:409-431`, `splitEntries` at `now`). The renderer therefore resolves through the view (§4).
-  - A target resolves only when its member is published and its gates are open at that instant. An `unlist`ed target (RFC-0042 §3) still resolves, because its page exists.
+- A snapshot is the whole working copy at one read (`snapshots.ts:23`). Rollback moves the pointer to an ancestor (`store.ts:1127`), which is just as consistent, and restores rebuild the index (point 4).
+- **Visibility decides.** `Loaded.reachable` is the published entries *before gates* (`astro-renderer/src/source.ts:147-155`); the gated set exists only per view instant (`#current()`, `source.ts:409-431`). The renderer resolves through the view (§4).
+  - A target resolves only when its member is published and its gates are open at that instant. An `unlist`ed target (RFC-0042 §3) still resolves.
   - A draft, archived, embargoed, `hide`-expired or missing target resolves to nothing.
-- **Publish warns, never fails.** `referenceIssues(snapshot, now)`, pure and in `@cloudhal/core-ts/fields`, lists published entries whose references will not resolve: target missing, draft, archived, gated, in a disallowed collection, or with no version in a needed locale. It appears in Studio's publish dialog, in the MCP `publish` tool's approval text, and in `cloudhal snapshot --publish` output.
-  - A publish never fails on it: "a published snapshot must keep rendering" (RFC-0042 §4).
-  - Sanity's strong references block publishing per document, but Cloudhal publishes a whole site snapshot, and one draft venue must not hold back an unrelated fix.
-- **Gates** of targets are in the snapshot's gate index already, since it holds every published entry's instants (`Loaded.gates`). A referrer's cached page therefore expires when its target's embargo opens or its `hide` expiry passes.
+- **Publish warns, never fails.** `referenceIssues(snapshot, now)`, pure and in `@cloudhal/core-ts/fields`, lists published entries whose references will not resolve. It appears in Studio's publish dialog, the MCP `publish` tool's approval text and `cloudhal snapshot --publish` output. A publish never fails on it: "a published snapshot must keep rendering" (RFC-0042 §4).
+- **Gates.** Every published entry's instants are in the snapshot's gate index already (`Loaded.gates`), so a referrer's cached page expires when its target's embargo opens or its `hide` expiry passes.
 
-**Purges** (`cache-tags.ts`, `cache-purge.ts`):
-- **Tags.** Every reference value a response *read* adds `cloudhal-ref-<groupId>`, resolved or not. These tags come before optional tags, up to 4 KB (about 100 groups at 41 bytes each). Past that, the response carries one `cloudhal-refs-<siteId>` tag instead.
-- **Purging.** `planCachePurge` purges `cloudhal-ref-<group>` for every entry it already purges (changed, added or removed), by its group (`translation.group ?? id`), plus `cloudhal-refs-<siteId>` whenever any entry changed.
-  - So a retitled, unpublished or archived venue purges its referrers, in every language.
-  - So does a venue that *becomes* visible: published, a new Turkish member, an embargo that opens at the next publish.
-- **Why this is safe.** The tags carry opaque group ids, never titles. Cache-Tag is an edge-only header that Cloudflare strips before responses reach visitors (Cloudflare purge-by-tag documentation; unverified on this branch). Node builds set no tags.
-- **The §8 rule, revised:** no unresolved target may appear in HTML, JSON-LD, feeds, the sitemap, search or `llms.txt`. Cache tags are excluded from that rule.
+**Purges** (`cache-purge.ts`). There are no new tags. Referrer pages already carry their own node tag (`cloudhal-node-<id>`), set by the theme for the entry a response renders and for the entries an archive lists (`cache-tags.ts:6-8`). The planner reaches them through the index.
+- **The referrer rule.** Groups touched by the diff are collected from the before and after bodies (`translation.group ?? id`):
+  - every changed, added or removed entry;
+  - the entries the asset rule reaches;
+  - a changed group, which counts both its old and its new group.
 
-**Archives (RFC-0039).** An archive holds every node of the site, so references stay complete, and import rebuilds the index in its node batch (point 3). Dangling or foreign ids are reported, not refused, as RFC-0041 open question 8 decided for invalid values: `cloudhal import --dry-run` adds `referenceIssues`.
+  For those groups, the planner adds the node tags of:
+  - their referrers in the index that the fragment above shows as published, plus the inheriting members it names;
+  - the release's held referrers, read from the live snapshot, which the index may not match.
+
+  Lookup is one `entry_refs` probe per group, run through a new `SnapshotReader.referrersOf(siteId, groups)`. The store implements it, and so does the release planner's virtual reader (`releases.ts:607`), on the same index.
+- **What it covers.** Retitled, unpublished, archived and *newly visible* targets: a draft venue published, a new Turkish member, an embargo opening at a publish. Also changed covers, in every language and with any theme.
+- **Costs and limits.**
+  - A group referenced by thousands of pages exceeds `maxTags` (300) and falls back to purging everything, as any large diff does today.
+  - `isCloudhalCacheTag` (`cache-tags.ts:48`) and the site Worker's purge endpoint (`cloudflare-entry.ts:312-325`) are unchanged, so an older site Worker accepts every purge.
+  - No ids of unresolved targets reach any header.
+- The first draft's `cloudhal-ref-<group>` tags are dropped. Existing themes build their own tag lists (`starters/blog/src/pages/[...path].astro:261-321`), so they would never have emitted them. The new prefixes would also have made older site Workers answer 400 and fall back to a full purge on every publish. And their privacy relied on unverified header stripping.
+
+**Archives (RFC-0039).** An archive holds every node of the site, so references stay complete, and import rebuilds the index in its node batch (point 4). Dangling or foreign ids are reported, not refused (RFC-0041 open question 8): `cloudhal import --dry-run` adds `referenceIssues`. Until step 7, an archive *with* reference or repeater definitions is refused (`fields_unsupported`, §1).
 
 ### 3. The locale rule
 
@@ -335,10 +405,12 @@ A reference names a translation group (§1). In this site, the candidates are th
 
 The renderer, Studio's preview of a translation and `referenceIssues` ("Main hall has no Turkish version") share this one function, `pickMember`.
 
-- **`localized: false` is the default** that Studio pre-sets for references. The original holds the ids, and every translation resolves them in its own language (RFC-0041 §5). A translator never re-picks targets, and a venue's Turkish version appears on the Turkish event without any write.
+- **`localized: false` is the default** that Studio pre-sets for references. The group's same-site original holds the ids, and every same-site translation resolves them in its own language (RFC-0041 §5). A translator never re-picks targets, and a venue's Turkish version appears on the Turkish event without any write.
 - **`localized: true`** is for real differences between languages, such as a regional partner. Each version holds its own group ids, and an empty value falls back to the original's (`fromOriginal`).
 - **Language editions** (RFC-0034; an original in another site of the project). Non-localized values are copied when the edition is made (RFC-0041 §5, through `forEdition`, `cross-site.ts:115`). Group ids are shared across sites, so a copied id stays the same id.
   - `forEdition` keeps an id when the edition site has a member of that group in a collection the edition's own field allows. Otherwise the id is dropped and reported ("2 references not carried: Main hall has no edition in site B yet").
+  - A repeater item left with no value once its references are dropped is dropped too, and reported, as `remove_field` with `sub` does (§7), so the edition write never fails on "no empty item". A `requiredToPublish` field emptied this way is fine: the copy is a draft.
+  - **Inside an edition site,** the edition node's own translations do not inherit its non-localized values. This is RFC-0041's existing rule: `originalOf` looks for the group's node in the same site (`store/entry-fields.ts:54-62`; search does the same, `search-rows.ts:299`), and the group's node is in another site. Each such member holds its own references, and their rows get `shared = 0` (§2). Changing that rule for every field type is open question 12.
   - A reference never resolves across sites: it reads only members with this site's `site_id`.
   - This lands in phase 2 with the guard, because without it making an edition would be refused (`unknown_entry`) as soon as references exist.
 - **Repeaters are localized as a whole.**
@@ -388,14 +460,14 @@ interface GraphSource {
   - per entry: 100 reference values (code, §1);
   - per render: **200 resolved targets**, shared by every `entryFields` call of one request (`MediaContext.budget` already carries per-request budgets).
 
-  Over budget, the remaining targets resolve to nothing with one `console.warn`, never an error. Their `cloudhal-ref-` tags are still added within the tag budget (§2). A listing of 20 events at depth 1 costs 20.
+  Over budget, the remaining targets resolve to nothing with one `console.warn`, never an error. Purges do not depend on what rendered: they go through the index (§2, Purges). A listing of 20 events at depth 1 costs 20.
 - **Batching.**
   - The snapshot source does no store reads: every lookup is in memory, and bundles (RFC-0010) need nothing new.
   - The live source (`cloudhal dev`, previews) makes one store read per level: `getGroupMembers(siteId, ids)`, a `json_each` IN list over `nodes_translation_locale`, plus the original by id.
-- **`referencedBy` covers translations.** A row sits on the node holding the value, which is the original for `localized: false`.
-  - The live source reads `entry_refs` by `(site_id, target_id)`, expands each `source_group` to its members in the requested locale, and filters them by the view.
-  - The snapshot's reverse map is built from resolved values, so it includes inheriting members by construction.
-  - The test plan compares the two sources.
+- **`referencedBy` equals the resolved values.** A row sits on the node holding the value.
+  - The live source reads `entry_refs` by `(site_id, target_id)`. It keeps the holder when the holder is in the requested locale, and expands a row only through §2's `shared` rule: `shared = 1` adds every inheriting member, `shared = 2` adds those without their own value of `root_key`, and `shared = 0` adds nobody. It then filters by the view.
+  - The snapshot's reverse map is built from `resolveFields` output, which applies the same rule.
+  - The test plan compares the two on the same snapshot of the working copy, edition chains and localized values held by translations included.
 - **Listings** (RFC-0042 §4):
   - **Filter by a reference: yes.** A `reference` field may be a list field, with ops `eq`, `ne`, `in`, `set` and `unset` on group ids: "events at this venue", "talks by this speaker". Its `entry_list_values` rows hold the group id in `text` (≤ 48 characters, below the 100-unit limit). A multiple reference writes one row per id with `has = 2`, like a multiple select (migration 0029).
   - **Sort by a reference, or filter by a referenced entry's field** ("events whose venue is in Istanbul"): **no.** Either needs denormalized target values that every target edit would invalidate. Agents and themes do it in two steps: `places` by `city eq istanbul`, then `venue in [...]` (at most 20 values).
@@ -410,7 +482,10 @@ interface GraphSource {
   ```
   - Exactly one of `property` and `targetField` is given (checked in code).
   - `targetField` is checked against the target collection's definitions with the preset table's type rules. So `location.address.streetAddress` can come from the venue's `street` field, and the motivation's "address retyped on every event" is solved, not just `location.name`.
-  - The value is read from the depth-1 member's resolved fields.
+  - **The data path.** `structuredDataFor` stays pure (`structured-data/values.ts:26-40`). Its `StructuredDataContext` gains `references?: ReadonlyMap<FieldKey, { member: ContentEntry; fields: ResolvedFields }>`, one entry per reference field a preset source names.
+    - `withStructuredData`, the async renderer export that already loads the original and assets (RFC-0042 §2), fills the map: for each such field, `pickMember` through the view (gated), then `resolveFields(site, member, memberOriginal)`, so a translation member's non-localized `street` comes from its original.
+    - This is one member per field, independent of the card depth: cards stay depth 1.
+    - A missing member or value emits nothing for the path, and a missing *required* value drops the preset document, as RFC-0042 §2 does for any required value.
   - `ReferenceValueProperty` is a named `$defs` enum, as RFC-0042 §1 requires for Rust.
 
 ### 5. Studio
@@ -480,9 +555,20 @@ All new UI follows `kumo-design`, `studio-ui` and DESIGN.md "Fields", imports on
   - A `null` sub-value inside a repeater item is stripped before checking: that sub-field is unset in that item.
   - A given reference or repeater value replaces the whole value.
   - Removals go in a separate **`clearFields: FieldKey[]`**, which works with either input.
+  - **Edge cases**, decided:
+    - A key absent from `fieldsStrict` also means unchanged. The input accepts any subset of keys, which is what makes splitting a schema work.
+    - An item whose sub-values are all `null` becomes `{}` once stripped. It is dropped from the list, and the result reports it (`droppedItems`), so the "no empty item" rule never fires on strict output.
+    - A key that is non-null in `fieldsStrict` and also listed in `clearFields` is refused in precheck (`invalid`, "set or clear, not both").
+    - An unknown key in `clearFields` is `unknown_field`.
+    - `clearFields` on create is `invalid`, since there is nothing to clear.
   - `fieldsJsonSchema(defs, locale, defaultLocale, { strict: true })` emits that meaning: every property required, `type: [T, "null"]`, and `enum` with `null` for selects. `list_collections` returns it as `fieldsSchemaStrict`, with `strictCost: { properties, depth, enumValues, unions }` counted by `strictSchemaCost`.
   - **Over a provider's limit** (Anthropic: 16 unions per request), a caller builds a smaller schema from a subset of `fieldsSchemaStrict.properties`. Each property's schema stands alone, with no `$ref`, and splitting is safe precisely because `null` leaves other keys alone.
-  - Phase 5 tests the round trip: strict output that changes only `venue` leaves `startsAt` and `speakers` untouched; a create with nulls stores no value; nulls inside items are stripped.
+  - Phase 5 tests the round trip:
+    - strict output that changes only `venue` leaves `startsAt` and `speakers` untouched;
+    - a create with nulls stores no value;
+    - nulls inside items are stripped, and all-null items are dropped and reported;
+    - a subset of keys leaves the others alone;
+    - set-and-clear of one key is refused.
 - **Example.** An `events` collection with `startsAt` (datetime), `venue` (a reference to `places`) and `speakers` (a repeater: `person` → `people`, `role` select, `talk` text):
 
   ```json
@@ -531,7 +617,7 @@ All new UI follows `kumo-design`, `studio-ui` and DESIGN.md "Fields", imports on
 
 ### 7. Field operations (`fields-operations/`)
 
-The four operations, their phases, budgets and revert stay as RFC-0041 §6 built them (`fields-operations/types.ts:22-50`). Phase 2 already makes every rewrite carry its `entry_refs` rows and the target guard (§2.5). Phase 4 adds the new types:
+The four operations, their phases, budgets and revert stay as RFC-0041 §6 built them (`fields-operations/types.ts:22-50`). Phase 2 already makes every rewrite carry its `entry_refs` rows and the target guard (§2.6). Phase 4 adds the new types:
 
 - **`sub`.** A repeater's sub-field is addressed with a new optional `sub` parameter (`rename_field {from: "speakers", sub: "name", to: "fullName"}`), and the marker records it (`FieldMigration.sub`, §1).
 - **`change_field_type` gains the inputs the new definitions require** (`FieldOperation` in `types.ts:36-46`, the MCP tool and `cloudhal fields retype`):
@@ -563,10 +649,13 @@ New rows of the closed table (`conversions.ts:38`):
 - **Where the graph reads happen.** The table is pure and synchronous (`conversions.ts:1-3`, `ConvertContext` at `:26-31`). The two text ↔ reference rows need entries, so `ConvertContext` gains an optional, prefetched `entries?: { byText: ReadonlyMap<string, string[]>; titles: ReadonlyMap<string, string> }` (case-folded slug or title → group ids; group id → default-locale title). Who builds it:
   - each operation pass (dry run, phase B pass, revert pass), from one read of the target collections, before the pass;
   - the store's `EntryEngine.write`, which is async, before it calls `normalizeEntryFields` (`entry-fields.ts:69-78`), only while a marker with such a conversion is active;
-  - the snapshot source, from its in-memory entries, lazily and only while the snapshot carries such a marker.
+  - the snapshot source, from its in-memory entries, lazily and only while the snapshot carries such a marker;
+  - the live source, which is async like the store: it builds the maps from the working copy, the same graph phase B reads, before resolving an entry whose collection carries such a marker.
 
-  A caller without it (the live source) resolves an unconverted value to `undefined` with an issue, which renders nothing and is never wrongly typed. Readers, writers and phase B therefore convert identically, and RFC-0041 §6's "a person's edit and the operation converge" holds.
-- **Phase B writes references only under the target guard** (§2.5). A missed guard skips the entry for the next pass, so a conversion can never write a deleted target.
+  Every converter therefore has the maps. Writers, phase B and the live source read the working copy, so they convert identically, and RFC-0041 §6's "a person's edit and the operation converge" holds.
+
+  The snapshot source converts against the snapshot's own entries. That is the graph it renders, and it may legitimately differ from the working copy, as every other value does. The test plan compares the two sources only on a snapshot of the current working copy, where both read the same entries.
+- **Phase B writes references only under the target guard** (§2.6). A missed guard skips the entry for the next pass, so a conversion can never write a deleted target.
 - **Revert** (`fields-operations/revert.ts`) restores earlier values under the same guard. A restored reference whose group has no member left in the site is dropped and reported in a new `FieldRevertResult.dropped: { entryId, field, targetId }[]`.
 - **Free definition edits:**
   - add or reorder sub-fields;
@@ -578,28 +667,35 @@ New rows of the closed table (`conversions.ts:38`):
 
 | Threat | Mitigation | Test |
 |---|---|---|
-| **A draft, archived, embargoed or hidden target leaks through a published referrer** (the snapshot holds drafts, and `Loaded` holds published entries before gates) | Resolution filters through the view's gates at its instant (§4); only gate-independent card parts are cached. A card carries only the member's public title, summary, URL and cover image, the image through the view's asset gates. Unresolved values render nothing: no id, no `data-` attribute, no empty link. JSON-LD's `reference` source uses the same cards. | RFC-0008's route sweep (extended by RFC-0042) gains a published referrer pointing at a draft, an archived, an embargoed and a `hide`-expired target, before and after their instants. No id, slug, title or asset of a hidden target may appear in HTML, JSON-LD, feeds, the sitemap, search, `llms.txt` or status pages. Cache tags may carry group ids (§2). |
+| **A draft, archived, embargoed or hidden target leaks through a published referrer** (the snapshot holds drafts, and `Loaded` holds published entries before gates) | Resolution filters through the view's gates at its instant (§4); only gate-independent card parts are cached. A card carries only the member's public title, summary, URL and cover image, the image through the view's asset gates. Unresolved values render nothing: no id, no `data-` attribute, no empty link. JSON-LD's `reference` source uses the same cards. | RFC-0008's route sweep (extended by RFC-0042) gains a published referrer pointing at a draft, an archived, an embargoed and a `hide`-expired target, before and after their instants. No id, slug, title or asset of a hidden target may appear in HTML, JSON-LD, feeds, the sitemap, search, `llms.txt`, status pages or response headers. Purges go through the index, so no header carries target ids (§2). |
 | **IDOR in the picker and on write** | Pick and references routes run under the `/sites/:siteId` membership check and query by `site_id`. The target guard requires a member with `n.site_id = ?` (§2.1). An id of another site gets the same `unknown_entry` as an id that does not exist. Editions copy only ids the edition site can resolve (§3). | A shared-suite case: another site's entry or group id in `create_entry`, `update_entry`, the API and `push` is refused identically; the pick route with another site's id answers 404. |
-| **An imported or pushed archive pins another tenant's entries** | The rebuild inserts only rows whose target has a member in the same site, and every guard and referrer query filters `site_id` (§2.3). | An archive referencing site Y's entry, imported into site X, must not block Y's delete or move, and must not list X's titles to Y. |
-| **Lock-out by low-privilege actors** (`content:draft:own`, `content:write:own`) | Only published referrers block delete and move (§2.2). Contributors cannot publish, and drafts, review and archived entries never lock. | Policy-suite cases: a contributor's draft and an author's review entry referencing another author's entry do not block its delete; an author's published entry does. |
+| **An imported or pushed archive pins another tenant's entries or assets** | Rows are site-scoped, and every guard filters both the row's `site_id` and the member's (§2). `asset_refs` gets the same filter as a phase-2 prerequisite (§2.5). | An archive referencing site Y's entry or asset, imported into site X, must not block Y's delete or move, and must not list X's titles to Y. |
+| **Lock-out by low-privilege actors** (`content:draft:own`, `content:write:own`) | Only what a published entry shows blocks, by the `shared` rule (§2): a translation's own value is never inherited. Contributors cannot publish; drafts, review and archived entries never lock. | Policy-suite cases that must *not* block: a contributor's draft; an author's review entry; a draft translation's `localized: true` value while its original is published; an edition member's value. Cases that must block: an author's published entry; a published translation inheriting its original's `localized: false` value. |
 | **Fan-out DoS on render** | Caps of 50 per field, 50 items and 10 sub-fields (contract); 100 reference values per entry (code); depth ≤ 2 with a visited set; 200 targets per page; ≤ 2 live reads per page, 0 for snapshots; `referencedBy` ≤ 100. | A property test: random graphs with cycles and 10× the caps resolve within budget, never throw, and cost at most `depth` live reads. |
-| **Write amplification and slow guards** | Each guard is one indexed probe on `(site_id, target_id)` or one `json_each` count; members are found through `nodes_translation_locale`. Delete and move cost one probe each. Rebuilds are chunked inside one batch. | RFC-0042's benchmark (#105), extended to 10,000 events × 3 references on Miniflare D1, reports the write, delete and move guard costs. |
+| **Write amplification and slow guards** | Each guard is one indexed probe on `(site_id, target_id)` or one `json_each` count; members are found through `nodes_translation_locale`. Delete, move and group change cost one probe each, plus the site anchor when rows exist. The purge planner adds one probe per touched group. Rebuilds are chunked inside one batch. | RFC-0042's benchmark (#105), extended to 10,000 events × 3 references on Miniflare D1, reports the write, delete and move guard costs. |
 | **Picker search abuse** | `q` ≤ 100 characters, a substring match with no regex (rule 13), ≤ 20 results, and a per-member rate window. | A 100k-character `q` is refused before it is read. |
 | **Prompt injection through target titles** | Titles are data, quoted and truncated in approval prompts (`quote()`, 60 characters); `list_references` marks them as content. | Approval-prompt tests gain reference cases. |
-| **An older site Worker crashes on the new types** (`COMPILE[def.type]`, `props.ts:46`, has no entry) | `GET /__cloudhal/features` adds `{ "fields": 2 }`. Writers refuse the new types with `409 fields_unsupported` until the site Worker reports it, as `gates: 2` guards `expiry` (`availability.ts:243`, `cloudflare/src/features.ts`). `resolveFields` skips unknown types from phase 1. | The site Worker features test; a renderer test with an unknown field type. |
-| **Assets in repeaters deleted while used** | `fieldAssetRefs` walks items (§2.4), so the guard, rebuild and purge cover them. | An asset used only in a repeater item cannot be deleted; the rebuild keeps its row; a retired or foreign asset id in an item is refused. |
+| **An older site Worker crashes on the new types** (`COMPILE[def.type]`, `props.ts:46`, has no entry) | `GET /__cloudhal/features` adds `{ "fields": 2 }`. Every write path refuses the new types with `409 fields_unsupported` until it is reported: interactive writes and `checkBundle` for import, sync, push, pull and restore (§1), as `gates: 2` guards `expiry` (`availability.ts:243`, `cloudflare/src/features.ts`). `resolveFields` skips unknown types from phase 1. | The site Worker features test; an import, a push and a restore of a bundle with a reference definition are refused before step 7; a renderer test with an unknown field type. |
+| **Assets in repeaters deleted while used** | `fieldAssetRefs` walks items, `fieldAssetIssues` resolves sub-field types, and the purge planner's asset rule reads field and item assets (§2.5). | An asset used only in a repeater item cannot be deleted; the rebuild keeps its row; a retired, foreign or non-image asset in an image sub-field is refused at its item path; a changed item image purges its page. |
+| **A group change strands references** (`translation.group` is writable) | Leaving a group is guarded like a delete, with the site anchor (§2.2, R6). | Relinking a referenced untranslated original as a translation, and dropping `translation`, are both refused while a published entry shows the reference; a draft referrer does not block. |
 
 **Policy.** No new scopes.
 - Field definitions stay site settings: `site:settings`; for agents, `site:write` plus a person's approval, person-classed as today (`field-tools.ts:264-267`).
 - Values are content: `content:write`, with the `:own` limits.
 - Reading targets in the picker and `list_references` needs `content:read`, which every role already holds (`roles.ts` `READ`).
-- Referencing an entry never writes it, and only a published referrer can stop its delete or move.
+- Referencing an entry never writes it. Only what a published entry shows can stop its delete, its move or its leaving the group (§2.2).
 
-### 9. Rollout (one PR each; the types stay refused until step 7)
+### 9. Rollout (one PR each; the types stay refused on every write path until step 7)
 
+0. **Prerequisite: `asset_refs` by site** (§2.5).
+   - `deleteAsset`'s guard filters by site;
+   - `refsRebuild` joins same-site assets and chunks its `INSERT`;
+   - the purge planner's asset rule reads field assets.
+
+   It is independent of this RFC's types, and fixes three existing gaps.
 1. **Contract and pure core:**
    - the §1 diff, fixtures and `pnpm gen` through `contract-change`;
-   - `checkFieldDefinitions` with the new rules, **refusing both types** (`fields_unsupported`);
+   - the gate: `checkFieldDefinitions` **and** `checkBundle`'s `assertFieldTypes` refuse both types (`fields_unsupported`), so a phase-1 server takes no such definition from Studio, MCP, the API, import, sync, push, pull or restore;
    - `fieldPropSchema`, value checks, `resolveFields` (skipping unknown types);
    - `fieldsJsonSchema` (open and strict) with `strictSchemaCost`, `referenceIssues`, `pickMember`;
    - the dispatch-table entries of §1;
@@ -607,59 +703,85 @@ New rows of the closed table (`conversions.ts:38`):
 
    No behaviour change.
 2. **Store and integrity:**
-   - migration 0033;
-   - the target guard, the definitions anchor and the rows;
-   - the delete, move and publish rules with the policy (§2.2);
-   - site-checked, chunked `entryRefsRebuild` in import, sync and restore, and `referenceIssues` in `import --dry-run`;
-   - `fieldAssetRefs` walking items;
-   - rows and the target guard in field-operation rewrites, with operations on the new types refused;
+   - migration 0033, with `entry_refs` in `SITE_TABLES`;
+   - the target guard, the definitions anchor bound as planned, and the rows with `shared`/`root_key`;
+   - the delete, move, group-change and publish rules, with the site anchor and the policy (§2.2), and the races R1 to R11 as cases;
+   - chunked `entryRefsRebuild` in import, sync and restore, and `referenceIssues` in `import --dry-run`;
+   - the item walk in `fieldAssetRefs`, and `fieldAssetIssues` with sub-field types and item paths;
+   - rows and the target guard in field-operation rewrites, with operations naming the new types refused;
    - the kind-aware release `depsOf`;
-   - edition id mapping in `forEdition`;
-   - the `fields: 2` writer guard;
-   - API: entry routes, `pick` and `references`.
+   - edition id mapping in `forEdition`, emptied items dropped;
+   - the `fields: 2` capability in the gate;
+   - the API: entry routes, `pick` and `references`.
 
    The shared suites enable the types with a store option (`SiteGraphStoreOptions.fieldTypes`); production keeps refusing them.
-3. **Renderer:**
+3. **Renderer and purges:**
    - cards, depth and budget, gated per view;
-   - `groupMembers`/`referencedBy` on both sources;
+   - `groupMembers` and `referencedBy` on both sources, with the `shared` rule;
    - `EntryFields.astro` (links for references, a nested `<dl>` per item);
-   - `cloudhal-ref-` tags and the purge planner rules;
+   - the conversion maps in the live and snapshot sources;
+   - the purge planner's referrer rule and `SnapshotReader.referrersOf` (no new tags);
    - features `fields: 2`;
    - the route sweep extension;
    - a frozen theme copy for `old-theme-compat.test.ts`.
 4. **Field operations:** `sub`, the new `change_field_type` inputs, the conversion rows with the prefetched context, revert `dropped`, and the CLI flags.
 5. **MCP:**
    - `list_collections` (`fieldsSchema`, `fieldsSchemaStrict`, `strictCost`);
-   - `fieldsStrict` and `clearFields`;
+   - `fieldsStrict` and `clearFields` with the edge cases of §6;
    - prechecks, `delete_entry`'s refusal and `list_references`;
    - the translation tools' repeater paths;
    - the operation tools' new inputs;
    - regenerated tool docs (`node scripts/mcp-tools-doc.ts`).
 6. **Studio:** the five blocks, `FieldReference`, the builder, "Used by", the delete dialog and the publish warnings; `design:shots`; the `fields` namespace and `pnpm i18n:import`.
-7. **Enable** (small): `checkFieldDefinitions` accepts the two types where the writer guard confirms `fields: 2`; `update_collection`'s input lists them; `docs/guides/fields.md`. It needs steps 2 to 6 released.
-8. **Listings and structured data:** reference list fields (rows, `checkFieldQuery`, the property suite) and `ReferenceValueSource` with `targetField`.
+7. **Enable** (small):
+   - the gate accepts the two types where the site Worker reports `fields: 2`, on every path;
+   - `update_collection`'s input lists them;
+   - the one-time per-site `entryRefsRebuild` job (§2.4);
+   - `docs/guides/fields.md`.
+
+   It needs steps 0 and 2 to 6 released.
+8. **Listings and structured data:** reference list fields (rows, `checkFieldQuery`, the property suite), and `ReferenceValueSource` with `targetField` (its own `contract-change`, §4).
 
 **Test plan.** Store behaviour goes into the shared suites (`packages/core-ts/src/testing-*.ts`), on SQLite, Miniflare D1 and Durable Object SQLite.
 - `testing-references.ts` (new):
   - writes, and canonicalizing a member's id to its group;
   - refusing a missing, cross-site, wrong-collection, own-group or archived new target;
-  - the definitions-anchor races: a reference field added, or an allowed collection removed, between plan and batch;
-  - delete: the last member versus a remaining member, and published versus draft referrers;
-  - move, of an original and of a translation;
+  - **every race R1 to R11 of §2.3**, as two interleaved batches each: the definitions anchor bound as planned (with a definitions change between `getSite` and the batch), and the move and delete site anchors;
+  - delete: the last member versus a remaining member in an allowed or a disallowed collection, and a published versus a draft referrer;
+  - moves of an original and of a translation;
+  - group changes: relinking a referenced original, and dropping `translation`;
   - publish re-checks;
+  - the `shared` rule:
+    - a draft translation's `localized: true` value does not block;
+    - a published translation inheriting a `localized: false` value does;
+    - edition members never inherit;
   - the same target in two items;
   - an edition site referencing a cross-site group;
+  - rows kept for a missing target, and still blocking once a member reappears;
   - rows after every write, delete, import, restore and operation phase;
-  - a foreign-tenant archive.
+  - a foreign-tenant archive;
+  - site deletion removing the rows.
+- `testing-gates.ts`, beside its bundle-gate cases: a bundle with reference or repeater definitions is refused by import, push, pull and restore before step 7, and accepted with the capability.
 - `testing-fields.ts`: repeater values, `requiredToPublish` per item, the leaf and reference caps, assets in items.
-- `testing-assets.ts`: an asset used only in a repeater is not deletable, and its row survives a rebuild.
+- `testing-assets.ts`:
+  - an asset used only in a repeater is not deletable, and its row survives a rebuild;
+  - a non-image in an image sub-field is refused at its item path;
+  - another site's archive does not block an asset's delete.
 - `testing-field-operations.ts`: every new conversion row, `sub`, a target deleted during phase B, resume, revert with a deleted target.
-- `testing-releases.ts` (today on SQLite and D1): a scheduled referrer of a non-live target is not held and renders without it; an edition's group id never fails the run.
-- `testing-translations.ts`: edition mapping, and drops reported.
+- `testing-releases.ts` (today on SQLite and D1): a scheduled referrer of a non-live target is not held and renders without it, and an edition's group id never fails the run.
+- `testing-translations.ts`: edition mapping, drops and emptied items reported.
 - `testing-list-values*.ts`: reference list fields, the seeded SQL-versus-evaluator comparison included.
-- Pure tests: the emitter's keywords and depth, root `object`, no recursion, `strictCost`; the strict round trip (phase 5); `referenceIssues`; `pickMember`; budget and cycles, property-based.
-- Renderer: identical cards on the snapshot and live sources, gate instants, `referencedBy` through translations, cache tags and purges, including a target that becomes visible.
-- Studio: block tests (keyboard, focus after add and remove, live region), `design:shots` at both widths, `design:lint`.
+- **Pure tests:**
+  - the emitter's keywords and depth, root `object`, no recursion, `strictCost`;
+  - the strict round trip and its edge cases (phase 5);
+  - `referenceIssues` and `pickMember`;
+  - the definitions anchor's text equality for every fixture definition;
+  - budget and cycles, property-based.
+- **Renderer:**
+  - identical cards and `referencedBy` on the snapshot and live sources, for a snapshot of the working copy;
+  - gate instants;
+  - purge plans for a target retitled, unpublished, newly published, newly translated and with a changed cover, with a theme that emits no new tags.
+- **Studio:** block tests (keyboard, focus after add and remove, live region), `design:shots` at both widths, `design:lint`.
 
 ## Alternatives considered
 
@@ -667,12 +789,15 @@ New rows of the closed table (`conversions.ts:38`):
 |---|---|---|---|
 | Store a per-site anchor member's id instead of the group id | No foreign ids in values | Editions need an id rewrite per site; the anchor changes when the original is deleted; every lookup maps member → anchor | The group id is project-stable and already indexed (§1) |
 | Anchor every entry write on the site hash | Simple | Any site edit (theme, menus) conflicts every concurrent entry write | Anchor on the collection's definitions only (§2.1) |
-| Every reference locks, drafts included (Sanity's strong default) | Strictest | Contributors pin others' entries; abandoned drafts pin forever | Only published referrers lock (§2.2) |
+| Every reference locks, drafts included (Sanity's strong default) | Strictest | Contributors pin others' entries; abandoned drafts pin forever | Only what a published entry shows locks, by the `shared` rule (§2.2) |
 | Weak references (no locking at all) | No refusals | Live pages silently lose venues on delete; "used by" still needs the index | Lock where the live site depends |
 | Cascade or "unlink and delete" | One click | Rewrites other people's entries as a side effect | Refuse and list; open question 1 |
 | Block publish or fail the build on unresolved references | Strict | Publish is a site snapshot; one draft venue blocks every fix | Warn (§2) |
-| References as release dependencies (today's generic extractor) | A scheduled event takes its venue live with it | Locks every member of the target until the run; edition group ids fail runs; hard, where render is soft | Kind-aware `depsOf` drops them (§2.6) |
-| Tag only rendered targets; forbid group ids in tags | Fewer tags | Newly visible targets never purge their referrers; per-member purges miss group-keyed referrers | `cloudhal-ref-<group>` for every value read; tags are edge-only |
+| References as release dependencies (today's generic extractor) | A scheduled event takes its venue live with it | Locks every member of the target until the run; edition group ids fail runs; hard, where render is soft | Kind-aware `depsOf` drops them (§2.7) |
+| `cloudhal-ref-<group>` cache tags on referrer responses (first revision) | Purges by group | Themes build tags themselves, so existing themes would never emit them; older site Workers answer 400 to new prefixes and every publish purges everything; ids in headers rest on unverified stripping; header budget | The purge planner adds referrers' existing node tags through `entry_refs` (§2, Purges) |
+| Store something immutable (a new `refId` per entry) instead of the group id | Survives group changes | A new identity on every entry, its own index, migrations and editions mapping; translations still need group resolution | Group ids, with group changes guarded like deletes (§2.2) |
+| Rewrite referrers when a target changes group | Group changes always succeed | Rewrites other people's published entries as a side effect of a translation link | Refuse while shown by a published entry (§2.2) |
+| Keep rows only while the target has a member (first revision) | Smaller table | Nothing re-creates rows when a member reappears; cleanup on last-member delete is fiddly | Rows for every stored value; the site filter is the isolation (§2) |
 | `null` in strict output means "remove", as in `fields` | One input | Following the schema deletes every untouched field | `fieldsStrict` with `null` = unchanged, plus `clearFields` |
 | `anyOf` in `update_collection`'s input for strict modes | Looks strict-friendly | Optional properties and bounds still fail strict modes | Inputs stay non-strict; `$defs` fixed instead |
 | Reverse lookups by scanning `json_extract` over `nodes` | No table | Every delete and move scans the site | `entry_refs`, the `asset_refs` pattern |
@@ -685,10 +810,14 @@ New rows of the closed table (`conversions.ts:38`):
 ## Compatibility & migration
 
 - **Contract:** two new variants, a new `$defs` and one optional marker property. Existing sites, snapshots, bundles and archives stay valid, and there is no `schemaVersion` bump.
-  - An older admin Worker refuses the new definitions, so servers upgrade first.
+  - An admin Worker before phase 1 refuses the new definitions by schema. One at phases 1 to 6 refuses them by the gate, on every write path, bundles included (§1). Servers upgrade first.
   - An older site Worker is covered by `fields: 2`.
-- **Data:** none to migrate. The types are refused until step 7, so migration 0033 is DDL only, and the definitions anchor keeps `field_key_in_use` honest.
-- **Themes:** additive. `entry.fields` keeps meaning what is stored: group ids and item objects. Old theme copies render the new types as nothing. `EntryFields.astro` ships in the renderer package.
+  - The purge endpoint and `isCloudhalCacheTag` are unchanged, so mixed admin and site Worker versions purge normally (§2).
+- **Data:** none to migrate. The types are refused on every write path until step 7, so migration 0033 is DDL only. Step 7's one-time per-site rebuild is the safety net, and the definitions anchor keeps `field_key_in_use` honest.
+- **Themes:** additive. `entry.fields` keeps meaning what is stored: group ids and item objects.
+  - Themes from v0.5.0 on render fields through the renderer's `entryFields` and `EntryFields.astro`, so they draw references and repeaters after a renderer upgrade.
+  - Older copies show nothing for them.
+  - Either way, no theme code is needed for correct purges, because referrers are purged through their own node tags (§2).
 - **Releases:** the kind-aware `depsOf` changes nothing for existing content, because no field value can be a group id before step 7.
 - **Rollback:**
   - A snapshot restores the site node and entries, and the index is rebuilt in its batch.
@@ -715,11 +844,13 @@ New rows of the closed table (`conversions.ts:38`):
 8. **`fieldsSchemaStrict` beside `fieldsSchema`**, with `strictCost`, and no automatic splitting into groups. *Recommended.*
 9. **Publish warnings as a gate:** never; warnings only. *Recommended.* A site setting could later make them a person-approval point for agents' publishes, like RFC-0042 §3.5's expiry rule.
 10. **Review referrers:** they do not lock, like drafts. *Recommended*, so that a contributor's review request never pins an entry. The alternative, locking from review, protects content about to go live, but it reopens the contributor lock-out.
-11. **`asset_refs` follow-ups found here:** `refsRebuild` puts a whole site in one `INSERT`, which can exceed D1's 100 KB statement on large imports, and `deleteAsset`'s guard (`assets.ts:867`) and the rebuild have no `site_id` filter, the same cross-tenant pin as §2.3. *Recommended:* one small PR before phase 2, outside this RFC.
+11. ~~`asset_refs` follow-ups~~ **Decided** in the second revision: §9 step 0 is a prerequisite of phase 2 (§2.5).
+12. **Edition chains and non-localized values:** inside an edition site, the edition node's translations do not inherit its non-localized values of any type, as RFC-0041 behaves today (`originalOf`). References follow that rule (`shared = 0`). *Recommended:* keep it in stage 4, and fix it for every field type in its own change, defining the in-site root as the member with no same-site source.
+13. **R8** (a translation published just after its inherited target was deleted): accept it with a warning. *Recommended*, because refusing would block a translator over a value they cannot edit. The alternative is to refuse the publish until the original's value is fixed.
 
 ## Review log (2026-11-10, PR #193)
 
-An independent multi-agent review upheld 28 findings and split two. Each one, with the decision taken:
+An independent multi-agent review upheld 28 findings and split two. Each one, with the decision taken. Section numbers in this first table refer to commit fe8ac929; the second round renumbered §2 (§2.4 rebuilds, §2.5 assets, §2.6 field operations, §2.7 releases).
 
 | # | Finding | Decision |
 |---|---|---|
@@ -744,3 +875,26 @@ An independent multi-agent review upheld 28 findings and split two. Each one, wi
 | U25 | The Event address cannot come from a Place | `ReferenceValueSource.targetField` (§4) |
 | U26 | `change_field_type` lacks inputs | `collections`, `maxItems`, `subFields`, `itemLabel`, and CLI flags (§7) |
 | S2 | The release closure treats ids as dependencies | Kind-aware `depsOf` drops references; a `testing-releases` case (§2.6) |
+
+### Second round (2026-11-10, verification of fe8ac929)
+
+Three verifiers found 34 earlier findings resolved. The unresolved ones and the new issues, with the decisions:
+
+| Finding | Decision |
+|---|---|
+| Group ids change (`translation.group` is writable), so stored ids escape the guards (blocking, two verifiers) | Leaving a group is guarded like a delete, with the site anchor, and refused while a published entry shows the reference (§1, §2.2, R6, tests). Rewriting referrers and a new immutable id are both rejected (Alternatives). |
+| Import, push, pull and restore bypass the gate (blocking, two verifiers) | `checkBundle` gains `assertFieldTypes`, covering every row path through `importSite`, with one capability shared with interactive writes (§1). Step 7 runs a one-time per-site rebuild (§2.4, §9). |
+| The blocking expansion treats every row as inherited (blocking, three verifiers) | Rows carry `shared` and `root_key`, mirroring `resolveFields`. One SQL fragment serves the guards, the live `referencedBy` and the purge planner, so live equals snapshot. The policy is stated explicitly (§2, §4, §8). |
+| The definitions anchor is read separately from the planned `Site` (blocking) | The anchor binds the definitions of the very `Site` object the write planned with, compared with `json(...) IS json(?)` (§2.1). |
+| The move guard anchors the wrong collection, and the delete exception ignores allowed collections | Moves, deletes and group changes anchor on the hash of the planned site when rows exist. The exception counts only usable members in collections every blocking field allows (§2.2, R4, R5). |
+| No emission path for `cloudhal-ref-` tags; old Workers refuse new prefixes; budget; privacy (blocking) | Tags dropped. The purge planner adds referrers' own node tags through `entry_refs`, covering newly visible targets and changed covers. No new prefix, no header ids, no theme code (§2, Purges). |
+| Rows depend on membership and are not re-created | Rows are kept for every stored value; the site filter is the isolation (§2 invariant, R11). |
+| `entry_refs` is missing from `SITE_TABLES` | Added in phase 2 (§2.9). |
+| `fieldAssetIssues` and the purge planner do not follow | Both are specified: sub-field types, item paths, and `fieldAssetRefs` in the asset rule, which also fixes top-level image fields (§2.5). |
+| The `asset_refs` cross-tenant fix was only recommended | Decided as rollout step 0, a prerequisite of phase 2 (§2.5, §9, OQ 11). |
+| Edition chains have no original; mapping can empty an item | Edition members do not inherit (RFC-0041's rule, `shared = 0`; OQ 12). Emptied items are dropped and reported (§3). |
+| The conversion-context claims contradict each other | The live source prefetches from the working copy. The snapshot source converts against its own entries. The comparison test runs on a snapshot of the working copy (§7). |
+| `fieldsStrict` edge cases | Absent keys mean unchanged; all-null items are dropped and reported; set-and-clear is refused; an unknown key to clear is refused; clearing on create is refused (§6). |
+| The Event address data path was undefined, and the phase-8 contract was unlisted | `StructuredDataContext.references`, filled by `withStructuredData` through `pickMember` and `resolveFields`, independent of card depth. The phase-8 contract change is listed in §1 (§4). |
+| Move and delete races | Listed as R1 to R11 with their guards; R8 accepted and warned (§2.3, OQ 13). |
+
