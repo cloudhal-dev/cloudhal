@@ -384,6 +384,7 @@ overrides:
 
 patchedDependencies:
   '@cloudflare/kumo@2.14.0': 198f9be784beeb608a5d59b175d6085d7b4f0291567d57b089a85da1fef5f9d7
+  miniflare@4.20260730.0: 6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46
 
 importers:
 
@@ -582,7 +583,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -670,7 +671,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -869,7 +870,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -934,7 +935,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1045,7 +1046,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       rrule-temporal:
         specifier: 'catalog:'
         version: 2.2.8
@@ -1076,7 +1077,7 @@ importers:
         version: 13.0.3
       miniflare:
         specifier: 'catalog:'
-        version: 4.20260730.0(@types/node@26.6.5)
+        version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
       tsx:
         specifier: 'catalog:'
         version: 4.23.15
@@ -7920,7 +7921,7 @@ snapshots:
 
   min-indent@1.0.1: {}
 
-  miniflare@4.20260730.0(@types/node@26.6.5):
+  miniflare@4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       sharp: 0.35.5(@types/node@26.6.5)
