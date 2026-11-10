@@ -1,0 +1,85 @@
+diff --git a/dist/src/index.js b/dist/src/index.js
+index ae57410a970d7d47f9f1810567529df69e9d8df1..e46464411db851fafb5c2b4a582e1497e8e0da2f 100644
+--- a/dist/src/index.js
++++ b/dist/src/index.js
+@@ -72975,7 +72975,10 @@ var DispatchFetchDispatcher = class extends undici.Dispatcher {
+       const headers = convertUndiciHeadersToStandard(options.headers ?? {});
+       this.addHeaders(headers, path69);
+       options.headers = headers;
+-      options.reset = true;
++      // Cloudhal patch (cloudflare/workers-sdk#15781): reuse connections instead of one
++      // TIME_WAIT port per dispatch; never replay a request that may have reached the Worker.
++      options.idempotent = false;
++      options.reset = false;
+       return this.runtimeDispatcher.dispatch(options, handler);
+     } else {
+       return this.globalDispatcher.dispatch(options, handler);
+@@ -92215,6 +92218,10 @@ port.addEventListener("message", async (event) => {
+       dispatcherUrl = url;
+       dispatcher = new Pool(new URL(url).origin, {
+         connect: { rejectUnauthorized: false },
++      // Cloudhal patch (cloudflare/workers-sdk#16445): close idle sockets before
++      // workerd's 5s idle timeout, as the runtime dispatcher does since #15781.
++      keepAliveTimeout: 1000,
++      keepAliveMaxTimeout: 1000,
+               // Disable timeouts for local dev \u2014 long-running responses (streaming,
+       // slow uploads, long-polling) should not be killed by undici defaults.
+       headersTimeout: 0,
+@@ -92247,7 +92254,10 @@ port.addEventListener("message", async (event) => {
+       port.postMessage({ id, error: new Error(String(error)) });
+     }
+   } finally {
+-    Atomics.store(notifyHandle, /* index */ 0, /* value */ 1);
++    // Cloudhal patch (cloudflare/workers-sdk#15552): publish THIS request's generation
++    // (never 0), not a bare flag, so a late notify from the previous reply cannot wake the
++    // next call before its reply is queued.
++    Atomics.store(notifyHandle, /* index */ 0, /* generation */ (id + 1) | 0);
+     Atomics.notify(notifyHandle, /* index */ 0);
+   }
+ });
+@@ -92278,13 +92288,6 @@ var SynchronousFetcher = class {
+   }
+   fetch(url44, init2) {
+     this.#ensureWorker();
+-    Atomics.store(
+-      this.#notifyHandle,
+-      /* index */
+-      0,
+-      /* value */
+-      0
+-    );
+     const id = this.#nextId++;
+     this.#channel.port1.postMessage({
+       id,
+@@ -92293,13 +92296,13 @@ var SynchronousFetcher = class {
+       headers: init2.headers,
+       body: init2.body
+     });
+-    Atomics.wait(
+-      this.#notifyHandle,
+-      /* index */
+-      0,
+-      /* value */
+-      0
+-    );
++    // Cloudhal patch (cloudflare/workers-sdk#15552): a stale notify from the previous
++    // reply wakes the wait early; re-check the generation and sleep again. The worker
++    // stores the generation after posting, so seeing it means the reply is queued.
++    const generation = (id + 1) | 0;
++    for (let seen = Atomics.load(this.#notifyHandle, 0); seen !== generation; seen = Atomics.load(this.#notifyHandle, 0)) {
++      Atomics.wait(this.#notifyHandle, 0, seen);
++    }
+     const message = (0, import_node_worker_threads.receiveMessageOnPort)(
+       this.#channel.port1
+     )?.message;
+@@ -104369,6 +104372,10 @@ See https://developers.cloudflare.com/cloudflare-one/access-controls/service-cre
+       });
+       this.#runtimeDispatcher = new import_undici9.Pool(this.#runtimeEntryURL, {
+         connect: { rejectUnauthorized: false },
++        // Cloudhal patch (cloudflare/workers-sdk#15781): close idle client sockets
++        // before workerd's 5s idle timeout.
++        keepAliveTimeout: 1e3,
++        keepAliveMaxTimeout: 1e3,
+         // Disable timeouts for local dev — long-running responses (streaming,
+         // slow uploads, long-polling) should not be killed by undici defaults.
+         headersTimeout: 0,

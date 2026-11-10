@@ -1,0 +1,61 @@
+name: D1 stress
+
+# #190: runs the Miniflare halves (D1, Durable Object SQLite, R2) of every package that tests with
+# the pinned Miniflare, many times on fresh runners, under the same load as CI
+# (`turbo --concurrency=2`). Run it by hand after a Miniflare bump or a change to its patch
+# (ADR-0012, addendum 2026-11-10); pull requests that touch the patch run it on their own.
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per Node version
+        type: number
+        default: 10
+  pull_request:
+    paths:
+      - patches/miniflare@*.patch
+      - .github/workflows/d1-stress.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: d1-stress-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      runs: ${{ steps.runs.outputs.runs }}
+    steps:
+      - id: runs
+        env:
+          RUNS: ${{ inputs.runs || 10 }}
+        run: echo "runs=$(node -e 'console.log(JSON.stringify(Array.from({ length: Math.min(Number(process.env.RUNS), 50) }, (_, i) => i + 1)))')" >> "$GITHUB_OUTPUT"
+
+  d1:
+    name: D1 halves (Node ${{ matrix.node }}, run ${{ matrix.run }})
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24, 26]
+        run: ${{ fromJSON(needs.plan.outputs.runs) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Same scheduler load as CI's test step; `-t` keeps only the suites labelled "(Miniflare)".
+      - run: >-
+          pnpm turbo run test --concurrency=2
+          --filter=@cloudhal/storage --filter=@cloudhal/core-ts --filter=@cloudhal/api
+          --filter=@cloudhal/schedules --filter=@cloudhal/comments --filter=@cloudhal/analytics
+          -- -t '\(Miniflare\)'
