@@ -21,6 +21,7 @@ import type { MailSender } from "./mail.ts";
 import type { McpOauthOptions } from "./mcp-oauth.ts";
 import type { PlaygroundOptions } from "./playground.ts";
 import type { AiDeps } from "./routes/ai.ts";
+import type { SiteBuildService } from "./routes/site-build.ts";
 import type { UploadSecret } from "./uploads.ts";
 
 /** Resolves who is calling: a session cookie, an API key, … Returns undefined for anonymous. */
@@ -152,6 +153,11 @@ export interface ApiDeps {
    * comments and schedules unconfigured.
    */
   readonly playground?: PlaygroundOptions;
+  /**
+   * #150: the self-hosted Node server's static-site rebuild queue. `/api/sites/:id/site-build`
+   * reports it (with the last `site.build` audit row); without it the route says `enabled: false`.
+   */
+  readonly siteBuild?: SiteBuildService;
 }
 
 export type Env = {
@@ -186,6 +192,8 @@ export type Env = {
     schedules: SchedulesDeps | undefined;
     /** The scheduler (RFC-0008); undefined on servers without one. */
     scheduler: SchedulerControl | undefined;
+    /** The self-hosted static site's rebuild queue (#150); undefined elsewhere. */
+    siteBuild: SiteBuildService | undefined;
     /** `ApiDeps.clientAddressHeader`: where the client's address is read for rate limits. */
     clientAddressHeader: string | undefined;
   };

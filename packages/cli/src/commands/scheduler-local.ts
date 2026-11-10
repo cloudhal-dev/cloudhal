@@ -23,6 +23,7 @@ import {
   notFoundFromAnalytics,
 } from "@cloudhal/core-ts/automations";
 import {
+  type ReleasePublishedHook,
   runScheduledTick,
   type SchedulerControl,
   type TickReport,
@@ -67,6 +68,8 @@ export interface LocalSchedulerOptions {
   readonly siteId?: string | undefined;
   /** Automations run (§11.6). Default: `automationsEnabled()` of the process environment. */
   readonly automations?: boolean | undefined;
+  /** A release went live: `cloudhal studio` rebuilds the self-hosted site (#150). */
+  readonly onReleasePublished?: ReleasePublishedHook | undefined;
 }
 
 /** What the Node ticker adds for the built-in jobs (§11.1): local analytics and the local renderer. */
@@ -147,6 +150,7 @@ export function runLocalTick(
     builtinInputs: () => localBuiltinInputs(o),
     // §11.6: `CLOUDHAL_AUTOMATIONS=off` stops automations; releases go on.
     automationsEnabled: o.automations ?? automationsEnabled(),
+    ...(o.onReleasePublished ? { onReleasePublished: o.onReleasePublished } : {}),
   });
 }
 

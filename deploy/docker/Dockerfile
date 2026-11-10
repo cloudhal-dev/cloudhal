@@ -39,7 +39,8 @@ ENV NODE_ENV=production \
   PATH="/opt/cloudhal/bin:/opt/cloudhal/node_modules/.bin:${PATH}" \
   CLOUDHAL_HOST=0.0.0.0 \
   CLOUDHAL_INIT=blog \
-  CLOUDHAL_SITE_NAME="My site"
+  CLOUDHAL_SITE_NAME="My site" \
+  CLOUDHAL_SITE_BUILD=on
 USER node
 WORKDIR /data
 VOLUME ["/data"]

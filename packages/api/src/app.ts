@@ -51,6 +51,7 @@ import { proposals } from "./routes/proposals.ts";
 import { redirects } from "./routes/redirects.ts";
 import { scheduleRoutes, schedulerRoute } from "./routes/schedules.ts";
 import { siteSearch } from "./routes/search.ts";
+import { siteBuild } from "./routes/site-build.ts";
 import { sites } from "./routes/sites.ts";
 import { snapshots } from "./routes/snapshots.ts";
 import { taxonomies } from "./routes/taxonomies.ts";
@@ -101,6 +102,8 @@ const SITE_AREAS: readonly (readonly [string, Hono<Env>])[] = [
   // RFC-0004 §6.1: the media library.
   ["assets", assets],
   ["media", siteMedia],
+  // #150: the self-hosted static site's rebuild on publish (`enabled: false` elsewhere).
+  ["site-build", siteBuild],
 ];
 
 /**
@@ -345,6 +348,7 @@ function setContext(c: Context<Env>, deps: ApiDeps, shared: SharedContext): void
   c.set("comments", deps.comments);
   c.set("schedules", shared.schedules);
   c.set("scheduler", deps.scheduler);
+  c.set("siteBuild", deps.siteBuild);
   // #165: where rate limits read the client's address (`ApiDeps.clientAddressHeader`).
   c.set("clientAddressHeader", deps.clientAddressHeader);
 }

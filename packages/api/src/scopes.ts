@@ -210,6 +210,8 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/snapshots/:snapshotId/publish`, "site:publish:own"],
   ["POST", `${S}/snapshots/:snapshotId/rollback`, "site:rollback"],
   ["GET", `${S}/activity`, "member"],
+  // #150: the self-hosted static site's last build (Studio's overview)
+  ["GET", `${S}/site-build`, "site:read"],
   ["POST", `${S}/preview-links`, "preview:create"],
   ["GET", `${S}/approvals`, "member"],
   ["POST", `${S}/approvals/:approvalId/:decision`, "member"],

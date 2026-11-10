@@ -197,6 +197,26 @@ export function releasesSuite(
       expect((await tick(T + 2 * 60_000)).ran).toBe(0);
     });
 
+    it("#150: a committed release calls the published hook once; a throwing hook fails nothing", async () => {
+      const s = await story();
+      const { release } = await scheduled([s.id]);
+      const calls: unknown[] = [];
+      const onReleasePublished = (p: unknown) => {
+        calls.push(p);
+        throw new Error("the rebuild queue is gone");
+      };
+      expect((await tick(T - 1000, { onReleasePublished })).ran).toBe(0);
+      expect(calls).toEqual([]);
+      const report = await tick(T + 41_000, { onReleasePublished });
+      expect(report).toMatchObject({ ran: 1, failed: 0 });
+      const S = await live();
+      expect(calls).toEqual([{ siteId: site.id, snapshotId: S.id, releaseId: release.id }]);
+      expect(logs.some((l) => l.includes("the published hook of release"))).toBe(true);
+      expect((await get(release.id)).state).toBe("published");
+      // a later tick has nothing to publish and calls nothing
+      await tick(T + 120_000, { onReleasePublished });
+      expect(calls).toHaveLength(1);
+    });
     it("approving a release of a draft publishes it: marked published, dated at T, live after the run", async () => {
       const s = await story({ status: "draft" });
       // Creating (or proposing) a release never changes the node's status.

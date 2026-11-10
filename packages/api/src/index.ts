@@ -54,4 +54,10 @@ export {
   type PlaygroundInfo,
   type PlaygroundOptions,
 } from "./playground.ts";
+export {
+  SITE_BUILD_TOOL,
+  type SiteBuildLast,
+  type SiteBuildService,
+  type SiteBuildStatus,
+} from "./routes/site-build.ts";
 export { releaseApprovalCheck, releaseRights } from "./schedules.ts";

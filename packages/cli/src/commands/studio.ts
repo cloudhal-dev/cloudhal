@@ -10,7 +10,7 @@ import {
 } from "@cloudhal/api/auth";
 import { CLIENT_ADDRESS_HEADER, serveNode } from "@cloudhal/api/node";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
-import { openLocalStore } from "@cloudhal/core-ts/local";
+import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { nodeTransport } from "@cloudhal/core-ts/media-node";
 import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { assetDir } from "../assets.ts";
@@ -22,6 +22,11 @@ import { localComments } from "./comments-local.ts";
 import { terminalMailSender } from "./mail-local.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 import { automationsEnabled, startLocalScheduler } from "./scheduler-local.ts";
+import {
+  type LocalSiteBuild,
+  type LocalSiteBuildOptions,
+  localSiteBuild,
+} from "./site-build-run.ts";
 import {
   assertNoAuthLocal,
   assertProxyHasBaseUrl,
@@ -55,6 +60,11 @@ export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
   readonly scheduler?: boolean;
   /** @deprecated the comments job runs on the scheduler's tick; `false` skips the ticker. */
   readonly commentsJob?: boolean;
+  /**
+   * Tests: the rebuild's command instead of the image's `site-build --wait`, and its debounce
+   * (`CLOUDHAL_SITE_BUILD=on` still switches it on, #150).
+   */
+  readonly siteBuild?: Pick<LocalSiteBuildOptions, "command" | "debounceMs" | "maxWaitMs">;
   /** The environment `CLOUDHAL_*` is read from (tests); default `process.env`. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Tests: run Better Auth's Origin check under `NODE_ENV=test` too (`AuthOptions.originCheck`). */
@@ -106,13 +116,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
       log(`created a new "${scaffold.starter}" project in ${options.projectDir}`);
   }
   const cfg = await readProjectConfig(options.projectDir);
-  // The theme's block types (RFC-0015 §6) join the built-ins, and its design settings
-  // (RFC-0017 §1) check `Site.theme.config`: validated, offered, listed.
-  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir), {
-    blocks: await loadBlockRegistry(options.projectDir),
-    themeSettings: await loadThemeSettings(options.projectDir),
-    themeDesign: await loadThemeDesign(options.projectDir),
-  });
+  const { local, siteBuild } = await openStudioStore(options, cfg, env);
   const studioDist = options.studioDist ?? (await assetDir("studio")) ?? "";
   const serveStudio = await exists(path.join(studioDist, "index.html"));
 
@@ -136,6 +140,8 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
           graph: local.store,
           // RFC-0008 §11.1: the broken-link sweep's 404 rows
           ...(analytics.feature().enabled ? { analytics } : {}),
+          // #150: a release run is a publish too
+          ...(siteBuild ? { onReleasePublished: siteBuild.onReleasePublished } : {}),
         });
   const origins = studioAuthOrigins(server, env);
   let deps: Parameters<typeof createApi>[0] = {
@@ -143,6 +149,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     analytics,
     comments,
     ...(ticker ? { scheduler: ticker } : {}),
+    ...(siteBuild ? { siteBuild } : {}),
     // RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite.
     schedules: {
       store: new SqlScheduleStore(local.sql),
@@ -211,6 +218,9 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     hostname: server.hostname,
     trustProxy: server.behindProxy,
   });
+  // #150: one build at start, through the same queue and audit row as a publish's (the served site
+  // follows the new image, and a new volume gets its status page).
+  siteBuild?.rebuilder.schedule("start");
   const url = studioUrl(server, listening.port);
   const warning = noBaseUrlWarning(server);
   logOauthOff(options.log, setup ? oauth : undefined);
@@ -224,10 +234,40 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     stop: async () => {
       stopRollups();
       ticker?.stop();
+      await siteBuild?.stop();
       await new Promise<void>((resolve) => listening.server.close(() => resolve()));
       await local.close();
     },
   };
+}
+
+/**
+ * The project's store for Studio: the theme's block types (RFC-0015 §6) join the built-ins, its
+ * design settings (RFC-0017 §1) check `Site.theme.config`, and with CLOUDHAL_SITE_BUILD=on every
+ * publish rebuilds the self-hosted static site (#150). The store's hook is bound before the store
+ * exists; the rebuild queue needs the store's database.
+ */
+async function openStudioStore(
+  options: StudioOptions,
+  cfg: Awaited<ReturnType<typeof readProjectConfig>>,
+  env: Readonly<Record<string, string | undefined>>,
+): Promise<{ local: LocalStore; siteBuild: LocalSiteBuild | undefined }> {
+  let siteBuild: LocalSiteBuild | undefined;
+  const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir), {
+    blocks: await loadBlockRegistry(options.projectDir),
+    themeSettings: await loadThemeSettings(options.projectDir),
+    themeDesign: await loadThemeDesign(options.projectDir),
+    onPublished: async (site) => siteBuild?.onPublished(site),
+  });
+  siteBuild = await localSiteBuild({
+    env,
+    projectDir: options.projectDir,
+    siteId: cfg.siteId,
+    sql: local.sql,
+    log: options.log ?? ((l) => console.log(`  ${l}`)),
+    ...options.siteBuild,
+  });
+  return { local, siteBuild };
 }
 
 /**

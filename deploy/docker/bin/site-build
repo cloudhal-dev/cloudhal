@@ -28,16 +28,32 @@
 # snapshot, else the latest. The project's dependencies are the image's node_modules, linked into
 # the project on first use, so no install and no network is needed.
 set -eu
+# `--wait`, first: wait (at most 30 minutes) for a build that is running to finish, instead of
+# giving up. `cloudhal studio`'s rebuild on publish (CLOUDHAL_SITE_BUILD=on, #150) and the
+# entrypoint's start-up build use it; by hand and from cron a second build is refused.
+wait=0
+if [ "${1:-}" = "--wait" ]; then
+  wait=1
+  shift
+fi
 cd /data
 if [ ! -f cloudhal.json ]; then
   echo "site-build: no project in /data yet; start the container once first" >&2
   exit 1
 fi
-# One build at a time: a cron run and a hand-started one would otherwise share the staging folder.
+# One build at a time: Studio's rebuild, the start-up build, a cron run and a hand-started one
+# would otherwise share the staging folder.
 exec 9>/tmp/site-build.lock
-if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
-  echo "site-build: another build is running; try again when it is done" >&2
-  exit 1
+if command -v flock >/dev/null 2>&1; then
+  if [ "$wait" = 1 ]; then
+    if ! flock -w 1800 9; then
+      echo "site-build: another build has been running for 30 minutes; giving up" >&2
+      exit 1
+    fi
+  elif ! flock -n 9; then
+    echo "site-build: another build is running; try again when it is done" >&2
+    exit 1
+  fi
 fi
 [ -e node_modules ] || ln -s /opt/cloudhal/node_modules node_modules
 
