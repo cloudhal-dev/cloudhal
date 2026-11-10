@@ -414,7 +414,7 @@
       "params": 5
     },
     "packages/core-ts/src/cache-purge.ts::planCachePurge": {
-      "lines": 233
+      "lines": 207
     },
     "packages/core-ts/src/media/image.ts::inspectAvif": {
       "depth": 6

@@ -2,7 +2,7 @@
  * planCachePurge (RFC-0002 §7): a publish purges the tags of what changed between the live and the
  * new snapshot — node, term and list tags — and the site tag only for structure.
  */
-import type { ContentEntry, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldDefinition, Site, Taxonomy, Term } from "@cloudhal/core-contracts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -189,6 +189,31 @@ describe("planCachePurge", () => {
     expect(removed).toContain(assetCacheTag(asset.id));
     expect(removed).toContain(nodeCacheTag(hello.id));
     expect(removed).not.toContain(siteCacheTag(site.id));
+  });
+
+  it("media (RFC-0045 §2.5): a changed asset purges the entries showing it in a typed image field", async () => {
+    const { asset } = await store.ingestAsset({
+      siteId: site.id,
+      bytes: PNG_1X1,
+      filename: "poster.png",
+      uploadedBy: human,
+      source: { kind: "upload" },
+      fields: { decorative: true },
+    });
+    const poster = {
+      key: "poster",
+      type: "image",
+      labels: { en: { label: "Poster" } },
+      localized: false,
+    } as FieldDefinition;
+    const s = (await store.getSite(site.id)) as Site;
+    const posts = { ...s.collections?.posts, fields: [poster] } as never;
+    await store.updateSite({ ...s, collections: { ...s.collections, posts } });
+    await store.updateContentEntry({ ...hello, fields: { poster: asset.id } });
+    await publish();
+    // Only the field shows the asset: its new slug moves the URL the article renders.
+    await store.updateAsset({ ...asset, slug: "poster-renamed" });
+    expect(await tagsOf()).toEqual([assetCacheTag(asset.id), nodeCacheTag(hello.id)].sort());
   });
 
   it("structure purges the site: pages, redirects, term slugs, the site's settings", async () => {

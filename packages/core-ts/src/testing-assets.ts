@@ -838,7 +838,10 @@ export function assetsSuite(ctx: SuiteContext): void {
       const bundle = await exportSite({ sql: ctx.sql(), blobs: ctx.blobs() }, w.site.id);
       expect(bundle.media?.map((m) => m.sha256)).toEqual([asset.sha256]);
       expect(bundle.purged?.map((p) => p.sha256)).toEqual([gone.asset.sha256]);
-      // Into the same storage under replace: the derived tables are rebuilt from the bundle.
+      // Into the same storage under replace: the derived tables are rebuilt from the bundle with
+      // the node set it writes (an edit since the export makes the import write it, #196).
+      const now = (await store.getContentEntry(w.entry.id)) as ContentEntry;
+      await store.updateContentEntry({ ...now, title: "Edited since the export" });
       await ctx.sql().run("DELETE FROM asset_refs WHERE site_id = ?", [w.site.id]);
       await importSite({ sql: ctx.sql(), blobs: ctx.blobs() }, bundle, { mode: "replace" });
       expect((await store.assetUsage(w.site.id, [asset.id])).get(asset.id)?.total).toBe(1);

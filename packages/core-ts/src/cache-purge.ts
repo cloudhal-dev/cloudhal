@@ -19,16 +19,16 @@
  *
  * - an **asset** (RFC-0004 §7.4) that left the live snapshot or changed: its media URLs
  *   (`cloudhal-asset-<id>`), and — when it changed — the responses that show it: the node tag of
- *   every entry and page that refers to it, and the term tag of every term (archives, chips) that
- *   does. A newly added asset purges nothing (404s are never cached, and whatever starts showing
- *   it changed itself). Media never carry the site tag, so the site-wide purges above leave them.
+ *   every entry and page that refers to it (typed fields included, RFC-0045 §2.5), and the term tag
+ *   of every term (archives, chips) that does (`cache-purge-assets.ts`). A newly added asset purges
+ *   nothing (404s are never cached, and whatever starts showing it changed itself). Media never
+ *   carry the site tag, so the site-wide purges above leave them.
  *
  * Falls back to purging everything when there is no previous snapshot, a snapshot or node cannot
  * be read, reading the diff would take more than `maxReads` node reads, or the result has more
  * than `maxTags` tags.
  */
 import type {
-  Asset,
   ContentEntry,
   NodeRef,
   Site,
@@ -36,15 +36,9 @@ import type {
   Taxonomy,
   Term,
 } from "@cloudhal/core-contracts";
-import {
-  assetCacheTag,
-  listCacheTag,
-  nodeCacheTag,
-  siteCacheTag,
-  termCacheTag,
-} from "./cache-tags.ts";
+import { planAssetPurge } from "./cache-purge-assets.ts";
+import { listCacheTag, nodeCacheTag, siteCacheTag, termCacheTag } from "./cache-tags.ts";
 import { canonicalJson } from "./hash.ts";
-import { assetRefsOf } from "./media/refs.ts";
 
 export interface SnapshotReader {
   getSnapshot(id: string): Promise<Snapshot | undefined>;
@@ -202,34 +196,8 @@ export async function planCachePurge(
     const tags = new Set<string>();
     const why: string[] = [];
 
-    // Media: an asset that left the live snapshot or changed (§7.4). Its own URLs, and the
-    // responses that show it (they resolve its URL, alt, caption and size when they render).
-    const assetChanges = changed.filter((c) => (c.after ?? c.before)?.kind === "asset" && c.before);
-    if (assetChanges.length > 0) {
-      const shown = new Set<string>();
-      for (const c of assetChanges) {
-        const id = (c.before as NodeRef).id;
-        tags.add(assetCacheTag(id));
-        if (!c.after) {
-          why.push(`asset ${id} was removed`);
-          continue;
-        }
-        const [a, b] = await Promise.all([read<Asset>(c.before as NodeRef), read<Asset>(c.after)]);
-        if (a.slug !== b.slug || a.status !== b.status)
-          why.push(`asset ${id}: slug or status changed`);
-        else why.push(`asset ${id} changed`);
-        shown.add(id);
-      }
-      if (shown.size > 0)
-        for (const ref of (to as Snapshot).nodes) {
-          if (ref.kind !== "contentEntry" && ref.kind !== "page" && ref.kind !== "term") continue;
-          const body = await read<unknown>(ref);
-          if (!assetRefsOf(ref.kind, body).some((r) => shown.has(r.assetId))) continue;
-          if (ref.kind === "term")
-            for (const id of withAncestors(ref.id)) tags.add(termCacheTag(id));
-          else tags.add(nodeCacheTag(ref.id));
-        }
-    }
+    // Media (§7.4): an asset that left the live snapshot or changed (`cache-purge-assets.ts`).
+    await planAssetPurge({ changed, to: to as Snapshot, read, withAncestors, tags, why });
 
     for (const c of termChanges) {
       const a = c.before ? await read<Term>(c.before) : undefined;

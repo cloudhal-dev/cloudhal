@@ -8,6 +8,7 @@ import { GATES_ENFORCED } from "./availability.ts";
 import { ConflictError, UniqueConstraintError } from "./errors.ts";
 import { nodeHash } from "./hash.ts";
 import { SiteGraphStore } from "./store.ts";
+import { assetRefsSuite } from "./testing-asset-refs.ts";
 import { assetsSuite } from "./testing-assets.ts";
 import { collectionsSuite } from "./testing-collections.ts";
 import { entryQuerySuite } from "./testing-entry-query.ts";
@@ -269,6 +270,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
     taxonomySuite(suite);
     menuSuite(suite);
     assetsSuite(suite);
+    assetRefsSuite(suite);
     permalinksSuite(suite);
     collectionsSuite(suite);
     fieldsSuite(suite);

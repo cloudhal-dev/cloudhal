@@ -31,7 +31,7 @@ import { ID_PREFIX } from "./ids.ts";
 import { RASTER_TYPES } from "./media/image.ts";
 import { type InspectOptions, inspectUpload } from "./media/ingest.ts";
 import { type AssetRefUse, assetRefsOf, canonicalImageRefs } from "./media/refs.ts";
-import { refsRebuild } from "./media/refs-rebuild.ts";
+import { refsRebuild, UNUSED_ASSET_SQL } from "./media/refs-rebuild.ts";
 import { sniff } from "./media/sniff.ts";
 import {
   assetKindFor,
@@ -319,7 +319,7 @@ export class AssetEngine {
       where.push("json_extract(body, '$.uploadedBy.kind') = ?");
       params.push(q.uploadedBy);
     }
-    if (q.unused) where.push("NOT EXISTS (SELECT 1 FROM asset_refs r WHERE r.asset_id = nodes.id)");
+    if (q.unused) where.push(UNUSED_ASSET_SQL);
     if (q.missingAlt)
       where.push(
         "json_extract(body, '$.kind') = 'image' AND json_extract(body, '$.alt') IS NULL AND json_extract(body, '$.decorative') IS NULL",
@@ -864,8 +864,8 @@ export class AssetEngine {
    */
   async deleteAsset(a: Asset): Promise<void> {
     const r = await this.#sql.run(
-      "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'asset' AND site_id = ? AND NOT EXISTS (SELECT 1 FROM asset_refs WHERE asset_id = ?)",
-      [a.id, a.rev, a.siteId, a.id],
+      "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'asset' AND site_id = ? AND NOT EXISTS (SELECT 1 FROM asset_refs WHERE site_id = ? AND asset_id = ?)",
+      [a.id, a.rev, a.siteId, a.siteId, a.id],
     );
     if (r.changes === 1) return;
     const usage = (await this.assetUsage(a.siteId, [a.id])).get(a.id);
