@@ -36,9 +36,11 @@ jobs:
     steps:
       - id: runs
         env:
-          RUNS: ${{ inputs.runs || 10 }}
+          # `github.event.inputs` holds strings, so a typed 0 stays "0" (truthy) and is not replaced
+          # by the default; pull requests have no inputs and take the default.
+          RUNS: ${{ github.event.inputs.runs || '10' }}
         run: |
-          echo "runs=$(jq -nc --argjson n "$RUNS" '[range(1; ([$n, 50] | min) + 1)]')" >> "$GITHUB_OUTPUT"
+          echo "runs=$(jq -nc --argjson n "$RUNS" '[range(1; ([[$n, 50] | min, 1] | max) + 1)]')" >> "$GITHUB_OUTPUT"
 
   d1:
     name: D1 halves (Node ${{ matrix.node }}, run ${{ matrix.run }})
@@ -47,6 +49,8 @@ jobs:
     timeout-minutes: 30
     strategy:
       fail-fast: false
+      # Leave concurrent-job slots for other pull requests' CI.
+      max-parallel: 10
       matrix:
         node: [24, 26]
         run: ${{ fromJSON(needs.plan.outputs.runs) }}
@@ -63,9 +67,9 @@ jobs:
       # `-t` keeps only the suites labelled "(Miniflare)".
       - name: Miniflare halves on an oversubscribed runner
         env:
-          HOGS: ${{ inputs.hogs || 4 }}
+          HOGS: ${{ github.event.inputs.hogs || '4' }}
         run: |
-          for i in $(seq "$HOGS"); do sh -c 'while :; do :; done' & done
+          for _ in $(seq "$HOGS"); do sh -c 'while :; do :; done' & done
           trap 'kill $(jobs -p) 2>/dev/null' EXIT
           pnpm turbo run test --concurrency=2 \
             --filter=@cloudhal/storage --filter=@cloudhal/core-ts --filter=@cloudhal/api \
