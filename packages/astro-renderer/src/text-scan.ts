@@ -7,9 +7,6 @@
 
 const isSpace = (c: string | undefined): boolean => c !== undefined && /\s/.test(c);
 const LINE_BREAK = /[\n\r\u2028\u2029]/;
-/** Whitespace that is not a line break. */
-const isInlineSpace = (c: string | undefined): boolean =>
-  isSpace(c) && !LINE_BREAK.test(c as string);
 
 /**
  * `html` with every tag (`<` up to the next `>`) replaced by `gap`: what
@@ -33,23 +30,19 @@ export function stripTags(html: string, gap: string): string {
 const NAMED: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'" };
 
 /**
- * `<` before one of these opens markup in HTML (a start or end tag, a comment, a declaration, a
- * processing instruction); before anything else it is text.
- */
-const MARKUP_START = /<(?=[A-Za-z/!?])/g;
-
-/**
- * Text of HTML this module's callers rendered (meta descriptions, feed descriptions, JSON-LD,
+ * Text of HTML this module's callers rendered (meta and feed descriptions, JSON-LD,
  * table-of-contents labels, heading ids, reading time): tags dropped, entities decoded once,
  * whitespace collapsed.
  *
- * Safe by construction (CodeQL js/incomplete-multi-character-sanitization): the result never holds
- * markup. Decoding `&lt;script&gt;` would otherwise produce `<script>` after the tags were
- * stripped, so a `<` that would open markup (a letter, `/`, `!` or `?` after it) becomes U+FF1C
- * FULLWIDTH LESS-THAN SIGN, which reads the same and is never markup; `a < b` and `x<5` stay as
- * they are. Every caller's sink escapes as well (Astro attributes, `jsonLdText`, the feeds' `xml`),
- * so this is the second line, not the only one. Entities are decoded in one pass, so `&amp;lt;`
- * is the text `&lt;`, not `<`.
+ * **Plain text, not HTML.** Decoding is the point (`Array&lt;string&gt;` reads `Array<string>`),
+ * so the result can hold `<script>` when the source said `&lt;script&gt;`. Every sink escapes it
+ * for its context, and `test/html-text-sinks.test.ts` checks each one with that input: Astro
+ * attributes and text (meta, og, twitter, the table of contents), `jsonLdText` (JSON-LD:
+ * `<`, `>` and `&` as `\u003c`…, so no `</script>` or `<!--`), the feeds' `xml()` (RSS). A new
+ * caller must put the result through an escaping sink too, never `set:html`.
+ *
+ * Entities are decoded in one pass, so `&amp;lt;` is the text `&lt;`, and `&amp;#60;` the text
+ * `&#60;` (the regex chain before decoded those twice).
  */
 export function htmlText(html: string): string {
   return stripTags(html, " ")
@@ -58,45 +51,77 @@ export function htmlText(html: string): string {
       const n = Number(code);
       return n <= 0x10ffff ? String.fromCodePoint(n) : m;
     })
-    .replace(MARKUP_START, "\uFF1C")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+/** `\s` runs and the last `\n` inside them, for `leadingHeading`. */
+function skipSpace(text: string, from: number): { end: number; lastNl: number } {
+  let i = from;
+  let lastNl = -1;
+  for (; isSpace(text[i]); i++) if (text[i] === "\n") lastNl = i;
+  return { end: i, lastNl };
+}
+
 /**
- * The opening ATX heading of a markdown body (`# Title`, closing `#`s allowed) when it is the
- * first non-blank line: its text, and how much of the body it and the blank lines after it take.
- * What `/^\s*#\s+(.+?)\s*#*\s*(?:\r?\n|$)/` matched on ordinary bodies, linearly (that regex was
- * cubic on a heading line of spaces). One difference, on purpose: the space after `#` must be on
- * the same line, as in CommonMark, so `#` alone on a line followed by text is not a heading.
+ * Where `\s*#*\s*(?:\r?\n|$)` from `at` ends (the old regex's tail, with its backtracking worked
+ * out): at the end of the text when only whitespace and `#`s are left; else after the last `\n`
+ * of the whitespace after the `#`s; else after the last `\n` of the whitespace before them; -1
+ * when none of those exist.
+ */
+function headingTailEnd(text: string, at: number): number {
+  const before = skipSpace(text, at);
+  if (before.end === text.length) return text.length;
+  let hashes = before.end;
+  while (text[hashes] === "#") hashes++;
+  const after = skipSpace(text, hashes);
+  if (after.end === text.length) return text.length;
+  if (after.lastNl !== -1) return after.lastNl + 1;
+  return before.lastNl !== -1 ? before.lastNl + 1 : -1;
+}
+
+/**
+ * The opening ATX heading of a markdown body (`# Title`, closing `#`s allowed): its text, and how
+ * much of the body it takes (the blank lines and `#`-only lines after it too). Exactly what
+ * `/^\s*#\s+(.+?)\s*#*\s*(?:\r?\n|$)/` matched (text trimmed), in one pass: that regex was cubic
+ * on a heading line of spaces (CodeQL js/polynomial-redos, alert 17).
  */
 export function leadingHeading(markdown: string): { text: string; length: number } | undefined {
-  let i = 0;
-  while (isSpace(markdown[i])) i++;
-  if (markdown[i] !== "#") return undefined;
-  i++;
-  const afterHash = i;
-  while (isInlineSpace(markdown[i])) i++;
-  if (i === afterHash) return undefined;
-  const nl = markdown.indexOf("\n", i);
-  const lineEnd = nl === -1 ? markdown.length : nl;
-  // The heading's text: the line without trailing spaces, closing `#`s and the spaces before them.
-  let end = lineEnd;
-  while (end > i && isSpace(markdown[end - 1])) end--;
-  while (end > i && markdown[end - 1] === "#") end--;
-  while (end > i && isSpace(markdown[end - 1])) end--;
-  const text = markdown.slice(i, end);
-  if (text === "" || LINE_BREAK.test(text)) return undefined;
-  if (nl === -1) return { text, length: markdown.length };
-  // The blank lines after it go too: up to the last line break of the whitespace that follows,
-  // or to the end when only whitespace follows.
-  let length = nl + 1;
-  let j = length;
-  while (isSpace(markdown[j])) {
-    if (markdown[j] === "\n") length = j + 1;
-    j++;
+  let p = 0;
+  while (isSpace(markdown[p])) p++;
+  if (markdown[p] !== "#") return undefined;
+  p++;
+  // `\s+`: at least one, and it may cross line breaks.
+  const r = skipSpace(markdown, p).end;
+  if (r === p) return undefined;
+  if (r < markdown.length) {
+    // `(.+?)` from `r` up to the line's end: the shortest text whose rest of line is `\s*#*\s*`.
+    let lineEnd = r;
+    while (lineEnd < markdown.length && !LINE_BREAK.test(markdown[lineEnd] as string)) lineEnd++;
+    // The tail must cover the rest of the line (it holds no `\n` there), so the text ends where
+    // the line's last `\s*#*\s*` starts. Past the line the tail runs on through whitespace (a
+    // `\u2028` or a lone `\r` is whitespace, not a `\n`), so where the `#`s fall can differ: a
+    // text ending before the line's closing `#`s, or one keeping them and ending before the
+    // trailing whitespace. The earlier one that works is the regex's (lazy) answer.
+    let trailing = lineEnd;
+    while (trailing > r && isSpace(markdown[trailing - 1])) trailing--;
+    let closing = trailing;
+    while (closing > r && markdown[closing - 1] === "#") closing--;
+    while (closing > r && isSpace(markdown[closing - 1])) closing--;
+    for (const e of new Set([Math.max(closing, r + 1), Math.max(trailing, r + 1)])) {
+      const end = headingTailEnd(markdown, e);
+      if (end !== -1) return { text: markdown.slice(r, e).trim(), length: end };
+    }
   }
-  return { text, length: j === markdown.length ? j : length };
+  // No text from `r` works (or the whitespace runs to the end): the regex backs `\s+` off,
+  // keeping at least one, until `(.+?)` can take one whitespace character that is not a line
+  // break and the tail after it ends: at the end of the text, or after a `\n` before `r`.
+  const run = skipSpace(markdown, p);
+  const tailEnd = r === markdown.length ? r : run.lastNl;
+  for (let q = tailEnd - 1; q > p; q--)
+    if (!LINE_BREAK.test(markdown[q] as string))
+      return { text: "", length: r === markdown.length ? r : run.lastNl + 1 };
+  return undefined;
 }
 
 /** A heading `renderMarkdown` wrote: `<h2 id="…">…</h2>` or `<h3 …>`. */

@@ -85,22 +85,82 @@ describe("A2UI data paths with reserved keys", () => {
   });
 });
 
-describe("surface pointers with reserved keys", () => {
-  it.each(["/__proto__/x", "/constructor/prototype/x", "/a/__proto__"])(
-    "checkSurface reports %s",
-    (path) => {
-      const surface = {
-        id: "sec_pollute002",
-        kind: "surface" as const,
-        catalog: catalog.id,
-        data: {},
-        components: [
-          { id: "root", component: "TextField", props: { label: "N", value: { path } } },
+describe("A2UI inputs whose component id is a reserved key", () => {
+  it.each(["prototype", "constructor", "Prototype"])(
+    "convert, with %s-value as the data key",
+    (raw) => {
+      const r = fromA2ui(
+        [
+          { version: v, createSurface: { surfaceId: "s", catalogId: A2UI_BASIC_CATALOG } },
+          {
+            version: v,
+            updateComponents: {
+              surfaceId: "s",
+              components: [
+                { id: "root", component: "Column", children: [raw, "ok"] },
+                { id: raw, component: "TextField", label: "Name", text: "Ada" },
+                { id: "ok", component: "CheckBox", label: "Agree", value: true },
+              ],
+            },
+          },
         ],
-      };
-      expect(checkSurface(surface as never, catalog).issues).toContainEqual(
-        expect.objectContaining({ message: expect.stringMatching(/reserved keys/) }),
+        { sectionId: "sec_pollute003", catalog: catalog.id },
       );
+      const key = `${raw.toLowerCase()}-value`;
+      expect(r.surface.data).toEqual({ [key]: "Ada", ok: true });
+      expect(r.surface.components.find((c) => c.component === "TextField")?.props).toMatchObject({
+        value: { path: `/${key}` },
+      });
+      expect(checkSurface(r.surface, catalog).issues).toEqual([]);
     },
   );
+});
+
+describe("surface pointers with reserved keys", () => {
+  const surface = (data: unknown, components: unknown[]) =>
+    ({ id: "sec_pollute002", kind: "surface", catalog: catalog.id, data, components }) as never;
+  const reserved = (issues: { message: string }[]) =>
+    issues.filter((i) => /reserved keys/.test(i.message));
+
+  it.each(["/__proto__/x", "/constructor/prototype/x", "/a/__proto__", "/a/prototype"])(
+    "checkSurface refuses %s where the page writes through it",
+    (path) => {
+      const written = [
+        { id: "root", component: "TextField", props: { label: "N", value: { path } } },
+      ];
+      expect(reserved(checkSurface(surface({}, written), catalog).issues)).toEqual([
+        expect.objectContaining({ path: "/components/0/props/value/path" }),
+      ]);
+      const checkbox = [
+        { id: "root", component: "Checkbox", props: { label: "N", checked: { path } } },
+      ];
+      expect(reserved(checkSurface(surface({}, checkbox), catalog).issues)).toHaveLength(1);
+      const button = [
+        {
+          id: "root",
+          component: "Button",
+          props: { label: "Go", onClick: { action: "toggle", path } },
+        },
+      ];
+      expect(reserved(checkSurface(surface({}, button), catalog).issues)).toEqual([
+        expect.objectContaining({ path: "/components/0/props/onClick/path" }),
+      ]);
+      const scrolly = [
+        { id: "root", component: "Scrolly", props: { step: { path } }, children: ["s1"] },
+        { id: "s1", component: "Step", children: [] },
+      ];
+      expect(reserved(checkSurface(surface({}, scrolly), catalog).issues)).toEqual([
+        expect.objectContaining({ path: "/components/0/props/step/path" }),
+      ]);
+    },
+  );
+
+  it("accepts read bindings through a data key named constructor or prototype", () => {
+    const page = surface({ stages: { prototype: "Q1", constructor: "Q2" } }, [
+      { id: "root", component: "Column", children: ["a", "b"] },
+      { id: "a", component: "Text", props: { text: { path: "/stages/prototype" } } },
+      { id: "b", component: "Text", props: { text: { path: "/stages/constructor" } } },
+    ]);
+    expect(checkSurface(page, catalog).issues).toEqual([]);
+  });
 });
