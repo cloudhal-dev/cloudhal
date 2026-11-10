@@ -2,12 +2,15 @@
  * What a self-hoster gets (docs/guides/self-host.md, #143): runs the image with an empty volume,
  * waits for its HEALTHCHECK, then — through the API, as Studio would — checks that the first owner
  * can sign up only with the setup token (#165), that Studio's page is served and that `/mcp`
- * refuses an anonymous call, lists the scaffolded site, builds the public site with `site-build`
- * before the first publish (RFC-0043's status page, which the compose file's Caddyfile — run in a
- * `caddy` container on the same volume — answers with 503 and `Retry-After`), publishes it, builds
- * it twice more (the site, which Caddy now answers with 200; the third build swaps the served tree
- * in place, #166) and reads the built home page. Run by .github/workflows/docker.yml after every
- * build, and by hand:
+ * refuses an anonymous call, lists the scaffolded site, waits for the entrypoint's start-up
+ * `site-build`, takes a draft snapshot and builds the public site with `site-build` before the
+ * first publish (RFC-0043's status page, never the draft, which the compose file's Caddyfile — run
+ * in a `caddy` container on the same volume — answers with 503 and `Retry-After`), publishes it,
+ * builds it twice more (the site, which Caddy now answers with 200; the third build swaps the
+ * served tree in place, #166) and reads the built home page. An image whose CLI has no
+ * `cloudhal build --published` (a backfill of 0.7.1 or older) skips the status-page checks:
+ * its `site-build` builds the old way. Run by .github/workflows/docker.yml after every build, and
+ * by hand:
  *
  *   node scripts/docker-smoke.ts [--image <ref>] [--platform <os/arch>] [--port <n>]
  *                                [--site-port <n>] [--keep]
@@ -88,6 +91,25 @@ function expect(ok: boolean, what: string, detail?: unknown): void {
   if (!ok) throw new Error(`${what}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
 }
 
+/**
+ * The entrypoint builds the site once Studio answers (a background `site-build`): wait until it
+ * has published (`/data/dist` is its symlink) and cleaned up (the staging folder is gone).
+ */
+async function waitStartupBuild(): Promise<void> {
+  for (let i = 0; i < 90; i++) {
+    const done = spawnSync("docker", [
+      "exec",
+      name,
+      "sh",
+      "-c",
+      "test -L /data/dist && test ! -e /data/.site-build",
+    ]);
+    if (done.status === 0) return;
+    await sleep(2000);
+  }
+  throw new Error("the start-up site-build did not finish within 180 s");
+}
+
 /** Runs `site-build` in the container; returns the build `current` points at afterwards. */
 function siteBuild(which: string): string {
   const r = spawnSync("docker", ["exec", name, "site-build"], { stdio: "inherit" });
@@ -149,6 +171,36 @@ async function served(
 ): Promise<{ status: number; headers: Headers; body: string }> {
   const res = await fetch(`${siteOrigin}${pathname}`);
   return { status: res.status, headers: res.headers, body: await res.text() };
+}
+
+/** RFC-0043 §1.10: what Caddy answers while the build is the not-published status page. */
+async function expectStatusPage(): Promise<void> {
+  const unpublished = await served("/");
+  expect(
+    unpublished.status === 503,
+    "Caddy answers / with 503 before the first publish",
+    unpublished.status,
+  );
+  expect(
+    unpublished.headers.get("retry-after") === "3600",
+    "Retry-After: 3600",
+    unpublished.headers.get("retry-after"),
+  );
+  expect(
+    unpublished.headers.get("cache-control") === "no-store",
+    "Cache-Control: no-store",
+    unpublished.headers.get("cache-control"),
+  );
+  expect(unpublished.headers.get("x-robots-tag") === "noindex", "X-Robots-Tag: noindex");
+  expect(unpublished.body.includes('data-state="not-published"'), "the 503 is the status page");
+  const deep = await served("/posts/hello-world");
+  expect(deep.status === 503, "every page is the 503 before the first publish", deep.status);
+  const robots = await served("/robots.txt");
+  expect(
+    robots.status === 200 && robots.body.includes("Disallow: /"),
+    "robots.txt is 200 and disallows all",
+    robots,
+  );
 }
 
 docker([
@@ -223,52 +275,55 @@ try {
   const site = (sites.body as { id: string; name: string }[])[0];
   if (site?.name !== "Smoke Site") expect(false, "the scaffolded site is listed", sites.body);
   if (!site) throw new Error("no site");
-  // A volume from 0.6.3 has a real /data/dist folder: the first build moves it aside, keeps it as
+  // RFC-0043 §1.10: `cloudhal build --published`, which site-build uses when the CLI has it.
+  const hasPublished =
+    spawnSync("docker", [
+      "exec",
+      name,
+      "sh",
+      "-c",
+      "cloudhal build --help | grep -q -e --published",
+    ]).status === 0;
+  if (!hasPublished)
+    console.log("! this image's CLI has no `build --published`: skipping the status-page checks");
+  const marker = () =>
+    docker(["exec", name, "sh", "-c", `cat ${SITE}/.cloudhal-status 2>/dev/null || true`]);
+
+  // The entrypoint's start-up build: on a new volume, the status page at once.
+  await waitStartupBuild();
+  if (hasPublished)
+    expect(marker() === "not-published", "the start-up build is the status page", marker());
+  step("the entrypoint's start-up site-build published the site's first build");
+
+  // A snapshot nobody published: `--published` must not build it.
+  const draft = await api("POST", `/api/sites/${site.id}/snapshots`, {
+    cookie,
+    body: { label: "smoke draft" },
+  });
+  expect(draft.status === 200 || draft.status === 201, "a draft snapshot", draft.body);
+
+  // A volume from 0.6.3 has a real /data/dist folder: the next build moves it aside, keeps it as
   // site/previous, and puts the symlink in its place (#166).
-  docker(["exec", name, "sh", "-c", "mkdir -p /data/dist && touch /data/dist/marker"]);
-  // RFC-0043 §1.10: before the first publish the build is the status page and its marker, never
-  // the drafts, and Caddy answers it with 503 and Retry-After (robots.txt keeps its 200).
+  docker([
+    "exec",
+    name,
+    "sh",
+    "-c",
+    "rm /data/dist && mkdir /data/dist && touch /data/dist/marker",
+  ]);
+  // Before the first publish the build is the status page and its marker, never the drafts, and
+  // Caddy answers it with 503 and Retry-After (robots.txt keeps its 200).
   const first = siteBuild("before the first publish");
   const resolved = docker(["exec", name, "readlink", "-f", SITE]);
   expect(resolved.startsWith("/data/site/"), `${SITE} resolves under /data/site/`, resolved);
   const legacy = spawnSync("docker", ["exec", name, "test", "-e", "/data/site/previous/marker"]);
   expect(legacy.status === 0, "site/previous is the moved 0.6.3 folder, marker included");
-  step("the first site-build moved a 0.6.3 /data/dist aside as site/previous");
-  const marker = docker(["exec", name, "cat", `${SITE}/.cloudhal-status`]);
-  expect(marker === "not-published", "the unpublished build has the not-published marker", marker);
-  const statusHtml = docker(["exec", name, "cat", `${SITE}/index.html`]);
-  expect(
-    statusHtml.includes('data-state="not-published"') && !HOME_H1.test(statusHtml),
-    "the unpublished build is the status page, not the site",
-  );
+  step("site-build moved a 0.6.3 /data/dist aside as site/previous");
   await startCaddy();
-  const unpublished = await served("/");
-  expect(
-    unpublished.status === 503,
-    "Caddy answers / with 503 before the first publish",
-    unpublished.status,
-  );
-  expect(
-    unpublished.headers.get("retry-after") === "3600",
-    "Retry-After: 3600",
-    unpublished.headers.get("retry-after"),
-  );
-  expect(
-    unpublished.headers.get("cache-control") === "no-store",
-    "Cache-Control: no-store",
-    unpublished.headers.get("cache-control"),
-  );
-  expect(unpublished.headers.get("x-robots-tag") === "noindex", "X-Robots-Tag: noindex");
-  expect(unpublished.body.includes('data-state="not-published"'), "the 503 is the status page");
-  const deep = await served("/posts/hello-world");
-  expect(deep.status === 503, "every page is the 503 before the first publish", deep.status);
-  const robots = await served("/robots.txt");
-  expect(
-    robots.status === 200 && robots.body.includes("Disallow: /"),
-    "robots.txt is 200 and disallows all",
-    robots,
-  );
-  step("before the first publish Caddy serves the status page with 503 and Retry-After");
+  if (hasPublished) {
+    await expectStatusPage();
+    step("before the first publish, with a draft snapshot, Caddy serves the 503 status page");
+  }
 
   const publish = await api("POST", `/api/sites/${site.id}/snapshots`, {
     cookie,
@@ -279,8 +334,7 @@ try {
 
   const second = siteBuild("after the publish");
   expect(second !== first, "the build after the publish is a new tree", { first, second });
-  const noMarker = spawnSync("docker", ["exec", name, "test", "-e", `${SITE}/.cloudhal-status`]);
-  expect(noMarker.status !== 0, "the published build has no status marker");
+  expect(marker() === "", "the published build has no status marker", marker());
   expect(
     HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
     "the built home page shows the site name",

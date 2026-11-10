@@ -22,9 +22,11 @@
 # unpublished snapshots never reach the public site. Before the first publish the build is the
 # not-published status page with a `.cloudhal-status` marker, which the compose file's Caddyfile
 # answers with 503 and Retry-After; the first build after a publish replaces it like any other.
-# Arguments go to `cloudhal build` after `--published` (so `--snapshot` is refused). The project's
-# dependencies are the image's node_modules, linked into the project on first use, so no install
-# and no network is needed.
+# Arguments go to `cloudhal build` after `--published` (so `--snapshot` is refused). An image built
+# from this script with a CLI from before the flag (`CLOUDHAL_VERSION` 0.7.1 or older: the scripts
+# come from the checkout, the CLI from npm) warns once and builds the old way: the published
+# snapshot, else the latest. The project's dependencies are the image's node_modules, linked into
+# the project on first use, so no install and no network is needed.
 set -eu
 cd /data
 if [ ! -f cloudhal.json ]; then
@@ -124,7 +126,14 @@ for entry in .[!.]* ..?* *; do
     *) cp -a "$entry" "$stage/" ;;
   esac
 done
-(cd "$stage" && cloudhal build --published "$@")
+# `--published` when this CLI has it (`cloudhal build --help` lists every flag).
+if cloudhal build --help 2>/dev/null | grep -q -e '--published'; then
+  only=--published
+else
+  only=""
+  echo "site-build: this cloudhal CLI has no \`build --published\` (0.7.1 or older): building the published snapshot, else the latest one, and no status page before the first publish" >&2
+fi
+(cd "$stage" && cloudhal build $only "$@")
 
 # Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"

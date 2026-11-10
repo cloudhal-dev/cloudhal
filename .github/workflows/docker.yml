@@ -24,7 +24,10 @@ name: Docker image
 # - a pull request that touches the image builds it for linux/amd64 without pushing and runs the
 #   amd64 smoke test and the scan.
 # Versions before 0.6.4 cannot pass the gates: the smoke test expects the first owner's setup
-# token (#165), which 0.6.4 brought, and the image needs `--init-if-empty` (0.6.3).
+# token (#165), which 0.6.4 brought, and the image needs `--init-if-empty` (0.6.3). A backfill of
+# 0.6.4–0.7.1 passes without the RFC-0043 status page: its CLI has no `cloudhal build --published`,
+# so `site-build` (from this checkout) warns and builds the old way, and the smoke test skips its
+# status-page checks.
 
 on:
   workflow_call:

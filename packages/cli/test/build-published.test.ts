@@ -11,7 +11,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { STATUS_CSP } from "@cloudhal/astro-renderer/status-page";
-import { openLocalStore } from "@cloudhal/core-ts/local";
+import type { Snapshot } from "@cloudhal/core-contracts";
+import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   STATUS_MARKER,
@@ -109,6 +110,30 @@ describe("cloudhal build --published", () => {
   let tmp: string;
   let projectDir: string;
   let dist: string;
+  /** The snapshot the second case publishes; the rollback case returns to it. */
+  let published: Snapshot | undefined;
+  const DRAFT_NAME = "Renamed In Draft";
+
+  async function withStore<T>(
+    fn: (store: LocalStore["store"], siteId: string) => Promise<T>,
+  ): Promise<T> {
+    const cfg = await readProjectConfig(projectDir);
+    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+    try {
+      return await fn(local.store, cfg.siteId);
+    } finally {
+      await local.close();
+    }
+  }
+
+  /** A draft change the home page shows: the starter's `<h1>` is the site name. */
+  const renameSite = (name: string) =>
+    withStore(async (store, siteId) => {
+      const site = await store.getSite(siteId);
+      if (!site) throw new Error("no site");
+      await store.updateSite({ ...site, name });
+    });
+
   beforeAll(async () => {
     tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-build-published-"));
     projectDir = path.join(tmp, "site");
@@ -126,38 +151,58 @@ describe("cloudhal build --published", () => {
     );
   });
 
-  it("writes the status page while nothing is published: no snapshot, no drafts", async () => {
+  it("writes the status page while nothing is published, never the latest snapshot", async () => {
     // a stale build in dist is replaced, as an Astro build replaces it
     await mkdir(dist, { recursive: true });
     await writeFile(path.join(dist, "stale.html"), "old");
+    // a snapshot nobody published: plain `cloudhal build` would render it
+    const draft = await snapshot({ projectDir, label: "draft" });
     const { code, output } = await runCli(projectDir, ["build", "--published"]);
     expect(code, output).toBe(0);
     expect(output).toContain("not-published: nothing is published yet");
     expect(output).toContain("Retry-After: 3600");
+    expect(output).not.toContain(draft.id);
     expect((await readdir(dist)).sort()).toEqual(STATUS_FILES);
     const html = await readFile(path.join(dist, "index.html"), "utf8");
+    expect(html).toContain('data-state="not-published"');
     expect(html).toContain(TITLE);
     expect(html).toContain('<html lang="en"');
     expect(html).not.toContain("Hello, world"); // the seeded post, unpublished with the site
-    // the build made no snapshot: before the flag, it fell back to a fresh one of the drafts
-    const cfg = await readProjectConfig(projectDir);
-    const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
-    try {
-      expect(await local.store.latestSnapshot(cfg.siteId)).toBeFalsy();
-    } finally {
-      await local.close();
-    }
+    // the build made no snapshot of its own: the latest is still the unpublished one
+    expect((await withStore((store, siteId) => store.latestSnapshot(siteId)))?.id).toBe(draft.id);
   });
 
-  it("builds the published snapshot once there is one, without the marker", async () => {
-    const snap = await snapshot({ projectDir, publish: true, label: "launch" });
+  it("builds the published snapshot, not a later unpublished one, without the marker", async () => {
+    published = await snapshot({ projectDir, publish: true, label: "launch" });
+    await renameSite(DRAFT_NAME);
+    const later = await snapshot({ projectDir, label: "draft rename" });
     const { code, output } = await runCli(projectDir, ["build", "--published"]);
     expect(code, output.slice(-4000)).toBe(0);
-    expect(output).toContain(`from ${snap.id} (published)`);
+    expect(output).toContain(`from ${published.id} (published)`);
+    expect(output).not.toContain(later.id);
     const files = await readdir(dist);
     expect(files).not.toContain(STATUS_MARKER);
     const home = await readFile(path.join(dist, "index.html"), "utf8");
     expect(home).toMatch(/<h1[^>]*>Unpublished Site<\/h1>/);
     expect(home).toContain('href="/posts/hello-world"');
+    expect(home).not.toContain(DRAFT_NAME);
+  }, 180_000);
+
+  it("follows a rollback: publish s1, publish s2, roll back to s1, build s1", async () => {
+    const s1 = published;
+    if (!s1) throw new Error("the previous case publishes s1");
+    const s2 = await snapshot({ projectDir, publish: true, label: "second" }); // the rename
+    expect(s2.id).not.toBe(s1.id);
+    await withStore(async (store, siteId) => {
+      const site = await store.getSite(siteId);
+      if (!site) throw new Error("no site");
+      await store.rollback(site, s1.id, { kind: "human", id: "user_localcli0001", name: "test" });
+    });
+    const { code, output } = await runCli(projectDir, ["build", "--published"]);
+    expect(code, output.slice(-4000)).toBe(0);
+    expect(output).toContain(`from ${s1.id} (published)`);
+    const home = await readFile(path.join(dist, "index.html"), "utf8");
+    expect(home).toMatch(/<h1[^>]*>Unpublished Site<\/h1>/);
+    expect(home).not.toContain(DRAFT_NAME);
   }, 180_000);
 });
