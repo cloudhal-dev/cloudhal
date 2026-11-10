@@ -136,7 +136,7 @@ export class FakeWae implements WaeSqlBinding {
       const alias = q.match(/\b(?:blob|double)\d+ AS (\w+)/);
       if (alias) throw new SqlApiError(`Input was invalid: column \`${alias[1]}\` not found`);
     }
-    if (/quantileWeighted\([^;]*?if\([^,]+,\s*double\d+\s*,/.test(q))
+    if (weightsBesideLiteralZero(q))
       throw new SqlApiError(
         "Input was invalid: Your query could not be executed due to a type error",
       );
@@ -153,4 +153,31 @@ export class FakeWae implements WaeSqlBinding {
       statistics: { elapsed_ms: 1, rows_read: 4_500_000, bytes_read: 0 },
     };
   }
+}
+
+const WEIGHT_ARG = /\s*double\d+\s*,/y;
+
+/**
+ * Whether `q` has `quantileWeighted(…if(<cond>, doubleN, …` before the next `;`: what
+ * `/quantileWeighted\([^;]*?if\([^,]+,\s*double\d+\s*,/` tested, in one pass (that regex rescanned
+ * from every `quantileWeighted(` and `if(`; CodeQL alert 8). A `quantileWeighted(` with no match
+ * before its `;` means none of the later ones before that `;` match either.
+ */
+export function weightsBesideLiteralZero(q: string): boolean {
+  let comma = -1;
+  for (let at = q.indexOf("quantileWeighted("); at !== -1; ) {
+    const semi = q.indexOf(";", at);
+    const end = semi === -1 ? q.length : semi;
+    for (let k = q.indexOf("if(", at + 17); k !== -1 && k < end; k = q.indexOf("if(", k + 1)) {
+      // `[^,]+`: the condition runs to the first comma after `if(`, at least one character.
+      if (comma < k + 3) comma = q.indexOf(",", k + 3);
+      if (comma === -1) return false;
+      if (comma === k + 3) continue;
+      WEIGHT_ARG.lastIndex = comma + 1;
+      if (WEIGHT_ARG.test(q)) return true;
+    }
+    if (semi === -1) return false;
+    at = q.indexOf("quantileWeighted(", semi + 1);
+  }
+  return false;
 }

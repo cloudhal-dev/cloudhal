@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
 
+# Least privilege for the GITHUB_TOKEN: every job only reads the repository. Caches
+# (setup-node, rust-cache, cache-cargo-install) use the Actions cache service, not this token;
+# nothing here comments, uploads releases or writes checks.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true

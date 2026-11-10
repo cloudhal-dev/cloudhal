@@ -17,6 +17,10 @@ on:
       - "packages/create-cloudhal/**"
       - "starters/**"
 
+# Packs, installs and builds locally; the token only reads the repository.
+permissions:
+  contents: read
+
 jobs:
   smoke:
     runs-on: ubuntu-latest

@@ -37,7 +37,7 @@ export function sharedVersion(pkgs: readonly Pkg[]): string {
 
 /** Whether the npm registry serves `name@version`. */
 export async function onNpm(name: string, version: string): Promise<boolean> {
-  const res = await fetch(`https://registry.npmjs.org/${name.replace("/", "%2F")}/${version}`);
+  const res = await fetch(`https://registry.npmjs.org/${name.replaceAll("/", "%2F")}/${version}`);
   return res.ok;
 }
 

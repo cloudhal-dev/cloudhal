@@ -34,7 +34,9 @@ function summary(description: string): string {
   // A cut inside a code span would leave it open for the rest of the table.
   if ((short.match(/`/g) ?? []).length % 2 === 1) short = `${short.slice(0, -1)}\`…`;
   // `<` outside code spans would read as an HTML tag; inside them it shows as written.
+  // Backslashes first, so an escaped pipe in a description cannot end the cell.
   return short
+    .replace(/\\/g, "\\\\")
     .replace(/\|/g, "\\|")
     .split("`")
     .map((part, i) => (i % 2 === 0 ? part.replace(/</g, "&lt;") : part))
