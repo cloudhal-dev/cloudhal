@@ -435,5 +435,27 @@ describe("tool briefs (RFC-0022 22e)", () => {
       ],
     } as never);
     expect((kept.page.sections[0] as { data: unknown }).data).toEqual({ kg: 70 });
+    // a pointer through a reserved key is skipped: nothing is written to Object.prototype
+    for (const path of ["/__proto__/kg", "/constructor/prototype/kg"]) {
+      const skipped = withSampleInputs({
+        sections: [
+          {
+            id: "sec_x0000001",
+            kind: "surface",
+            catalog: "blog@1",
+            data: {},
+            components: [
+              {
+                id: "root",
+                component: "NumberField",
+                props: { label: "W", min: 1, value: { path } },
+              },
+            ],
+          },
+        ],
+      } as never);
+      expect((skipped.page.sections[0] as { data: unknown }).data).toEqual({});
+      expect(({} as Record<string, unknown>).kg).toBeUndefined();
+    }
   });
 });

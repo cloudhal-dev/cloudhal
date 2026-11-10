@@ -8,10 +8,48 @@ import { isObj } from "./shared.ts";
 
 // ── surfaces in markdown bodies (RFC-0020 §5) ────────────────────────────────────────────────
 
-/** A fence opening a surface: ```surface {"id":"pricing","catalog":"blog@1"} (or ~~~). */
-export const FENCE_OPEN = /^ {0,3}(`{3,}|~{3,})[ \t]*([^\s`]*)(.*)$/;
+const LINE_BREAK = /[\n\r\u2028\u2029]/;
+const isSpace = (c: string) => /\s/.test(c);
+
+/**
+ * A line opening a code fence: the fence (```` ``` ```` or `~~~`, three or more), the info string's
+ * first word and the rest of the line, as in ```surface {"id":"pricing","catalog":"blog@1"}.
+ * What `/^ {0,3}(`{3,}|~{3,})[ \t]*([^\s`]*)(.*)$/` matched, in one pass: that regex was
+ * quadratic on a fence followed by many tabs and a lone `\r` (js/polynomial-redos, alert 30).
+ */
+export function fenceOpen(line: string): [fence: string, word: string, rest: string] | undefined {
+  // `.` and `$` (no `m` flag): the regex never matched a line holding a line break.
+  if (LINE_BREAK.test(line)) return undefined;
+  let i = 0;
+  while (i < 3 && line[i] === " ") i++;
+  const ch = line[i];
+  if (ch !== "`" && ch !== "~") return undefined;
+  const start = i;
+  while (line[i] === ch) i++;
+  if (i - start < 3) return undefined;
+  const fence = line.slice(start, i);
+  while (line[i] === " " || line[i] === "\t") i++;
+  const word = i;
+  while (i < line.length && line[i] !== "`" && !isSpace(line[i] as string)) i++;
+  return [fence, line.slice(word, i), line.slice(i)];
+}
 export const SURFACE_ID = /^[a-z][a-z0-9-]{0,40}$/;
 export const CATALOG_ID = /^[a-z][a-z0-9-]{0,40}@[0-9]{1,4}$/;
+
+/**
+ * Whether `line` closes a fence opened with `fence`: up to three spaces, at least as many of its
+ * character, then only spaces or tabs. What `^ {0,3}`{n,}[ \t]*$` tested, without building a
+ * RegExp from the body's text for every fence (CodeQL followed the line into it, alert 45).
+ */
+export function closesFence(line: string, fence: string): boolean {
+  let i = 0;
+  while (i < 3 && line[i] === " ") i++;
+  const start = i;
+  while (line[i] === fence[0]) i++;
+  if (i - start < fence.length) return false;
+  while (line[i] === " " || line[i] === "\t") i++;
+  return i === line.length;
+}
 
 /** One ```surface fence of a body, parsed line by line. */
 export interface BodySurface {
@@ -116,15 +154,13 @@ export function bodySurfaces(markdown: string): BodySurface[] {
   const lines = markdown.split(/\r?\n/);
   const out: BodySurface[] = [];
   for (let i = 0; i < lines.length; i++) {
-    const m = FENCE_OPEN.exec(lines[i] as string);
+    const m = fenceOpen(lines[i] as string);
     if (!m) continue;
-    const fence = m[1] as string;
-    const closes = (l: string) =>
-      new RegExp(`^ {0,3}${fence[0] === "`" ? "`" : "~"}{${fence.length},}[ \\t]*$`).test(l);
+    const [fence, word, rest] = m;
     let j = i + 1;
-    while (j < lines.length && !closes(lines[j] as string)) j++;
-    if (m[2] === "surface")
-      out.push(parseSurfaceFence((m[3] ?? "").trim(), lines.slice(i + 1, j), j < lines.length, i));
+    while (j < lines.length && !closesFence(lines[j] as string, fence)) j++;
+    if (word === "surface")
+      out.push(parseSurfaceFence(rest.trim(), lines.slice(i + 1, j), j < lines.length, i));
     i = j;
   }
   return out;

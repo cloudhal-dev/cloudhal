@@ -4,7 +4,7 @@
  * `CLOUDHAL_MAIL_FROM` / `CLOUDHAL_MAIL_FROM_NAME`. Plain text only; bodies are never logged (they
  * carry one-time links).
  */
-import { MailError, type MailMessage, type MailSender } from "@cloudhal/api";
+import { isMailAddress, MailError, type MailMessage, type MailSender } from "@cloudhal/api";
 
 /** The part of the binding's structured `send()` this sender uses. */
 export interface SendEmailBinding {
@@ -25,7 +25,11 @@ export interface MailEnv {
   CLOUDHAL_MAIL_FROM_NAME?: string;
 }
 
-/** A plain `local@domain` address: no display name, no spaces or line breaks. */
+/**
+ * A plain `local@domain` address: no display name, no spaces or line breaks.
+ * @deprecated Use `isMailAddress` from `@cloudhal/api`: the same answers in one linear pass (this
+ * pattern backtracks quadratically on long `.x` runs).
+ */
 export const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
@@ -61,7 +65,7 @@ export function cloudflareEmailSender(
 /** The deployment's sender, when the binding and a valid `CLOUDHAL_MAIL_FROM` are both there. */
 export function adminMail(env: MailEnv): MailSender | undefined {
   const from = env.CLOUDHAL_MAIL_FROM?.trim();
-  if (!env.EMAIL || !from || !MAIL_ADDRESS.test(from)) return undefined;
+  if (!env.EMAIL || !from || !isMailAddress(from)) return undefined;
   return cloudflareEmailSender(env.EMAIL, {
     email: from,
     ...(env.CLOUDHAL_MAIL_FROM_NAME ? { name: env.CLOUDHAL_MAIL_FROM_NAME } : {}),

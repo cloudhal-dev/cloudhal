@@ -1,5 +1,6 @@
 /** Bound values: paths and calls, JSON Pointers, conditions (RFC-0020 §3, RFC-0022 §1). */
 import type { PropsIssue } from "../../blocks.ts";
+import { isReservedKey } from "../../names.ts";
 import { isObj, isScalar, SURFACE_LIMITS } from "../shared.ts";
 
 // ── bindings, functions, conditions ──────────────────────────────────────────────────────────
@@ -78,6 +79,18 @@ export function checkPointer(pointer: unknown, path: string, out: PropsIssue[]):
     segments.length > SURFACE_LIMITS.pointerSegments
   )
     out.push({ path, message: "a JSON Pointer into the surface's data, such as /plans/0/price" });
+}
+
+/**
+ * A pointer the page writes through (an input's model, a Scrolly's `step`, a Button action's
+ * `path`): no reserved key (`__proto__`, `constructor`, `prototype`) on the way, since a write
+ * there would reach a prototype (the page's runtime and the Build eval's sample inputs write
+ * through these). Read bindings may name such keys: `getPointer` reads own properties only.
+ */
+export function checkWrittenPointer(pointer: unknown, path: string, out: PropsIssue[]): void {
+  const segments = typeof pointer === "string" ? pointerSegments(pointer) : undefined;
+  if (segments?.some(isReservedKey))
+    out.push({ path, message: "__proto__, constructor and prototype are reserved keys here" });
 }
 
 export function checkOperand(v: unknown, path: string, out: PropsIssue[]): void {

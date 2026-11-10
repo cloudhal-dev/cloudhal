@@ -18,7 +18,8 @@ import {
   refuseFieldIssues,
 } from "@cloudhal/core-ts/fields";
 import { fieldAssetIssues, fieldAssetRefs } from "@cloudhal/core-ts/media";
-import { type JsonSchema, quote, type ToolContext } from "./common.ts";
+import { isReservedKey } from "@cloudhal/core-ts/names";
+import { type JsonSchema, quote, type ToolContext, ToolError } from "./common.ts";
 
 type Values = Record<string, unknown>;
 
@@ -36,10 +37,15 @@ export const FIELDS_PATCH: JsonSchema = {
     "Typed custom fields to change, as a merge patch: given keys are set, null removes a key, others stay. The collection's fieldsSchema (list_collections) lists the keys and allowed values.",
 };
 
-/** The stored `fields` with `patch` applied: `null` removes a key. */
+/**
+ * The stored `fields` with `patch` applied: `null` removes a key. A reserved key (`__proto__`,
+ * `constructor`, `prototype`) is refused, also for collections without field definitions: JSON
+ * input can carry `__proto__` as an own key, and assigning it would swap the object's prototype.
+ */
 export function mergeFields(current: Values | undefined, patch: Values): Values {
   const next: Values = { ...(current ?? {}) };
   for (const [key, value] of Object.entries(patch)) {
+    if (isReservedKey(key)) throw new ToolError("invalid", `fields: "${key}" is a reserved key`);
     if (value === null) delete next[key];
     else next[key] = value;
   }

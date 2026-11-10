@@ -14,6 +14,9 @@
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { nearestIcon } from "./icon-names.ts";
 import { trimChar } from "./names.ts";
+import { dataKeyFor, InteropError, pointerGet, pointerSet } from "./surface-interop-data.ts";
+
+export { InteropError };
 
 export const A2UI_VERSION = "v0.9";
 export const A2UI_BASIC_CATALOG = "https://a2ui.org/specification/v0_9/catalogs/basic/catalog.json";
@@ -68,45 +71,6 @@ class Ids {
   fresh(base: string): string {
     return this.get(`${base}\u0000${this.#taken.size}`);
   }
-}
-
-function pointerGet(data: unknown, pointer: string): unknown {
-  if (pointer === "" || pointer === "/") return data;
-  let cur = data;
-  for (const raw of pointer.replace(/^\//, "").split("/")) {
-    const seg = raw.replace(/~1/g, "/").replace(/~0/g, "~");
-    if (Array.isArray(cur)) cur = /^\d+$/.test(seg) ? cur[Number(seg)] : undefined;
-    else if (isObj(cur) && Object.hasOwn(cur, seg)) cur = cur[seg];
-    else return undefined;
-  }
-  return cur;
-}
-
-function pointerSet(data: Json, pointer: string, value: unknown): Json {
-  if (pointer === "" || pointer === "/") return isObj(value) ? structuredClone(value) : {};
-  const segs = pointer
-    .replace(/^\//, "")
-    .split("/")
-    .map((s) => s.replace(/~1/g, "/").replace(/~0/g, "~"));
-  if (segs.some((s) => s === "__proto__" || s === "prototype" || s === "constructor")) return data;
-  const out = structuredClone(data);
-  let cur: Json | unknown[] = out;
-  for (let i = 0; i < segs.length - 1; i++) {
-    const s = segs[i] as string;
-    const next: unknown = Array.isArray(cur) ? cur[Number(s)] : cur[s];
-    const container: Json | unknown[] =
-      isObj(next) || Array.isArray(next) ? next : /^\d+$/.test(segs[i + 1] ?? "") ? [] : {};
-    if (Array.isArray(cur)) cur[Number(s)] = container;
-    else cur[s] = container;
-    cur = container;
-  }
-  const last = segs.at(-1) as string;
-  if (value === undefined) {
-    if (Array.isArray(cur)) cur.splice(Number(last), 1);
-    else delete cur[last];
-  } else if (Array.isArray(cur)) cur[Number(last)] = value;
-  else cur[last] = value;
-  return out;
 }
 
 // ── A2UI → Cloudhal ─────────────────────────────────────────────────────────────────────────
@@ -514,7 +478,7 @@ export function fromA2ui(
         // A literal value becomes the surface's data, so the input can write to it.
         let path = isObj(bound) && typeof bound.path === "string" ? bound.path : undefined;
         if (!path) {
-          path = `/${id.replace(/[^a-z0-9-]/g, "-")}`;
+          path = `/${dataKeyFor(id)}`;
           data = pointerSet(
             data,
             path,
@@ -1225,9 +1189,4 @@ export function toJsonRender(surface: Pick<SurfaceSection, "components" | "data"
     },
     notes: notes.list,
   };
-}
-
-/** A document that cannot be converted at all (not a wrong prop: those are notes or store issues). */
-export class InteropError extends Error {
-  override readonly name = "InteropError";
 }

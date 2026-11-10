@@ -95,8 +95,18 @@ export interface ObservabilityConfig {
  */
 export type AiConfig = Record<string, never>;
 
-/** A plain `local@domain` address: no display name, no spaces or line breaks. */
-const MAIL_ADDRESS = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
+/**
+ * A plain `local@domain` address: no display name, no spaces or line breaks, no `<`, `>` or `"`.
+ * The same answers as `isMailAddress` in `@cloudhal/api` and the regex both replaced
+ * (`/^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/`, quadratic on long `.x` runs), in one linear pass;
+ * not imported from there, so reading `cloudhal.json` never loads the API.
+ */
+export function isMailAddress(value: string): boolean {
+  if (/[\s<>"]/.test(value)) return false;
+  const at = value.indexOf("@");
+  if (at < 1 || value.indexOf("@", at + 1) !== -1) return false;
+  return value.slice(at + 2, -1).includes(".");
+}
 
 /** `cloudhal.json` at the project root. Kept tiny; everything else lives in the store. */
 export interface ProjectConfig {
@@ -235,7 +245,7 @@ export function parseMailConfig(input: unknown): MailConfig | undefined {
     throw new Error(`${CONFIG_FILE}: mail must be an object like {"from": "studio@example.com"}`);
   const o = input as Record<string, unknown>;
   const from = typeof o.from === "string" ? o.from.trim() : "";
-  if (!MAIL_ADDRESS.test(from) || from.length > 254)
+  if (!isMailAddress(from) || from.length > 254)
     throw new Error(
       `${CONFIG_FILE}: mail.from must be a plain address like "studio@example.com" (no display name; use mail.fromName)`,
     );

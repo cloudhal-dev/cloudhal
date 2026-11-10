@@ -5,6 +5,7 @@
  */
 import type { ContentEntry, Correction } from "@cloudhal/core-contracts";
 import { htmlText, renderBody, renderInlineMarkdown } from "./markdown.ts";
+import { renderedHeadings } from "./text-scan.ts";
 
 /** One heading of an article's table of contents; `id` is the anchor the rendered body carries. */
 export interface TocItem {
@@ -22,18 +23,12 @@ export interface ArticleOutline {
 /** Words per minute when a theme sets none (RFC-0018 §1 `readingSpeed`). */
 export const READING_SPEED = 230;
 
-const HEADING = /<h([23]) id="([^"]+)">([\s\S]*?)<\/h\1>/g;
-
 /**
  * Headings of HTML rendered by `renderMarkdown`/`renderBody` (their ids come from `headingSlug`).
  * HTML bodies keep no ids through the sanitizer, so they have no table of contents.
  */
 export function tableOfContents(html: string): TocItem[] {
-  return [...html.matchAll(HEADING)].map((m) => ({
-    id: m[2] as string,
-    text: htmlText(m[3] as string),
-    depth: Number(m[1]) as 2 | 3,
-  }));
+  return renderedHeadings(html).map((h) => ({ id: h.id, text: htmlText(h.inner), depth: h.depth }));
 }
 
 /**

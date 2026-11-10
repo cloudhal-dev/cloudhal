@@ -19,6 +19,7 @@
  * Every result must also fit the new definition (`valueIssues`); anything else is unconvertible.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
+import { escapeAtLineStarts, unlink } from "./markdown-scan.ts";
 import type { FieldType } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
@@ -54,13 +55,22 @@ type Step = (value: unknown, to: FieldDefinition, ctx: ConvertContext) => Conver
 const fail = (reason: string): Conversion => ({ ok: false, reason });
 const ok = (value: unknown): Conversion => ({ ok: true, value });
 
+/** Characters that open block markup at a line's start (headings, quotes, lists, setext rules). */
+const LINE_MARKERS = "#>+=-";
+const DIGIT = /^\d$/;
+
 /** CommonMark escapes for the characters that would turn plain words into markup. */
 export function escapeMarkdown(text: string): string {
-  return text
-    .replace(/[\\`*_[\]<>|~&]/g, "\\$&")
-    .replace(/^(\s*)([#>+=-])/gm, "$1\\$2")
-    .replace(/^(\s*\d+)([.)])/gm, "$1\\$2")
-    .replace(/:(?=:)/g, "\\:");
+  // Line starts through linear scans: `/^(\s*)([#>+=-])/gm` and `/^(\s*\d+)([.)])/gm` backtracked
+  // quadratically on many blank lines (`\s*` runs across them).
+  const marked = escapeAtLineStarts(text.replace(/[\\`*_[\]<>|~&]/g, "\\$&"), (t, at) =>
+    LINE_MARKERS.includes(t[at] ?? " ") ? at : -1,
+  );
+  return escapeAtLineStarts(marked, (t, at) => {
+    let end = at;
+    while (DIGIT.test(t[end] ?? "")) end++;
+    return end > at && (t[end] === "." || t[end] === ")") ? end : -1;
+  }).replace(/:(?=:)/g, "\\:");
 }
 
 /** The words of a markdown string: no markup, link text without targets, no directives. */
@@ -69,12 +79,17 @@ export function markdownToPlain(markdown: string, multiline: boolean): string {
   for (const raw of markdown.split(/\r?\n/)) {
     const line = raw.trim();
     if (line.startsWith("```") || line.startsWith("~~~") || line.startsWith("::")) continue;
-    const words = line
-      .replace(/^#{1,6}\s+/, "")
-      .replace(/^>\s?/, "")
-      .replace(/^(?:[-*+]|\d+[.)])\s+/, "")
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
-      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+    // Images, then links, through linear scans (the regexes before them were quadratic on "![").
+    const words = unlink(
+      unlink(
+        line
+          .replace(/^#{1,6}\s+/, "")
+          .replace(/^>\s?/, "")
+          .replace(/^(?:[-*+]|\d+[.)])\s+/, ""),
+        "![",
+      ),
+      "[",
+    )
       .replace(/(\*\*|__|~~|\*|_|`)/g, "")
       .replace(/\\([!-/:-@[-`{-~])/g, "$1")
       .trim();

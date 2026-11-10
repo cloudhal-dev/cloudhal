@@ -48,6 +48,21 @@ export function trimEndChar(text: string, ch: string): string {
 }
 
 /**
+ * Keys a path, pointer or merge from outside input must never write: through them an assignment
+ * reaches an object's prototype (`obj.__proto__.x = 1`, `obj.constructor.prototype.x = 1`) and,
+ * from there, every object (CodeQL js/prototype-polluting-assignment). Writers refuse them with an
+ * error rather than skipping them, so the caller learns its input was not applied.
+ */
+export const RESERVED_KEYS: ReadonlySet<string> = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
+/** Whether `key` is one of {@link RESERVED_KEYS}. */
+export const isReservedKey = (key: string): boolean => RESERVED_KEYS.has(key);
+
+/**
  * Folds a name for comparison: NFKC, Turkish-aware lower-casing (İ, I and ı all become i),
  * diacritics removed, apostrophes and dots dropped (`A.I.` → `ai`), every other run of
  * non-letters/digits turned into a single `-`. `Yapay Zekâ` → `yapay-zeka`; a folded slug is itself.

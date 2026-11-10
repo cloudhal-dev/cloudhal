@@ -19,6 +19,7 @@ import {
 import { safeHref, safeSrc } from "./safe-urls.ts";
 import { sanitizeHtml } from "./sanitize.ts";
 import { renderSurface, surfaceProblems } from "./surfaces.ts";
+import { htmlText, leadingHeading, stripTags } from "./text-scan.ts";
 
 export type { MediaContext } from "./media.ts";
 
@@ -357,14 +358,6 @@ export function renderInlineMarkdown(source: string): string {
   }
 }
 
-const ENTITIES: Record<string, string> = {
-  "&amp;": "&",
-  "&lt;": "<",
-  "&gt;": ">",
-  "&quot;": '"',
-  "&#39;": "'",
-};
-
 /** Markdown as plain text (meta descriptions): rendered safely, then tags dropped and entities decoded. */
 export function markdownText(source: string): string {
   return htmlText(renderMarkdown(source));
@@ -372,20 +365,10 @@ export function markdownText(source: string): string {
 
 /** Inline markdown as plain text: inline tags go without leaving gaps ("**537**," → "537,"). */
 export function inlineMarkdownText(source: string): string {
-  return htmlText(renderInlineMarkdown(source).replace(/<[^>]*>/g, ""));
+  return htmlText(stripTags(renderInlineMarkdown(source), ""));
 }
 
-/** Text of HTML this module produced: tags dropped, entities decoded, whitespace collapsed. */
-export function htmlText(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(?:amp|lt|gt|quot|#39);/g, (m) => ENTITIES[m] ?? m)
-    .replace(/&#(\d{1,7});/g, (m, n: string) =>
-      Number(n) <= 0x10ffff ? String.fromCodePoint(Number(n)) : m,
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-}
+export { htmlText };
 
 /**
  * `markdown` bodies are rendered as data; `html` bodies go through the allowlist sanitizer
@@ -492,9 +475,9 @@ export function entryArticleParts(
 ): { body: ContentEntry["body"]; header: string; cover: string; media: MediaContext } {
   let body = entry.body;
   if (body.format === "markdown") {
-    const m = body.value.match(/^\s*#\s+(.+?)\s*#*\s*(?:\r?\n|$)/);
-    if (m && m[1]?.trim().toLowerCase() === entry.title.trim().toLowerCase())
-      body = { ...body, value: body.value.slice(m[0].length) };
+    const h1 = leadingHeading(body.value);
+    if (h1 && h1.text.trim().toLowerCase() === entry.title.trim().toLowerCase())
+      body = { ...body, value: body.value.slice(h1.length) };
   }
   const when = entry.publishedAt ?? undefined;
   const date = when

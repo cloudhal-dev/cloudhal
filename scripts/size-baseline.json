@@ -22,7 +22,7 @@
     "packages/core-ts/src/menu.ts": 928,
     "packages/core-ts/src/releases.ts": 996,
     "packages/core-ts/src/store.ts": 1212,
-    "packages/core-ts/src/surface-interop.ts": 1233,
+    "packages/core-ts/src/surface-interop.ts": 1192,
     "packages/core-ts/src/taxonomy.ts": 1718,
     "packages/mcp-server/src/menu-tools.ts": 1058,
     "packages/mcp-server/src/schedule-tools.ts": 1553,

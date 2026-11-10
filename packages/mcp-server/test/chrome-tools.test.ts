@@ -80,6 +80,11 @@ describe("chrome tools (RFC-0025)", () => {
     await expect(
       run("set_chrome", { siteId, rev: saved.rev, header: { layout: "zigzag" } }),
     ).rejects.toThrow();
+    // JSON input can carry `__proto__` as an own key: refused, not merged into the part's prototype
+    await expect(
+      run("set_chrome", { siteId, rev: saved.rev, header: JSON.parse('{"__proto__":{"x":1}}') }),
+    ).rejects.toThrow('"__proto__" is a reserved key');
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
 
     const merged = (
       await run("set_chrome", { siteId, rev: saved.rev, header: { width: "wide" }, footer: null })

@@ -4,6 +4,7 @@
  * returned once, travels in a URL fragment, and never appears in audit rows or logs.
  */
 import { sha256Hex } from "@cloudhal/core-ts";
+import { trimEndChar } from "@cloudhal/core-ts/names";
 import type { Context } from "hono";
 import type { Env } from "./context.ts";
 import { apiError } from "./errors.ts";
@@ -135,7 +136,8 @@ export function studioOrigin(
   configured: string | undefined,
   trusted: ReadonlySet<string>,
 ): string {
-  if (configured) return configured.replace(/\/+$/, "");
+  // `trimEndChar`, not `/\/+$/`, which backtracks on a long run of "/" (js/polynomial-redos).
+  if (configured) return trimEndChar(configured, "/");
   const own = new URL(c.req.url).origin;
   const origin = c.req.header("origin");
   return origin && (origin === own || trusted.has(origin)) ? origin : own;

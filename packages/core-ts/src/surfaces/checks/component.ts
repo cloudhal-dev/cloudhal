@@ -1,8 +1,8 @@
 /** Rules for one component of a surface: children, props, bindings, motion and per-kind limits. */
 import type { SurfaceComponent } from "@cloudhal/core-contracts";
-import { checkCondition, isPathValue } from "../bindings/values.ts";
+import { checkCondition, checkWrittenPointer, isPathValue } from "../bindings/values.ts";
 import { type CatalogEntry, childRule } from "../catalog/index.ts";
-import { INPUT_MODEL } from "../catalog/props.ts";
+import { INPUT_COMPONENTS, INPUT_MODEL } from "../catalog/props.ts";
 import { checkMotion } from "../motion.ts";
 import { isObj } from "../shared.ts";
 import { kidsOf, type SurfaceGraph } from "./graph.ts";
@@ -51,9 +51,27 @@ export function checkComponent(
     });
   if (c.component === "Button" && isObj(c.props) && isObj(c.props.onClick))
     checkAction(c.props.onClick, `${at}/props/onClick`, issues);
+  checkWrites(c, at, issues);
   if (c.visible !== undefined) checkCondition(c.visible, `${at}/visible`, issues);
   if (c.motion !== undefined) checkMotion(c.motion, c.component, `${at}/motion`, issues);
   checkEffects(g, c, at);
+}
+
+/** The pointers this component writes through: no reserved keys on the way (see `checkWrittenPointer`). */
+function checkWrites(c: SurfaceComponent, at: string, issues: SurfaceGraph["issues"]): void {
+  if (!isObj(c.props)) return;
+  const model = INPUT_COMPONENTS.has(c.component)
+    ? (INPUT_MODEL[c.component] ?? "value")
+    : undefined;
+  const bound = model ? c.props[model] : c.component === "Scrolly" ? c.props.step : undefined;
+  if (isPathValue(bound))
+    checkWrittenPointer(bound.path, `${at}/props/${model ?? "step"}/path`, issues);
+  if (
+    c.component === "Button" &&
+    isObj(c.props.onClick) &&
+    typeof c.props.onClick.path === "string"
+  )
+    checkWrittenPointer(c.props.onClick.path, `${at}/props/onClick/path`, issues);
 }
 
 /** RFC-0024: ambient presets, marquees, rotating and split text, scroll stories. */
