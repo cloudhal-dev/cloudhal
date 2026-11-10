@@ -1,9 +1,10 @@
 # RFC-0045: Collections stage 4: reference fields and repeaters
 
-- Status: Draft (revised six times on 2026-11-10, after an independent review of PR #193 and five verification passes; the fifth revision departed from the PM's index-mode request for purges, see "Owner decisions"; the review log and the implementation watch list are at the end)
+- Status: Accepted (2026-11-10, by Halil), with the three Owner decisions ratified; see "Decisions (2026-11-10)". The ADR lands with rollout step 2.
+  Drafted in PR #193 and revised six times after an independent review and five verification passes; the review log and the implementation watch list are at the end.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-10
 - Related:
-  - [#114](https://github.com/cloudhal-dev/cloudhal/issues/114) (this stage); #71 (the collections plan).
+  - [#114](https://github.com/cloudhal-dev/cloudhal/issues/114) (this stage); #71 (the collections plan); [#196](https://github.com/cloudhal-dev/cloudhal/issues/196) (the `unchanged`-import `asset_refs` overwrite, fixed by rollout step 0).
   - RFC-0040 / ADR-0042 (the registry), RFC-0041 / ADR-0043 (typed fields, field operations), RFC-0042 / ADR-0044 (§2 presets, §4 listings and `entry_list_values`, §6 "out: stage 4").
   - RFC-0004 §4.4 (`asset_refs`, the model for the reverse index), RFC-0008 §6 and §7 (releases and their dependency closure, holds, gates, the gate index), RFC-0010 (snapshot bundles), RFC-0015 / ADR-0030 (the props subset), RFC-0033 / ADR-0035 (one node per locale, translation groups, `localization.fallback`), RFC-0034 (language editions), RFC-0039 / ADR-0041 (archives).
   - Prior art (checked 2026-11-10; "unverified" where a primary page could not be read):
@@ -20,16 +21,16 @@
       - [OpenAI](https://developers.openai.com/api/docs/guides/structured-outputs): types plus `anyOf`; no `allOf`/`not`/`if`; "Root objects must not be `anyOf`"; every property required, optional ones as a `null` union; up to 5,000 properties, 10 levels of nesting and 1,000 enum values; recursion allowed; `oneOf` not mentioned.
       - [Anthropic](https://platform.claude.com/docs/en/build-with-claude/structured-outputs): `anyOf`, and `$defs`/`$ref` without recursion; no `minimum`/`maximum`/`minLength`/`maxLength`; `minItems` only 0 or 1; per request at most 20 strict tools, 24 optional parameters, and 16 parameters with union types (`anyOf` or type arrays).
 
-## Owner decisions
+## Decisions (2026-11-10)
 
-The verification passes left these for the owner to ratify explicitly:
+Ratified by the owner (Halil) on 2026-11-10, as the verification passes left them for him to decide:
 
-1. **Purges read the two snapshots, not the index.** Every publish path computes referrer purges from the immutable `from` and `to` bodies: one bundle plus the missing hashes (§2, Purges point 4). It is exact by construction. An index probe cannot see a referrer edited away or deleted after the snapshot, which is why the fifth revision departed from the PM's index-mode request; the verifiers confirmed that departure.
+1. **Snapshot-only purges.** Every publish path computes referrer purges from the immutable `from` and `to` bodies: one bundle plus the missing hashes (§2, Purges point 4). It is exact by construction. An index probe cannot see a referrer edited away or deleted after the snapshot, which is why the fifth revision departed from the project manager's index-mode request; the verifiers confirmed that departure, and the owner ratified it.
    - **Cost:** on a 5,000-entry site, about 25 shard reads and 21 MB per publish that touches references, adding roughly 0.5 to 1.5 s to the publish response.
    - **Short-circuit:** sites without reference definitions skip it entirely.
    - **Fallback:** without either bundle, or past the read, byte or node budgets, the publish purges the whole site cache. That is safe, but it spends a purge.
-2. **Archiving a group's last member does not release a lock.** While a published entry shows a reference, the group's last member (not archived, in an allowed collection) cannot be deleted, moved away or relinked. Archiving it first is allowed but does not help. Unpublish or edit the referrers, as the delete dialog says (§2.2, §5).
-3. **Phase 2 changes behaviour on every existing site**, before the types exist (Compatibility):
+2. **Archiving the last member does not release a lock.** While a published entry shows a reference, the group's last member (not archived, in an allowed collection) cannot be deleted, moved away or relinked. Archiving it first is allowed but does not help. Unpublish or edit the referrers, as the delete dialog says (§2.2, §5).
+3. **Phase-2 behaviour changes on existing sites** are accepted, before the types exist (Compatibility). They are listed in the phase-2 changeset:
    - `translation_group_in_use`;
    - the `readsOriginal`/`originalOf` tightening (OQ 14);
    - the group check on group-only changes;
@@ -399,7 +400,7 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
 **4. Rebuilds** run in the same batch as the node set: `importSite`/`pull`/`push` (`sync-plan.ts:308`), `cloudhal import --replace` and `--revert`, and snapshot restores.
 - **Only when the batch writes the node set.** `nodeBatch` (`sync-plan.ts:295-308`) adds the node `DELETE`/`INSERT` only when `!changes.unchanged && !changes.conflict`. `entryRefsRebuild` is emitted under exactly that condition.
   - On an import planned `unchanged` it is skipped. Its rows would come from bodies read at plan time, and they could overwrite a writer's fresher rows that committed between plan and batch. The writers' own rows are already current there.
-  - **`refsRebuild` for `asset_refs` has the same hole on main today**: it is pushed unconditionally at `sync-plan.ts:308`. Step 0 fixes it the same way (tracked in its own issue).
+  - **`refsRebuild` for `asset_refs` has the same hole on main today**: it is pushed unconditionally at `sync-plan.ts:308`. Step 0 fixes it the same way ([#196](https://github.com/cloudhal-dev/cloudhal/issues/196)).
 - `entryRefsRebuild(siteId, rows)` builds the rows from the bodies, with the site's definitions from the site row, as `refsRebuild` does (`media/refs-rebuild.ts:12-37`), and `DELETE`s and `INSERT`s them under `site_id = ?`.
   - It computes `shared` in JS from the same site row, so no `NULL` can arise.
   - It reads body keys through any `migration.fromKey` the site row carries, as `resolveFields` does. A bundle exported mid-operation then keeps rows for the entries that were not yet rewritten.
@@ -807,9 +808,9 @@ New rows of the closed table (`conversions.ts:38`):
 
 ### 9. Rollout (one PR each; the types stay refused on every write path until step 7)
 
-0. **Prerequisite: `asset_refs` by site** (§2.5).
+0. **Prerequisite: `asset_refs` by site** (§2.5; fixes [#196](https://github.com/cloudhal-dev/cloudhal/issues/196)).
    - `deleteAsset`'s guard filters by site;
-   - `refsRebuild` joins same-site assets, chunks its `INSERT`, and is emitted only when its import batch writes the node set, which closes the existing hole where an `unchanged` push overwrites fresh `asset_refs` rows (`sync-plan.ts:308`; separate issue);
+   - `refsRebuild` joins same-site assets, chunks its `INSERT`, and is emitted only when its import batch writes the node set, which closes the existing hole where an `unchanged` push overwrites fresh `asset_refs` rows (`sync-plan.ts:308`; [#196](https://github.com/cloudhal-dev/cloudhal/issues/196));
    - the purge planner's asset rule reads field assets;
    - the `unused` asset listing filter (`assets.ts:322`) filters by site, since a foreign archive can hide an asset from its own site's list today;
    - size ratchet (rule 12): the asset rule moves out of `planCachePurge` (a baselined 233-line function) into `core-ts/src/cache-purge-assets.ts`. The edits to `assets.ts` (1,370 lines) and `store.ts` (1,212), both baselined, add no net lines.
@@ -984,6 +985,8 @@ New rows of the closed table (`conversions.ts:38`):
 - New refusals, each with a hint in `field-hints.ts`: `entry_referenced`, `reference_target_moved`, `reference_target_unknown`, `unknown_entry`, `too_many_references`, `field_key_in_use`, `fields_unsupported`, `field_operation_unsupported`, `field_operation_running`, `translation_group_in_use`, `translation_shape_mismatch`, `list_field_type`.
 
 ## Open questions (each with a recommended answer)
+
+The owner's acceptance ratified the three decisions above. The answers below are the recommendations each phase PR follows; a phase PR that needs a different answer brings it back to the owner.
 
 1. **Deleting a referenced entry:** refuse while a published referrer exists and this is the group's last member in the site; no cascade. *Recommended.* Add an explicit `unlink_entry` operation (dry run, approval, snapshot, revert) if people ask for it.
 2. **Per-sub-field localization in a shared repeater:** not in stage 4. *Recommended.* Revisit with stable item keys (`_key`, which cannot collide with a `FieldKey`).
@@ -1164,3 +1167,6 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | Stale index-era wording (Summary, §4, §8, Alternatives, OQ 15), "per-collections", the bundle claim | All corrected. |
 | An owner summary | The new "Owner decisions" section near the top. |
 
+### Acceptance (2026-11-10)
+
+The owner accepted the RFC with the three decisions ratified ("Kabul ediyorum"). "Owner decisions" became "Decisions (2026-11-10)", and [#196](https://github.com/cloudhal-dev/cloudhal/issues/196) is linked from step 0.
