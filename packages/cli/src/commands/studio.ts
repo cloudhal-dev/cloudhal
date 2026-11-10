@@ -68,6 +68,8 @@ export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
     LocalSiteBuildOptions,
     "command" | "debounceMs" | "maxWaitMs" | "stopDeadlineMs" | "timeoutMs"
   >;
+  /** Tests: how long a stop waits for open requests (default 8 s, inside Docker's 10 s grace). */
+  readonly shutdownBudgetMs?: number;
   /** The environment `CLOUDHAL_*` is read from (tests); default `process.env`. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Tests: run Better Auth's Origin check under `NODE_ENV=test` too (`AuthOptions.originCheck`). */
@@ -231,15 +233,47 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     stop: async () => {
       stopRollups();
       ticker?.stop();
-      // No new requests (so no new publishes) from here; open ones finish meanwhile.
-      const closed = new Promise<void>((resolve) => listening.server.close(() => resolve()));
-      // #150: a running build gets a few seconds, then it is ended and recorded as stopped, all
-      // inside Docker's 10 s stop grace period and before the database closes.
-      await siteBuild?.stop();
-      await closed;
-      await local.close();
+      await shutDown({
+        server: listening.server,
+        siteBuild,
+        local,
+        budgetMs: options.shutdownBudgetMs ?? SHUTDOWN_BUDGET_MS,
+      });
     },
   };
+}
+
+/** How long a stop waits for open requests (and the site build), inside Docker's 10 s grace. */
+const SHUTDOWN_BUDGET_MS = 8_000;
+
+/**
+ * Stops in an order that fits Docker's stop grace period: no new requests (so no new publishes),
+ * idle keep-alive connections closed at once; a running site build gets a few seconds, then it is
+ * ended and recorded as stopped (#150); requests still open (a Build chat stream can run for
+ * minutes) get what is left of `budgetMs`, then their connections are cut; the database closes last.
+ */
+async function shutDown(o: {
+  server: Awaited<ReturnType<typeof serveNode>>["server"];
+  siteBuild: LocalSiteBuild | undefined;
+  local: LocalStore;
+  budgetMs: number;
+}): Promise<void> {
+  const started = Date.now();
+  const http = "closeAllConnections" in o.server ? o.server : undefined;
+  const closed = new Promise<void>((resolve) => o.server.close(() => resolve()));
+  http?.closeIdleConnections();
+  await o.siteBuild?.stop();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<true>((resolve) => {
+    timer = setTimeout(() => resolve(true), Math.max(0, o.budgetMs - (Date.now() - started)));
+  });
+  const overdue = await Promise.race([closed.then(() => false), late]);
+  clearTimeout(timer);
+  if (overdue && http) {
+    http.closeAllConnections();
+    await closed;
+  }
+  await o.local.close();
 }
 
 /**

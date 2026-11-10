@@ -3,8 +3,8 @@
  * cron or hand-started `site-build`, or the entrypoint. After each swap `site-build` writes
  * `<project>/site/current.json` (temporary file, then a rename): when, which build, the snapshot or
  * the status page, and who ran it. This reads it defensively (a size limit, every field checked)
- * and checks it names the build `site/current` points at; a volume whose builds predate the file,
- * or one served from a 0.6.3 `dist` folder, still reports that something is online (its time only).
+ * and checks it names the build `site/current` points at; a volume whose builds predate the file
+ * reports the build `current` names and its time, one served from a 0.6.3 `dist` folder its time.
  */
 import { lstat, readFile, readlink } from "node:fs/promises";
 import path from "node:path";
@@ -56,6 +56,7 @@ export function parseServed(text: string, currentBuild: string | undefined) {
     r.state === "published" || r.state === "not-published" ? (r.state as string) : undefined;
   const served: SiteBuildServed = {
     at,
+    build: r.build,
     ...(state === "published" && isToken(r.snapshotId, 64) ? { snapshotId: r.snapshotId } : {}),
     ...(state ? { state: state as "published" | "not-published" } : {}),
     ...(typeof r.source === "string" && SOURCES.has(r.source) ? { source: r.source } : {}),
@@ -95,5 +96,5 @@ export async function readServed(projectDir: string): Promise<SiteBuildServed | 
     // no file (a build from before it), or unreadable
   }
   const at = await mtime(path.join(site, "current"));
-  return at ? { at } : null;
+  return at ? { at, ...(isToken(build, 64) ? { build } : {}) } : null;
 }

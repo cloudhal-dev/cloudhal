@@ -14,6 +14,7 @@ import {
   localSiteBuild,
   outputTail,
   parseBuildOutput,
+  parseLiveBuild,
   plainText,
   runSiteBuildCommand,
   siteBuildAuditEntry,
@@ -145,6 +146,33 @@ describe("plainText", () => {
   });
 });
 
+describe("parseLiveBuild", () => {
+  it("reads the build site-build made live, with or without the status-page note", () => {
+    expect(
+      parseLiveBuild(
+        "built x from snap_a (published)\nsite-build: /data/dist -> site/current -> 20261111T010203Z.42\n",
+      ),
+    ).toBe("20261111T010203Z.42");
+    expect(
+      parseLiveBuild(
+        "site-build: /data/dist -> site/current -> 20261111T010203Z.42: the not-published status page (nothing is published yet)",
+      ),
+    ).toBe("20261111T010203Z.42");
+    expect(parseLiveBuild("site-build: building\n")).toBeUndefined();
+    expect(parseLiveBuild("site-build: /data/dist -> site/current -> ../x y")).toBeUndefined();
+    expect(
+      parseLiveBuild(`site-build: /data/dist -> site/current -> ${"a".repeat(65)}`),
+    ).toBeUndefined();
+  });
+
+  it("stays linear on long output", () => {
+    const long = `${"site-build: x\n".repeat(3000)}site-build: /data/dist -> site/current -> ${"x".repeat(100_000)}`;
+    const t = performance.now();
+    expect(parseLiveBuild(long)).toBeUndefined();
+    expect(performance.now() - t).toBeLessThan(500);
+  });
+});
+
 describe("outputTail", () => {
   it("keeps the last whole lines within 600 characters", () => {
     const lines = Array.from({ length: 50 }, (_, i) => `line ${i} ${"x".repeat(30)}`);
@@ -183,6 +211,16 @@ describe("runSiteBuildCommand", () => {
   it("fails when the command cannot start", async () => {
     const r = await runSiteBuildCommand({ command: "/nonexistent/site-build", args: [], cwd: "." });
     expect(r).toMatchObject({ ok: false, error: expect.stringContaining("ENOENT") });
+  });
+
+  it("names the build that went live, also when a later step failed", async () => {
+    const live = 'console.log("site-build: /data/dist -> site/current -> 20261111T010203Z.9")';
+    expect(await runSiteBuildCommand(node(live))).toEqual({
+      ok: true,
+      build: "20261111T010203Z.9",
+    });
+    const r = await runSiteBuildCommand(node(`${live}; process.exit(143)`));
+    expect(r).toMatchObject({ ok: false, build: "20261111T010203Z.9" });
   });
 
   it("stores the failure's output as plain text", async () => {
@@ -272,8 +310,11 @@ describe("what is served", () => {
     expect(await readServed(project)).toBeNull();
     await mkdir(path.join(project, "site", "20261111T010203Z.7"), { recursive: true });
     await symlink("20261111T010203Z.7", path.join(project, "site", "current"));
-    // a build from before the file: its time only
-    expect(Object.keys((await readServed(project)) ?? {})).toEqual(["at"]);
+    // a build from before the file: its time and the build `current` names
+    expect(await readServed(project)).toEqual({
+      at: expect.any(String),
+      build: "20261111T010203Z.7",
+    });
     const record = {
       at: "2026-11-11T01:02:05.000Z",
       build: "20261111T010203Z.7",
@@ -284,22 +325,27 @@ describe("what is served", () => {
     await writeFile(path.join(project, "site", "current.json"), JSON.stringify(record));
     expect(await readServed(project)).toEqual({
       at: "2026-11-11T01:02:05.000Z",
+      build: "20261111T010203Z.7",
       state: "published",
       snapshotId: "snap_SERVED123",
       source: "cron",
     });
-    // a record of another build (written before a swap was interrupted): its time only
+    // a record of another build (its writer was stopped): the link's build and time only
     await writeFile(
       path.join(project, "site", "current.json"),
       JSON.stringify({ ...record, build: "older" }),
     );
-    expect(Object.keys((await readServed(project)) ?? {})).toEqual(["at"]);
+    expect(await readServed(project)).toEqual({
+      at: expect.any(String),
+      build: "20261111T010203Z.7",
+    });
   });
 
   it("refuses what does not check out", () => {
     const ok = { at: "2026-11-11T01:02:05Z", build: "b1", state: "not-published", source: "start" };
     expect(parseServed(JSON.stringify(ok), "b1")).toEqual({
       at: "2026-11-11T01:02:05.000Z",
+      build: "b1",
       state: "not-published",
       source: "start",
     });
@@ -319,7 +365,7 @@ describe("what is served", () => {
         JSON.stringify({ ...ok, state: "published", snapshotId: "<script>", source: "evil" }),
         "b1",
       ),
-    ).toEqual({ at: "2026-11-11T01:02:05.000Z", state: "published" });
+    ).toEqual({ at: "2026-11-11T01:02:05.000Z", build: "b1", state: "published" });
   });
 
   it("reports a 0.6.3 dist folder as online", async () => {
@@ -350,5 +396,15 @@ describe("siteBuildAuditEntry", () => {
       reason: "exited with 1: boom",
       input: { trigger: "release" },
     });
+    expect(
+      siteBuildAuditEntry("site_aaaaaaaa", {
+        ok: false,
+        at: "2026-11-10T12:00:00.000Z",
+        durationMs: 4200,
+        error: "stopped: Studio is shutting down",
+        trigger: "publish",
+        build: "20261110T120004Z.7",
+      }).input,
+    ).toEqual({ trigger: "publish", build: "20261110T120004Z.7" });
   });
 });

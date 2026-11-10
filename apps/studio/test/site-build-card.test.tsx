@@ -13,6 +13,7 @@ import {
   SiteBuildCard,
   siteBuildPoll,
 } from "../src/components/site-overview/SiteBuildCard.tsx";
+import { ApiRequestError } from "../src/lib/api.ts";
 import { on, serve, testQueryClient, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
@@ -24,6 +25,7 @@ const status = (body: unknown) =>
   serve(on("GET", "/api/sites/site_1/site-build", { status: 200, body }));
 const AT = new Date(Date.now() - 120_000).toISOString();
 const LATER = new Date(Date.now() - 30_000).toISOString();
+const OLDER = new Date(Date.now() - 3_600_000).toISOString();
 const failed = {
   at: AT,
   ok: false,
@@ -43,14 +45,47 @@ describe("SiteBuildCard", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("stops polling when the feature is off or the request fails", () => {
-    expect(siteBuildPoll({ enabled: false }, false)).toBe(false);
-    expect(siteBuildPoll(undefined, true)).toBe(false);
-    expect(siteBuildPoll({ enabled: true, state: "idle", last: null }, true)).toBe(false);
-    expect(siteBuildPoll({ enabled: true, state: "idle", last: null }, false)).toBe(POLL_IDLE_MS);
-    expect(siteBuildPoll({ enabled: true, state: "running", last: null }, false)).toBe(
-      POLL_BUSY_MS,
-    );
+  it("stops polling only on a permanent answer: off, or a 4xx", () => {
+    const idle = { enabled: true as const, state: "idle" as const, last: null };
+    const running = { ...idle, state: "running" as const };
+    const http = (status: number) =>
+      new ApiRequestError(status, { error: "x", message: "x" } as never);
+    expect(siteBuildPoll({ enabled: false }, null)).toBe(false);
+    expect(siteBuildPoll(undefined, http(403))).toBe(false);
+    expect(siteBuildPoll(idle, http(404))).toBe(false);
+    expect(siteBuildPoll(idle, null)).toBe(POLL_IDLE_MS);
+    expect(siteBuildPoll(running, null)).toBe(POLL_BUSY_MS);
+    // a network error, a 5xx, a timeout or a 429: keep the last pace (idle without data)
+    expect(siteBuildPoll(undefined, new TypeError("fetch failed"))).toBe(POLL_IDLE_MS);
+    expect(siteBuildPoll(running, http(502))).toBe(POLL_BUSY_MS);
+    expect(siteBuildPoll(idle, http(503))).toBe(POLL_IDLE_MS);
+    expect(siteBuildPoll(idle, http(429))).toBe(POLL_IDLE_MS);
+  });
+
+  it("keeps polling after a server error and shows the card once it answers", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let calls = 0;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => {
+          calls++;
+          return calls === 1
+            ? new Response(JSON.stringify({ error: "internal", message: "boom" }), { status: 500 })
+            : Response.json({ enabled: true, state: "idle", last: null });
+        }),
+      );
+      const qc = testQueryClient();
+      render(wrap(<SiteBuildCard siteId="site_1" />, "en", qc));
+      await vi.waitFor(() =>
+        expect(qc.getQueryState(["site-build", "site_1"])?.status).toBe("error"),
+      );
+      await vi.advanceTimersByTimeAsync(POLL_IDLE_MS + 100);
+      expect(await screen.findByText("Public site build")).toBeTruthy();
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("asks once and no more after the server says off", async () => {
@@ -135,6 +170,34 @@ describe("SiteBuildCard", () => {
     expect(screen.getByText("snap_fixed")).toBeTruthy();
     expect(screen.queryByText("The last build failed")).toBeNull();
     expect(document.body.textContent).not.toContain("astro: the theme threw");
+  });
+
+  it("shows a build that went live and then failed (same build id) as built", async () => {
+    status({
+      enabled: true,
+      state: "idle",
+      last: { ...failed, build: "20261111T010203Z.42", error: "stopped: Studio is shutting down" },
+      // written before the clean-up that failed: earlier than the run's end
+      served: { at: AT, build: "20261111T010203Z.42", snapshotId: "snap_live", state: "published" },
+    });
+    render(wrap(<SiteBuildCard siteId="site_1" />));
+    expect(await screen.findByText("Built")).toBeTruthy();
+    expect(screen.getByText("snap_live")).toBeTruthy();
+    expect(screen.queryByText("The last build failed")).toBeNull();
+  });
+
+  it("keeps a failure current when the served build is the older one", async () => {
+    status({
+      enabled: true,
+      state: "idle",
+      last: failed,
+      served: { at: OLDER, build: "20261110T000000Z.7", snapshotId: "snap_old" },
+    });
+    render(wrap(<SiteBuildCard siteId="site_1" />));
+    expect(await screen.findByText("Failed")).toBeTruthy();
+    expect(
+      screen.getByText("The previous version stays online. The next publish tries again."),
+    ).toBeTruthy();
   });
 
   it("says nothing is online when a failure follows no served build", async () => {

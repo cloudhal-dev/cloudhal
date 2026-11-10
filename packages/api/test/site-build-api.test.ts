@@ -54,7 +54,7 @@ describe("API site build status", () => {
       outcome: "error",
       durationMs: 9000,
       reason: "exited with 1: /opt/cloudhal/theme.ts: boom",
-      input: { trigger: "publish" },
+      input: { trigger: "publish", build: "20261111T010003Z.7" },
     });
 
   it("is off without the rebuild queue, or for another site", async () => {
@@ -73,6 +73,8 @@ describe("API site build status", () => {
       ok: false,
       durationMs: 9000,
       trigger: "publish",
+      // it went live before its run failed
+      build: "20261111T010003Z.7",
     });
     const editor = await status(a, "site:read,audit:read");
     expect(editor.last).toMatchObject({

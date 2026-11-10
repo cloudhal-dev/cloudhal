@@ -21,6 +21,8 @@ export const SITE_BUILD_TOOL = "site.build";
 export interface SiteBuildServed {
   /** When that build went live (ISO). */
   readonly at: string;
+  /** Its build id (`/data/site/<id>`), when known: Studio's last build went live if it matches. */
+  readonly build?: string | undefined;
   readonly snapshotId?: string | undefined;
   /** `published`: the site; `not-published`: the status page (RFC-0043 §1.10). */
   readonly state?: "published" | "not-published" | undefined;
@@ -46,6 +48,8 @@ export interface SiteBuildLast {
   /** `published`: the site; `not-published`: the status page (RFC-0043 §1.10). */
   readonly state?: "published" | "not-published" | undefined;
   readonly trigger?: string | undefined;
+  /** The build id it made live, when it got that far (a failure with one failed after the swap). */
+  readonly build?: string | undefined;
   /** The build's last output lines, when it failed (callers with `audit:read` only). */
   readonly error?: string | undefined;
 }
@@ -62,7 +66,7 @@ export type SiteBuildStatus =
 
 function lastOf(row: AuditRow | undefined, withError: boolean): SiteBuildLast | null {
   if (!row) return null;
-  const input = (row.input ?? {}) as { trigger?: unknown; state?: unknown };
+  const input = (row.input ?? {}) as { trigger?: unknown; state?: unknown; build?: unknown };
   const state =
     input.state === "published" || input.state === "not-published" ? input.state : undefined;
   return {
@@ -72,6 +76,7 @@ function lastOf(row: AuditRow | undefined, withError: boolean): SiteBuildLast | 
     ...(row.snapshotId ? { snapshotId: row.snapshotId } : {}),
     ...(state ? { state } : {}),
     ...(typeof input.trigger === "string" ? { trigger: input.trigger } : {}),
+    ...(typeof input.build === "string" && input.build.length <= 64 ? { build: input.build } : {}),
     ...(withError && row.outcome !== "ok" && row.reason ? { error: row.reason } : {}),
   };
 }

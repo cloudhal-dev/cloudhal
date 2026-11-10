@@ -28,6 +28,11 @@ export interface SiteBuildResult {
   readonly snapshotId?: string | undefined;
   /** `published`: the site; `not-published`: RFC-0043's status page (nothing is published). */
   readonly state?: "published" | "not-published" | undefined;
+  /**
+   * The build id `site-build` made live (`site/<id>`), when it got that far: a failure that names
+   * one went live, and only a step after the swap failed.
+   */
+  readonly build?: string | undefined;
   /** Why it failed: the build's last output lines. */
   readonly error?: string | undefined;
   /** What asked for it: `publish`, `rollback`, `release`, … (the first request of the burst). */
@@ -149,7 +154,9 @@ export function createSiteRebuilder(o: SiteRebuilderOptions): SiteRebuilder {
     log(
       result.ok
         ? `site build (${trigger}): ${result.state === "not-published" ? "the not-published status page" : (result.snapshotId ?? "done")} in ${result.durationMs} ms`
-        : `site build (${trigger}) failed after ${result.durationMs} ms; the previous site is still served: ${result.error ?? "no output"}`,
+        : result.build
+          ? `site build (${trigger}): ${result.build} went live, then the run failed after ${result.durationMs} ms: ${result.error ?? "no output"}`
+          : `site build (${trigger}) failed after ${result.durationMs} ms; the previous site is still served: ${result.error ?? "no output"}`,
     );
     try {
       await o.onResult?.(result);

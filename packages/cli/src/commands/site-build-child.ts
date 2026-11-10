@@ -4,7 +4,10 @@
  * ended as a group: `stop` (an abort) and the build's deadline send SIGTERM to the whole group, and
  * SIGKILL after a short grace, so no grandchild keeps the lock (`/tmp/site-build.lock`) or the
  * staging folder. Being its own group, a terminal's Ctrl-C no longer reaches it directly: Studio's
- * stop path aborts it instead. The output kept for a failure is plain text (no ANSI escapes or
+ * stop path aborts it instead. `site-build` ignores the signals during its swap, so a stop never
+ * cuts a publish half-way; the build id its "live" line names (`parseLiveBuild`) is recorded, so a
+ * run that went live and then failed (a stop during the clean-up after the swap) is told apart from
+ * one that changed nothing. The output kept for a failure is plain text (no ANSI escapes or
  * control characters), scanned once.
  */
 import { type ChildProcess, spawn } from "node:child_process";
@@ -35,6 +38,38 @@ export function parseBuildOutput(output: string): Pick<SiteBuildOutcome, "snapsh
     if (id && !id.includes(" ")) return { state: "published", snapshotId: id };
   }
   return {};
+}
+
+/** What `site-build` prints once its swap is whole. */
+const LIVE_PREFIX = "site-build: /data/dist -> site/current -> ";
+const MAX_BUILD_ID = 64;
+
+/**
+ * The build `site-build` made live (`site-build: /data/dist -> site/current -> <id>[: …]`), when
+ * its output says so: the id is letters, digits, `.`, `_` and `-`. Line scans, no regex.
+ */
+export function parseLiveBuild(output: string): string | undefined {
+  for (const line of output.split("\n").reverse()) {
+    const text = line.trim();
+    if (!text.startsWith(LIVE_PREFIX)) continue;
+    const rest = text.slice(LIVE_PREFIX.length);
+    const colon = rest.indexOf(":");
+    const id = colon === -1 ? rest : rest.slice(0, colon);
+    if (id.length === 0 || id.length > MAX_BUILD_ID) return undefined;
+    for (let i = 0; i < id.length; i++) {
+      const c = id.charCodeAt(i);
+      const ok =
+        (c >= 0x30 && c <= 0x39) ||
+        (c >= 0x41 && c <= 0x5a) ||
+        (c >= 0x61 && c <= 0x7a) ||
+        c === 0x2e ||
+        c === 0x5f ||
+        c === 0x2d;
+      if (!ok) return undefined;
+    }
+    return id;
+  }
+  return undefined;
 }
 
 /** The last lines of `output` within `ERROR_TAIL` characters. */
@@ -187,8 +222,10 @@ export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutco
       );
     };
     const failure = (why: string): SiteBuildOutcome => {
-      const tail = outputTail(plainText(output));
-      return { ok: false, error: tail ? `${why}: ${tail}` : why };
+      const text = plainText(output);
+      const tail = outputTail(text);
+      const build = parseLiveBuild(text);
+      return { ok: false, error: tail ? `${why}: ${tail}` : why, ...(build ? { build } : {}) };
     };
     const onAbort = () => {
       const reason: unknown = o.signal?.reason;
@@ -202,8 +239,12 @@ export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutco
     child.stderr?.on("data", keep);
     child.once("error", (e) => finish({ ok: false, error: e.message }));
     child.once("close", (code, signal) => {
-      // a build that finished meanwhile (its swap is not interrupted) is live: a success
-      if (code === 0) return finish({ ok: true, ...parseBuildOutput(plainText(output)) });
+      // a build that finished within the grace (site-build ignores a stop during its swap): a success
+      if (code === 0) {
+        const text = plainText(output);
+        const build = parseLiveBuild(text);
+        return finish({ ok: true, ...parseBuildOutput(text), ...(build ? { build } : {}) });
+      }
       if (ended) return finish(failure(ended));
       finish(failure(signal ? `stopped by ${signal}` : `exited with ${code}`));
     });

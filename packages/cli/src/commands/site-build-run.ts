@@ -25,6 +25,7 @@ import { createSiteRebuilder, type SiteBuildResult, type SiteRebuilder } from ".
 export {
   outputTail,
   parseBuildOutput,
+  parseLiveBuild,
   plainText,
   runSiteBuildCommand,
   type SiteBuildCommand,
@@ -87,7 +88,11 @@ export function siteBuildAuditEntry(siteId: string, r: SiteBuildResult): AuditEn
     durationMs: r.durationMs,
     ...(r.snapshotId ? { snapshotId: r.snapshotId } : {}),
     ...(r.error ? { reason: r.error } : {}),
-    input: { trigger: r.trigger, ...(r.state ? { state: r.state } : {}) },
+    input: {
+      trigger: r.trigger,
+      ...(r.state ? { state: r.state } : {}),
+      ...(r.build ? { build: r.build } : {}),
+    },
   };
 }
 

@@ -9,6 +9,7 @@
  */
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { AuditLog } from "@cloudhal/agent-runtime";
@@ -335,6 +336,41 @@ describe("cloudhal studio without CLOUDHAL_SITE_BUILD", () => {
       expect(await res.json()).toEqual({ enabled: false });
     } finally {
       await s.stop();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("cloudhal studio: stopping with a request still open", () => {
+  it("cuts the connection after the shutdown budget and closes the database", async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-studio-stop-open-"));
+    const projectDir = path.join(tmp, "site");
+    await init({ dir: projectDir, name: "Open" });
+    const { siteId } = await readProjectConfig(projectDir);
+    const s = await studio({
+      projectDir,
+      noAuth: true,
+      port: 0,
+      scheduler: false,
+      env: {},
+      shutdownBudgetMs: 300,
+    });
+    // a request whose body never finishes: an active connection, like a long stream
+    const socket = net.connect(s.port, "127.0.0.1");
+    await new Promise<void>((resolve) => socket.once("connect", () => resolve()));
+    const ended = new Promise<void>((resolve) => socket.once("close", () => resolve()));
+    socket.on("error", () => {});
+    socket.write(
+      `POST /api/sites/${siteId}/snapshots HTTP/1.1\r\nHost: localhost\r\ncontent-type: application/json\r\ncontent-length: 100\r\n\r\n{"pub`,
+    );
+    await new Promise((r) => setTimeout(r, 100));
+    const t = performance.now();
+    try {
+      await s.stop();
+      expect(performance.now() - t).toBeLessThan(2000);
+      await ended;
+    } finally {
+      socket.destroy();
       await rm(tmp, { recursive: true, force: true });
     }
   });

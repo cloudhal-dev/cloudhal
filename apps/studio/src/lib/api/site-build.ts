@@ -10,6 +10,8 @@ export interface SiteBuildLast {
   /** `published`: the site; `not-published`: the status page (nothing is published yet). */
   state?: "published" | "not-published";
   trigger?: string;
+  /** The build id it made live (a failure with one failed only after the swap). */
+  build?: string;
   /** The build's last output lines, when it failed. */
   error?: string;
 }
@@ -17,6 +19,8 @@ export interface SiteBuildLast {
 /** What visitors see now, from the last build that went live (Studio's, cron's or a hand-run). */
 export interface SiteBuildServed {
   at: string;
+  /** Its build id: Studio's last build is what is online when `last.build` matches. */
+  build?: string;
   snapshotId?: string;
   state?: "published" | "not-published";
   /** `studio`, `cron`, `manual`, `start`. */

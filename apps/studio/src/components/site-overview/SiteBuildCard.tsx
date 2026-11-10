@@ -2,7 +2,7 @@ import { Badge, Banner, Code, InlineCopyText, SectionCard } from "@cloudhal/ui";
 import { Globe, WarningCircle } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "../../i18n/index.tsx";
-import { api, type SiteBuildStatus } from "../../lib/api.ts";
+import { ApiRequestError, api, type SiteBuildStatus } from "../../lib/api.ts";
 import { RelativeTime } from "../RelativeTime.tsx";
 import { StatRow } from "./SiteStatusCard.tsx";
 
@@ -12,30 +12,59 @@ export const POLL_IDLE_MS = 30_000;
 
 type Enabled = Extract<SiteBuildStatus, { enabled: true }>;
 
-/** How often to look again: never when the feature is off or the request failed. */
-export function siteBuildPoll(data: SiteBuildStatus | undefined, failed: boolean): number | false {
-  if (failed || !data?.enabled) return false;
-  return data.state !== "idle" ? POLL_BUSY_MS : POLL_IDLE_MS;
+/** An answer that will not change by asking again: a 4xx (403, 404, …), not a timeout or 429. */
+function isPermanent(error: unknown): boolean {
+  return (
+    error instanceof ApiRequestError &&
+    error.status >= 400 &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 429
+  );
+}
+
+/**
+ * How often to look again: never once the server said the feature is off or refused for good (a
+ * 4xx); after a network error or a 5xx, at the last pace (idle when nothing came yet).
+ */
+export function siteBuildPoll(data: SiteBuildStatus | undefined, error: unknown): number | false {
+  if (isPermanent(error) || data?.enabled === false) return false;
+  return data?.enabled && data.state !== "idle" ? POLL_BUSY_MS : POLL_IDLE_MS;
+}
+
+/**
+ * Whether Studio's last build is what visitors see: by build id when both sides name one (a run
+ * that failed after its swap still went live), else by time (a build that went live within a
+ * minute of its end).
+ */
+function lastIsServed(s: Enabled): boolean | undefined {
+  const { last, served } = s;
+  if (!last || !served) return undefined;
+  if (last.build && served.build) return last.build === served.build;
+  if (!last.ok) return false;
+  const end = Date.parse(last.at) + (last.durationMs ?? 0);
+  return Date.parse(served.at) <= end + 60_000;
 }
 
 /** What the card shows: what is online, and whether Studio's last build failed after it. */
 export function siteBuildView(s: Enabled) {
-  const last = s.last;
-  const served = s.served;
+  const { last, served } = s;
+  const live = lastIsServed(s);
   const lastEnd = last ? Date.parse(last.at) + (last.durationMs ?? 0) : Number.NaN;
-  // a cron or hand-started build that went live after Studio's failed one supersedes it
-  const superseded = !!last && !last.ok && !!served && Date.parse(served.at) > lastEnd;
-  const failure = last && !last.ok && !superseded ? last : undefined;
+  // Studio's failed build is current unless it went live after all (same build id), or another
+  // build went live after it (a cron or hand-started one: another id, or a later time)
+  const replaced =
+    !!served &&
+    !!last &&
+    (last.build && served.build ? served.build !== last.build : Date.parse(served.at) > lastEnd);
+  const failure = last && !last.ok && !live && !replaced ? last : undefined;
   // the server says what is online (`served`); an older one only knows Studio's last build
   const online =
     served !== undefined ? served : last?.ok ? { at: last.at, ...pick(last) } : undefined;
   // a failure: when it ran; otherwise when what is online went live
   const when = failure ? failure.at : (served?.at ?? last?.at);
-  // the duration is Studio's build's, shown only while it is the one online (or the failure)
-  const durationMs =
-    failure || (last?.ok && (!served || Date.parse(served.at) <= lastEnd + 60_000))
-      ? last?.durationMs
-      : undefined;
+  // the duration is Studio's build's, shown for the failure or while that build is online
+  const durationMs = failure || (last && (live ?? last.ok)) ? last?.durationMs : undefined;
   return {
     failure,
     online,
@@ -65,7 +94,7 @@ export function SiteBuildCard({ siteId }: { siteId: string }) {
     queryKey: ["site-build", siteId],
     queryFn: () => api.siteBuild.status(siteId),
     retry: false,
-    refetchInterval: (q) => siteBuildPoll(q.state.data, q.state.status === "error"),
+    refetchInterval: (q) => siteBuildPoll(q.state.data, q.state.error),
   });
   const s = status.data;
   if (!s?.enabled) return null;
