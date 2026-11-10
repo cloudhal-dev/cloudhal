@@ -32,6 +32,7 @@
     "@cloudhal/agent-runtime": "workspace:*",
     "@cloudhal/analytics": "workspace:*",
     "@cloudhal/api": "workspace:*",
+    "@cloudhal/astro-renderer": "workspace:*",
     "@cloudhal/cloudflare": "workspace:*",
     "@cloudhal/comments": "workspace:*",
     "@cloudhal/core-contracts": "workspace:*",

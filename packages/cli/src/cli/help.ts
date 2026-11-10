@@ -8,7 +8,11 @@ const PROJECT = `  cloudhal init <dir> [--name <name>] [--starter blog]   create
   cloudhal dev [--port <n>] [--host [<addr>]]             live preview (drafts visible); --host alone is
                                                           0.0.0.0, every IPv4 address (:: for IPv6 too)
   cloudhal snapshot [--label <text>] [--publish]          freeze the current graph (optionally publish)
-  cloudhal build [--snapshot <id>]                        static HTML from the published/latest snapshot
+  cloudhal build [--snapshot <id> | --published]          static HTML from the published snapshot, else the
+                                                          latest, else a fresh one of the drafts; --published:
+                                                          the published snapshot only, and before the first
+                                                          publish the not-published status page with a
+                                                          .cloudhal-status marker (RFC-0043; self-hosting)
   cloudhal studio [--port <n>] [--host [<addr>]] [--base-url <url>] [--behind-proxy] [--no-auth]
                   [--init-if-empty [--starter blog] [--name <name>]]
                                                           API + Studio UI for this project (default :8787);

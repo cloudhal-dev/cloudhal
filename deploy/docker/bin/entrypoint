@@ -23,6 +23,29 @@ if [ "${1:-studio}" = "studio" ]; then
       esac
       ;;
   esac
+  # One site build per start, once Studio answers (it migrates the database, and on an empty
+  # volume creates the project, first; the build reads the same database). A volume upgraded from
+  # an image that built drafts before the first publish then switches at once to the published
+  # build or the 503 status page, and a new volume gets the status page, without waiting for the
+  # next `site-build`. In the background, so Studio never waits for it; the outer subshell exits at
+  # once, so tini (PID 1) reaps the build rather than `cloudhal studio`. A failure changes nothing
+  # (site-build publishes only a finished build) and is only logged.
+  (
+    (
+      i=0
+      until node -e "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" 2>/dev/null; do
+        i=$((i + 1))
+        if [ "$i" -ge 90 ]; then
+          echo "entrypoint: Studio did not answer within 180 s; no start-up site-build" >&2
+          exit 0
+        fi
+        sleep 2
+      done
+      [ -f /data/cloudhal.json ] || exit 0
+      echo "entrypoint: start-up site-build"
+      site-build || echo "entrypoint: the start-up site-build failed; the served site is unchanged" >&2
+    ) &
+  )
   [ $# -gt 0 ] && shift
   exec cloudhal studio --init-if-empty "$@"
 fi
