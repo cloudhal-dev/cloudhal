@@ -1,5 +1,17 @@
 # @cloudhal/astro-renderer
 
+## 0.7.2
+
+### Patch Changes
+
+- 6de8d67: Corrections to the machine-drafted translations of collections, typed fields, listings, the OAuth consent screen, Connected agents, the setup-link sign-up text and the site status pages (#112), in all 18 non-English languages. The fixes cover changed meaning, security wording that had softened, mixed terms and mixed register. Examples: Indonesian said "not yet verified" for a self-registered agent, Polish dropped "you" from the loopback warning, and Japanese and Korean lost "never" in "never beyond your role". Korean used a formal register in the new screens while the rest of Studio uses its polite-informal one. Nothing else changes, and the languages remain AI drafts awaiting review by people who speak them.
+- Updated dependencies [060a9c8]
+  - @cloudhal/core-ts@0.7.2
+  - @cloudhal/comments@0.7.2
+  - @cloudhal/analytics@0.7.2
+  - @cloudhal/core-contracts@0.7.2
+  - @cloudhal/storage@0.7.2
+
 ## 0.7.1
 
 ### Patch Changes
