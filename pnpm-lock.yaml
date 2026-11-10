@@ -745,6 +745,9 @@ importers:
       '@cloudhal/api':
         specifier: workspace:*
         version: link:../api
+      '@cloudhal/astro-renderer':
+        specifier: workspace:*
+        version: link:../astro-renderer
       '@cloudhal/cloudflare':
         specifier: workspace:*
         version: link:../cloudflare

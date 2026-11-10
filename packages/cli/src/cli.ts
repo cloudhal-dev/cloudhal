@@ -20,6 +20,7 @@ export const OPTIONS = {
   label: { type: "string" },
   publish: { type: "boolean" },
   snapshot: { type: "string" },
+  published: { type: "boolean" },
   "no-auth": { type: "boolean" },
   scopes: { type: "string" },
   skills: { type: "string" },
@@ -90,6 +91,7 @@ const ONLY_FOR: Readonly<
   "base-url": { commands: ["studio"] },
   "behind-proxy": { commands: ["studio"] },
   "init-if-empty": { commands: ["studio"] },
+  published: { commands: ["build"] },
 };
 
 /**

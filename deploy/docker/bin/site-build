@@ -18,10 +18,13 @@
 # 0.6.3 folder is kept as `site/legacy-0.6.3` for one build. Never run an Astro build in /data by
 # hand (`cloudhal build`, `cloudhal deploy`): it would empty the served build through the symlink.
 #
-# The snapshot is the published one, else the latest: before the first publish the site is built
-# from the latest snapshot (RFC-0043's `cloudhal build --published` is not in this version). The
-# project's dependencies are the image's node_modules, linked into the project on first use, so no
-# install and no network is needed.
+# The snapshot is the published one only (`cloudhal build --published`, RFC-0043 §1.10): drafts and
+# unpublished snapshots never reach the public site. Before the first publish the build is the
+# not-published status page with a `.cloudhal-status` marker, which the compose file's Caddyfile
+# answers with 503 and Retry-After; the first build after a publish replaces it like any other.
+# Arguments go to `cloudhal build` after `--published` (so `--snapshot` is refused). The project's
+# dependencies are the image's node_modules, linked into the project on first use, so no install
+# and no network is needed.
 set -eu
 cd /data
 if [ ! -f cloudhal.json ]; then
@@ -121,7 +124,7 @@ for entry in .[!.]* ..?* *; do
     *) cp -a "$entry" "$stage/" ;;
   esac
 done
-(cd "$stage" && cloudhal build "$@")
+(cd "$stage" && cloudhal build --published "$@")
 
 # Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"
@@ -146,4 +149,8 @@ ln -sfn site/current "dist.$$"
 mv -T "dist.$$" dist
 # Builds that neither `current` nor `previous` points at.
 find site -mindepth 1 -maxdepth 1 -type d ! -name "$id" ! -name "${prev:-$id}" -exec rm -rf {} +
-echo "site-build: /data/dist -> site/current -> $id"
+if [ -f "site/$id/.cloudhal-status" ]; then
+  echo "site-build: /data/dist -> site/current -> $id: the $(cat "site/$id/.cloudhal-status") status page (nothing is published yet)"
+else
+  echo "site-build: /data/dist -> site/current -> $id"
+fi

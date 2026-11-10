@@ -1,5 +1,6 @@
 import { isAgentMode, type Scope } from "@cloudhal/agent-runtime";
 import { build, dev } from "../commands/astro.ts";
+import { STATUS_MARKER, staticRetryAfter } from "../commands/build-status.ts";
 import { chromeGet, chromeSet } from "../commands/chrome.ts";
 import { init } from "../commands/init.ts";
 import { mcp } from "../commands/mcp.ts";
@@ -57,6 +58,16 @@ const snapshotCommand: CliCommand = async (_rest, values, { projectDir }) => {
 };
 
 const buildCommand: CliCommand = async (_rest, values, { projectDir }) => {
+  if (values.published) {
+    if (values.snapshot) throw new Error("usage: cloudhal build [--snapshot <id> | --published]");
+    const r = await build({ projectDir, published: true });
+    if (r.state === "published") console.log(`built ${r.outDir} from ${r.snapshotId} (published)`);
+    else
+      console.log(
+        `${r.state}: nothing is published yet; wrote the status page to ${r.outDir} (${r.files.join(", ")}); a web server should answer it with 503 and Retry-After: ${staticRetryAfter(r.state)} while ${STATUS_MARKER} exists`,
+      );
+    return 0;
+  }
   const r = await build({
     projectDir,
     ...(values.snapshot ? { snapshotId: values.snapshot } : {}),

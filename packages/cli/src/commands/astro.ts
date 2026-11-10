@@ -1,8 +1,9 @@
 import path from "node:path";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
+import { type StaticState, writeStatusBuild } from "./build-status.ts";
 import { startLocalScheduler } from "./scheduler-local.ts";
-import { resolveBuildSnapshot } from "./snapshot.ts";
+import { resolveBuildSnapshot, resolvePublishedBuild } from "./snapshot.ts";
 
 export interface DevOptions {
   readonly projectDir: string;
@@ -69,17 +70,58 @@ export interface BuildOptions {
   readonly projectDir: string;
   /** Render this snapshot instead of the published/latest one. */
   readonly snapshotId?: string;
+  /**
+   * RFC-0043 §1.10: render the published snapshot only, never the latest one or the drafts; a
+   * site that was never published gets the `not-published` status page as its whole output
+   * (`build-status.ts`). Cannot be combined with `snapshotId`.
+   */
+  readonly published?: boolean;
+  /** The clock for the status page (RFC-0008 §9.4); `Date.now` by default. */
+  readonly now?: () => number;
 }
 
-/** Static build from a snapshot: published → latest → freshly created. */
+/** `build({ published: true })`: the published site, or the status page that stands for it. */
+export type PublishedBuildResult =
+  | { readonly state: "published"; readonly snapshotId: string; readonly outDir: string }
+  | { readonly state: StaticState; readonly outDir: string; readonly files: readonly string[] };
+
+/**
+ * Static build from a snapshot: published → latest → freshly created. With `published`, the
+ * published snapshot or the status page (RFC-0043 §1.10).
+ */
+export async function build(
+  options: BuildOptions & { readonly published: true },
+): Promise<PublishedBuildResult>;
+export async function build(options: BuildOptions): Promise<{ snapshotId: string; outDir: string }>;
 export async function build(
   options: BuildOptions,
+): Promise<{ snapshotId: string; outDir: string } | PublishedBuildResult> {
+  if (!options.published) {
+    const snapshotId = options.snapshotId ?? (await resolveBuildSnapshot(options.projectDir)).id;
+    return astroBuild(options.projectDir, snapshotId);
+  }
+  if (options.snapshotId)
+    throw new Error("--published builds the published snapshot: drop --snapshot");
+  const target = await resolvePublishedBuild(options.projectDir);
+  if ("snapshot" in target) {
+    const r = await astroBuild(options.projectDir, target.snapshot.id);
+    return { state: "published", ...r };
+  }
+  const outDir = path.join(path.resolve(options.projectDir), "dist");
+  const state = "not-published" as const;
+  const now = (options.now ?? Date.now)();
+  const files = await writeStatusBuild({ outDir, state, site: target.unpublished, now });
+  return { state, outDir, files };
+}
+
+async function astroBuild(
+  projectDir: string,
+  snapshotId: string,
 ): Promise<{ snapshotId: string; outDir: string }> {
-  const snapshotId = options.snapshotId ?? (await resolveBuildSnapshot(options.projectDir)).id;
   process.env.CLOUDHAL_SOURCE = `snapshot:${snapshotId}`;
-  const cfg = await readProjectConfig(options.projectDir);
+  const cfg = await readProjectConfig(projectDir);
   const astro = await import("astro");
-  const root = path.resolve(options.projectDir);
+  const root = path.resolve(projectDir);
   // A static build has no request: without `site`, Astro's URLs (canonical links, the sitemap,
   // feeds) say localhost. The site's own primary domain still wins (`siteOrigin`).
   const site = cfg.domains?.site ? `https://${cfg.domains.site}` : undefined;

@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { Snapshot } from "@cloudhal/core-contracts";
+import type { Site, Snapshot } from "@cloudhal/core-contracts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { readProjectConfig } from "../config.ts";
 
@@ -70,4 +70,27 @@ export async function resolveBuildSnapshot(projectDir: string): Promise<Snapshot
     await local.close();
   }
   return snapshot({ projectDir, label: "build" });
+}
+
+/**
+ * What `cloudhal build --published` renders (RFC-0043 §1.10): the published snapshot, or — when
+ * the site has never been published — the live site node, whose name and default locale the
+ * `not-published` status page shows. Never the latest snapshot or the drafts. A pointer to a
+ * snapshot the store no longer has is an error, not "not published": that site was published.
+ */
+export async function resolvePublishedBuild(
+  projectDir: string,
+): Promise<{ readonly snapshot: Snapshot } | { readonly unpublished: Site }> {
+  const cfg = await readProjectConfig(projectDir);
+  const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+  try {
+    const site = await local.store.getSite(cfg.siteId);
+    if (!site) throw new Error(`site ${cfg.siteId} not found`);
+    if (!site.publishedSnapshotId) return { unpublished: site };
+    const s = await local.store.getSnapshot(site.publishedSnapshotId);
+    if (!s) throw new Error(`published snapshot ${site.publishedSnapshotId} not found`);
+    return { snapshot: s };
+  } finally {
+    await local.close();
+  }
 }

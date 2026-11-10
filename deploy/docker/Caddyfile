@@ -2,7 +2,8 @@
 # point at this machine, ports 80 and 443 open). Studio and the API at CLOUDHAL_BASE_URL, proxied
 # with X-Forwarded-Proto/Host/For (set CLOUDHAL_BEHIND_PROXY=1); the public site at
 # CLOUDHAL_SITE_URL, from /data/dist: the built site as `site-build` publishes it (a real folder
-# with the 0.6.3 image; a symlink to /data/site/current, swapped atomically, from 0.6.4 on).
+# with the 0.6.3 image; a symlink to /data/site/current, swapped atomically, from 0.6.4 on). Before
+# the first publish that build is the not-published status page, answered with 503 (0.7.2 on).
 {$CLOUDHAL_BASE_URL} {
 	reverse_proxy cloudhal:8787
 }
@@ -19,6 +20,30 @@
 		file
 	}
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	# Before the first publish `site-build` (`cloudhal build --published`, RFC-0043 §1.10) writes
+	# the not-published status page instead of the site, with a `.cloudhal-status` marker. While
+	# the marker exists every path but robots.txt (which must not be a 503, and disallows all) is
+	# that page with 503, Retry-After and no-store: crawlers come back later and nothing is cached
+	# or indexed. These are the headers the Cloudflare deployment sends with the same page.
+	@status {
+		file /.cloudhal-status
+		not path /robots.txt
+	}
+	handle @status {
+		header {
+			Cache-Control "no-store"
+			Retry-After "3600"
+			X-Robots-Tag "noindex"
+			X-Cloudhal-State "not-published"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "no-referrer"
+			Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		}
+		rewrite * /index.html
+		file_server {
+			status 503
+		}
+	}
 	# A page opened before the last build may still ask for that build's hashed assets: they come
 	# from /data/site/previous, the build before the current one (0.6.4 and later; immutable too).
 	@previous {
