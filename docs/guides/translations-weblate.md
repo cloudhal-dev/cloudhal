@@ -54,14 +54,14 @@ Visitor-facing strings (themes, privacy notices on sites) are not on Weblate yet
 
 ## 6. Glossary of coined terms
 
-Studio coins a few terms of its own (issue #112). Every language uses one rendering for each, so drafts and reviewers stay consistent. The table is the rendering the catalogs use after the QA pass of November 2026 ([docs/i18n-review/qa-2026-11.md](../i18n-review/qa-2026-11.md)), normally the majority form in that language's Studio. Reviewers may change a term: change it in every key that uses it, and in this table, in the same PR. On Weblate, these rows go into the project glossary.
+Studio coins a few terms of its own (issue #112). Each language should use one rendering for each, so drafts and reviewers stay consistent. The table is the rendering the catalogs use after the QA pass of November 2026 ([docs/i18n-review/qa-2026-11.md](../i18n-review/qa-2026-11.md)), normally the majority form in that language's Studio. It holds within the reviewed namespaces (the pass's 494 keys); elsewhere the pass only searched for the variant forms it had found and fixed the clear cases, and the report lists the strings it left ("Outside the 494 keys"). Other catalogs may still use older terms: when you find one, align it. Reviewers may change a term: change it in every key that uses it, and in this table, in the same PR. On Weblate, these rows go into the project glossary.
 
 General rules for every language:
 
 - Product and technical names stay as they are: Cloudhal, Studio, MCP, OAuth, URL, JSON, Markdown, Snapshot, Release, SEO, sitemap.xml, file paths, environment variables and CLI flags.
 - Names of buttons in other apps (Claude's *Settings* and *Connectors*, Claude Code's *Authenticate*, MCP Inspector's *Streamable HTTP* and *Quick OAuth Flow*) stay in English unless that app is localized in your language.
 - Studio uses the language's usual UI register throughout, and one register per language: informal where Studio already is (Turkish *sen*, German *du*, Spanish *tú*, Korean 해요체), formal where it already is (French *vous*, Indonesian *Anda*, Persian *شما*). Hebrew uses gender-neutral forms (plural or impersonal imperatives). The status pages are read by site visitors: neutral public register.
-- Turkish says *giriş yap* for sign in and *çıkış yap* for sign out, never *oturum aç*.
+- Turkish says *giriş yap* for sign in, never *oturum aç*, and *çıkış yap* for signing out of Studio; *oturumu kapat* (close the session) remains in the session list and the invite page (left for the owner, see the report).
 
 ### Content
 

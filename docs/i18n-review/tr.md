@@ -1,6 +1,6 @@
 # Turkish review pack: strings changed since your last review
 
-Every Turkish string added or changed after your review of collections, fields and listings (issue #112, 2026-10-23, commit 2e896582), as of this PR: 92 keys. Security-relevant screens come first.
+Every Turkish string added or changed after your review of collections, fields and listings (issue #112, 2026-10-23, commit 2e896582), as of this PR: 92 keys, plus one older string fixed for the glossary (last section). Security-relevant screens come first.
 
 - **English**: the source (`en`).
 - **Current Turkish**: what Studio shows after this PR. Rows marked **fixed in this PR** were clear errors; the machine draft is quoted under the table.
@@ -46,13 +46,13 @@ Shown when an agent asks to connect. Every line decides whether someone approves
 
 ## Connected agents: identity labels — security
 
-The badges and messages that say who a connected agent is.
+The badges and messages that say who a connected agent is. Each label here and its consent-screen twin (`connectedAgents:identifiedBy` = `oauthConsent:who.fromHost`, `connectedAgents:selfRegistered` = `oauthConsent:who.selfRegistered`) must stay word for word the same, so a person sees the same words for the same state on both screens; change both or neither.
 
 | Key | English | Current Turkish | Suggested |
 |---|---|---|---|
 | `connectedAgents:description` (new) | Apps you connected by URL, such as Claude, ChatGPT or Cursor. Each works as you, never beyond your role, until you disconnect it. | URL ile bağladığın Claude, ChatGPT veya Cursor gibi uygulamalar. Her biri sen bağlantısını kesene kadar senin adına, rolünün ötesine geçmeden çalışır. | URL ile bağladığın Claude, ChatGPT veya Cursor gibi uygulamalar. Her biri, sen bağlantısını kesene kadar senin adına çalışır ve hiçbir zaman rolünün ötesine geçmez. |
 | `connectedAgents:allDescription` (new) | Every member's connections. Disconnecting one ends it at once; its member can connect it again. | Tüm üyelerin bağlantıları. Birinin bağlantısını kesmek onu hemen sonlandırır; üyesi yeniden bağlayabilir. |  |
-| `connectedAgents:identifiedBy` (new) | Identified by {host} | {host} ile tanımlanıyor | Kimliği: {host} |
+| `connectedAgents:identifiedBy` (new) | Identified by {host} | {host} ile tanımlanıyor |  |
 | `connectedAgents:selfRegistered` (new) | Self-registered, not verified | Kendini kaydetmiş, doğrulanmamış |  |
 | `connectedAgents:lookalike` (new) | Looks like {client}, not verified as it | {client} gibi görünüyor, öyle olduğu doğrulanmadı |  |
 | `connectedAgents:disconnectedDescription` (new) | {client} can no longer work in this Studio. If it asks to connect again, you decide again. | {client} artık bu Studio'da çalışamaz. Yeniden bağlanmak isterse yine sen karar verirsin. |  |
@@ -168,4 +168,14 @@ Public pages a visitor sees instead of the site (RFC-0043). Formal register ("si
 | `status:backBy` (new) | Back by {time} | {time} itibarıyla geri döneceğiz | Tahmini dönüş: {time} |
 | `status:reference` (new) | Reference: {reference} | Referans: {reference} |  |
 | `status:builtWith` (new) | Built with Cloudhal | Cloudhal ile yapıldı |  |
+
+## Fixed outside the changed keys
+
+Strings you had already reviewed, changed only to keep a glossary term (sign in is *giriş yap*).
+
+| Key | English | Was | Now |
+|---|---|---|---|
+| `core:agents.notEnabledDescription` | This server runs without sign-in, so it can't issue keys. Agents on your machine can still connect over stdio with cloudhal mcp. | Sunucu oturum açma olmadan çalışıyor, bu yüzden anahtar üretemez. Kendi bilgisayarındaki agent'lar yine de cloudhal mcp ile stdio üzerinden bağlanabilir. | Sunucu giriş olmadan çalışıyor, bu yüzden anahtar üretemez. Kendi bilgisayarındaki agent'lar yine de cloudhal mcp ile stdio üzerinden bağlanabilir. |
+
+Left as they are: the session strings say *oturumu kapat* (close the session) for "sign out" of one session or device (`core:account.sessions.*`, `core:members.remove.signOut`) and in the invite page (`core:inviteAccept.signOutFirst`, `core:inviteAccept.otherSession`), where Studio's own button is *Çıkış yap*. Your call whether the invite page should say *Önce çıkış yap*.
 
