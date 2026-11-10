@@ -16,6 +16,7 @@ import {
   resolveChrome,
   type SiteChrome,
 } from "@cloudhal/core-ts/chrome";
+import { isReservedKey } from "@cloudhal/core-ts/names";
 import { id, mapError, obj, type ToolContext, type ToolDefinition, ToolError } from "./common.ts";
 
 async function requireSite(ctx: ToolContext, siteId: string): Promise<Site> {
@@ -24,12 +25,18 @@ async function requireSite(ctx: ToolContext, siteId: string): Promise<Site> {
   return site;
 }
 
-/** `patch` onto `current`: a value replaces the part, null removes it. */
+/**
+ * `patch` onto `current`: a value replaces the part, null removes it. A reserved key
+ * (`__proto__`, `constructor`, `prototype`) is refused: JSON input can carry `__proto__` as an own
+ * key, and assigning it would swap the part's prototype instead of setting a field.
+ */
 function merge<T extends object>(current: T | undefined, patch: Record<string, unknown>): T {
   const out: Record<string, unknown> = { ...(current ?? {}) };
-  for (const [k, v] of Object.entries(patch))
+  for (const [k, v] of Object.entries(patch)) {
+    if (isReservedKey(k)) throw new ToolError("invalid", `"${k}" is a reserved key`);
     if (v === null) delete out[k];
     else out[k] = v;
+  }
   return out as T;
 }
 

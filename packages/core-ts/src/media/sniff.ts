@@ -48,12 +48,52 @@ const ACTIVE_TEXT =
 /** Never inside a data file's sniffed window, wherever it appears. */
 const ACTIVE_ANYWHERE = /<(?:script|html|!doctype\s+html|iframe|object|embed)\b/i;
 
-function isSvgText(text: string): boolean {
-  // An optional BOM, XML declaration, comments and whitespace, then the svg root element.
-  const t = text.replace(/^﻿/, "");
-  return /^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE\s+svg[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<svg[\s>]/i.test(
-    t,
-  );
+const isSpace = (c: string | undefined): boolean => c !== undefined && /\s/.test(c);
+const skipSpace = (t: string, i: number): number => {
+  while (isSpace(t[i])) i++;
+  return i;
+};
+const startsWithCi = (t: string, word: string, at: number): boolean =>
+  t.slice(at, at + word.length).toLowerCase() === word;
+/** Past any `<!-- … -->` comments (each ends at its first `-->`) and the whitespace after them; -1 when one never ends. */
+function skipComments(t: string, at: number): number {
+  let i = at;
+  while (t.startsWith("<!--", i)) {
+    const end = t.indexOf("-->", i + 4);
+    if (end === -1) return -1;
+    i = skipSpace(t, end + 3);
+  }
+  return i;
+}
+
+/**
+ * An optional BOM, XML declaration, comments and whitespace, an optional svg DOCTYPE, then the svg
+ * root element. A linear scan in place of
+ * `/^\s*(?:<\?xml[^>]*\?>\s*)?(?:<!--[\s\S]*?-->\s*)*(?:<!DOCTYPE\s+svg[^>]*>\s*)?(?:<!--[\s\S]*?-->\s*)*<svg[\s>]/i`,
+ * which backtracked exponentially on uploads starting `<!--` with many `--><!--` (CodeQL
+ * js/redos, alerts 24, 35, 36). Same answers, except that a comment ends at its first `-->` as in
+ * HTML and XML (the regex could stretch one over a later `-->`), which only ever answers "not svg".
+ */
+export function isSvgText(text: string): boolean {
+  const t = text.startsWith("\uFEFF") ? text.slice(1) : text;
+  let i = skipSpace(t, 0);
+  if (startsWithCi(t, "<?xml", i)) {
+    // `[^>]*\?>`: the declaration ends at its first `>`, which must follow a `?`.
+    const gt = t.indexOf(">", i + 5);
+    if (gt === -1 || gt - 1 < i + 5 || t[gt - 1] !== "?") return false;
+    i = skipSpace(t, gt + 1);
+  }
+  i = skipComments(t, i);
+  if (i === -1) return false;
+  if (startsWithCi(t, "<!doctype", i) && isSpace(t[i + 9])) {
+    const name = skipSpace(t, i + 9);
+    if (!startsWithCi(t, "svg", name)) return false;
+    const gt = t.indexOf(">", name + 3);
+    if (gt === -1) return false;
+    i = skipComments(t, skipSpace(t, gt + 1));
+    if (i === -1) return false;
+  }
+  return startsWithCi(t, "<svg", i) && (t[i + 4] === ">" || isSpace(t[i + 4]));
 }
 
 /**

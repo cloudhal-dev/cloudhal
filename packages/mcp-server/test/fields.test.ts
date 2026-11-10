@@ -421,3 +421,15 @@ describe("typed custom fields over MCP (RFC-0041 §8)", () => {
     expect(entries.every((e) => "capacity" in (e.fields ?? {}))).toBe(true);
   });
 });
+
+describe("mergeFields", () => {
+  it("refuses reserved keys instead of swapping the object's prototype", async () => {
+    const { mergeFields } = await import("../src/entry-fields.ts");
+    expect(mergeFields({ a: 1 }, { b: 2, a: null })).toEqual({ b: 2 });
+    for (const key of ["__proto__", "constructor", "prototype"])
+      expect(() => mergeFields({}, JSON.parse(`{"${key}":{"x":1}}`))).toThrow(
+        `fields: "${key}" is a reserved key`,
+      );
+    expect(({} as Record<string, unknown>).x).toBeUndefined();
+  });
+});

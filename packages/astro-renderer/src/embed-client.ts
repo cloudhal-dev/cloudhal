@@ -10,6 +10,7 @@
  * version (`/_cloudhal/*` is cached as immutable): bump it with any change to the code; a test
  * pins the code's hash to the version.
  */
+import { hasEmbedLine } from "./text-scan.ts";
 
 /** The only hosts an `embed` player may load from (also the CSP `frame-src`). */
 export const EMBED_FRAME_ORIGINS = [
@@ -88,7 +89,7 @@ export function usesEmbeds(content: {
   markdown?: string | undefined;
   sections?: readonly { kind: string; type?: string; format?: string; body?: string }[] | undefined;
 }): boolean {
-  const md = (s: string | undefined) => !!s && /(^|\n)\s*(?:>\s*)*::embed\b/.test(s);
+  const md = (s: string | undefined) => !!s && hasEmbedLine(s);
   if (md(content.markdown)) return true;
   return (content.sections ?? []).some(
     (s) =>

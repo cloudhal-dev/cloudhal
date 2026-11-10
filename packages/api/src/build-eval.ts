@@ -409,9 +409,12 @@ export function withSampleInputs(page: Page): { page: Page; inputs: number } {
       if (c.component !== "NumberField" && c.component !== "RadioGroup") continue;
       inputs++;
       const keys = bound.path.split("/").slice(1);
+      // The store refuses these in pointers; checked again here because this writes through them.
+      if (keys.some((k) => k === "__proto__" || k === "constructor" || k === "prototype")) continue;
       let at: Record<string, unknown> = data;
       for (const k of keys.slice(0, -1)) {
-        if (typeof at[k] !== "object" || at[k] === null) at[k] = {};
+        const next = Object.hasOwn(at, k) ? at[k] : undefined;
+        if (typeof next !== "object" || next === null) at[k] = {};
         at = at[k] as Record<string, unknown>;
       }
       const last = keys[keys.length - 1] as string;

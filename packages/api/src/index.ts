@@ -40,6 +40,7 @@ export {
   TOOL_EVAL_BRIEFS,
 } from "./build-eval.ts";
 export type { ActorResolver, ApiDeps } from "./context.ts";
+export { EMAIL_MAX_LENGTH, isEmailAddress, isMailAddress } from "./email.ts";
 export type { ApiErrorBody } from "./errors.ts";
 export { MailError, type MailMessage, type MailSender } from "./mail.ts";
 export { oauthClientsPruneJob } from "./oauth-prune-job.ts";

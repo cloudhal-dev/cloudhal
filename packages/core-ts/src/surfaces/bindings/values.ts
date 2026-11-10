@@ -1,5 +1,6 @@
 /** Bound values: paths and calls, JSON Pointers, conditions (RFC-0020 §3, RFC-0022 §1). */
 import type { PropsIssue } from "../../blocks.ts";
+import { isReservedKey } from "../../names.ts";
 import { isObj, isScalar, SURFACE_LIMITS } from "../shared.ts";
 
 // ── bindings, functions, conditions ──────────────────────────────────────────────────────────
@@ -78,6 +79,9 @@ export function checkPointer(pointer: unknown, path: string, out: PropsIssue[]):
     segments.length > SURFACE_LIMITS.pointerSegments
   )
     out.push({ path, message: "a JSON Pointer into the surface's data, such as /plans/0/price" });
+  // Inputs write through their pointer (the page's runtime, the Build eval's sample inputs).
+  else if (segments.some(isReservedKey))
+    out.push({ path, message: "__proto__, constructor and prototype are reserved keys" });
 }
 
 export function checkOperand(v: unknown, path: string, out: PropsIssue[]): void {

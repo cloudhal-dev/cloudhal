@@ -1,4 +1,5 @@
 /** RFC 6902 JSON Patch over plain JSON, with forbidden keys refused. */
+import { RESERVED_KEYS } from "../../names.ts";
 import { pointerSegments } from "../bindings/values.ts";
 import { isObj, SURFACE_LIMITS } from "../shared.ts";
 
@@ -24,7 +25,8 @@ export class PatchError extends Error {
 }
 
 export const OPS = new Set(["add", "remove", "replace", "move", "copy", "test"]);
-export const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+/** The reserved keys of `@cloudhal/core-ts/names`, refused at every level of a patch path. */
+export const FORBIDDEN_KEYS = RESERVED_KEYS;
 
 export function container(doc: unknown, segments: string[], index: number, path: string): unknown {
   let cur = doc;
