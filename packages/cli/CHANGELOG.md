@@ -1,5 +1,33 @@
 # @cloudhal/cli
 
+## 0.7.2
+
+### Patch Changes
+
+- 8526116: `cloudhal build --published` (RFC-0043 §1.10) builds the published snapshot only, never the latest snapshot or the drafts. When nothing is published yet, it writes the `not-published` status page as the whole output instead, in the site's default language: `index.html` and `404.html`, a `robots.txt` that disallows everything, a `_headers` file with `no-store` and `noindex`, and a `.cloudhal-status` marker. The Docker image's `site-build` now passes the flag, and the compose file's Caddyfile answers every path except `robots.txt` with that page, status 503 and `Retry-After: 3600` while the marker exists. The image also runs `site-build` once in the background when Studio starts, so a fresh self-hosted site no longer serves drafts before its first publish, and a volume upgraded from 0.7.1 or older switches on its first start. `cloudhal build` without the flag is unchanged.
+- 6de8d67: Corrections to the machine-drafted translations of collections, typed fields, listings, the OAuth consent screen, Connected agents, the setup-link sign-up text and the site status pages (#112), in all 18 non-English languages. The fixes cover changed meaning, security wording that had softened, mixed terms and mixed register. Examples: Indonesian said "not yet verified" for a self-registered agent, Polish dropped "you" from the loopback warning, and Japanese and Korean lost "never" in "never beyond your role". Korean used a formal register in the new screens while the rest of Studio uses its polite-informal one. Nothing else changes, and the languages remain AI drafts awaiting review by people who speak them.
+- 060a9c8: A self-hosted site rebuilds itself on publish (#150). With `CLOUDHAL_SITE_BUILD=on`, which is the Docker image's default, `cloudhal studio` runs the image's `site-build` in a child process after every publish: a publish in Studio or through MCP, an approval, a rollback, or a release that goes live (at its time or through "Publish now"). It also runs it once at start.
+  
+  - **One build per burst.** A burst of publishes builds once (3 seconds after the last one, at most a minute after the first).
+  - **One build at a time.** Studio's builds, a cron `site-build` and a hand-started one share one lock.
+  - **Failures keep the last good site.** A failed build keeps the previous site and is tried again on the next publish.
+  - **Bounded.** A build has a deadline (`CLOUDHAL_SITE_BUILD_TIMEOUT`, 30 minutes by default). Stopping Studio during a build ends it within 5 seconds, with everything it started, and records it as stopped.
+  
+  Every build is recorded in the site's Activity as "Build public site", with its duration, snapshot and output on failure. The site's overview shows a new "Public site build" card with the same details, and what visitors see now from `/data/site/current.json`, which `site-build` writes after each swap, so builds from cron or by hand show there too. The failure's output is shown only to roles with `audit:read`. `CLOUDHAL_SITE_BUILD=off` turns both off for sites built elsewhere, and a plain `cloudhal studio` keeps it off. For other integrations, `ScheduledTickOptions.onReleasePublished` (core-ts) reports releases that went live, `ReleaseServiceOptions.onReleasePublished` (and the API's `SchedulesDeps.onReleasePublished`) reports a release published now, `openLocalStore` takes `onPublished`, and `GET /api/sites/:id/site-build` reports the queue, the last build and what is served.
+- Updated dependencies [6de8d67]
+- Updated dependencies [060a9c8]
+  - @cloudhal/astro-renderer@0.7.2
+  - @cloudhal/api@0.7.2
+  - @cloudhal/core-ts@0.7.2
+  - @cloudhal/mcp-server@0.7.2
+  - @cloudhal/cloudflare@0.7.2
+  - @cloudhal/comments@0.7.2
+  - @cloudhal/agent-runtime@0.7.2
+  - @cloudhal/analytics@0.7.2
+  - @cloudhal/core-contracts@0.7.2
+  - @cloudhal/schedules@0.7.2
+  - @cloudhal/storage@0.7.2
+
 ## 0.7.1
 
 ### Patch Changes
