@@ -6,11 +6,13 @@
  * and `pnpm install`.
  */
 import { execFile } from "node:child_process";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
 
-const fixture = (name: string) => fileURLToPath(new URL(`./fixtures/${name}`, import.meta.url));
+const here = path.dirname(fileURLToPath(import.meta.url));
+const fixture = (name: string) => path.join(here, "fixtures", name);
 
 describe("Miniflare carries the #190 fix (ADR-0012)", () => {
   it("synchronous D1 calls stay in step when the proxy thread is preempted (workers-sdk#15552)", async () => {
