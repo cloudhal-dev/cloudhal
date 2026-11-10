@@ -5,6 +5,7 @@
  * depth with an `InteropError`, step into arrays by index only, and read and write own properties
  * only (CodeQL js/prototype-polluting-assignment, alerts 42–44). Worker-safe: pure functions.
  */
+import { isReservedKey } from "./names.ts";
 import { isObj } from "./surfaces/shared.ts";
 
 type Json = Record<string, unknown>;
@@ -15,6 +16,16 @@ export class InteropError extends Error {
 }
 
 const ARRAY_INDEX = /^\d+$/;
+
+/**
+ * The data key an input with a literal value gets: its component id, with a suffix when the id
+ * is a reserved key (an A2UI id such as "prototype"), so a valid document never fails on a path
+ * it never wrote.
+ */
+export function dataKeyFor(id: string): string {
+  const key = id.replace(/[^a-z0-9-]/g, "-");
+  return isReservedKey(key) ? `${key}-value` : key;
+}
 
 /** RFC 6901 segments of `pointer` (`/a/b~1c` → `["a", "b/c"]`). */
 const segmentsOf = (pointer: string): string[] =>

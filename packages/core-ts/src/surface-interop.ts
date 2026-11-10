@@ -13,8 +13,8 @@
  */
 import type { SurfaceComponent, SurfaceSection } from "@cloudhal/core-contracts";
 import { nearestIcon } from "./icon-names.ts";
-import { isReservedKey, trimChar } from "./names.ts";
-import { InteropError, pointerGet, pointerSet } from "./surface-interop-data.ts";
+import { trimChar } from "./names.ts";
+import { dataKeyFor, InteropError, pointerGet, pointerSet } from "./surface-interop-data.ts";
 
 export { InteropError };
 
@@ -478,10 +478,7 @@ export function fromA2ui(
         // A literal value becomes the surface's data, so the input can write to it.
         let path = isObj(bound) && typeof bound.path === "string" ? bound.path : undefined;
         if (!path) {
-          // The component's id is the data key; one that is a reserved key (an A2UI id such as
-          // "prototype") gets a suffix, so a valid document never fails on a path it never wrote.
-          const key = id.replace(/[^a-z0-9-]/g, "-");
-          path = `/${isReservedKey(key) ? `${key}-value` : key}`;
+          path = `/${dataKeyFor(id)}`;
           data = pointerSet(
             data,
             path,
