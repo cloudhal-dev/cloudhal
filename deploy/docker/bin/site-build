@@ -37,8 +37,9 @@
 # SIGTERM or SIGINT (Studio stopping, a build past CLOUDHAL_SITE_BUILD_TIMEOUT, Ctrl-C) ends the
 # build: the staging folder is removed and the exit code is non-zero; the served site is unchanged.
 # The swap that publishes a finished build ignores them (the script and every command it runs
-# there: an ignored signal is inherited), so it is never cut half-way; it is a few renames, well
-# inside the 2 s Studio gives before SIGKILL. Once it is done the script prints
+# there: an ignored signal is inherited; no Node process runs in it, as Node resets them), so it is
+# never cut half-way, current.json included; it is a few renames and a printf, well inside the 2 s
+# Studio gives before SIGKILL. Once it is done the script prints
 # `site-build: /data/dist -> site/current -> <build id>`: from then on the build is live, whatever
 # happens to the clean-up after it (Studio reads that line).
 set -eu
@@ -179,11 +180,35 @@ case "$ran_by" in
   *) ran_by=manual ;;
 esac
 
+# What the build rendered, read before the swap (interruptible: nothing is published yet): the
+# status page from its marker, else the snapshot from `cloudhal build`'s own line, as Studio reads
+# it. Only ids made of letters, digits, `_` and `-` are kept.
+marker=""
+if [ -f "$stage/dist/.cloudhal-status" ]; then marker=1; fi
+snap=""
+if [ -z "$marker" ]; then
+  snap=$(node -e '
+    const suffix = " (published)";
+    const lines = require("node:fs").readFileSync(process.argv[1], "utf8").split("\n").reverse();
+    for (const line of lines) {
+      const text = line.trim();
+      if (!text.endsWith(suffix)) continue;
+      const at = text.lastIndexOf(" from ");
+      const snap = at === -1 ? "" : text.slice(at + 6, text.length - suffix.length);
+      if (snap && !snap.includes(" ")) { process.stdout.write(snap); break; }
+    }
+  ' "$out") || snap=""
+fi
+case "$snap" in *[!A-Za-z0-9_-]*) snap="" ;; esac
+state=""
+if [ -n "$marker" ]; then state=not-published; elif [ -n "$snap" ]; then state=published; fi
+
 # Publish: the finished build → /data/site/<build id>, then each pointer with one rename. TERM and
 # INT are ignored until the swap is whole (a stop that comes now is dropped: the run ends as a
 # success, a moment later); nothing slow runs in this window.
 trap '' TERM INT
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"
+case "$id" in *[!0-9TZ.]*) echo "site-build: unexpected build id $id" >&2; exit 1 ;; esac
 mkdir -p site
 mv "$stage/dist" "site/$id"
 prev=$(readlink site/current 2>/dev/null || true)
@@ -191,29 +216,14 @@ prev=$(readlink site/current 2>/dev/null || true)
 if [ "$legacy" = 0.6.3 ]; then prev="legacy-0.6.3"; fi
 ln -sfn "$id" "site/current.$$"
 mv -T "site/current.$$" site/current
-# What is served now, for Studio's overview: the snapshot from `cloudhal build`'s own line (as
-# Studio reads it), the status page from its marker. Never fails the build: it is live already.
-marker=""
-if [ -f "site/$id/.cloudhal-status" ]; then marker=1; fi
-node -e '
-  const fs = require("node:fs");
-  const [id, out, marker, source, file, temp] = process.argv.slice(1);
-  let snapshotId;
-  if (!marker) {
-    const suffix = " (published)";
-    for (const line of fs.readFileSync(out, "utf8").split("\n").reverse()) {
-      const text = line.trim();
-      if (!text.endsWith(suffix)) continue;
-      const at = text.lastIndexOf(" from ");
-      const snap = at === -1 ? "" : text.slice(at + 6, text.length - suffix.length);
-      if (snap && !snap.includes(" ")) { snapshotId = snap; break; }
-    }
-  }
-  const state = marker ? "not-published" : snapshotId ? "published" : undefined;
-  const record = { at: new Date().toISOString(), build: id, ...(state ? { state } : {}), ...(snapshotId ? { snapshotId } : {}), source };
-  fs.writeFileSync(temp, JSON.stringify(record) + "\n");
-  fs.renameSync(temp, file);
-' "$id" "$out" "$marker" "$ran_by" site/current.json "site/current.json.$$" ||
+# What is served now, for Studio's overview, written by the shell itself (a Node process would
+# reset the ignored signals): checked values only, so the JSON needs no escaping.
+{
+  printf '{"at":"%s","build":"%s"' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$id"
+  if [ -n "$state" ]; then printf ',"state":"%s"' "$state"; fi
+  if [ -n "$snap" ]; then printf ',"snapshotId":"%s"' "$snap"; fi
+  printf ',"source":"%s"}\n' "$ran_by"
+} >"site/current.json.$$" && mv "site/current.json.$$" site/current.json ||
   echo "site-build: could not record site/current.json; Studio shows this build without its snapshot" >&2
 if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
   ln -sfn "$prev" "site/previous.$$"

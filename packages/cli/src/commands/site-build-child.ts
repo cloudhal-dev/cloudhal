@@ -17,6 +17,8 @@ import type { SiteBuildOutcome } from "./site-rebuild.ts";
 const ERROR_TAIL = 600;
 /** Output kept in memory while a build runs. */
 const OUTPUT_KEEP = 16_384;
+/** A line longer than this is no `site-build:` line worth reading (and is not buffered whole). */
+const MAX_LINE = 4096;
 /** Between SIGTERM and SIGKILL to the build's process group, and after SIGKILL until we give up. */
 const KILL_GRACE_MS = 2_000;
 /** A running build's deadline unless `CLOUDHAL_SITE_BUILD_TIMEOUT` (seconds) says otherwise. */
@@ -171,19 +173,41 @@ function signalGroup(child: ChildProcess, sig: NodeJS.Signals): void {
 export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutcome> {
   return new Promise((resolve) => {
     let output = "";
-    let partial = "";
+    /** The build the live line named, read while streaming (the kept output is only its tail). */
+    let live: string | undefined;
     /** Why we ended the build (abort or deadline), when we did. */
     let ended: string | undefined;
     let done = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    const keep = (chunk: Buffer) => {
-      const text = chunk.toString();
-      output = (output + text).slice(-OUTPUT_KEEP);
+    const line = (text: string) => {
+      if (text.length > MAX_LINE || !text.startsWith("site-build:")) return;
       // forward the script's own progress lines, not Astro's whole build log
-      const lines = (partial + text).split("\n");
-      partial = lines.pop() ?? "";
-      for (const line of lines) if (line.startsWith("site-build:")) o.log?.(line);
+      o.log?.(text);
+      live = parseLiveBuild(plainText(text)) ?? live;
     };
+    /** One reader per stream, so a line of stdout never mixes with one of stderr. */
+    const reader = () => {
+      let partial = "";
+      /** Inside a line longer than `MAX_LINE`: dropped up to its newline. */
+      let skipping = false;
+      const onData = (chunk: Buffer) => {
+        const text = chunk.toString();
+        output = (output + text).slice(-OUTPUT_KEEP);
+        const lines = (partial + text).split("\n");
+        partial = lines.pop() ?? "";
+        for (const l of lines) {
+          if (skipping) skipping = false;
+          else line(l);
+        }
+        if (partial.length > MAX_LINE) {
+          partial = "";
+          skipping = true;
+        }
+      };
+      return { onData, flush: () => (skipping ? undefined : line(partial)) };
+    };
+    const stdout = reader();
+    const stderr = reader();
     const child = spawn(o.command, [...o.args], {
       cwd: o.cwd,
       env: o.env ?? process.env,
@@ -222,10 +246,8 @@ export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutco
       );
     };
     const failure = (why: string): SiteBuildOutcome => {
-      const text = plainText(output);
-      const tail = outputTail(text);
-      const build = parseLiveBuild(text);
-      return { ok: false, error: tail ? `${why}: ${tail}` : why, ...(build ? { build } : {}) };
+      const tail = outputTail(plainText(output));
+      return { ok: false, error: tail ? `${why}: ${tail}` : why, ...(live ? { build: live } : {}) };
     };
     const onAbort = () => {
       const reason: unknown = o.signal?.reason;
@@ -235,15 +257,16 @@ export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutco
     timers.push(setTimeout(() => end(`timed out after ${durationText(timeoutMs)}`), timeoutMs));
     if (o.signal?.aborted) onAbort();
     else o.signal?.addEventListener("abort", onAbort, { once: true });
-    child.stdout?.on("data", keep);
-    child.stderr?.on("data", keep);
+    child.stdout?.on("data", stdout.onData);
+    child.stderr?.on("data", stderr.onData);
     child.once("error", (e) => finish({ ok: false, error: e.message }));
     child.once("close", (code, signal) => {
+      stdout.flush();
+      stderr.flush();
       // a build that finished within the grace (site-build ignores a stop during its swap): a success
       if (code === 0) {
-        const text = plainText(output);
-        const build = parseLiveBuild(text);
-        return finish({ ok: true, ...parseBuildOutput(text), ...(build ? { build } : {}) });
+        const built = parseBuildOutput(plainText(output));
+        return finish({ ok: true, ...built, ...(live ? { build: live } : {}) });
       }
       if (ended) return finish(failure(ended));
       finish(failure(signal ? `stopped by ${signal}` : `exited with ${code}`));

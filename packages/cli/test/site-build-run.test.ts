@@ -223,6 +223,27 @@ describe("runSiteBuildCommand", () => {
     expect(r).toMatchObject({ ok: false, build: "20261111T010203Z.9" });
   });
 
+  it("keeps the live build when more than 16 KB of output follows it", async () => {
+    const r = await runSiteBuildCommand(
+      node(
+        'console.log("site-build: /data/dist -> site/current -> 20261111T010203Z.11"); for (let i = 0; i < 400; i++) console.error("x".repeat(100)); process.stdout.write("site-build: no newline at the end"); process.exit(1)',
+      ),
+    );
+    expect(r).toMatchObject({ ok: false, build: "20261111T010203Z.11" });
+    expect(r.error).not.toContain("site/current");
+  });
+
+  it("forwards site-build lines whole, also around a line too long to buffer", async () => {
+    const logs: string[] = [];
+    await runSiteBuildCommand({
+      ...node(
+        'process.stdout.write("site-build: " + "y".repeat(10_000) + "\\nsite-build: after\\nsite-build: last")',
+      ),
+      log: (l) => logs.push(l),
+    });
+    expect(logs).toEqual(["site-build: after", "site-build: last"]);
+  });
+
   it("stores the failure's output as plain text", async () => {
     const r = await runSiteBuildCommand(
       node('console.error("\\u001b[31mError:\\u001b[0m broke"); process.exit(1)'),

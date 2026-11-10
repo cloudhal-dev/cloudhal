@@ -342,7 +342,7 @@ describe("cloudhal studio without CLOUDHAL_SITE_BUILD", () => {
 });
 
 describe("cloudhal studio: stopping with a request still open", () => {
-  it("cuts the connection after the shutdown budget and closes the database", async () => {
+  it("cuts the open connection after the shutdown budget, then finishes stopping", async () => {
     const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-studio-stop-open-"));
     const projectDir = path.join(tmp, "site");
     await init({ dir: projectDir, name: "Open" });
@@ -369,6 +369,16 @@ describe("cloudhal studio: stopping with a request still open", () => {
       await s.stop();
       expect(performance.now() - t).toBeLessThan(2000);
       await ended;
+      // nothing listens any more
+      const refused = await new Promise<boolean>((resolve) => {
+        const again = net.connect(s.port, "127.0.0.1");
+        again.once("connect", () => {
+          again.destroy();
+          resolve(false);
+        });
+        again.once("error", () => resolve(true));
+      });
+      expect(refused).toBe(true);
     } finally {
       socket.destroy();
       await rm(tmp, { recursive: true, force: true });
