@@ -12,6 +12,10 @@ on:
         description: Runs per Node version
         type: number
         default: 10
+      hogs:
+        description: Busy loops beside the tests (0 = CI's own load)
+        type: number
+        default: 4
   pull_request:
     paths:
       - patches/miniflare@*.patch
@@ -54,9 +58,16 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Same scheduler load as CI's test step; `-t` keeps only the suites labelled "(Miniflare)".
-      - run: >-
-          pnpm turbo run test --concurrency=2
-          --filter=@cloudhal/storage --filter=@cloudhal/core-ts --filter=@cloudhal/api
-          --filter=@cloudhal/schedules --filter=@cloudhal/comments --filter=@cloudhal/analytics
-          -- -t '\(Miniflare\)'
+      # CI's test step (`turbo --concurrency=2`), plus one busy loop per vCPU: the proxy race needs a
+      # preempted thread, and an oversubscribed runner preempts far more often than a quiet one.
+      # `-t` keeps only the suites labelled "(Miniflare)".
+      - name: Miniflare halves on an oversubscribed runner
+        env:
+          HOGS: ${{ inputs.hogs || 4 }}
+        run: |
+          for i in $(seq "$HOGS"); do sh -c 'while :; do :; done' & done
+          trap 'kill $(jobs -p) 2>/dev/null' EXIT
+          pnpm turbo run test --concurrency=2 \
+            --filter=@cloudhal/storage --filter=@cloudhal/core-ts --filter=@cloudhal/api \
+            --filter=@cloudhal/schedules --filter=@cloudhal/comments --filter=@cloudhal/analytics \
+            -- -t '\(Miniflare\)'

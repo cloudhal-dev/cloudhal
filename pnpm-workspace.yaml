@@ -109,9 +109,9 @@ overrides:
   "undici@<7.30.1": 7.30.2
 
 # The Miniflare patch backports cloudflare/workers-sdk#15552 (the sync binding proxy's off-by-one
-# desync, the `fetch-sync.ts:147` assertion), #15781 (one TIME_WAIT port per dispatchFetch) and the
-# sync pool's keep-alive below workerd's 5 s idle timeout (#16445 A); both PRs are merged for
-# Miniflare 5 only (#190, ADR-0012 addendum 2026-11-10). Not published, like the overrides.
+# desync, the `fetch-sync.ts:147` assertion; merged for Miniflare 5 only) and closes the sync
+# pool's idle sockets after 1 s, before workerd's 5 s idle timeout (#16445 A). #190, ADR-0012
+# addendum 2026-11-10. Not published, like the overrides.
 # `packages/storage/test/miniflare-patch.test.ts` fails when it is missing. Remove with the 4.x pin.
 patchedDependencies:
   '@cloudflare/kumo@2.14.0': patches/@cloudflare__kumo@2.14.0.patch
