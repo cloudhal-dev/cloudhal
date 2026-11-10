@@ -93,6 +93,28 @@ jobs:
             echo "::error::version must be x.y.z (got '$VERSION')"
             exit 1
           fi
+      # The publish job tags after five minutes even when npm does not serve every package yet
+      # (scripts/publish-ci.ts), and `npm install` in the image then fails with ETARGET (0.7.1:
+      # @cloudhal/analytics appeared six minutes after its publish). Wait, up to 30 minutes, until
+      # npm resolves every package of the release group at this version.
+      - name: Wait until npm serves the release
+        if: env.VERSION != ''
+        run: |
+          pkgs=$(jq -r '.fixed[0][]' .changeset/config.json)
+          for attempt in $(seq 1 60); do
+            missing=""
+            for p in $pkgs; do
+              [ "$(npm view "$p@$VERSION" version 2>/dev/null)" = "$VERSION" ] || missing="$missing $p"
+            done
+            if [ -z "$missing" ]; then
+              echo "npm serves every package of the release group at $VERSION"
+              exit 0
+            fi
+            echo "waiting for:$missing (attempt $attempt of 60)"
+            sleep 30
+          done
+          echo "::error::npm does not serve$missing at $VERSION after 30 minutes"
+          exit 1
 
       # edge: the packages of this ref, built and packed the way the release job packs them
       - if: env.VERSION == ''
