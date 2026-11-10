@@ -6,7 +6,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { GATES_ENFORCED } from "./availability.ts";
 import type { BlockRegistry, PropsSchema } from "./blocks.ts";
 import { rebuildListValues } from "./list-values/backfill.ts";
-import { SiteGraphStore } from "./store.ts";
+import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
 export interface LocalStore {
   readonly store: SiteGraphStore;
@@ -32,6 +32,11 @@ export async function openLocalStore(
     blocks?: BlockRegistry | undefined;
     themeSettings?: PropsSchema | undefined;
     themeDesign?: string | undefined;
+    /**
+     * After every publish, rollback and `notifyPublished` (the store's hook): the self-hosted
+     * Node server rebuilds its static site (#150). Failures go to the store's hook error log.
+     */
+    onPublished?: SiteGraphStoreOptions["onPublished"] | undefined;
   } = {},
 ): Promise<LocalStore> {
   const dir = path.resolve(dataDir);
@@ -49,6 +54,7 @@ export async function openLocalStore(
     ...(options.blocks ? { blocks: options.blocks } : {}),
     ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
     ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),
+    ...(options.onPublished ? { onPublished: options.onPublished } : {}),
   });
   return { store, sql, blobs, dataDir: dir, close: () => sql.close() };
 }

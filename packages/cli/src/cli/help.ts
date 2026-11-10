@@ -32,7 +32,9 @@ const PROJECT = `  cloudhal init <dir> [--name <name>] [--starter blog]   create
                                                           hop and needs --base-url, --init-if-empty
                                                           (CLOUDHAL_INIT=<starter>) creates the project first
                                                           when the folder is empty (lost+found aside) and has
-                                                          no cloudhal.json
+                                                          no cloudhal.json; CLOUDHAL_SITE_BUILD=on (the Docker
+                                                          image) runs its site-build at start and after every
+                                                          publish, debounced, one build at a time
   cloudhal mcp [--mode plan|manual|edits|auto|bypass] [--scopes a,b] [--skills <dir>] [--preview-url <url>]
                                                           MCP server over stdio for this project
 `;

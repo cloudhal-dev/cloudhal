@@ -39,7 +39,9 @@ ENV NODE_ENV=production \
   PATH="/opt/cloudhal/bin:/opt/cloudhal/node_modules/.bin:${PATH}" \
   CLOUDHAL_HOST=0.0.0.0 \
   CLOUDHAL_INIT=blog \
-  CLOUDHAL_SITE_NAME="My site"
+  CLOUDHAL_SITE_NAME="My site" \
+  CLOUDHAL_SITE_BUILD=on
+# (CLOUDHAL_SITE_BUILD_TIMEOUT, seconds, is a rebuild's deadline: 30 minutes unless set.)
 USER node
 WORKDIR /data
 VOLUME ["/data"]

@@ -119,6 +119,8 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   "GET /api/projects",
   `GET ${S}`,
   `GET ${S}/pending`,
+  // #150: a playground has no self-hosted rebuild, so this answers `{ enabled: false }`.
+  `GET ${S}/site-build`,
   `PUT ${S}`,
   // RFC-0040: the collection registry, part of the site's structure.
   `GET ${S}/collections`,

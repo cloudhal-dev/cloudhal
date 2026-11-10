@@ -75,7 +75,8 @@ export function SiteStatusCard({
   );
 }
 
-function StatRow({ label, value }: { label: string; value: ReactNode }) {
+/** One label and value of an overview card's list (`<dl>`). */
+export function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
       <Text as="dt" variant="secondary">

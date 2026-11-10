@@ -23,29 +23,43 @@ if [ "${1:-studio}" = "studio" ]; then
       esac
       ;;
   esac
-  # One site build per start, once Studio answers (it migrates the database, and on an empty
-  # volume creates the project, first; the build reads the same database). A volume upgraded from
-  # an image that built drafts before the first publish then switches at once to the published
-  # build or the 503 status page, and a new volume gets the status page, without waiting for the
-  # next `site-build`. In the background, so Studio never waits for it; the outer subshell exits at
-  # once, so tini (PID 1) reaps the build rather than `cloudhal studio`. A failure changes nothing
-  # (site-build publishes only a finished build) and is only logged.
-  (
+  # One site build per start: a volume upgraded from an image that built drafts before the first
+  # publish then switches at once to the published build or the 503 status page, and a new volume
+  # gets the status page, without waiting for a publish. CLOUDHAL_SITE_BUILD=off (the site is built
+  # elsewhere) turns it off, with the rebuild on publish. Unset or empty is `on` (the image's
+  # default); the normalised value is exported, so `cloudhal studio` (which reads empty as off)
+  # agrees with this script.
+  site_build=$(printf '%s' "${CLOUDHAL_SITE_BUILD:-on}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+  case "$site_build" in
+    "" | on | 1 | true | yes) site_build=on ;;
+    *) site_build=off ;;
+  esac
+  export CLOUDHAL_SITE_BUILD="$site_build"
+  # A CLI with the rebuild on publish (#150; its help names CLOUDHAL_SITE_BUILD) runs the start-up
+  # build itself, in the same queue and audit log as a publish's. An older one (an image built from
+  # these scripts with an older CLOUDHAL_VERSION) gets it from here: in the background once Studio
+  # answers (it migrates the database, and on an empty volume creates the project, first); the
+  # outer subshell exits at once, so tini (PID 1) reaps the build rather than `cloudhal studio`.
+  # `--wait` queues it behind a build that is already running (one lock, /tmp/site-build.lock). A
+  # failure changes nothing (site-build publishes only a finished build) and is only logged.
+  if [ "$site_build" = on ] && ! cloudhal --help 2>/dev/null | grep -q CLOUDHAL_SITE_BUILD; then
     (
-      i=0
-      until node -e "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" 2>/dev/null; do
-        i=$((i + 1))
-        if [ "$i" -ge 90 ]; then
-          echo "entrypoint: Studio did not answer within 180 s; no start-up site-build" >&2
-          exit 0
-        fi
-        sleep 2
-      done
-      [ -f /data/cloudhal.json ] || exit 0
-      echo "entrypoint: start-up site-build"
-      site-build || echo "entrypoint: the start-up site-build failed; the served site is unchanged" >&2
-    ) &
-  )
+      (
+        i=0
+        until node -e "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))" 2>/dev/null; do
+          i=$((i + 1))
+          if [ "$i" -ge 90 ]; then
+            echo "entrypoint: Studio did not answer within 180 s; no start-up site-build" >&2
+            exit 0
+          fi
+          sleep 2
+        done
+        [ -f /data/cloudhal.json ] || exit 0
+        echo "entrypoint: start-up site-build"
+        CLOUDHAL_SITE_BUILD_SOURCE=start site-build --wait || echo "entrypoint: the start-up site-build failed; the served site is unchanged" >&2
+      ) &
+    )
+  fi
   [ $# -gt 0 ] && shift
   exec cloudhal studio --init-if-empty "$@"
 fi

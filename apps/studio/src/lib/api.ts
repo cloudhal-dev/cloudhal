@@ -172,6 +172,7 @@ export type {
 } from "./api/schedules-types.ts";
 export { SCHEDULE_NOTIFICATION_KINDS } from "./api/schedules-types.ts";
 export type { SiteSearchHit, SiteSearchKind, SiteSearchResult } from "./api/search.ts";
+export type { SiteBuildLast, SiteBuildServed, SiteBuildStatus } from "./api/site-build.ts";
 export type {
   ArchiveReason,
   EntrySummary,
@@ -227,6 +228,7 @@ import { menusApi } from "./api/menus.ts";
 import { notificationsApi } from "./api/notifications.ts";
 import { projectsApi } from "./api/projects.ts";
 import { searchApi } from "./api/search.ts";
+import { siteBuildApi } from "./api/site-build.ts";
 import { taxonomyApi } from "./api/taxonomy.ts";
 import { teamApi } from "./api/team.ts";
 import { translationsApi } from "./api/translations.ts";
@@ -237,6 +239,7 @@ export const api = {
   meOnSite: teamApi.meOnSite,
   instance: teamApi.instance,
   scheduler: teamApi.scheduler,
+  siteBuild: siteBuildApi,
   members: teamApi.members,
   invites: teamApi.invites,
   passwordReset: teamApi.passwordReset,

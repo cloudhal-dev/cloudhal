@@ -23,6 +23,7 @@ import { OverviewAnalyticsCard } from "../components/Readers.tsx";
 import { RecentActivity } from "../components/RecentActivity.tsx";
 import { Status } from "../components/Status.tsx";
 import { RecentContentCard } from "../components/site-overview/RecentContentCard.tsx";
+import { SiteBuildCard } from "../components/site-overview/SiteBuildCard.tsx";
 import { SiteStatusCard } from "../components/site-overview/SiteStatusCard.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useT, withMessages } from "../i18n/index.tsx";
@@ -34,15 +35,21 @@ const SchedulerStalledBanner = lazy(() =>
   withMessages(import("../components/SchedulerStalled.tsx"), ["schedules"]),
 );
 
+/** RFC-0008 §8.7: the scheduler's status when it is stalled with work due; otherwise undefined. */
+function useSchedulerStalled() {
+  const status = useQuery({ queryKey: ["scheduler"], queryFn: api.scheduler, retry: false }).data;
+  const stalled =
+    !!status && !status.healthy && (status.state !== "unknown" || status.dueWithin24h);
+  return stalled ? status : undefined;
+}
+
 export function SiteOverviewPage() {
   const t = useT();
   const { siteId } = useParams({ from: "/sites/$siteId" });
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
-  const scheduler = useQuery({ queryKey: ["scheduler"], queryFn: api.scheduler, retry: false });
-  const s = scheduler.data;
-  const stalled = !!s && !s.healthy && (s.state !== "unknown" || s.dueWithin24h);
+  const stalled = useSchedulerStalled();
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
   const registry = useCollections(siteId);
   const posts = registry.data?.find((c) => c.key === BUILT_IN_COLLECTION);
@@ -117,7 +124,7 @@ export function SiteOverviewPage() {
       <PendingApprovalsBanner siteId={siteId} />
       {stalled ? (
         <Suspense fallback={null}>
-          <SchedulerStalledBanner siteId={siteId} status={s} />
+          <SchedulerStalledBanner siteId={siteId} status={stalled} />
         </Suspense>
       ) : null}
       <CommentsWaitingBanner siteId={siteId} />
@@ -188,6 +195,7 @@ export function SiteOverviewPage() {
             articles={posts ? entryTotal(posts) : 0}
             snapshots={snapshots.data?.length ?? 0}
           />
+          <SiteBuildCard siteId={siteId} />
           <SectionCard
             title={t("activity.recent")}
             actions={viewAll(`/sites/${siteId}/activity`)}

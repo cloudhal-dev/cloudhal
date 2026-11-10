@@ -148,6 +148,27 @@ export function isAssetEvent(tool: string): tool is AssetEvent {
   return Object.hasOwn(ASSET_EVENTS, tool);
 }
 
+/**
+ * What the deployment does by itself and records in the site's audit log, with their label key
+ * under `tools`: the self-hosted server's rebuild of the static site on publish (#150).
+ */
+export const SYSTEM_EVENTS = {
+  "site.build": "siteBuild",
+} as const;
+export type SystemEvent = keyof typeof SYSTEM_EVENTS;
+
+/** Every REST and system event with a label, by audit `tool`, and its key under `tools`. */
+const EVENT_LABELS = { ...KEY_EVENTS, ...MEMBER_EVENTS, ...ASSET_EVENTS, ...SYSTEM_EVENTS };
+
+/** The label key under `tools` of a REST or system event, or undefined for an MCP tool. */
+export function eventLabelKey(
+  tool: string,
+): (typeof EVENT_LABELS)[keyof typeof EVENT_LABELS] | undefined {
+  return Object.hasOwn(EVENT_LABELS, tool)
+    ? EVENT_LABELS[tool as keyof typeof EVENT_LABELS]
+    : undefined;
+}
+
 /** An elevation grant's audit reason ends with `requested by the agent (appr_…)` (ADR-0016). */
 const REQUESTED_BY_AGENT = /requested by the agent \((appr_[A-Za-z0-9_-]+)\)\s*$/;
 

@@ -562,6 +562,7 @@ export interface MessageParams {
   "oauthConsent.who.sendsBack": { host: string | number };
   "oauthConsent.who.thisComputerApp": { scheme: string | number };
   "overview.commentsWaiting": { count: number };
+  "overview.siteBuild.seconds": { seconds: number };
   "pageStatus.leftOut": { count: number };
   "pageStatus.publishTitle": { title: string | number };
   "passwords.advice.empty": { min: string | number };

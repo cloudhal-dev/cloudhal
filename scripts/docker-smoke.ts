@@ -5,12 +5,13 @@
  * refuses an anonymous call, lists the scaffolded site, waits for the entrypoint's start-up
  * `site-build`, takes a draft snapshot and builds the public site with `site-build` before the
  * first publish (RFC-0043's status page, never the draft, which the compose file's Caddyfile — run
- * in a `caddy` container on the same volume — answers with 503 and `Retry-After`), publishes it,
- * builds it twice more (the site, which Caddy now answers with 200; the third build swaps the
- * served tree in place, #166) and reads the built home page. An image whose CLI has no
- * `cloudhal build --published` (a backfill of 0.7.1 or older) skips the status-page checks:
- * its `site-build` builds the old way. Run by .github/workflows/docker.yml after every build, and
- * by hand:
+ * in a `caddy` container on the same volume — answers with 503 and `Retry-After`), publishes it
+ * and waits for Studio's rebuild on publish (#150: the site, which Caddy now answers with 200, and
+ * the overview's `/site-build` report), runs a build that fails and checks the site stayed, and
+ * builds once more (it swaps the served tree in place, #166). An image whose CLI has no
+ * `cloudhal build --published` or no rebuild on publish (a backfill of 0.7.1 or older) skips
+ * those checks: its `site-build` builds the old way, by hand. Run by .github/workflows/docker.yml
+ * after every build, and by hand:
  *
  *   node scripts/docker-smoke.ts [--image <ref>] [--platform <os/arch>] [--port <n>]
  *                                [--site-port <n>] [--keep]
@@ -173,6 +174,33 @@ async function served(
   return { status: res.status, headers: res.headers, body: await res.text() };
 }
 
+/** #150: Studio's report of the rebuild on publish, or undefined where the CLI has none. */
+interface BuildReport {
+  enabled: boolean;
+  state?: string;
+  last?: { at: string; ok: boolean; trigger?: string; snapshotId?: string; state?: string } | null;
+  /** What is served now, from /data/site/current.json (any build's). */
+  served?: { at: string; snapshotId?: string; state?: string; source?: string } | null;
+}
+async function buildReport(siteId: string, cookie: string): Promise<BuildReport | undefined> {
+  const r = await api("GET", `/api/sites/${siteId}/site-build`, { cookie });
+  if (r.status !== 200) return undefined;
+  const body = r.body as BuildReport;
+  return body.enabled ? body : undefined;
+}
+
+/** Waits until Studio's queue is idle and its last build is one `trigger` started. */
+async function waitReportedBuild(siteId: string, cookie: string, trigger: string, since: string) {
+  for (let i = 0; i < 150; i++) {
+    const report = await buildReport(siteId, cookie);
+    const last = report?.last;
+    if (report?.state === "idle" && last && last.trigger === trigger && last.at >= since)
+      return last;
+    await sleep(2000);
+  }
+  throw new Error(`Studio reported no finished ${trigger} build within 300 s`);
+}
+
 /** RFC-0043 §1.10: what Caddy answers while the build is the not-published status page. */
 async function expectStatusPage(): Promise<void> {
   const unpublished = await served("/");
@@ -293,7 +321,13 @@ try {
   await waitStartupBuild();
   if (hasPublished)
     expect(marker() === "not-published", "the start-up build is the status page", marker());
-  step("the entrypoint's start-up site-build published the site's first build");
+  // #150: a CLI with the rebuild on publish runs the start-up build itself and reports it.
+  const rebuilds = (await buildReport(site.id, cookie)) !== undefined;
+  if (rebuilds) {
+    const start = await waitReportedBuild(site.id, cookie, "start", "");
+    expect(start.ok, "Studio's start-up build succeeded", start);
+  } else console.log("! this image's CLI does not rebuild on publish: building by hand");
+  step("the start-up site-build published the site's first build");
 
   // A snapshot nobody published: `--published` must not build it.
   const draft = await api("POST", `/api/sites/${site.id}/snapshots`, {
@@ -332,7 +366,20 @@ try {
   expect(publish.status === 200 || publish.status === 201, "publish", publish.body);
   step(`site ${site.id} published`);
 
-  const second = siteBuild("after the publish");
+  // #150: Studio rebuilds on the publish by itself; an older CLI needs `site-build` by hand.
+  let second: string;
+  if (rebuilds) {
+    const snapshotId = (publish.body as { snapshot?: { id?: string } }).snapshot?.id;
+    // the first `publish` build of this volume (container and host clocks may differ)
+    const built = await waitReportedBuild(site.id, cookie, "publish", "");
+    expect(
+      built.ok && built.state === "published" && built.snapshotId === snapshotId,
+      "Studio rebuilt the site from the published snapshot",
+      { built, snapshotId },
+    );
+    second = docker(["exec", name, "readlink", "/data/site/current"]);
+    step(`Studio rebuilt the site on the publish (${built.snapshotId})`);
+  } else second = siteBuild("after the publish");
   expect(second !== first, "the build after the publish is a new tree", { first, second });
   expect(marker() === "", "the published build has no status marker", marker());
   expect(
@@ -342,7 +389,24 @@ try {
   const published = await served("/");
   expect(published.status === 200, "Caddy answers / with 200 after the publish", published.status);
   expect(HOME_H1.test(published.body), "Caddy serves the built home page");
-  step(`site-build published the site, served with 200: ${SITE} -> site/current -> ${second}`);
+  step(`the published site is served with 200: ${SITE} -> site/current -> ${second}`);
+
+  // A failed build changes nothing: `--snapshot` with `--published` is refused before anything is
+  // built (an older CLI fails on the unknown snapshot instead).
+  const failed = spawnSync("docker", [
+    "exec",
+    name,
+    "site-build",
+    "--snapshot",
+    "snap_nonexistent0",
+  ]);
+  expect(failed.status !== 0, "a build that fails exits non-zero", failed.status);
+  expect(
+    docker(["exec", name, "readlink", "/data/site/current"]) === second,
+    "a failed build leaves site/current as it was",
+  );
+  expect((await served("/")).status === 200, "Caddy still serves the site after a failed build");
+  step("a failed site-build kept the previous site");
 
   // A third build swaps the served tree in one rename and keeps the one before it, whose pages
   // may still load their assets (#166).
@@ -353,7 +417,7 @@ try {
     name,
     "sh",
     "-c",
-    "ls -1 /data/site | grep -v -x -e current -e previous",
+    "ls -1 /data/site | grep -v -x -e current -e previous -e current.json",
   ]);
   expect(
     kept === [second, third].sort().join("\n"),
@@ -368,6 +432,26 @@ try {
   );
   expect((await served("/")).status === 200, "Caddy still answers / with 200 after the swap");
   step("a third site-build swapped the served tree and kept the previous one");
+  // #150: the hand-started build is what the overview says is served
+  if (rebuilds) {
+    const record = JSON.parse(docker(["exec", name, "cat", "/data/site/current.json"])) as {
+      build?: string;
+      source?: string;
+      state?: string;
+    };
+    expect(
+      record.build === third && record.source === "manual" && record.state === "published",
+      "site/current.json records the hand-started build",
+      record,
+    );
+    const report = await buildReport(site.id, cookie);
+    expect(
+      report?.served?.source === "manual" && report.served.state === "published",
+      "the overview reports the hand-started build as served",
+      report,
+    );
+    step("site/current.json and the overview name the hand-started build");
+  }
   console.log("\nDocker smoke test passed.");
 } catch (e) {
   console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}\n--- container logs ---`);

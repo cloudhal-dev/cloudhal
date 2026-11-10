@@ -11,16 +11,7 @@ import {
 import { Robot } from "@phosphor-icons/react";
 import { useCallback } from "react";
 import { useT } from "../i18n/index.tsx";
-import {
-  ASSET_EVENTS,
-  isAssetEvent,
-  isKeyEvent,
-  isKnownTool,
-  isMemberEvent,
-  KEY_EVENTS,
-  MEMBER_EVENTS,
-  requestedByAgent,
-} from "../lib/activity.ts";
+import { eventLabelKey, isKnownTool, requestedByAgent } from "../lib/activity.ts";
 import { isAutoApproved } from "../lib/agents.ts";
 import type {
   AgentMode,
@@ -35,21 +26,17 @@ import { RoleBadge } from "./Roles.tsx";
 
 /**
  * Human-readable label for an MCP tool name ("update_page" → "Update page") or a person's action
- * on an agent key ("agent-key.elevate" → "Elevate agent key"); unknown tools pass through.
+ * on an agent key ("agent-key.elevate" → "Elevate agent key"), or a system event ("site.build");
+ * unknown tools pass through.
  */
 export function useToolLabel() {
   const t = useT();
   return useCallback(
-    (tool: string) =>
-      isKnownTool(tool)
-        ? t(`tools.${tool}`)
-        : isKeyEvent(tool)
-          ? t(`tools.${KEY_EVENTS[tool]}`)
-          : isMemberEvent(tool)
-            ? t(`tools.${MEMBER_EVENTS[tool]}`)
-            : isAssetEvent(tool)
-              ? t(`tools.${ASSET_EVENTS[tool]}`)
-              : tool,
+    (tool: string) => {
+      if (isKnownTool(tool)) return t(`tools.${tool}`);
+      const key = eventLabelKey(tool);
+      return key ? t(`tools.${key}`) : tool;
+    },
     [t],
   );
 }

@@ -39,11 +39,6 @@ import type {
 } from "@cloudhal/core-contracts";
 import { nodeHash, type SiteGraphStore, sha256Hex } from "@cloudhal/core-ts";
 import {
-  type ReleasePurger,
-  ReleaseService,
-  type SchedulerControl,
-} from "@cloudhal/core-ts/releases";
-import {
   type ApprovalVerdict,
   approvalArgs,
   canonicalInstant,
@@ -59,50 +54,15 @@ import {
 import type { ReleaseRecord, SqlScheduleStore } from "@cloudhal/schedules/sql";
 import { releaseRiskFor } from "./release-risk.ts";
 import { titleOf } from "./release-titles.ts";
+import { type SchedulesDeps, schedulesAvailable } from "./schedules-deps.ts";
 
-/** What a deployment provides for schedules (RFC-0008 §16). */
-export interface SchedulesDeps {
-  readonly store: SqlScheduleStore;
-  /** `false` when the deployment turned schedules off. Default true. */
-  readonly available?: boolean | undefined;
-  /** `CLOUDHAL_AUTOMATIONS=off` → false: automations stop, releases and gates go on (§11.6). */
-  readonly automationsEnabled?: boolean | undefined;
-  /**
-   * The deployment's ticker (`ApiDeps.scheduler`): its mode for `/api/instance` and
-   * `/api/scheduler`, and `poke` when something becomes due sooner (a release scheduled, approved or
-   * moved, a window opened; §8.3).
-   */
-  readonly scheduler?: SchedulerControl | undefined;
-  /** "Publish now" purges the live site's cache like a tick does (absent: nothing is cached). */
-  readonly purge?: ReleasePurger | undefined;
-  /** New versions one call may pin (§6.1 step 4; Workers Free: 20, the default). */
-  readonly maxNewBodies?: number | undefined;
-}
-
-/** True when the deployment serves schedules. */
-export const schedulesAvailable = (deps: SchedulesDeps | undefined): deps is SchedulesDeps =>
-  deps !== undefined && deps.available !== false;
-
-/** core-ts's `ReleaseService` over this graph, with the deployment's ticker and purge. */
-export function releaseService(
-  deps: SchedulesDeps,
-  graph: SiteGraphStore,
-  now?: () => Date,
-): ReleaseService {
-  return new ReleaseService({
-    graph,
-    ...(now ? { now } : {}),
-    ...(deps.scheduler ? { scheduler: deps.scheduler } : {}),
-    ...(deps.purge ? { purge: deps.purge } : {}),
-    ...(deps.maxNewBodies !== undefined ? { maxNewBodies: deps.maxNewBodies } : {}),
-  });
-}
-
-/** Tells the ticker something is due at `at` (never throws, never awaited by callers' answers). */
-export function poke(deps: SchedulesDeps, at: string | undefined): void {
-  if (!at || !deps.scheduler) return;
-  deps.scheduler.poke(at).catch(() => undefined);
-}
+// What a deployment provides (`SchedulesDeps`) and the service over it: `schedules-deps.ts`.
+export {
+  poke,
+  releaseService,
+  type SchedulesDeps,
+  schedulesAvailable,
+} from "./schedules-deps.ts";
 
 /** The person approving on a local server without people (stdio, `bypass`, a confirmed elicitation). */
 export const LOCAL_PERSON = Object.freeze({ id: "user_localdev01", name: "Local developer" });

@@ -22,6 +22,9 @@ services:
       # The public site's origin: `site-build` writes its host into canonical links, the sitemap
       # and feeds (cloudhal.json `domains.site`); with the caddy profile Caddy serves the site there.
       - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
+      # Rebuild the public site on every publish, and once at start (#150); `off` when the site is
+      # built elsewhere (CI, another host). `site-build` by hand or from cron works either way.
+      - CLOUDHAL_SITE_BUILD=${CLOUDHAL_SITE_BUILD:-on}
       - CLOUDHAL_AUTOMATIONS=${CLOUDHAL_AUTOMATIONS:-on}
       - CLOUDHAL_TRUSTED_ORIGINS=${CLOUDHAL_TRUSTED_ORIGINS:-}
       # Remote MCP clients (RFC-0044; docs/guides/mcp-oauth.md): `off` turns OAuth, metadata

@@ -48,8 +48,6 @@ import {
   type PinnedItem,
   pinItems,
   RELEASE_LEASE_MS,
-  type ReleaseExecution,
-  type ReleaseExecutor,
   referencedNodeIds,
   releaseWhen,
   runClaimedRelease,
@@ -74,9 +72,12 @@ import { type BuiltinInputs, graphBuiltinRunner } from "./automations.ts";
 import { type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
+import * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
+import { releaseExecutor } from "./release-executor.ts";
 import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
+export { type ReleasePublishedHook, recordPurgeOutcome } from "./release-after.ts";
 export type { ReleasePurge } from "./release-apply.ts";
 
 /**
@@ -113,115 +114,12 @@ export type { TickReport, TickTrigger } from "@cloudhal/schedules";
 /** A runtime whose ticker needs no pokes (cron), or none at all (tests). */
 export const CRON_RUNTIME: SchedulerRuntime = { mode: "cron", poke: async () => {} };
 
-// ───────────────────────────── the executor ─────────────────────────────
-
-/**
- * Statements one release execution takes, for `runDue`'s budget check: the stored purge plan (1),
- * the site, the live snapshot and the parent (3), the eight-statement batch, and the purge's own
- * bookkeeping after it (up to 4). A site that moved between the reads and the batch repeats the
- * reads and the batch once; that rare path may end the tick early (`more`), never mid-batch.
- */
-export const RELEASE_EXECUTOR_COST = 16;
-
-export interface ReleaseExecutorOptions {
-  readonly graph: SiteGraphStore;
-  readonly schedules: SqlScheduleStore;
-  /** Absent where nothing is cached (Node): the outcome records `purge: "none"`. */
-  readonly purge?: ReleasePurger | undefined;
-  /**
-   * Corrects the outcome's `purge` after a deferred or failed purge. Default: through `schedules`.
-   * The tick passes one over a counting (never refusing) driver, so a committed release always
-   * gets its purge.
-   */
-  readonly recordPurge?: ((releaseId: string, purge: ReleasePurge) => Promise<void>) | undefined;
-  readonly log?: ((line: string) => void) | undefined;
-}
-
-function isPurgePlan(v: unknown): v is CachePurgePlan {
-  if (!v || typeof v !== "object") return false;
-  const p = v as { mode?: unknown; tags?: unknown };
-  return p.mode === "everything" || (p.mode === "tags" && Array.isArray(p.tags));
-}
-
-/** The `ReleaseExecutor` of `runDue`: `publishRelease`, then the stored purge plan. */
-export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
-  const log = o.log ?? (() => {});
-  const recordPurge =
-    o.recordPurge ?? ((id: string, purge: ReleasePurge) => o.schedules.recordPurge(id, purge));
-  return {
-    cost: RELEASE_EXECUTOR_COST,
-    async execute(input): Promise<ReleaseExecution> {
-      const stored = await o.schedules.releasePurgePlan(input.release.id);
-      const plan: CachePurgePlan = isPurgePlan(stored)
-        ? stored
-        : { mode: "everything", reason: "no purge plan was stored with the release" };
-      const expected: ReleasePurge = !o.purge
-        ? "none"
-        : plan.mode === "everything"
-          ? "everything"
-          : plan.tags.length > 0
-            ? "tags"
-            : "none";
-      const r = await o.graph.publishRelease({
-        release: input.release,
-        items: input.items,
-        run: {
-          id: input.run.id,
-          leaseToken: input.run.leaseToken,
-          recovering: input.run.recovering,
-        },
-        now: input.now,
-        latenessSeconds: input.latenessSeconds,
-        purge: expected,
-      });
-      switch (r.kind) {
-        case "published": {
-          let purge: ReleasePurge = expected;
-          if (r.committed && o.purge && expected !== "none") {
-            try {
-              purge = await o.purge(input.release.siteId, plan);
-            } catch (e) {
-              purge = "failed";
-              log(
-                `schedules: purge after release ${input.release.id} failed: ${e instanceof Error ? e.message : String(e)}`,
-              );
-            }
-            if (purge !== expected)
-              await recordPurge(input.release.id, purge).catch((e) =>
-                log(
-                  `schedules: could not record the purge of ${input.release.id}: ${e instanceof Error ? e.message : String(e)}`,
-                ),
-              );
-          }
-          return {
-            kind: "published",
-            snapshotId: r.snapshotId,
-            baseSnapshotId: r.baseSnapshotId,
-            purge,
-            committed: r.committed,
-          };
-        }
-        case "conflict":
-          return { kind: "conflict", conflicts: r.conflicts };
-        case "failed":
-          return { kind: "failed", code: r.code, message: r.message };
-        case "canceled":
-          return { kind: "canceled" };
-        case "retry":
-          return { kind: "retry", error: r.error };
-      }
-    },
-  };
-}
-
-/** Rewrites a published release's `outcome.purge` (one statement). */
-export async function recordPurgeOutcome(
-  sql: SqlDriver,
-  releaseId: string,
-  purge: ReleasePurge,
-): Promise<void> {
-  await new SqlScheduleStore(sql).recordPurge(releaseId, purge);
-}
+// The executor (`runDue`'s seam): `release-executor.ts`.
+export {
+  RELEASE_EXECUTOR_COST,
+  type ReleaseExecutorOptions,
+  releaseExecutor,
+} from "./release-executor.ts";
 
 // ───────────────────────────── the tick ─────────────────────────────
 
@@ -267,6 +165,8 @@ export interface ScheduledTickOptions {
   readonly purge?: ((ctx: { counted: SqlDriver }) => ReleasePurger) | undefined;
   /** `CLOUDHAL_AUTOMATIONS=off` → false. */
   readonly automationsEnabled?: boolean | undefined;
+  /** A release of this tick went live (`ReleaseExecutorOptions.onPublished`). */
+  readonly onReleasePublished?: after.ReleasePublishedHook | undefined;
   readonly log?: ((line: string) => void) | undefined;
   /** Options of the tick's `SiteGraphStore` (gates, hooks); its `sql` and `blobs` are the tick's. */
   readonly graph?: Omit<SiteGraphStoreOptions, "sql" | "blobs"> | undefined;
@@ -291,7 +191,8 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       graph,
       schedules,
       purge,
-      recordPurge: (id, p) => recordPurgeOutcome(counted, id, p),
+      recordPurge: (id, p) => after.recordPurgeOutcome(counted, id, p),
+      onPublished: o.onReleasePublished,
       log: o.log,
     }),
     builtins:
@@ -376,6 +277,8 @@ export interface ReleaseServiceOptions {
   readonly purge?: ReleasePurger | undefined;
   /** New bodies one call may write (§6.1 step 4; Workers Free: 20). `Infinity` on Node. */
   readonly maxNewBodies?: number | undefined;
+  /** After "Publish now" commits a release, as a tick's `onReleasePublished` (the Node server rebuilds, #150). */
+  readonly onReleasePublished?: after.ReleasePublishedHook | undefined;
   readonly log?: ((line: string) => void) | undefined;
 }
 
@@ -423,6 +326,7 @@ export class ReleaseService {
   readonly #scheduler: SchedulerRuntime;
   readonly #purge: ReleasePurger | undefined;
   readonly #maxNewBodies: number;
+  readonly #onReleasePublished: after.ReleasePublishedHook | undefined;
   readonly #log: (line: string) => void;
 
   constructor(o: ReleaseServiceOptions) {
@@ -433,6 +337,7 @@ export class ReleaseService {
     this.#scheduler = o.scheduler ?? CRON_RUNTIME;
     this.#purge = o.purge;
     this.#maxNewBodies = o.maxNewBodies ?? MAX_NEW_BODIES_PER_REQUEST;
+    this.#onReleasePublished = o.onReleasePublished;
     this.#log = o.log ?? (() => {});
   }
 
@@ -925,6 +830,7 @@ export class ReleaseService {
           graph: this.graph,
           schedules: this.schedules,
           purge: this.#purge,
+          onPublished: this.#onReleasePublished,
           log: this.#log,
         }),
         log: this.#log,

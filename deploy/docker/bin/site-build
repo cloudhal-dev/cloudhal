@@ -27,17 +27,50 @@
 # come from the checkout, the CLI from npm) warns once and builds the old way: the published
 # snapshot, else the latest. The project's dependencies are the image's node_modules, linked into
 # the project on first use, so no install and no network is needed.
+#
+# After each swap the build that is now served is recorded in /data/site/current.json (written to a
+# temporary file, then renamed): `at`, `build`, `state` (`published` with its `snapshotId`, or
+# `not-published`) and `source` (CLOUDHAL_SITE_BUILD_SOURCE: `studio`, `cron`, `start`; default
+# `manual`). Studio's overview reads it, so a cron or hand-started build shows there too. It sits
+# beside `current`, not in it, so it is never served.
+#
+# SIGTERM or SIGINT (Studio stopping, a build past CLOUDHAL_SITE_BUILD_TIMEOUT, Ctrl-C) ends the
+# build: the staging folder is removed and the exit code is non-zero; the served site is unchanged.
+# The swap that publishes a finished build ignores them (the script and every command it runs
+# there: an ignored signal is inherited; no Node process runs in it, as Node resets them), so it is
+# never cut half-way, current.json included; it is a few renames and a printf, well inside the 2 s
+# Studio gives before SIGKILL. Once it is done the script prints
+# `site-build: /data/dist -> site/current -> <build id>`: from then on the build is live, whatever
+# happens to the clean-up after it (Studio reads that line).
 set -eu
+trap 'exit 143' TERM
+trap 'exit 130' INT
+# `--wait`, first: wait (at most 30 minutes) for a build that is running to finish, instead of
+# giving up. `cloudhal studio`'s rebuild on publish (CLOUDHAL_SITE_BUILD=on, #150) and the
+# entrypoint's start-up build use it; by hand and from cron a second build is refused.
+wait=0
+if [ "${1:-}" = "--wait" ]; then
+  wait=1
+  shift
+fi
 cd /data
 if [ ! -f cloudhal.json ]; then
   echo "site-build: no project in /data yet; start the container once first" >&2
   exit 1
 fi
-# One build at a time: a cron run and a hand-started one would otherwise share the staging folder.
+# One build at a time: Studio's rebuild, the start-up build, a cron run and a hand-started one
+# would otherwise share the staging folder.
 exec 9>/tmp/site-build.lock
-if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
-  echo "site-build: another build is running; try again when it is done" >&2
-  exit 1
+if command -v flock >/dev/null 2>&1; then
+  if [ "$wait" = 1 ]; then
+    if ! flock -w 1800 9; then
+      echo "site-build: another build has been running for 30 minutes; giving up" >&2
+      exit 1
+    fi
+  elif ! flock -n 9; then
+    echo "site-build: another build is running; try again when it is done" >&2
+    exit 1
+  fi
 fi
 [ -e node_modules ] || ln -s /opt/cloudhal/node_modules node_modules
 
@@ -57,11 +90,14 @@ if [ -d dist ] && [ ! -L dist ]; then
   fi
   legacy=0.6.3
 fi
-# Temporary links an interrupted run left behind (the prune below handles folders only).
+# Temporary links an interrupted run left behind (the prune after the swap handles folders only),
+# and the folder a 0.6.3 volume's first publish moves its dist to (removed here, outside the swap).
 find . -maxdepth 1 -type l -name 'dist.*' -exec rm -f {} +
 if [ -d site ]; then
-  find site -maxdepth 1 -type l \( -name 'current.*' -o -name 'previous.*' \) -exec rm -f {} +
+  find site -maxdepth 1 \( -type l -o -type f \) \( -name 'current.*' -o -name 'previous.*' \) \
+    ! -name current.json -exec rm -f {} +
 fi
+if [ "$legacy" = 0.6.3 ]; then rm -rf site/legacy-0.6.3; fi
 
 # The public origin for canonical links, the sitemap and feeds is the site's primary domain, kept
 # in cloudhal.json as `domains.site` (`cloudhal domain set <hostname>`). CLOUDHAL_SITE_URL — the
@@ -133,10 +169,46 @@ else
   only=""
   echo "site-build: this cloudhal CLI has no \`build --published\` (0.7.1 or older): building the published snapshot, else the latest one, and no status page before the first publish" >&2
 fi
-(cd "$stage" && cloudhal build $only "$@")
+# The build's standard output is kept (it names the snapshot it rendered) and still shown; its
+# exit code comes back through a file, as a pipeline reports only tee's.
+out="$stage/.cloudhal-build.out"
+{ (cd "$stage" && cloudhal build $only "$@") || echo "$?" >"$stage/.cloudhal-build.rc"; } | tee "$out"
+if [ -f "$stage/.cloudhal-build.rc" ]; then exit "$(cat "$stage/.cloudhal-build.rc")"; fi
+ran_by=${CLOUDHAL_SITE_BUILD_SOURCE:-manual}
+case "$ran_by" in
+  studio | cron | manual | start) ;;
+  *) ran_by=manual ;;
+esac
 
-# Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
+# What the build rendered, read before the swap (interruptible: nothing is published yet): the
+# status page from its marker, else the snapshot from `cloudhal build`'s own line, as Studio reads
+# it. Only ids made of letters, digits, `_` and `-` are kept.
+marker=""
+if [ -f "$stage/dist/.cloudhal-status" ]; then marker=1; fi
+snap=""
+if [ -z "$marker" ]; then
+  snap=$(node -e '
+    const suffix = " (published)";
+    const lines = require("node:fs").readFileSync(process.argv[1], "utf8").split("\n").reverse();
+    for (const line of lines) {
+      const text = line.trim();
+      if (!text.endsWith(suffix)) continue;
+      const at = text.lastIndexOf(" from ");
+      const snap = at === -1 ? "" : text.slice(at + 6, text.length - suffix.length);
+      if (snap && !snap.includes(" ")) { process.stdout.write(snap); break; }
+    }
+  ' "$out") || snap=""
+fi
+case "$snap" in *[!A-Za-z0-9_-]*) snap="" ;; esac
+state=""
+if [ -n "$marker" ]; then state=not-published; elif [ -n "$snap" ]; then state=published; fi
+
+# Publish: the finished build → /data/site/<build id>, then each pointer with one rename. TERM and
+# INT are ignored until the swap is whole (a stop that comes now is dropped: the run ends as a
+# success, a moment later); nothing slow runs in this window.
+trap '' TERM INT
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"
+case "$id" in *[!0-9TZ.]*) echo "site-build: unexpected build id $id" >&2; exit 1 ;; esac
 mkdir -p site
 mv "$stage/dist" "site/$id"
 prev=$(readlink site/current 2>/dev/null || true)
@@ -144,22 +216,33 @@ prev=$(readlink site/current 2>/dev/null || true)
 if [ "$legacy" = 0.6.3 ]; then prev="legacy-0.6.3"; fi
 ln -sfn "$id" "site/current.$$"
 mv -T "site/current.$$" site/current
+# What is served now, for Studio's overview, written by the shell itself (a Node process would
+# reset the ignored signals): checked values only, so the JSON needs no escaping.
+{
+  printf '{"at":"%s","build":"%s"' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$id"
+  if [ -n "$state" ]; then printf ',"state":"%s"' "$state"; fi
+  if [ -n "$snap" ]; then printf ',"snapshotId":"%s"' "$snap"; fi
+  printf ',"source":"%s"}\n' "$ran_by"
+} >"site/current.json.$$" && mv "site/current.json.$$" site/current.json ||
+  echo "site-build: could not record site/current.json; Studio shows this build without its snapshot" >&2
 if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
   ln -sfn "$prev" "site/previous.$$"
   mv -T "site/previous.$$" site/previous
 fi
 # /data/dist, the stable served path. A 0.6.3 volume has a real folder there: it moves aside once
 # (two renames, the one moment it is missing), and every later build only replaces the symlink.
-if [ "$legacy" = 0.6.3 ]; then
-  rm -rf site/legacy-0.6.3
-  mv dist site/legacy-0.6.3
-fi
+if [ "$legacy" = 0.6.3 ]; then mv dist site/legacy-0.6.3; fi
 ln -sfn site/current "dist.$$"
 mv -T "dist.$$" dist
-# Builds that neither `current` nor `previous` points at.
-find site -mindepth 1 -maxdepth 1 -type d ! -name "$id" ! -name "${prev:-$id}" -exec rm -rf {} +
-if [ -f "site/$id/.cloudhal-status" ]; then
+# Live: the line Studio reads the served build from (`site-build-child.ts`).
+if [ -n "$marker" ]; then
   echo "site-build: /data/dist -> site/current -> $id: the $(cat "site/$id/.cloudhal-status") status page (nothing is published yet)"
 else
   echo "site-build: /data/dist -> site/current -> $id"
 fi
+trap 'exit 143' TERM
+trap 'exit 130' INT
+# Builds that neither `current` nor `previous` points at. Interruptible, and never a failure: the
+# next run prunes what is left.
+find site -mindepth 1 -maxdepth 1 -type d ! -name "$id" ! -name "${prev:-$id}" -exec rm -rf {} + ||
+  echo "site-build: could not remove older builds; the next run tries again" >&2
