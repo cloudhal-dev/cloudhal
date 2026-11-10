@@ -26,12 +26,15 @@ if [ "${1:-studio}" = "studio" ]; then
   # One site build per start: a volume upgraded from an image that built drafts before the first
   # publish then switches at once to the published build or the 503 status page, and a new volume
   # gets the status page, without waiting for a publish. CLOUDHAL_SITE_BUILD=off (the site is built
-  # elsewhere) turns it off, with the rebuild on publish.
+  # elsewhere) turns it off, with the rebuild on publish. Unset or empty is `on` (the image's
+  # default); the normalised value is exported, so `cloudhal studio` (which reads empty as off)
+  # agrees with this script.
   site_build=$(printf '%s' "${CLOUDHAL_SITE_BUILD:-on}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
   case "$site_build" in
-    on | 1 | true | yes) site_build=on ;;
+    "" | on | 1 | true | yes) site_build=on ;;
     *) site_build=off ;;
   esac
+  export CLOUDHAL_SITE_BUILD="$site_build"
   # A CLI with the rebuild on publish (#150; its help names CLOUDHAL_SITE_BUILD) runs the start-up
   # build itself, in the same queue and audit log as a publish's. An older one (an image built from
   # these scripts with an older CLOUDHAL_VERSION) gets it from here: in the background once Studio
@@ -53,7 +56,7 @@ if [ "${1:-studio}" = "studio" ]; then
         done
         [ -f /data/cloudhal.json ] || exit 0
         echo "entrypoint: start-up site-build"
-        site-build --wait || echo "entrypoint: the start-up site-build failed; the served site is unchanged" >&2
+        CLOUDHAL_SITE_BUILD_SOURCE=start site-build --wait || echo "entrypoint: the start-up site-build failed; the served site is unchanged" >&2
       ) &
     )
   fi

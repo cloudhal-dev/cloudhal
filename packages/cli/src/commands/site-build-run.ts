@@ -11,7 +11,6 @@
  * site output to swap and defaults to `off` (and stays off, with a warning, when `on` finds no
  * `site-build` command on its PATH).
  */
-import { spawn } from "node:child_process";
 import { access, constants } from "node:fs/promises";
 import path from "node:path";
 import { type AuditEntry, AuditLog } from "@cloudhal/agent-runtime";
@@ -19,20 +18,41 @@ import { SITE_BUILD_TOOL, type SiteBuildService } from "@cloudhal/api";
 import type { Actor, Site } from "@cloudhal/core-contracts";
 import type { ReleasePublishedHook } from "@cloudhal/core-ts/releases";
 import type { SqlDriver } from "@cloudhal/storage";
-import {
-  createSiteRebuilder,
-  type SiteBuildOutcome,
-  type SiteBuildResult,
-  type SiteRebuilder,
-} from "./site-rebuild.ts";
+import { runSiteBuildCommand, SITE_BUILD_TIMEOUT_MS } from "./site-build-child.ts";
+import { readServed } from "./site-build-served.ts";
+import { createSiteRebuilder, type SiteBuildResult, type SiteRebuilder } from "./site-rebuild.ts";
+
+export {
+  outputTail,
+  parseBuildOutput,
+  plainText,
+  runSiteBuildCommand,
+  type SiteBuildCommand,
+} from "./site-build-child.ts";
 
 /** Who the audit rows name. */
 export const SITE_BUILD_ACTOR: Actor = { kind: "system", id: "sys_sitebuild", name: "Site build" };
 
-/** The build's output kept for a failure's reason: its last lines, at most this many characters. */
-const ERROR_TAIL = 600;
-/** Output kept in memory while a build runs. */
-const OUTPUT_KEEP = 16_384;
+/** The longest `CLOUDHAL_SITE_BUILD_TIMEOUT` taken (a day; timers cap at about 24.8 days). */
+const MAX_TIMEOUT_S = 86_400;
+
+/**
+ * `CLOUDHAL_SITE_BUILD_TIMEOUT`: a running build's deadline in seconds (whole, 1 to a day; the
+ * wait for another build's lock counts). Unset: 30 minutes; anything else is reported and ignored.
+ */
+export function siteBuildTimeoutMs(
+  env: Readonly<Record<string, string | undefined>>,
+  log: (line: string) => void = () => {},
+): number {
+  const v = env.CLOUDHAL_SITE_BUILD_TIMEOUT?.trim();
+  if (!v) return SITE_BUILD_TIMEOUT_MS;
+  const n = Number(v);
+  if (Number.isInteger(n) && n >= 1 && n <= MAX_TIMEOUT_S) return n * 1000;
+  log(
+    `CLOUDHAL_SITE_BUILD_TIMEOUT must be whole seconds from 1 to ${MAX_TIMEOUT_S} (got ${JSON.stringify(v)}); using 30 minutes`,
+  );
+  return SITE_BUILD_TIMEOUT_MS;
+}
 
 /** `CLOUDHAL_SITE_BUILD`: `on` (`1`, `true`, `yes`) or `off` (anything else, and unset). */
 export function siteBuildEnabled(env: Readonly<Record<string, string | undefined>>): boolean {
@@ -53,75 +73,6 @@ export async function findOnPath(name: string, pathEnv: string | undefined) {
     }
   }
   return undefined;
-}
-
-/**
- * What a finished build rendered, from `cloudhal build --published`'s own lines: `built … from
- * <snapshot> (published)` or `not-published: …`. Line scans, no regex over the output.
- */
-export function parseBuildOutput(output: string): Pick<SiteBuildOutcome, "snapshotId" | "state"> {
-  for (const line of output.split("\n").reverse()) {
-    const text = line.trim();
-    if (text.startsWith("not-published:")) return { state: "not-published" };
-    const suffix = " (published)";
-    if (!text.endsWith(suffix)) continue;
-    const at = text.lastIndexOf(" from ");
-    if (at === -1) continue;
-    const id = text.slice(at + 6, text.length - suffix.length);
-    if (id && !id.includes(" ")) return { state: "published", snapshotId: id };
-  }
-  return {};
-}
-
-/** The last lines of `output` within `ERROR_TAIL` characters. */
-export function outputTail(output: string): string {
-  const lines = output.trimEnd().split("\n");
-  let tail = "";
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const next = tail ? `${lines[i]}\n${tail}` : (lines[i] ?? "");
-    if (next.length > ERROR_TAIL) break;
-    tail = next;
-  }
-  return tail || output.slice(-ERROR_TAIL);
-}
-
-export interface SiteBuildCommand {
-  readonly command: string;
-  readonly args: readonly string[];
-  readonly cwd: string;
-  readonly env?: NodeJS.ProcessEnv | undefined;
-  /** `site-build:` progress lines and failures (the container log). */
-  readonly log?: ((line: string) => void) | undefined;
-}
-
-/** One build in a child process: success is exit code 0. */
-export function runSiteBuildCommand(o: SiteBuildCommand): Promise<SiteBuildOutcome> {
-  return new Promise((resolve) => {
-    let output = "";
-    let partial = "";
-    const keep = (chunk: Buffer) => {
-      const text = chunk.toString();
-      output = (output + text).slice(-OUTPUT_KEEP);
-      // forward the script's own progress lines, not Astro's whole build log
-      const lines = (partial + text).split("\n");
-      partial = lines.pop() ?? "";
-      for (const line of lines) if (line.startsWith("site-build:")) o.log?.(line);
-    };
-    const child = spawn(o.command, [...o.args], {
-      cwd: o.cwd,
-      env: o.env ?? process.env,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-    child.stdout?.on("data", keep);
-    child.stderr?.on("data", keep);
-    child.once("error", (e) => resolve({ ok: false, error: e.message }));
-    child.once("close", (code, signal) => {
-      if (code === 0) return resolve({ ok: true, ...parseBuildOutput(output) });
-      const why = signal ? `stopped by ${signal}` : `exited with ${code}`;
-      const tail = outputTail(output);
-      resolve({ ok: false, error: tail ? `${why}: ${tail}` : why });
-    });
-  });
 }
 
 /** The `site.build` audit row of one result. */
@@ -147,6 +98,10 @@ export interface LocalSiteBuild extends SiteBuildService {
   /** The scheduler's release hook (RFC-0008 release runs). */
   readonly onReleasePublished: ReleasePublishedHook;
   readonly rebuilder: SiteRebuilder;
+  /**
+   * Drops a queued build and gives a running one `stopDeadlineMs` (5 s) to finish, then ends it and
+   * records it as stopped. A second Ctrl-C or SIGTERM meanwhile ends it at once.
+   */
   stop(): Promise<void>;
 }
 
@@ -160,6 +115,9 @@ export interface LocalSiteBuildOptions {
   readonly command?: { readonly command: string; readonly args: readonly string[] } | undefined;
   readonly debounceMs?: number | undefined;
   readonly maxWaitMs?: number | undefined;
+  readonly stopDeadlineMs?: number | undefined;
+  /** Tests: a build's deadline instead of `CLOUDHAL_SITE_BUILD_TIMEOUT`'s. */
+  readonly timeoutMs?: number | undefined;
 }
 
 /**
@@ -183,8 +141,12 @@ export async function localSiteBuild(
   }
   const audit = new AuditLog(o.sql);
   const run = command;
+  const timeoutMs = o.timeoutMs ?? siteBuildTimeoutMs(o.env, o.log);
+  // `site-build` records who ran it in site/current.json
+  const env = { ...process.env, CLOUDHAL_SITE_BUILD_SOURCE: "studio" };
   const rebuilder = createSiteRebuilder({
-    run: () => runSiteBuildCommand({ ...run, cwd: o.projectDir, log: o.log }),
+    run: (signal) =>
+      runSiteBuildCommand({ ...run, cwd: o.projectDir, env, log: o.log, signal, timeoutMs }),
     onResult: async (r) => {
       await audit.record(siteBuildAuditEntry(o.siteId, r));
     },
@@ -195,6 +157,7 @@ export async function localSiteBuild(
   return {
     siteId: o.siteId,
     state: () => rebuilder.state(),
+    served: () => readServed(o.projectDir),
     rebuilder,
     onPublished: async (site) => {
       if (site.id === o.siteId) rebuilder.schedule("publish");
@@ -202,6 +165,17 @@ export async function localSiteBuild(
     onReleasePublished: ({ siteId }) => {
       if (siteId === o.siteId) rebuilder.schedule("release");
     },
-    stop: () => rebuilder.stop(),
+    stop: async () => {
+      // the build is its own process group: a terminal's second Ctrl-C reaches only us
+      const now = () => rebuilder.abort();
+      process.once("SIGINT", now);
+      process.once("SIGTERM", now);
+      try {
+        await rebuilder.stop(o.stopDeadlineMs);
+      } finally {
+        process.off("SIGINT", now);
+        process.off("SIGTERM", now);
+      }
+    },
   };
 }

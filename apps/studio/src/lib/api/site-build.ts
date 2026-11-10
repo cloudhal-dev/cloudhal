@@ -14,9 +14,25 @@ export interface SiteBuildLast {
   error?: string;
 }
 
+/** What visitors see now, from the last build that went live (Studio's, cron's or a hand-run). */
+export interface SiteBuildServed {
+  at: string;
+  snapshotId?: string;
+  state?: "published" | "not-published";
+  /** `studio`, `cron`, `manual`, `start`. */
+  source?: string;
+}
+
 export type SiteBuildStatus =
   | { enabled: false }
-  | { enabled: true; state: "idle" | "queued" | "running"; last: SiteBuildLast | null };
+  | {
+      enabled: true;
+      state: "idle" | "queued" | "running";
+      /** The last build Studio ran (its output only for `audit:read`). */
+      last: SiteBuildLast | null;
+      /** What is online now; null: nothing; absent: the server cannot tell. */
+      served?: SiteBuildServed | null;
+    };
 
 export const siteBuildApi = {
   status: (siteId: string) => request<SiteBuildStatus>(`/api/sites/${siteId}/site-build`),

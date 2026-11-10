@@ -35,12 +35,12 @@ const SchedulerStalledBanner = lazy(() =>
   withMessages(import("../components/SchedulerStalled.tsx"), ["schedules"]),
 );
 
-/** RFC-0008 §8.7: the scheduler's status, and whether it is stalled with work due. */
+/** RFC-0008 §8.7: the scheduler's status when it is stalled with work due; otherwise undefined. */
 function useSchedulerStalled() {
   const status = useQuery({ queryKey: ["scheduler"], queryFn: api.scheduler, retry: false }).data;
   const stalled =
     !!status && !status.healthy && (status.state !== "unknown" || status.dueWithin24h);
-  return { status, stalled };
+  return stalled ? status : undefined;
 }
 
 export function SiteOverviewPage() {
@@ -49,7 +49,7 @@ export function SiteOverviewPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
-  const { status: s, stalled } = useSchedulerStalled();
+  const stalled = useSchedulerStalled();
   const pages = useQuery({ queryKey: ["pages", siteId], queryFn: () => api.pages.list(siteId) });
   const registry = useCollections(siteId);
   const posts = registry.data?.find((c) => c.key === BUILT_IN_COLLECTION);
@@ -124,7 +124,7 @@ export function SiteOverviewPage() {
       <PendingApprovalsBanner siteId={siteId} />
       {stalled ? (
         <Suspense fallback={null}>
-          <SchedulerStalledBanner siteId={siteId} status={s} />
+          <SchedulerStalledBanner siteId={siteId} status={stalled} />
         </Suspense>
       ) : null}
       <CommentsWaitingBanner siteId={siteId} />

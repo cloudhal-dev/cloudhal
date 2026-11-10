@@ -41,6 +41,7 @@ ENV NODE_ENV=production \
   CLOUDHAL_INIT=blog \
   CLOUDHAL_SITE_NAME="My site" \
   CLOUDHAL_SITE_BUILD=on
+# (CLOUDHAL_SITE_BUILD_TIMEOUT, seconds, is a rebuild's deadline: 30 minutes unless set.)
 USER node
 WORKDIR /data
 VOLUME ["/data"]

@@ -179,6 +179,8 @@ interface BuildReport {
   enabled: boolean;
   state?: string;
   last?: { at: string; ok: boolean; trigger?: string; snapshotId?: string; state?: string } | null;
+  /** What is served now, from /data/site/current.json (any build's). */
+  served?: { at: string; snapshotId?: string; state?: string; source?: string } | null;
 }
 async function buildReport(siteId: string, cookie: string): Promise<BuildReport | undefined> {
   const r = await api("GET", `/api/sites/${siteId}/site-build`, { cookie });
@@ -415,7 +417,7 @@ try {
     name,
     "sh",
     "-c",
-    "ls -1 /data/site | grep -v -x -e current -e previous",
+    "ls -1 /data/site | grep -v -x -e current -e previous -e current.json",
   ]);
   expect(
     kept === [second, third].sort().join("\n"),
@@ -430,6 +432,26 @@ try {
   );
   expect((await served("/")).status === 200, "Caddy still answers / with 200 after the swap");
   step("a third site-build swapped the served tree and kept the previous one");
+  // #150: the hand-started build is what the overview says is served
+  if (rebuilds) {
+    const record = JSON.parse(docker(["exec", name, "cat", "/data/site/current.json"])) as {
+      build?: string;
+      source?: string;
+      state?: string;
+    };
+    expect(
+      record.build === third && record.source === "manual" && record.state === "published",
+      "site/current.json records the hand-started build",
+      record,
+    );
+    const report = await buildReport(site.id, cookie);
+    expect(
+      report?.served?.source === "manual" && report.served.state === "published",
+      "the overview reports the hand-started build as served",
+      report,
+    );
+    step("site/current.json and the overview name the hand-started build");
+  }
   console.log("\nDocker smoke test passed.");
 } catch (e) {
   console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}\n--- container logs ---`);

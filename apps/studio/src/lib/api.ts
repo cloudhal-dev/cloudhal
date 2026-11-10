@@ -172,7 +172,7 @@ export type {
 } from "./api/schedules-types.ts";
 export { SCHEDULE_NOTIFICATION_KINDS } from "./api/schedules-types.ts";
 export type { SiteSearchHit, SiteSearchKind, SiteSearchResult } from "./api/search.ts";
-export type { SiteBuildLast, SiteBuildStatus } from "./api/site-build.ts";
+export type { SiteBuildLast, SiteBuildServed, SiteBuildStatus } from "./api/site-build.ts";
 export type {
   ArchiveReason,
   EntrySummary,

@@ -27,7 +27,19 @@
 # come from the checkout, the CLI from npm) warns once and builds the old way: the published
 # snapshot, else the latest. The project's dependencies are the image's node_modules, linked into
 # the project on first use, so no install and no network is needed.
+#
+# After each swap the build that is now served is recorded in /data/site/current.json (written to a
+# temporary file, then renamed): `at`, `build`, `state` (`published` with its `snapshotId`, or
+# `not-published`) and `source` (CLOUDHAL_SITE_BUILD_SOURCE: `studio`, `cron`, `start`; default
+# `manual`). Studio's overview reads it, so a cron or hand-started build shows there too. It sits
+# beside `current`, not in it, so it is never served.
+#
+# SIGTERM or SIGINT (Studio stopping, a build past CLOUDHAL_SITE_BUILD_TIMEOUT, Ctrl-C) ends the
+# build: the staging folder is removed and the exit code is non-zero; the served site is unchanged.
+# The few renames that publish a finished build are not interrupted.
 set -eu
+trap 'exit 143' TERM
+trap 'exit 130' INT
 # `--wait`, first: wait (at most 30 minutes) for a build that is running to finish, instead of
 # giving up. `cloudhal studio`'s rebuild on publish (CLOUDHAL_SITE_BUILD=on, #150) and the
 # entrypoint's start-up build use it; by hand and from cron a second build is refused.
@@ -76,7 +88,8 @@ fi
 # Temporary links an interrupted run left behind (the prune below handles folders only).
 find . -maxdepth 1 -type l -name 'dist.*' -exec rm -f {} +
 if [ -d site ]; then
-  find site -maxdepth 1 -type l \( -name 'current.*' -o -name 'previous.*' \) -exec rm -f {} +
+  find site -maxdepth 1 \( -type l -o -type f \) \( -name 'current.*' -o -name 'previous.*' \) \
+    ! -name current.json -exec rm -f {} +
 fi
 
 # The public origin for canonical links, the sitemap and feeds is the site's primary domain, kept
@@ -149,9 +162,20 @@ else
   only=""
   echo "site-build: this cloudhal CLI has no \`build --published\` (0.7.1 or older): building the published snapshot, else the latest one, and no status page before the first publish" >&2
 fi
-(cd "$stage" && cloudhal build $only "$@")
+# The build's standard output is kept (it names the snapshot it rendered) and still shown; its
+# exit code comes back through a file, as a pipeline reports only tee's.
+out="$stage/.cloudhal-build.out"
+{ (cd "$stage" && cloudhal build $only "$@") || echo "$?" >"$stage/.cloudhal-build.rc"; } | tee "$out"
+if [ -f "$stage/.cloudhal-build.rc" ]; then exit "$(cat "$stage/.cloudhal-build.rc")"; fi
+ran_by=${CLOUDHAL_SITE_BUILD_SOURCE:-manual}
+case "$ran_by" in
+  studio | cron | manual | start) ;;
+  *) ran_by=manual ;;
+esac
 
-# Publish: the finished build → /data/site/<build id>, then each pointer with one rename.
+# Publish: the finished build → /data/site/<build id>, then each pointer with one rename. A stop
+# now waits for these few renames (it is noted, and the run ends as a success: the build is live).
+trap 'echo "site-build: stopping after the swap" >&2' TERM INT
 id="$(date -u +%Y%m%dT%H%M%SZ).$$"
 mkdir -p site
 mv "$stage/dist" "site/$id"
@@ -160,6 +184,30 @@ prev=$(readlink site/current 2>/dev/null || true)
 if [ "$legacy" = 0.6.3 ]; then prev="legacy-0.6.3"; fi
 ln -sfn "$id" "site/current.$$"
 mv -T "site/current.$$" site/current
+# What is served now, for Studio's overview: the snapshot from `cloudhal build`'s own line (as
+# Studio reads it), the status page from its marker. Never fails the build: it is live already.
+marker=""
+if [ -f "site/$id/.cloudhal-status" ]; then marker=1; fi
+node -e '
+  const fs = require("node:fs");
+  const [id, out, marker, source, file, temp] = process.argv.slice(1);
+  let snapshotId;
+  if (!marker) {
+    const suffix = " (published)";
+    for (const line of fs.readFileSync(out, "utf8").split("\n").reverse()) {
+      const text = line.trim();
+      if (!text.endsWith(suffix)) continue;
+      const at = text.lastIndexOf(" from ");
+      const snap = at === -1 ? "" : text.slice(at + 6, text.length - suffix.length);
+      if (snap && !snap.includes(" ")) { snapshotId = snap; break; }
+    }
+  }
+  const state = marker ? "not-published" : snapshotId ? "published" : undefined;
+  const record = { at: new Date().toISOString(), build: id, ...(state ? { state } : {}), ...(snapshotId ? { snapshotId } : {}), source };
+  fs.writeFileSync(temp, JSON.stringify(record) + "\n");
+  fs.renameSync(temp, file);
+' "$id" "$out" "$marker" "$ran_by" site/current.json "site/current.json.$$" ||
+  echo "site-build: could not record site/current.json; Studio shows this build without its snapshot" >&2
 if [ -n "$prev" ] && [ "$prev" != "$id" ]; then
   ln -sfn "$prev" "site/previous.$$"
   mv -T "site/previous.$$" site/previous

@@ -282,6 +282,7 @@ export const en = {
       snapshot: "Snapshot",
       failedTitle: "The last build failed",
       failedDescription: "The previous version stays online. The next publish tries again.",
+      failedNothingOnline: "Nothing is online yet. The next publish tries again.",
     },
   },
   pageStatus: {

@@ -3,13 +3,16 @@
  * Node publish path: the API's publish and rollback routes reach the store's `onPublished`, the queue runs the
  * build command in a child process (here a stand-in for the image's `site-build --wait` that
  * counts its runs and notices overlaps), a burst builds once, every result is a `site.build`
- * audit row that `/api/sites/:id/site-build` and the activity feed report, and a failed build is
- * reported and retried by the next publish.
+ * audit row that `/api/sites/:id/site-build` and the activity feed report, a failed build is
+ * reported and retried by the next publish, "Publish now" on a release builds once, and stopping
+ * Studio during a build ends the build's whole process group within the deadline.
  */
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { AuditLog } from "@cloudhal/agent-runtime";
+import { openLocalStore } from "@cloudhal/core-ts/local";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { init, readProjectConfig, type StudioHandle, studio } from "../src/index.ts";
 
@@ -165,6 +168,158 @@ describe("cloudhal studio: rebuild the site on publish", () => {
     const again = await builds(5);
     expect(again.last).toMatchObject({ ok: true, snapshotId: "snap_fakebuild1" });
     expect(existsSync(path.join(runs, "overlap"))).toBe(false);
+  });
+});
+
+/** Release routes act as a person: an owner signed in with the setup token (test values). */
+describe("cloudhal studio: Publish now on a release", () => {
+  it("builds once, as a release", async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-studio-site-build-release-"));
+    const projectDir = path.join(tmp, "site");
+    const runs = path.join(tmp, "runs");
+    await init({ dir: projectDir, name: "Release" });
+    await writeFile(path.join(tmp, "fake-build.mjs"), FAKE_BUILD);
+    await mkdir(runs);
+    const { siteId } = await readProjectConfig(projectDir);
+    const s = await studio({
+      projectDir,
+      port: 0,
+      scheduler: false,
+      env: { CLOUDHAL_SITE_BUILD: "on" },
+      siteBuild: {
+        command: { command: process.execPath, args: [path.join(tmp, "fake-build.mjs"), runs] },
+        debounceMs: 100,
+      },
+    });
+    const base = s.url.replace(/\/$/, "");
+    try {
+      const token = new URLSearchParams(new URL(s.setup?.url ?? "").hash.slice(1)).get("setup");
+      const signed = await fetch(`${base}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-cloudhal-setup-token": token ?? "" },
+        body: JSON.stringify({
+          name: "Olive Owner",
+          email: "owner@example.test",
+          password: "correct horse battery",
+        }),
+      });
+      expect(signed.status, await signed.clone().text()).toBe(200);
+      const cookie = signed.headers
+        .getSetCookie()
+        .map((c) => c.split(";")[0] as string)
+        .find((c) => c.includes("better-auth.session_token=")) as string;
+      const call = async (method: string, p: string, body?: unknown) => {
+        const res = await fetch(`${base}${p}`, {
+          method,
+          headers: { "content-type": "application/json", cookie, origin: base },
+          ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+        });
+        const json = (await res.json()) as unknown;
+        if (!res.ok) throw new Error(`${method} ${p}: ${res.status} ${JSON.stringify(json)}`);
+        return json;
+      };
+      const count = async () =>
+        existsSync(path.join(runs, "count"))
+          ? Number(await readFile(path.join(runs, "count"), "utf8"))
+          : 0;
+      const settled = async (n: number) => {
+        for (let i = 0; i < 200; i++) {
+          const st = (await call("GET", `/api/sites/${siteId}/site-build`)) as Status;
+          if ((await count()) >= n && st.state === "idle" && st.last) return st;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        throw new Error(`no ${n} finished builds`);
+      };
+      await settled(1); // the start-up build
+      const entries = (await call("GET", `/api/sites/${siteId}/entries`)) as
+        | { id: string }[]
+        | { items: { id: string }[] };
+      const [entry] = Array.isArray(entries) ? entries : entries.items;
+      const created = (
+        (await call("POST", `/api/sites/${siteId}/releases`, { nodeIds: [entry?.id] })) as {
+          release: { id: string; rev: number };
+        }
+      ).release;
+      const at = new Date(Date.now() + 5 * 3_600_000).toISOString();
+      const scheduled = (
+        (await call("POST", `/api/sites/${siteId}/releases/${created.id}/schedule`, {
+          when: { at },
+          rev: created.rev,
+        })) as { release: { rev: number } }
+      ).release;
+      const now = (await call("POST", `/api/sites/${siteId}/releases/${created.id}/publish-now`, {
+        rev: scheduled.rev,
+      })) as { release: { state: string } };
+      expect(now.release.state).toBe("published");
+      const st = await settled(2);
+      // and no more than one
+      await new Promise((r) => setTimeout(r, 400));
+      expect(await count()).toBe(2);
+      expect(st.last).toMatchObject({ ok: true, trigger: "release" });
+    } finally {
+      await s.stop();
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("cloudhal studio: stopping during a build", () => {
+  it("ends the build's process group within the deadline and records it", async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-studio-site-build-stop-"));
+    const projectDir = path.join(tmp, "site");
+    const pidFile = path.join(tmp, "grandchild.pid");
+    await init({ dir: projectDir, name: "Stop" });
+    const { siteId, dataDir } = await readProjectConfig(projectDir);
+    const logs: string[] = [];
+    const s = await studio({
+      projectDir,
+      noAuth: true,
+      port: 0,
+      scheduler: false,
+      env: { CLOUDHAL_SITE_BUILD: "on" },
+      siteBuild: {
+        // like site-build: a shell whose child (here a sleep) would hold the lock
+        command: {
+          command: "/bin/sh",
+          args: ["-c", `echo "site-build: waiting"; sleep 60 & echo $! > "${pidFile}"; wait`],
+        },
+        debounceMs: 10,
+        stopDeadlineMs: 300,
+      },
+      log: (l) => logs.push(l),
+    });
+    try {
+      for (let i = 0; i < 200 && !existsSync(pidFile); i++)
+        await new Promise((r) => setTimeout(r, 25));
+      const pid = Number((await readFile(pidFile, "utf8")).trim());
+      const t = performance.now();
+      await s.stop();
+      // the deadline, SIGTERM to the group, and the audit row; far inside Docker's 10 s
+      expect(performance.now() - t).toBeLessThan(3000);
+      let alive = true;
+      for (let i = 0; i < 100 && alive; i++) {
+        try {
+          process.kill(pid, 0);
+          await new Promise((r) => setTimeout(r, 20));
+        } catch {
+          alive = false;
+        }
+      }
+      expect(alive).toBe(false);
+      expect(logs.some((l) => l.includes("stopped: Studio is shutting down"))).toBe(true);
+      const local = await openLocalStore(path.join(projectDir, dataDir));
+      try {
+        const [row] = await new AuditLog(local.sql).list({ siteId, tool: "site.build", limit: 1 });
+        expect(row).toMatchObject({
+          outcome: "error",
+          reason: expect.stringContaining("stopped: Studio is shutting down"),
+        });
+      } finally {
+        await local.close();
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
   });
 });
 

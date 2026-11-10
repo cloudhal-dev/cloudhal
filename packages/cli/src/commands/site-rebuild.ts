@@ -12,6 +12,8 @@
  *   `site-build` takes (`site-build-run.ts` runs it with `--wait`).
  * - **A failure is reported, not retried.** The run keeps the previous site (it publishes only a
  *   finished build); the next publish schedules the next attempt.
+ * - **Stopping is bounded.** `stop` drops a queued build and gives a running one `deadlineMs` to
+ *   finish, then aborts it (`run`'s signal); the interrupted result is still reported.
  *
  * Pure: the build itself is `run`, the clock and timers are injectable (tests).
  */
@@ -38,8 +40,11 @@ export type SiteBuildOutcome = Omit<SiteBuildResult, "at" | "durationMs" | "trig
 export type SiteRebuildState = "idle" | "queued" | "running";
 
 export interface SiteRebuilderOptions {
-  /** One build, start to finish. A throw counts as a failure. */
-  readonly run: () => Promise<SiteBuildOutcome>;
+  /**
+   * One build, start to finish. A throw counts as a failure. `signal` aborts it (`stop`'s deadline;
+   * its `reason` is an Error that says why): it ends the build and resolves with a failure.
+   */
+  readonly run: (signal: AbortSignal) => Promise<SiteBuildOutcome>;
   /** After every build, success or failure (the audit row). Errors are logged. */
   readonly onResult?: ((result: SiteBuildResult) => void | Promise<void>) | undefined;
   readonly debounceMs?: number | undefined;
@@ -56,14 +61,23 @@ export interface SiteRebuilder {
   state(): SiteRebuildState;
   /** Resolves when nothing is queued or running (tests). */
   idle(): Promise<void>;
-  /** Drops a queued build and waits for a running one. Later requests are ignored. */
-  stop(): Promise<void>;
+  /**
+   * Drops a queued build and waits at most `deadlineMs` (default `SITE_BUILD_STOP_DEADLINE_MS`) for
+   * a running one, then aborts it and waits for its result. Later requests are ignored.
+   */
+  stop(deadlineMs?: number): Promise<void>;
+  /** Aborts the running build now (a second Ctrl-C while stopping). */
+  abort(): void;
 }
 
 /** A burst of publishes this close together builds once. */
 export const SITE_BUILD_DEBOUNCE_MS = 3_000;
 /** A build starts at the latest this long after the first request of a burst. */
 export const SITE_BUILD_MAX_WAIT_MS = 60_000;
+/** How long `stop` lets a running build finish: well inside Docker's 10 s stop grace period. */
+export const SITE_BUILD_STOP_DEADLINE_MS = 5_000;
+/** Why a build `stop` aborted reports failure. */
+export const SITE_BUILD_STOPPED = "stopped: Studio is shutting down";
 
 export function createSiteRebuilder(o: SiteRebuilderOptions): SiteRebuilder {
   const debounceMs = o.debounceMs ?? SITE_BUILD_DEBOUNCE_MS;
@@ -84,6 +98,8 @@ export function createSiteRebuilder(o: SiteRebuilderOptions): SiteRebuilder {
   /** The first request of the pending burst: its time and trigger. */
   let pending: { since: number; trigger: string } | undefined;
   let running: Promise<void> | undefined;
+  /** Aborts the running build. */
+  let controller: AbortController | undefined;
   let stopped = false;
   let waiters: (() => void)[] = [];
 
@@ -116,10 +132,13 @@ export function createSiteRebuilder(o: SiteRebuilderOptions): SiteRebuilder {
   const build = async (trigger: string): Promise<void> => {
     const started = now();
     let outcome: SiteBuildOutcome;
+    controller = new AbortController();
     try {
-      outcome = await o.run();
+      outcome = await o.run(controller.signal);
     } catch (e) {
       outcome = { ok: false, error: e instanceof Error ? e.message : String(e) };
+    } finally {
+      controller = undefined;
     }
     const result: SiteBuildResult = {
       ...outcome,
@@ -152,13 +171,29 @@ export function createSiteRebuilder(o: SiteRebuilderOptions): SiteRebuilder {
         waiters.push(resolve);
         settle();
       }),
-    async stop() {
+    async stop(deadlineMs = SITE_BUILD_STOP_DEADLINE_MS) {
       stopped = true;
       if (timer !== undefined) clearTimer(timer);
       timer = undefined;
       pending = undefined;
-      await running;
+      const current = running;
+      if (current) {
+        let deadline: unknown;
+        const late = new Promise<true>((resolve) => {
+          deadline = setTimer(() => resolve(true), deadlineMs);
+        });
+        const overdue = await Promise.race([current.then(() => false), late]);
+        clearTimer(deadline);
+        if (overdue) {
+          log(`site build: still running after ${deadlineMs} ms; stopping it`);
+          controller?.abort(new Error(SITE_BUILD_STOPPED));
+          await current;
+        }
+      }
       settle();
+    },
+    abort() {
+      controller?.abort(new Error(SITE_BUILD_STOPPED));
     },
   };
 }

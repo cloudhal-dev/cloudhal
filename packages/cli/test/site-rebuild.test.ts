@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createSiteRebuilder,
+  SITE_BUILD_STOPPED,
   type SiteBuildOutcome,
   type SiteBuildResult,
 } from "../src/commands/site-rebuild.ts";
@@ -205,5 +206,59 @@ describe("site rebuild queue", () => {
     await vi.advanceTimersByTimeAsync(1000);
     expect(builds.starts).toHaveLength(1);
     expect(q.state()).toBe("idle");
+  });
+
+  it("stop gives a running build its deadline, then aborts it and records it as stopped", async () => {
+    const results: SiteBuildResult[] = [];
+    let seen: AbortSignal | undefined;
+    const q = createSiteRebuilder({
+      // a build that ends only when aborted
+      run: (signal) =>
+        new Promise<SiteBuildOutcome>((resolve) => {
+          seen = signal;
+          signal.addEventListener("abort", () =>
+            resolve({ ok: false, error: (signal.reason as Error).message }),
+          );
+        }),
+      onResult: (r) => {
+        results.push(r);
+      },
+      debounceMs: 10,
+    });
+    q.schedule("publish");
+    await vi.advanceTimersByTimeAsync(10);
+    expect(q.state()).toBe("running");
+    let stopped = false;
+    const stopping = q.stop(500).then(() => {
+      stopped = true;
+    });
+    await vi.advanceTimersByTimeAsync(499);
+    expect(stopped).toBe(false);
+    expect(seen?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await stopping;
+    expect(seen?.aborted).toBe(true);
+    expect(results).toEqual([expect.objectContaining({ ok: false, error: SITE_BUILD_STOPPED })]);
+    expect(q.state()).toBe("idle");
+  });
+
+  it("abort ends the running build at once", async () => {
+    const results: SiteBuildResult[] = [];
+    const q = createSiteRebuilder({
+      run: (signal) =>
+        new Promise<SiteBuildOutcome>((resolve) => {
+          signal.addEventListener("abort", () => resolve({ ok: false, error: "stopped" }));
+        }),
+      onResult: (r) => {
+        results.push(r);
+      },
+      debounceMs: 10,
+    });
+    q.schedule("publish");
+    await vi.advanceTimersByTimeAsync(10);
+    const stopping = q.stop(60_000);
+    q.abort();
+    await stopping;
+    expect(results).toHaveLength(1);
   });
 });

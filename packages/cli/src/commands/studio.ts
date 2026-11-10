@@ -64,7 +64,10 @@ export interface StudioOptions extends StudioServerFlags, StudioInitFlags {
    * Tests: the rebuild's command instead of the image's `site-build --wait`, and its debounce
    * (`CLOUDHAL_SITE_BUILD=on` still switches it on, #150).
    */
-  readonly siteBuild?: Pick<LocalSiteBuildOptions, "command" | "debounceMs" | "maxWaitMs">;
+  readonly siteBuild?: Pick<
+    LocalSiteBuildOptions,
+    "command" | "debounceMs" | "maxWaitMs" | "stopDeadlineMs" | "timeoutMs"
+  >;
   /** The environment `CLOUDHAL_*` is read from (tests); default `process.env`. */
   readonly env?: Readonly<Record<string, string | undefined>>;
   /** Tests: run Better Auth's Origin check under `NODE_ENV=test` too (`AuthOptions.originCheck`). */
@@ -150,13 +153,7 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     comments,
     ...(ticker ? { scheduler: ticker } : {}),
     ...(siteBuild ? { siteBuild } : {}),
-    // RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite.
-    schedules: {
-      store: new SqlScheduleStore(local.sql),
-      maxNewBodies: Number.POSITIVE_INFINITY,
-      // §11.6: `CLOUDHAL_AUTOMATIONS=off` refuses automation keys and stops occurrences.
-      automationsEnabled: automationsEnabled(),
-    },
+    schedules: localSchedules(local, siteBuild),
     requireAuth: !options.noAuth,
     // RFC-0011: invites and reset links are printed here instead of sent.
     ...(cfg.mail ? { mail: terminalMailSender(cfg.mail, options.mailOut) } : {}),
@@ -234,8 +231,12 @@ export async function studio(options: StudioOptions): Promise<StudioHandle> {
     stop: async () => {
       stopRollups();
       ticker?.stop();
+      // No new requests (so no new publishes) from here; open ones finish meanwhile.
+      const closed = new Promise<void>((resolve) => listening.server.close(() => resolve()));
+      // #150: a running build gets a few seconds, then it is ended and recorded as stopped, all
+      // inside Docker's 10 s stop grace period and before the database closes.
       await siteBuild?.stop();
-      await new Promise<void>((resolve) => listening.server.close(() => resolve()));
+      await closed;
       await local.close();
     },
   };
@@ -268,6 +269,21 @@ async function openStudioStore(
     ...options.siteBuild,
   });
   return { local, siteBuild };
+}
+
+/** RFC-0008 §13: the schedule routes, tools and notifications on the project's SQLite. */
+function localSchedules(
+  local: LocalStore,
+  siteBuild: LocalSiteBuild | undefined,
+): NonNullable<Parameters<typeof createApi>[0]["schedules"]> {
+  return {
+    store: new SqlScheduleStore(local.sql),
+    maxNewBodies: Number.POSITIVE_INFINITY,
+    // §11.6: `CLOUDHAL_AUTOMATIONS=off` refuses automation keys and stops occurrences.
+    automationsEnabled: automationsEnabled(),
+    // #150: "Publish now" on a release is a publish too
+    ...(siteBuild ? { onReleasePublished: siteBuild.onReleasePublished } : {}),
+  };
 }
 
 /**
