@@ -1,5 +1,12 @@
 /** `cloudhal push`/`pull` endpoints and the /mcp origin guard. */
-import { SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import type { Site } from "@cloudhal/core-contracts";
+import {
+  canonicalJson,
+  exportSite,
+  nodeHash,
+  SiteGraphStore,
+  seedStarterSite,
+} from "@cloudhal/core-ts";
 import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -268,6 +275,53 @@ describe("admin bundle endpoints", () => {
 
     expect((await put(bundle.replace(site.id, "site_other0000001"))).status).toBe(400);
     expect((await put(bundle, "?mode=yolo")).status).toBe(400);
+  });
+
+  it("refuses a pushed reference or repeater definition with 409 fields_unsupported (RFC-0045)", async () => {
+    const a = await backend();
+    const b = await backend();
+    const site = await seedStarterSite(a.store, { name: "Pushed", slug: "pushed" });
+    const app = createApi({ store: b.store, admin: { deployToken: TOKEN, storage: b } });
+    const bundle = await exportSite(a, site.id);
+    const row = bundle.nodes.find((n) => n.kind === "site");
+    if (!row) throw new Error("no site row");
+    const label = { en: { label: "Venue" } };
+    const body = {
+      ...(JSON.parse(row.body) as Site),
+      collections: {
+        places: {},
+        events: {
+          fields: [
+            {
+              key: "venue",
+              type: "reference",
+              labels: label,
+              localized: false,
+              collections: ["places"],
+            },
+          ],
+        },
+      },
+    } as Site;
+    row.body = canonicalJson(body);
+    row.hash = await nodeHash(body);
+    for (const query of ["", "?mode=replace"]) {
+      const res = await app.request(`/api/admin/sites/${site.id}/bundle${query}`, {
+        method: "PUT",
+        headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify(bundle),
+      });
+      expect(res.status, query).toBe(409);
+      const answer = (await res.json()) as {
+        error: string;
+        details: { issues: { path: string }[] };
+      };
+      expect(answer.error).toBe("fields_unsupported");
+      expect(answer.details.issues.map((i) => i.path)).toEqual([
+        "collections/events/fields/0/type",
+      ]);
+    }
+    expect(await b.store.getSite(site.id)).toBeUndefined();
   });
 });
 

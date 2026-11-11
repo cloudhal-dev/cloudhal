@@ -1165,6 +1165,130 @@ export const SiteSchema = {
               "description": "The value is a list of option values. Absent: false."
             }
           }
+        },
+        {
+          "title": "ReferenceField",
+          "type": "object",
+          "description": "RFC-0045: entries of other (or this) collections of the same site, by translation group id (entry_…): the id of the group's original, which every language version and edition carries in translation.group.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized",
+            "collections"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "reference"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version picks its own targets; false: only the translation group's original holds them, and every version resolves them in its own language."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs at least one target. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "collections": {
+              "type": "array",
+              "description": "The collections a target may belong to: declared collections of this site (checked in code).",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/Slug"
+              }
+            },
+            "multiple": {
+              "type": "boolean",
+              "description": "The value is an ordered list of targets. Absent: false."
+            },
+            "maxItems": {
+              "type": "integer",
+              "description": "With multiple: at most this many targets. Absent: 20.",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "where": {
+              "type": "array",
+              "description": "Only with one target collection: conditions on its list fields that a newly chosen target must meet (no `now`; checked in code). Narrows the picker; not re-checked when the target changes later.",
+              "minItems": 1,
+              "maxItems": 4,
+              "items": {
+                "$ref": "#/$defs/FieldCondition"
+              }
+            }
+          }
+        },
+        {
+          "title": "RepeaterField",
+          "type": "object",
+          "description": "RFC-0045: an ordered list of items, each a flat object of sub-fields. A repeater cannot contain a repeater.",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "localized",
+            "fields"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "repeater"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "localized": {
+              "type": "boolean",
+              "description": "true: each language version has its own list (missing reads the original's); false: only the original holds the list."
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "An entry in review or published needs at least one item. Absent: false."
+            },
+            "migration": {
+              "$ref": "#/$defs/FieldMigration"
+            },
+            "fields": {
+              "type": "array",
+              "description": "The sub-fields of every item, in form order. Unique keys (checked in code).",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": {
+                "$ref": "#/$defs/SubFieldDefinition"
+              }
+            },
+            "maxItems": {
+              "type": "integer",
+              "description": "At most this many items. Absent: 20.",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "itemLabel": {
+              "$ref": "#/$defs/FieldKey",
+              "description": "The text, select or reference sub-field that names an item in Studio and approval prompts. Absent: the first such sub-field."
+            }
+          }
         }
       ]
     },
@@ -1228,11 +1352,17 @@ export const SiteSchema = {
             "datetime",
             "url",
             "image",
-            "select"
+            "select",
+            "reference",
+            "repeater"
           ]
         },
         "fromLocalized": {
           "type": "boolean"
+        },
+        "sub": {
+          "$ref": "#/$defs/FieldKey",
+          "description": "RFC-0045: the repeater's sub-field the operation rewrites (its key once the operation is done); fromKey and fromType then describe the sub-field."
         }
       }
     },
@@ -1900,6 +2030,299 @@ export const SiteSchema = {
               "minLength": 1,
               "maxLength": 200,
               "pattern": "^[^\\x00-\\x1F\\x7F]+$"
+            }
+          }
+        }
+      ]
+    },
+    "SubFieldDefinition": {
+      "description": "RFC-0045: one sub-field of a repeater item, discriminated by `type`. Only types whose value is a scalar: no datetime, no multiple select or reference, no repeater. No localized and no migration: the repeater's apply.",
+      "oneOf": [
+        {
+          "title": "TextSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "text"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            },
+            "maxLength": {
+              "type": "integer",
+              "description": "Absent: 5000.",
+              "minimum": 1,
+              "maximum": 5000
+            },
+            "multiline": {
+              "type": "boolean",
+              "description": "Line breaks allowed. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "RichTextSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "richText"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "NumberSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "number"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            },
+            "integer": {
+              "type": "boolean",
+              "description": "Whole numbers only. Absent: false."
+            },
+            "minimum": {
+              "type": "number"
+            },
+            "maximum": {
+              "type": "number"
+            }
+          }
+        },
+        {
+          "title": "BooleanSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "boolean"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            }
+          }
+        },
+        {
+          "title": "DateSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "date"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "UrlSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "url"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "ImageSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "image"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            }
+          }
+        },
+        {
+          "title": "SelectSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "options"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "select"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            },
+            "options": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 50,
+              "items": {
+                "$ref": "#/$defs/FieldOption"
+              }
+            }
+          }
+        },
+        {
+          "title": "ReferenceSubField",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "type",
+            "labels",
+            "collections"
+          ],
+          "properties": {
+            "key": {
+              "$ref": "#/$defs/FieldKey"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "reference"
+              ]
+            },
+            "labels": {
+              "$ref": "#/$defs/FieldLabels"
+            },
+            "requiredToPublish": {
+              "type": "boolean",
+              "description": "Every item of an entry in review or published needs a value. Absent: false."
+            },
+            "collections": {
+              "type": "array",
+              "description": "The collections a target may belong to (checked in code).",
+              "minItems": 1,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/Slug"
+              }
             }
           }
         }
@@ -3381,7 +3804,7 @@ export const ContentEntrySchema = {
     },
     "fields": {
       "type": "object",
-      "description": "Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value.",
+      "description": "Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value. A reference value is a translation group id or a list of them, a repeater value a list of flat objects (RFC-0045).",
       "additionalProperties": true
     },
     "tags": {

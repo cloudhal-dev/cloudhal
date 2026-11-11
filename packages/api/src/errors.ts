@@ -91,6 +91,11 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   structured_data_invalid: 422,
   invalid_expiry: 422,
   list_field_in_use: 409,
+  // RFC-0045 (collections stage 4): a type this server does not take yet is 409, like
+  // gates_unsupported (a deploy, not the request, changes the answer); the rest 422.
+  fields_unsupported: 409,
+  reference_target_unknown: 422,
+  too_many_references: 422,
   reserved_key: 400,
   immutable_field: 400,
   primary_not_assigned: 422,

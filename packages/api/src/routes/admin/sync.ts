@@ -24,6 +24,16 @@ import { OPERATOR_ACTOR } from "./shared.ts";
 const MAX_MEDIA_PUT = 100 * 1024 * 1024;
 
 /** Bundle export/import, primary domain, media blobs. */
+/**
+ * Refusals a push answers with their own code and details instead of 400 bad_request (RFC-0008:
+ * 409 gates_unsupported, 400 invalid_availability; RFC-0045: 409 fields_unsupported with its issues).
+ */
+const KEPT_CODES: ReadonlySet<string> = new Set([
+  "gates_unsupported",
+  "invalid_availability",
+  "fields_unsupported",
+]);
+
 export function syncAdminRoutes(deps: AdminDeps): Hono<Env> {
   const { storage } = deps;
   return new Hono<Env>()
@@ -144,12 +154,7 @@ export function syncAdminRoutes(deps: AdminDeps): Hono<Env> {
             { error: "conflict", message: e.message, details: { differing: e.differing } },
             409,
           );
-        // RFC-0008: refused gates keep their code (409 gates_unsupported, 400 invalid_availability).
-        if (
-          e instanceof InvariantError &&
-          (e.code === "gates_unsupported" || e.code === "invalid_availability")
-        )
-          throw e;
+        if (e instanceof InvariantError && KEPT_CODES.has(e.code)) throw e;
         if (e instanceof Error) throw badRequest(e.message);
         throw e;
       }

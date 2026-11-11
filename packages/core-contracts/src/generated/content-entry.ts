@@ -100,7 +100,7 @@ export interface ContentEntry {
   summary?: string;
   body: Body;
   /**
-   * Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value.
+   * Collection-specific values, keyed by field. A collection with typed fields (RFC-0041, Site.collections.<key>.fields) checks each value against its definition on write; otherwise any JSON. An absent key means no value. A reference value is a translation group id or a list of them, a repeater value a list of flat objects (RFC-0045).
    */
   fields: {
     [k: string]: unknown | undefined;

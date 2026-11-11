@@ -2,10 +2,17 @@
  * RFC-0041 / ADR-0043: shared names of typed custom fields — the issue shape, the limits, the
  * reserved keys and small helpers. Worker-safe, no imports beyond contract types.
  */
-import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
+import type { FieldDefinition, Site, SubFieldDefinition } from "@cloudhal/core-contracts";
 
 export type FieldType = FieldDefinition["type"];
+export type SubFieldType = SubFieldDefinition["type"];
 export type SelectFieldDefinition = Extract<FieldDefinition, { type: "select" }>;
+export type ReferenceFieldDefinition = Extract<FieldDefinition, { type: "reference" }>;
+export type RepeaterFieldDefinition = Extract<FieldDefinition, { type: "repeater" }>;
+/** RFC-0045: the two stage-4 types, refused on every write path until rollout step 7. */
+export type ReferenceFieldType = "reference" | "repeater";
+/** The types every writer accepts today (`FIELD_TYPES`). */
+export type EnabledFieldType = Exclude<FieldType, ReferenceFieldType>;
 /** What field code reads of a site: its collection settings. */
 export interface SiteFields {
   collections?: Site["collections"] | undefined;
@@ -15,8 +22,11 @@ export interface SiteFields {
   defaultLocale?: string | undefined;
 }
 
-/** The nine closed types, in the contract's order. */
-export const FIELD_TYPES: readonly FieldType[] = [
+/**
+ * The nine types every writer accepts, in the contract's order: what Studio, MCP, the API and the
+ * CLI offer. The stage-4 types (`REFERENCE_FIELD_TYPES`) are not among them until rollout step 7.
+ */
+export const FIELD_TYPES: readonly EnabledFieldType[] = [
   "text",
   "richText",
   "number",
@@ -27,6 +37,21 @@ export const FIELD_TYPES: readonly FieldType[] = [
   "image",
   "select",
 ];
+
+/** RFC-0045: `reference` and `repeater`, gated (`fields_unsupported`) until rollout step 7. */
+export const REFERENCE_FIELD_TYPES: readonly ReferenceFieldType[] = ["reference", "repeater"];
+
+/** Every type of the contract, in its order (`FIELD_TYPES` then `REFERENCE_FIELD_TYPES`). */
+export const ALL_FIELD_TYPES: readonly FieldType[] = [...FIELD_TYPES, ...REFERENCE_FIELD_TYPES];
+
+const KNOWN_TYPES: ReadonlySet<string> = new Set(ALL_FIELD_TYPES);
+
+/** True for a type of this contract version; a newer writer's type is not (RFC-0045 §4). */
+export const isKnownFieldType = (type: string): type is FieldType => KNOWN_TYPES.has(type);
+
+/** True for `reference` and `repeater`. */
+export const isReferenceFieldType = (type: string): type is ReferenceFieldType =>
+  type === "reference" || type === "repeater";
 
 /** RFC-0041 §2, §4 and Security: every limit in one place. */
 export const FIELD_LIMITS = {
@@ -43,6 +68,12 @@ export const FIELD_LIMITS = {
   richTextLength: 50_000,
   urlLength: 2048,
   selectOptions: 50,
+  /** RFC-0045: a multiple reference's or a repeater's `maxItems` when absent. */
+  listItems: 20,
+  /** RFC-0045: fields plus repeater sub-fields per collection. */
+  leavesPerCollection: 100,
+  /** RFC-0045: reference values per entry, across fields and repeater items. */
+  referencesPerEntry: 100,
 } as const;
 
 /**
@@ -83,6 +114,9 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   "toString",
   "valueOf",
   "hasOwnProperty",
+  "toLocaleString",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
 ]);
 
 export type FieldIssueCode =
@@ -109,7 +143,15 @@ export type FieldIssueCode =
   /** Definitions: a change that could lose or reinterpret values (§6). */
   | "field_change_needs_operation"
   /** Reading: a value that no longer fits its definition resolves to `undefined`. */
-  | "field_value_unreadable";
+  | "field_value_unreadable"
+  /** RFC-0045: a reference or repeater definition this server does not accept yet. */
+  | "fields_unsupported"
+  /** RFC-0045: a reference's `collections` names a collection the site does not have. */
+  | "reference_target_unknown"
+  /** RFC-0045: a reference's `where` does not fit its target collection's list fields. */
+  | "invalid_query"
+  /** RFC-0045: more than 100 reference values in one entry. */
+  | "too_many_references";
 
 /** One problem, at a slash path (`fields/startsAt/at`, `collections/events/fields/2/key`). */
 export interface FieldIssue {
@@ -125,6 +167,10 @@ export function fieldDefinitions(site: SiteFields, collection: string): readonly
 
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** `record[key]` when it is the record's own property; never a prototype member (`isPrototypeOf`). */
+export const ownValue = (record: Readonly<Record<string, unknown>>, key: string): unknown =>
+  Object.hasOwn(record, key) ? record[key] : undefined;
 
 /** Structural equality of JSON values (key order ignored). */
 export function sameJson(a: unknown, b: unknown): boolean {

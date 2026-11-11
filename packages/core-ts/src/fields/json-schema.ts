@@ -6,17 +6,27 @@
  * `description`. Top-level properties are not required. Numeric and length limits, which
  * Anthropic's strict mode drops, are written into each `description`; the checker enforces them.
  * Generated from definitions only, never from text an agent wrote.
+ *
+ * RFC-0045 §6: references are group id strings (or lists of them) and repeaters arrays of closed
+ * flat objects; the root is always an object, with no `$ref` and no recursion. With
+ * `{ strict: true }` the same schema in its strict profile (`json-schema-strict.ts`).
  */
-import type { FieldDefinition } from "@cloudhal/core-contracts";
+import type { FieldDefinition, SubFieldDefinition } from "@cloudhal/core-contracts";
+import { type EmitWords, emitReference, emitRepeater } from "../references/json-schema.ts";
+import { strictFieldsSchema } from "./json-schema-strict.ts";
 import { ASSET_ID_PATTERN } from "./props.ts";
-import { FIELD_LIMITS, fieldHelp, fieldLabel, optionLabel } from "./types.ts";
+import { FIELD_LIMITS, fieldHelp, fieldLabel, isKnownFieldType, optionLabel } from "./types.ts";
+
+export type JsonType = "object" | "string" | "number" | "integer" | "boolean" | "array";
 
 /** The subset of JSON Schema this emitter writes. */
 export interface JsonSchema {
-  type: "object" | "string" | "number" | "integer" | "boolean" | "array";
+  /** A list only in the strict profile: `[T, "null"]`. */
+  type: JsonType | readonly [JsonType, "null"];
   title?: string;
   description?: string;
-  enum?: string[];
+  /** `null` only in the strict profile. */
+  enum?: (string | null)[];
   pattern?: string;
   format?: "date" | "date-time";
   items?: JsonSchema;
@@ -39,12 +49,16 @@ export const JSON_SCHEMA_KEYWORDS: readonly string[] = [
   "additionalProperties",
 ];
 
-interface Words {
-  locale: string;
-  defaultLocale: string;
-}
+type Words = EmitWords;
 
 type Emit = (def: FieldDefinition, words: Words) => { schema: JsonSchema; notes: string[] };
+
+export interface FieldsJsonSchemaOptions {
+  /** The strict profile (`fieldsSchemaStrict`): every property required, optional ones nullable. */
+  strict?: boolean | undefined;
+  /** A collection's name for reference targets ("Places"); absent: its key. */
+  collectionName?: ((key: string) => string | undefined) | undefined;
+}
 
 const EMIT: Record<FieldDefinition["type"], Emit> = {
   text: (def) => {
@@ -118,6 +132,33 @@ const EMIT: Record<FieldDefinition["type"], Emit> = {
         }
       : { schema: one, notes: [`One of: ${listed}.`] };
   },
+  reference: (def, words) =>
+    def.type === "reference"
+      ? emitReference(def, words)
+      : { schema: { type: "string" }, notes: [] },
+  repeater: (def, words) =>
+    def.type === "repeater"
+      ? emitRepeater(def, words, subFieldJsonSchema)
+      : { schema: { type: "array" }, notes: [] },
+};
+
+/** A repeater sub-field's schema: its type's, with its label, help and limits (no localization note). */
+function subFieldJsonSchema(sub: SubFieldDefinition, words: Words): JsonSchema {
+  const def = sub as unknown as FieldDefinition;
+  const { schema, notes } = EMIT[sub.type](def, words);
+  const help = fieldHelp(def, words.locale, words.defaultLocale);
+  if (sub.type !== "boolean" && sub.requiredToPublish) notes.push("Needed to publish.");
+  return {
+    ...schema,
+    title: fieldLabel(def, words.locale, words.defaultLocale),
+    description: [help, ...notes].filter(Boolean).join(" "),
+  };
+}
+
+const SHARED: Partial<Record<FieldDefinition["type"], string>> = {
+  reference:
+    "Set on the original only; every language version shows the targets in its own language.",
+  repeater: "Set on the original only; every language version shows this list.",
 };
 
 /** One field's schema, with its label as `title` and help plus limits as `description`. */
@@ -125,11 +166,13 @@ export function fieldJsonSchema(
   def: FieldDefinition,
   locale: string,
   defaultLocale = locale,
+  options: Pick<FieldsJsonSchemaOptions, "collectionName"> = {},
 ): JsonSchema {
-  const words = { locale, defaultLocale };
+  const words: Words = { locale, defaultLocale, collectionName: options.collectionName };
   const { schema, notes } = EMIT[def.type](def, words);
   const help = fieldHelp(def, locale, defaultLocale);
-  if (!def.localized) notes.push("Set on the original only; translations read it from there.");
+  if (!def.localized)
+    notes.push(SHARED[def.type] ?? "Set on the original only; translations read it from there.");
   if (def.type !== "boolean" && def.requiredToPublish) notes.push("Needed to publish.");
   return {
     ...schema,
@@ -140,20 +183,25 @@ export function fieldJsonSchema(
 
 /**
  * The schema of a collection's `fields` object, in `locale` (labels fall back to
- * `defaultLocale`, then any). Every property is optional; omit a key to leave it unset.
+ * `defaultLocale`, then any). Every property is optional; omit a key to leave it unset. With
+ * `strict`, its strict profile. A definition of a type this version does not know is left out.
  */
 export function fieldsJsonSchema(
   defs: readonly FieldDefinition[],
   locale: string,
   defaultLocale = locale,
+  options: FieldsJsonSchemaOptions = {},
 ): JsonSchema {
   const properties: Record<string, JsonSchema> = {};
-  for (const def of defs) properties[def.key] = fieldJsonSchema(def, locale, defaultLocale);
-  return {
+  for (const def of defs)
+    if (isKnownFieldType(def.type))
+      properties[def.key] = fieldJsonSchema(def, locale, defaultLocale, options);
+  const open: JsonSchema = {
     type: "object",
     description:
       "Typed custom fields of this collection. Every field is optional; leave a key out to leave it unset.",
     properties,
     additionalProperties: false,
   };
+  return options.strict ? strictFieldsSchema(open) : open;
 }

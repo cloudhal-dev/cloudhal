@@ -161,6 +161,38 @@ export function describeFieldsApi(label: string, factory: ApiStoreFactory): void
       expect(made.body.fields).toEqual(loose);
     });
 
+    it("refuses reference and repeater definitions until they are enabled (RFC-0045, 409)", async () => {
+      const venue = {
+        key: "venue",
+        type: "reference",
+        labels: { en: { label: "Venue" } },
+        localized: false,
+        collections: ["posts"],
+      };
+      const speakers = {
+        key: "speakers",
+        type: "repeater",
+        labels: { en: { label: "Speakers" } },
+        localized: false,
+        fields: [{ key: "name", type: "text", labels: { en: { label: "Name" } } }],
+      };
+      for (const def of [venue, speakers])
+        for (const query of ["?dryRun=1", ""]) {
+          const refused = await put({ fields: [def] }, query);
+          expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+          expect(refused.body.error).toBe("fields_unsupported");
+        }
+      expect((await site()).collections?.events).toBeUndefined();
+      // and no field operation turns a field into one (the API takes the nine types only)
+      expect((await put(EVENTS)).status).toBe(200);
+      const ops = `/api/sites/${siteId}/collections/events/fields/operations`;
+      const retype = await call(ops, {
+        method: "POST",
+        body: JSON.stringify({ op: "change_field_type", key: "venue", type: "reference" }),
+      });
+      expect(retype.status).toBe(400);
+    });
+
     it("field operations: dry run, run, status, continue and revert (RFC-0041 §6)", async () => {
       expect((await put(EVENTS)).status).toBe(200);
       const made = await create({ venue: "Hall", level: "expert" });

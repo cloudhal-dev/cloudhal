@@ -15,7 +15,7 @@ import {
   parseFieldQuery,
 } from "../src/fields/query.ts";
 import { type ResolvedFields, resolveFields } from "../src/fields/resolve.ts";
-import { FIELD_TYPES } from "../src/fields/types.ts";
+import { ALL_FIELD_TYPES, FIELD_TYPES } from "../src/fields/types.ts";
 
 const L = { en: { label: "x" } };
 const DEFS: FieldDefinition[] = [
@@ -74,7 +74,9 @@ const issues = (query: FieldQuery, listFields: string[] = ALL) =>
 
 describe("the operator table (§4)", () => {
   it("covers every field type, and only number, date and datetime sort", () => {
-    expect(Object.keys(FIELD_QUERY_OPS).sort()).toEqual([...FIELD_TYPES].sort());
+    expect(Object.keys(FIELD_QUERY_OPS).sort()).toEqual([...ALL_FIELD_TYPES].sort());
+    // RFC-0045: neither stage-4 type is listable yet.
+    expect([FIELD_QUERY_OPS.reference, FIELD_QUERY_OPS.repeater]).toEqual([[], []]);
     expect(FIELD_TYPES.filter(canOrderBy)).toEqual(["number", "date", "datetime"]);
     expect(FIELD_QUERY_OPS.boolean).toEqual(["eq"]);
     expect(FIELD_QUERY_OPS.richText).toEqual(["set", "unset"]);

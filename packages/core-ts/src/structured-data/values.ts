@@ -197,6 +197,9 @@ const FIELD: Record<FieldDefinition["type"], FieldStep> = {
   select(value, _def, { spec }) {
     return fromVocabulary(spec, value);
   },
+  // RFC-0045: no value until rollout step 8 (`ReferenceValueSource`); a repeater never maps.
+  reference: () => undefined,
+  repeater: () => undefined,
 };
 
 function imageUrl(image: { assetId?: string; src?: string }, ctx: StructuredDataContext) {

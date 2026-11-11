@@ -6,11 +6,16 @@
  */
 import type { CollectionSettings, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import { SiteSchema } from "@cloudhal/core-contracts";
-import { fieldLabel, fieldsJsonSchema } from "@cloudhal/core-ts/fields";
+import { fieldLabel, fieldsJsonSchema, isReferenceFieldType } from "@cloudhal/core-ts/fields";
 import { type JsonSchema, quote } from "./common.ts";
+import { defsClosure } from "./schema-transforms.ts";
 
 const DEFS = SiteSchema.$defs as Record<string, JsonSchema>;
 const VARIANTS = (DEFS.FieldDefinition as JsonSchema).oneOf as JsonSchema[];
+
+/** A variant's `type` value (`{ enum: ["text"] }`). */
+const typeOf = (variant: JsonSchema): string =>
+  ((variant.properties as Record<string, { enum?: string[] }>).type?.enum ?? [])[0] ?? "";
 
 /** A definition variant without `migration`: only field operations write the marker. */
 function withoutMarker(variant: JsonSchema): JsonSchema {
@@ -18,7 +23,19 @@ function withoutMarker(variant: JsonSchema): JsonSchema {
   return { ...variant, properties };
 }
 
-/** `update_collection`'s `fields`: the contract's definitions, minus the operation marker. */
+/**
+ * The definitions `update_collection` takes: the contract's variants of the enabled types (RFC-0045's
+ * `reference` and `repeater` join at rollout step 7), each without the operation marker.
+ */
+const FIELD_DEFINITION: JsonSchema = {
+  ...DEFS.FieldDefinition,
+  oneOf: VARIANTS.filter((v) => !isReferenceFieldType(typeOf(v))).map(withoutMarker),
+};
+
+/**
+ * `update_collection`'s `fields`: the enabled definitions, minus the operation marker, with every
+ * `$defs` entry they reach (`defsClosure`), so a contract change cannot leave a `$ref` dangling.
+ */
 export const FIELD_DEFINITIONS_INPUT: JsonSchema = {
   type: "array",
   maxItems: 30,
@@ -26,16 +43,8 @@ export const FIELD_DEFINITIONS_INPUT: JsonSchema = {
     "The collection's typed custom fields, the whole list in form order ([] removes them all). Free edits only: add fields, reorder, change labels and help, add select options or change their labels, toggle multiline, searchable or requiredToPublish, change maxLength/minimum/maximum. Renaming a key, changing a type, localized or multiple, and dropping a key or option still in use need rename_field, change_field_type, set_field_localized or remove_field.",
   items: { $ref: "#/$defs/FieldDefinition" },
   $defs: {
-    FieldDefinition: {
-      ...DEFS.FieldDefinition,
-      oneOf: VARIANTS.map(withoutMarker),
-    },
-    FieldKey: DEFS.FieldKey,
-    FieldLabel: DEFS.FieldLabel,
-    FieldLabels: DEFS.FieldLabels,
-    FieldOption: DEFS.FieldOption,
-    Slug: DEFS.Slug,
-    Locale: DEFS.Locale,
+    ...defsClosure(SiteSchema as JsonSchema, FIELD_DEFINITION),
+    FieldDefinition: FIELD_DEFINITION,
   },
 };
 

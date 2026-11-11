@@ -4,6 +4,7 @@
  * `details.issues`, each at its slash path (`fields/startsAt/at`), so the hint only names the tool.
  */
 import type { InvariantCode } from "@cloudhal/core-ts";
+import { FIELD_TYPES } from "@cloudhal/core-ts/fields";
 
 const OPERATIONS = "rename_field, change_field_type, set_field_localized or remove_field";
 
@@ -37,6 +38,12 @@ const HINTS: Partial<Record<InvariantCode, string>> = {
     "fix the mappings at the paths in details.issues: list_collections shows a preset's paths, which are required and the sources each takes (structuredData.paths); field sources need a field of a fitting type, and required values come from the entry, never a constant",
   invalid_expiry:
     "expiry.field must be a date or datetime field of the collection (list_collections → fields)",
+  // RFC-0045 (references and repeaters; refused until they are enabled)
+  fields_unsupported: `reference and repeater fields are not available on this server yet: give the field one of the types update_collection's fields input takes (${FIELD_TYPES.join(", ")}; text for now), and keep the rest of the change as it is`,
+  reference_target_unknown:
+    "a reference field's collections must be collections of this site (list_collections)",
+  too_many_references:
+    "an entry holds at most 100 references across its fields and repeater items; remove some",
   list_field_in_use:
     "contentList sections on the pages in details.pages still filter or sort by that field: change their where/orderBy first (update_page), then try again",
 };

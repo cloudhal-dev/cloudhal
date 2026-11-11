@@ -454,12 +454,16 @@ function validateObject(
     return;
   }
   const at = (key: string) => (path ? `${path}/${key}` : key);
+  // Own keys and values only: `constructor`, `toString` or `__proto__` are not props of a block,
+  // and a prop named `isPrototypeOf` the value leaves out is absent, not Object.prototype's.
+  const own = (key: string) => (Object.hasOwn(v, key) ? v[key] : undefined);
   for (const key of Object.keys(v))
-    if (!(key in s.properties)) out.push({ path: at(key), message: "not a prop of this block" });
+    if (!Object.hasOwn(s.properties, key))
+      out.push({ path: at(key), message: "not a prop of this block" });
   for (const key of s.required ?? [])
-    if (v[key] === undefined) out.push({ path: at(key), message: "required" });
+    if (own(key) === undefined) out.push({ path: at(key), message: "required" });
   for (const [key, child] of Object.entries(s.properties)) {
-    const value = v[key];
+    const value = own(key);
     if (value === undefined) continue;
     if (child.type === "array") {
       if (!Array.isArray(value)) {

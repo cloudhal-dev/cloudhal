@@ -19,10 +19,19 @@ export const NO_LIST = "none";
 
 /**
  * Definition properties left out of the fingerprint: they never change a resolved value (labels,
- * help, publish rules, site search). Every other property counts, including future ones (a unit
- * test walks the schema and fails on a property that is neither here nor fingerprinted).
+ * help, publish rules, site search; RFC-0045's `where`, which narrows the picker and is never
+ * re-checked, and `itemLabel`, which only names items in Studio). Every other property counts,
+ * including future ones (a unit test walks the schema and fails on a property that is neither here
+ * nor fingerprinted). A reference's `collections`, `multiple` and `maxItems` and a repeater's
+ * `fields` count: they decide which stored values still read.
  */
-export const EXCLUDED: readonly string[] = ["labels", "requiredToPublish", "searchable"];
+export const EXCLUDED: readonly string[] = [
+  "labels",
+  "requiredToPublish",
+  "searchable",
+  "where",
+  "itemLabel",
+];
 
 /** One listed definition as fingerprinted: options keep their values, not their labels. */
 function shape(def: FieldDefinition): Record<string, unknown> {

@@ -7,6 +7,7 @@
  */
 import type { FieldDefinition, PublishStatus } from "@cloudhal/core-contracts";
 import { type BlockRegistry, createBlockRegistry } from "../blocks.ts";
+import { referenceCountIssues, requiredSubFieldIssues } from "../references/values.ts";
 import { type FieldsEntry, type FieldsOriginal, hasFieldValue, resolveFields } from "./resolve.ts";
 import { FIELD_LIMITS, type FieldIssue, jsonBytes, type SiteFields, sameJson } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
@@ -82,6 +83,12 @@ export function checkFieldValues(
     }
     out.push(...valueIssues(def, value, path, { blocks }));
   }
+  // RFC-0045: the per-entry reference cap, over every value (once one changed).
+  const touchesReferences = changedKeys(input).some((k) => {
+    const type = byKey.get(k)?.type;
+    return type === "reference" || type === "repeater";
+  });
+  if (out.length === 0 && touchesReferences) out.push(...referenceCountIssues(defs, input.values));
   return out;
 }
 
@@ -103,6 +110,8 @@ export function checkRequiredToPublish(
   const out: FieldIssue[] = [];
   for (const [key, field] of Object.entries(resolveFields(site, entry, original))) {
     const def = field.def;
+    // RFC-0045: a repeater's required sub-fields need a value in every item.
+    out.push(...requiredSubFieldIssues(def, field.value, `fields/${key}`));
     if (def.type === "boolean" || def.requiredToPublish !== true) continue;
     if (!hasFieldValue(field.value))
       out.push({

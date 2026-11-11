@@ -2772,6 +2772,70 @@ pub enum FieldDefinition {
         )]
         required_to_publish: ::std::option::Option<bool>,
     },
+    #[doc = "ReferenceField\n\nRFC-0045: entries of other (or this) collections of the same site, by translation group id (entry_…): the id of the group's original, which every language version and edition carries in translation.group."]
+    #[serde(rename = "reference")]
+    Reference {
+        #[doc = "The collections a target may belong to: declared collections of this site (checked in code)."]
+        collections: ::std::vec::Vec<Slug>,
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version picks its own targets; false: only the translation group's original holds them, and every version resolves them in its own language."]
+        localized: bool,
+        #[doc = "With multiple: at most this many targets. Absent: 20."]
+        #[serde(
+            rename = "maxItems",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        max_items: ::std::option::Option<::std::num::NonZeroU64>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "The value is an ordered list of targets. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        multiple: ::std::option::Option<bool>,
+        #[doc = "An entry in review or published needs at least one target. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+        #[doc = "Only with one target collection: conditions on its list fields that a newly chosen target must meet (no `now`; checked in code). Narrows the picker; not re-checked when the target changes later."]
+        #[serde(
+            rename = "where",
+            default,
+            skip_serializing_if = "::std::vec::Vec::is_empty"
+        )]
+        where_: ::std::vec::Vec<FieldCondition>,
+    },
+    #[doc = "RepeaterField\n\nRFC-0045: an ordered list of items, each a flat object of sub-fields. A repeater cannot contain a repeater."]
+    #[serde(rename = "repeater")]
+    Repeater {
+        #[doc = "The sub-fields of every item, in form order. Unique keys (checked in code)."]
+        fields: ::std::vec::Vec<SubFieldDefinition>,
+        #[doc = "The text, select or reference sub-field that names an item in Studio and approval prompts. Absent: the first such sub-field."]
+        #[serde(
+            rename = "itemLabel",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        item_label: ::std::option::Option<FieldKey>,
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "true: each language version has its own list (missing reads the original's); false: only the original holds the list."]
+        localized: bool,
+        #[doc = "At most this many items. Absent: 20."]
+        #[serde(
+            rename = "maxItems",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        max_items: ::std::option::Option<::std::num::NonZeroU64>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        migration: ::std::option::Option<FieldMigration>,
+        #[doc = "An entry in review or published needs at least one item. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
 }
 #[doc = "The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code)."]
 #[derive(:: serde :: Serialize, Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -2979,6 +3043,9 @@ pub struct FieldMigration {
     pub from_type: ::std::option::Option<FieldMigrationFromType>,
     #[doc = "The operation's \"before\" snapshot."]
     pub id: Id,
+    #[doc = "RFC-0045: the repeater's sub-field the operation rewrites (its key once the operation is done); fromKey and fromType then describe the sub-field."]
+    #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+    pub sub: ::std::option::Option<FieldKey>,
 }
 #[doc = "`FieldMigrationFromType`"]
 #[derive(
@@ -3012,6 +3079,10 @@ pub enum FieldMigrationFromType {
     Image,
     #[serde(rename = "select")]
     Select,
+    #[serde(rename = "reference")]
+    Reference,
+    #[serde(rename = "repeater")]
+    Repeater,
 }
 impl ::std::fmt::Display for FieldMigrationFromType {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
@@ -3025,6 +3096,8 @@ impl ::std::fmt::Display for FieldMigrationFromType {
             Self::Url => f.write_str("url"),
             Self::Image => f.write_str("image"),
             Self::Select => f.write_str("select"),
+            Self::Reference => f.write_str("reference"),
+            Self::Repeater => f.write_str("repeater"),
         }
     }
 }
@@ -3041,6 +3114,8 @@ impl ::std::str::FromStr for FieldMigrationFromType {
             "url" => Ok(Self::Url),
             "image" => Ok(Self::Image),
             "select" => Ok(Self::Select),
+            "reference" => Ok(Self::Reference),
+            "repeater" => Ok(Self::Repeater),
             _ => Err("invalid value".into()),
         }
     }
@@ -5451,6 +5526,129 @@ impl<'de> ::serde::Deserialize<'de> for StructuredDataSourceValue {
                 <D::Error as ::serde::de::Error>::custom(e.to_string())
             })
     }
+}
+#[doc = "RFC-0045: one sub-field of a repeater item, discriminated by `type`. Only types whose value is a scalar: no datetime, no multiple select or reference, no repeater. No localized and no migration: the repeater's apply."]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", deny_unknown_fields)]
+pub enum SubFieldDefinition {
+    #[doc = "TextSubField"]
+    #[serde(rename = "text")]
+    Text {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Absent: 5000."]
+        #[serde(
+            rename = "maxLength",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        max_length: ::std::option::Option<::std::num::NonZeroU64>,
+        #[doc = "Line breaks allowed. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        multiline: ::std::option::Option<bool>,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "RichTextSubField"]
+    #[serde(rename = "richText")]
+    RichText {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "NumberSubField"]
+    #[serde(rename = "number")]
+    Number {
+        #[doc = "Whole numbers only. Absent: false."]
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        integer: ::std::option::Option<bool>,
+        key: FieldKey,
+        labels: FieldLabels,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        maximum: ::std::option::Option<f64>,
+        #[serde(skip_serializing_if = "::std::option::Option::is_none")]
+        minimum: ::std::option::Option<f64>,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "BooleanSubField"]
+    #[serde(rename = "boolean")]
+    Boolean { key: FieldKey, labels: FieldLabels },
+    #[doc = "DateSubField"]
+    #[serde(rename = "date")]
+    Date {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "UrlSubField"]
+    #[serde(rename = "url")]
+    Url {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "ImageSubField"]
+    #[serde(rename = "image")]
+    Image {
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "SelectSubField"]
+    #[serde(rename = "select")]
+    Select {
+        key: FieldKey,
+        labels: FieldLabels,
+        options: ::std::vec::Vec<FieldOption>,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
+    #[doc = "ReferenceSubField"]
+    #[serde(rename = "reference")]
+    Reference {
+        #[doc = "The collections a target may belong to (checked in code)."]
+        collections: ::std::vec::Vec<Slug>,
+        key: FieldKey,
+        labels: FieldLabels,
+        #[doc = "Every item of an entry in review or published needs a value. Absent: false."]
+        #[serde(
+            rename = "requiredToPublish",
+            skip_serializing_if = "::std::option::Option::is_none"
+        )]
+        required_to_publish: ::std::option::Option<bool>,
+    },
 }
 #[doc = "One element of a generative UI surface (RFC-0020 §1), in a flat list: `component` names a catalog entry (a PascalCase built-in primitive such as `Stack`, or a registry block type such as `callout`), `children` refer to other ids of the same surface, and `props` follow the entry's schema, which the store checks. Field names follow A2UI v0.9."]
 #[derive(:: serde :: Deserialize, :: serde :: Serialize, Clone, Debug, PartialEq)]

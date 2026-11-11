@@ -27,6 +27,7 @@ import {
 import {
   assertIdsFree,
   assertNodeBody,
+  assertSnapshotFieldTypes,
   assertTimeZone,
   checkBundle,
   listedMedia,
@@ -349,6 +350,12 @@ export async function prepareImport(
   await assertIdsFree(to, bundle);
   const refs = bundle.snapshots.map((s) => ({ id: s.id, refs: snapshotRefs(s) }));
   const blobs = await bodiesToWrite(to, bundle, refs);
+  // RFC-0045 §1: the site bodies of snapshots too, once verified (rollout step 2 passes the
+  // capability, CopySiteOptions.fieldTypes, here and to checkBundle).
+  const siteHashes = new Set(
+    refs.flatMap((s) => s.refs.filter((r) => r.kind === "site").map((r) => r.hash)),
+  );
+  await assertSnapshotFieldTypes(siteId, blobs, siteHashes, undefined);
   await assertSnapshotsBacked(to, bundle, refs);
   const snapshots = await snapshotsToAdd(to, bundle);
   const project = await projectToAdd(to, bundle);

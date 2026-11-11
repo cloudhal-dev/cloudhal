@@ -33,7 +33,9 @@ describe("checkFieldDefinitions", () => {
     for (const name of await readdir(FIXTURES)) {
       const data = JSON.parse(await readFile(path.join(FIXTURES, name), "utf8")) as Site;
       expect(isValid("site", data), name).toBe(true);
-      expect(checkFieldDefinitions(data), name).toEqual([]);
+      // RFC-0045: stage-4 definitions pass only once a writer's capability allows them.
+      expect(checkFieldDefinitions(data, undefined, { referenceTypes: true }), name).toEqual([]);
+      if (name !== "collection-stage4.json") expect(checkFieldDefinitions(data), name).toEqual([]);
     }
   });
 
@@ -57,7 +59,8 @@ describe("checkFieldDefinitions", () => {
         }),
       ]);
     }
-    expect(RESERVED_FIELD_KEYS.size).toBe(32);
+    // RFC-0045 review: three more Object.prototype names (toLocaleString, isPrototypeOf, propertyIsEnumerable)
+    expect(RESERVED_FIELD_KEYS.size).toBe(35);
   });
 
   it("reserves every ContentEntry property of the contract", async () => {

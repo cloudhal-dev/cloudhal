@@ -210,7 +210,14 @@ export type InvariantCode =
   /** §2: a structured-data preset that does not fit the type's table or the collection's fields. */
   | "structured_data_invalid"
   /** §3: `expiry.field` is not a date or datetime field of the collection. */
-  | "invalid_expiry";
+  | "invalid_expiry"
+  // ── RFC-0045 (collections stage 4) ──
+  /** §1: a reference or repeater definition; refused on every write path until rollout step 7. */
+  | "fields_unsupported"
+  /** §1: a reference's `collections` names a collection the site neither declares nor uses. */
+  | "reference_target_unknown"
+  /** §1: more than 100 reference values in one entry, across fields and repeater items. */
+  | "too_many_references";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

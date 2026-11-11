@@ -1,0 +1,139 @@
+{
+  "reason": "a repeater has at most ten sub-fields",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-11-11T09:00:00Z",
+    "updatedAt": "2026-11-11T09:00:00Z",
+    "collections": {
+      "events": {
+        "fields": [
+          {
+            "key": "speakers",
+            "type": "repeater",
+            "labels": {
+              "en": {
+                "label": "Speakers"
+              }
+            },
+            "localized": false,
+            "maxItems": 20,
+            "itemLabel": "person",
+            "fields": [
+              {
+                "key": "sub0",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 0"
+                  }
+                }
+              },
+              {
+                "key": "sub1",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 1"
+                  }
+                }
+              },
+              {
+                "key": "sub2",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 2"
+                  }
+                }
+              },
+              {
+                "key": "sub3",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 3"
+                  }
+                }
+              },
+              {
+                "key": "sub4",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 4"
+                  }
+                }
+              },
+              {
+                "key": "sub5",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 5"
+                  }
+                }
+              },
+              {
+                "key": "sub6",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 6"
+                  }
+                }
+              },
+              {
+                "key": "sub7",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 7"
+                  }
+                }
+              },
+              {
+                "key": "sub8",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 8"
+                  }
+                }
+              },
+              {
+                "key": "sub9",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 9"
+                  }
+                }
+              },
+              {
+                "key": "sub10",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Sub 10"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "reason": "a reference field allows at most five target collections",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-11-11T09:00:00Z",
+    "updatedAt": "2026-11-11T09:00:00Z",
+    "collections": {
+      "events": {
+        "fields": [
+          {
+            "key": "venue",
+            "type": "reference",
+            "labels": {
+              "en": {
+                "label": "Venue"
+              }
+            },
+            "localized": false,
+            "collections": ["a", "b", "c", "d", "e", "f"]
+          }
+        ]
+      }
+    }
+  }
+}

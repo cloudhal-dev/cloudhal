@@ -25,7 +25,7 @@ import {
   runFieldOperation,
   type SiteGraphStore,
 } from "@cloudhal/core-ts";
-import { FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
+import { type EnabledFieldType, FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "./context.ts";
@@ -53,7 +53,7 @@ export function operationOf(collection: string, b: Body): FieldOperation {
     return { op, collection, key: str(b, "key"), localized: b.localized };
   }
   const type = str(b, "type");
-  if (!FIELD_TYPES.includes(type as FieldType))
+  if (!FIELD_TYPES.includes(type as EnabledFieldType))
     throw badRequest(`type must be one of ${FIELD_TYPES.join(", ")}`);
   if (b.onInvalid !== undefined && b.onInvalid !== "clear")
     throw badRequest('onInvalid is "clear" or absent');

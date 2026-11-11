@@ -3,7 +3,8 @@
  * `details.issues`, so the API and MCP answer with each problem where it sits. The error's code is
  * the issues' shared code (`invalid_value` reads `invalid_fields`); mixed value problems are
  * `invalid_fields`, and mixed definition problems take the first one's code, with
- * `field_change_needs_operation` first because it names what to do.
+ * `fields_unsupported` (RFC-0045's gate) and then `field_change_needs_operation` first because
+ * they name what to do.
  */
 import { type InvariantCode, InvariantError } from "../errors.ts";
 import type { FieldIssue, FieldIssueCode } from "./types.ts";
@@ -16,6 +17,8 @@ const DEFINITION_CODES = new Set<FieldIssueCode>([
   "field_bounds",
   "too_many_fields",
   "field_change_needs_operation",
+  "fields_unsupported",
+  "reference_target_unknown",
 ]);
 
 const asInvariant = (code: FieldIssueCode): InvariantCode =>
@@ -26,6 +29,7 @@ export function fieldRefusalCode(issues: readonly FieldIssue[]): InvariantCode {
   const first = issues[0];
   if (!first) return "invalid_fields";
   if (issues.every((i) => i.code === first.code)) return asInvariant(first.code);
+  if (issues.some((i) => i.code === "fields_unsupported")) return "fields_unsupported";
   if (issues.some((i) => i.code === "field_change_needs_operation"))
     return "field_change_needs_operation";
   const definition = issues.find((i) => DEFINITION_CODES.has(i.code));

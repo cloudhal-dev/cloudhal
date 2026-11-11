@@ -326,6 +326,24 @@ function ImageControl(c: Ctl) {
   );
 }
 
+/**
+ * RFC-0045: reference and repeater fields until their blocks ship (rollout step 6). Both types are
+ * refused on every write path until then, so this only shows a stored value read-only, as JSON,
+ * and never writes.
+ */
+function StoredValueControl({ label, description, error, value }: Ctl) {
+  return (
+    <Input
+      className="w-full font-mono"
+      label={label}
+      description={description}
+      error={error}
+      value={value === undefined ? "" : JSON.stringify(value)}
+      disabled
+    />
+  );
+}
+
 const CONTROLS: Record<FieldDefinition["type"], (c: Ctl) => ReactNode> = {
   text: TextControl,
   url: TextControl,
@@ -336,6 +354,8 @@ const CONTROLS: Record<FieldDefinition["type"], (c: Ctl) => ReactNode> = {
   datetime: DateControl,
   image: ImageControl,
   select: SelectControl,
+  reference: StoredValueControl,
+  repeater: StoredValueControl,
 };
 
 /** Placeholders only fit controls that show text; the rest say it under the control. */

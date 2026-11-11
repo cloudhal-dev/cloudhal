@@ -208,6 +208,43 @@ describe("EntryFieldsForm", () => {
       "https://x.test",
     );
   });
+
+  it("shows RFC-0045 reference and repeater values read-only until their blocks ship", () => {
+    const onChange = vi.fn();
+    const defs: FieldDefinition[] = [
+      {
+        key: "host",
+        type: "reference",
+        labels: { en: { label: "Host" } },
+        localized: false,
+        collections: ["people"],
+      },
+      {
+        key: "agenda",
+        type: "repeater",
+        labels: { en: { label: "Agenda" } },
+        localized: false,
+        fields: [{ key: "talk", type: "text", labels: { en: { label: "Talk" } } }],
+      },
+    ];
+    render(
+      <EntryFieldsForm
+        definitions={defs}
+        value={{ host: "entry_01HZX8K3Q9P1", agenda: [{ talk: "Hi" }] }}
+        onChange={onChange}
+        locale="en"
+        defaultLocale="en"
+        timeZone="UTC"
+        zoneLabel={(z) => z}
+        labels={labels}
+      />,
+    );
+    const host = screen.getByRole("textbox", { name: "Host" });
+    expect(host).toBeDisabled();
+    expect(host).toHaveValue('"entry_01HZX8K3Q9P1"');
+    expect(screen.getByRole("textbox", { name: "Agenda" })).toHaveValue('[{"talk":"Hi"}]');
+    expect(onChange).not.toHaveBeenCalled();
+  });
 });
 
 describe("entry fields model", () => {
