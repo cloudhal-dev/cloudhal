@@ -79,8 +79,6 @@ export {
   redirectLocale,
   splitTarget,
 } from "./redirects.ts";
-// RFC-0045 §2.4: site rows in canonical form (the anchors compare them as text).
-export { type CanonicalRowsResult, canonicalizeSiteRows } from "./references/canonical-rows.ts";
 export type {
   PublishReleaseInput,
   PublishReleaseResult,

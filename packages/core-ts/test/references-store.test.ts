@@ -14,10 +14,10 @@ import { ConflictError } from "../src/errors.ts";
 import { canonicalJson } from "../src/hash.ts";
 import { REFS_STATEMENT_BYTES } from "../src/media/refs-rebuild.ts";
 import { mapUniqueViolation } from "../src/node-sql.ts";
-import { canonicalizeSiteRows } from "../src/references/canonical-rows.ts";
 import { entryRefsRebuild } from "../src/references/rebuild.ts";
 import { entryRefRows } from "../src/references/rows.ts";
 import { collectionsAnchor, definitionsAnchor } from "../src/references/sql.ts";
+import { entryRefStatements } from "../src/references/writer.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../core-contracts/fixtures/valid/site");
 const L = (label: string) => ({ en: { label } });
@@ -28,33 +28,45 @@ async function db() {
   return sql;
 }
 
-async function holds(site: Site, stored: unknown = site) {
+/** Reverses every object's key order: a body as an older import could have stored it verbatim. */
+function verbatim(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(verbatim);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .reverse()
+      .map(([k, v]) => [k, verbatim(v)]),
+  );
+}
+
+async function holds(site: Site, text: string = canonicalJson(site)) {
   const sql = await db();
   await sql.run(
     "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, 'site', ?, 0, 'h', ?, 't', 't')",
-    [site.id, site.id, site.id, canonicalJson(stored)],
+    [site.id, site.id, site.id, text],
   );
-  const check = async (c: { sql: string; params: readonly unknown[] }) =>
-    (await sql.get<{ ok: number }>(`SELECT ${c.sql} AS ok`, c.params as never))?.ok;
+  const check = async (c: Promise<{ sql: string; params: readonly unknown[] }>) => {
+    const cond = await c;
+    return (await sql.get<{ ok: number }>(`SELECT ${cond.sql} AS ok`, cond.params as never))?.ok;
+  };
   return { sql, check };
 }
 
-describe("the anchors compare canonical bodies as text", () => {
+describe("the anchors compare the stored text, read when planned", () => {
   const sites = readdirSync(FIXTURES)
     .filter((f) => f.endsWith(".json"))
     .map((f) => [f, JSON.parse(readFileSync(join(FIXTURES, f), "utf8")) as Site] as const);
 
-  it.each(sites)(
-    "%s: every collection's definitions and the collections round-trip",
-    async (_, site) => {
-      const { check } = await holds(site);
-      expect(await check(collectionsAnchor(site))).toBe(1);
+  it.each(sites)("%s: canonical and verbatim rows both anchor", async (_, site) => {
+    for (const text of [canonicalJson(site), JSON.stringify(verbatim(site))]) {
+      const { sql, check } = await holds(site, text);
+      expect(await check(collectionsAnchor(sql, site))).toBe(1);
       for (const key of Object.keys(site.collections ?? {}))
-        expect(await check(definitionsAnchor(site, key)), key).toBe(1);
-      // a collection without definitions, and an absent `collections`, bind SQL NULL
-      expect(await check(definitionsAnchor(site, "nowhere"))).toBe(1);
-    },
-  );
+        expect(await check(definitionsAnchor(sql, site, key)), key).toBe(1);
+      // a collection without definitions, and an absent `collections`, compare SQL NULL
+      expect(await check(definitionsAnchor(sql, site, "nowhere"))).toBe(1);
+    }
+  });
 
   it("fractional and large bounds survive the stored form", async () => {
     const fields: FieldDefinition[] = [
@@ -70,20 +82,27 @@ describe("the anchors compare canonical bodies as text", () => {
     ];
     const site = {
       id: "site_01HZX8K3Q9AB",
+      rev: 0,
       collections: { things: { fields } },
     } as unknown as Site;
-    const { check } = await holds(site);
-    expect(await check(definitionsAnchor(site, "things"))).toBe(1);
-    expect(await check(collectionsAnchor(site))).toBe(1);
+    const { sql, check } = await holds(site);
+    expect(await check(definitionsAnchor(sql, site, "things"))).toBe(1);
+    expect(await check(collectionsAnchor(sql, site))).toBe(1);
   });
 
-  it("an absent collections binds NULL, a changed one fails", async () => {
-    const site = { id: "site_01HZX8K3Q9AC" } as Site;
-    const { check } = await holds(site);
-    expect(await check(collectionsAnchor(site))).toBe(1);
-    expect(await check(collectionsAnchor({ ...site, collections: {} }))).toBe(0);
-    const other = await holds({ ...site, collections: { a: {} } } as Site);
-    expect(await other.check(collectionsAnchor(site))).toBe(0);
+  it("a site that differs from the planned one conflicts; one changed after planning fails", async () => {
+    const site = { id: "site_01HZX8K3Q9AC", rev: 0 } as Site;
+    const { sql, check } = await holds(site);
+    expect(await check(collectionsAnchor(sql, site))).toBe(1);
+    await expect(collectionsAnchor(sql, { ...site, collections: {} })).rejects.toBeInstanceOf(
+      ConflictError,
+    );
+    const planned = await collectionsAnchor(sql, site);
+    await sql.run("UPDATE nodes SET body = ? WHERE id = ?", [
+      canonicalJson({ ...site, collections: { a: {} } }),
+      site.id,
+    ]);
+    expect(await check(Promise.resolve(planned))).toBe(0);
   });
 });
 
@@ -170,18 +189,52 @@ describe("the shared NOT NULL mapping", () => {
   });
 });
 
-describe("canonical site rows (§2.4)", () => {
-  it("rewrites a verbatim site row once, under its hash, and leaves canonical ones alone", async () => {
+describe("the rows INSERT reads shared from the site row at batch time", () => {
+  const SITE = "site_01HZX8K3Q9SH";
+  const ENTRY = "entry_01HZX8K3Q9EN";
+  const ref = (key: string, localized: boolean, extra: object = {}) => ({
+    key,
+    type: "reference",
+    labels: L(key),
+    localized,
+    collections: ["places"],
+    ...extra,
+  });
+  const planned = { id: SITE, rev: 0, collections: { events: { fields: [ref("venue", false)] } } };
+  const entry = {
+    id: ENTRY,
+    siteId: SITE,
+    collection: "events",
+    status: "draft",
+    fields: { venue: "entry_01HZX8K3QHALL" },
+  };
+
+  async function run(storedFields: unknown[]) {
     const sql = await db();
-    const site = { id: "site_01HZX8K3Q9CN", rev: 3, collections: { b: {}, a: { fields: [] } } };
-    const verbatim = JSON.stringify(site);
-    await sql.run(
-      "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, 'site', ?, 3, 'h', ?, 't', 't')",
-      [site.id, site.id, site.id, verbatim],
-    );
-    expect(await canonicalizeSiteRows(sql)).toEqual({ read: 1, rewritten: 1 });
-    const row = await sql.get<{ body: string; hash: string }>("SELECT body, hash FROM nodes");
-    expect(row).toEqual({ body: canonicalJson(site), hash: "h" });
-    expect(await canonicalizeSiteRows(sql)).toEqual({ read: 1, rewritten: 0 });
+    const site = { ...planned, collections: { events: { fields: storedFields } } };
+    for (const [id, kind, hash, body] of [
+      [SITE, "site", "s", site],
+      [ENTRY, "contentEntry", "eh", entry],
+    ] as const)
+      await sql.run(
+        "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, ?, ?, 0, ?, ?, 't', 't')",
+        [id, SITE, kind, id, hash, canonicalJson(body)],
+      );
+    await sql.batch(entryRefStatements(planned as never, entry as never, "eh"));
+    return sql.all<{ shared: number; root_key: string }>("SELECT shared, root_key FROM entry_refs");
+  }
+
+  it("matches a running rename's fromKey, and the exact key wins over it", async () => {
+    const renamed = ref("place", false, {
+      migration: { id: "snap_01HZX8K3Q9MG", fromKey: "venue" },
+    });
+    expect(await run([renamed])).toEqual([{ shared: 1, root_key: "venue" }]);
+    expect(await run([renamed, ref("venue", true)])).toEqual([{ shared: 2, root_key: "venue" }]);
+  });
+
+  it("a key retyped or gone by batch time fails the batch (NOT NULL), never inserts", async () => {
+    const text = { key: "venue", type: "text", labels: L("venue"), localized: false };
+    await expect(run([text])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
+    await expect(run([])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
   });
 });

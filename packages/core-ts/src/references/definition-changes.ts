@@ -3,7 +3,8 @@
  * stored values, checked by a site write (`planFieldDefinitions`) and kept true by guards on the
  * site CAS (rule 4); entry writes in between carry the definitions anchor (R3).
  *
- * - **Adding** a reference or repeater field over a key entries already hold (`field_key_in_use`).
+ * - **Adding** a reference or repeater field over a key entries already hold, or a reference
+ *   sub-field over a key their items hold (`field_key_in_use`).
  * - **Removing a target collection** while a value's group has a member in it.
  * - **Removing or retyping a sub-field** that items hold.
  * - **Turning `multiple` on or off** is refused outright (`change_field_type`), as for selects.
@@ -86,6 +87,28 @@ function subFieldRemoved(siteId: string, collection: string, key: string, sub: s
   } satisfies ReferenceDataChange;
 }
 
+/** A reference sub-field added to a repeater whose stored items already hold its key. */
+function subFieldAdded(
+  siteId: string,
+  at: { collection: string; key: string; sub: string; index: number },
+): ReferenceDataChange {
+  const { collection, key, sub, index } = at;
+  return {
+    collection,
+    key,
+    count: {
+      sql: `SELECT count(*) AS n FROM nodes WHERE ${IN_COLLECTION}
+        AND EXISTS (SELECT 1 FROM json_each(body, ?) i WHERE json_type(i.value, ?) IS NOT NULL)`,
+      params: [siteId, collection, `$.fields.${key}`, `$.${sub}`],
+    },
+    issue: (n) => ({
+      path: `collections/${collection}/fields/${key}/fields/${index}`,
+      code: "field_key_in_use",
+      message: `${entries(n)} of ${collection} already hold ${key}.${sub} in their items; choose another key`,
+    }),
+  };
+}
+
 /** The changes of one field kept under its key (same type). */
 function compare(
   siteId: string,
@@ -106,6 +129,13 @@ function compare(
     const gone = was.collections.filter((c) => !now.collections.includes(c));
     if (gone.length > 0)
       data.push(collectionsRemoved(siteId, { collection, key: now.key, field: now.key }, gone));
+  }
+  if (was.type === "repeater" && now.type === "repeater") {
+    const old = new Set(was.fields.map((x) => x.key));
+    now.fields.forEach((sub, index) => {
+      if (sub.type === "reference" && !old.has(sub.key))
+        data.push(subFieldAdded(siteId, { collection, key: now.key, sub: sub.key, index }));
+    });
   }
   if (was.type === "repeater" && now.type === "repeater")
     for (const sub of was.fields) {

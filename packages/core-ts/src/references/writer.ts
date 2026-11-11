@@ -7,13 +7,14 @@
  *   own reference value when the entry becomes published, each group has a member in this site in
  *   an allowed collection, not archived when newly chosen. A newly chosen target also meets
  *   `where`, and no value names the entry's own group (checked when planned).
- * - **The definitions anchor**, on every write that changes `fields` or `collection`: the
- *   collection's definitions as planned.
+ * - **The definitions anchor**: the collection's definitions as planned, on every write in a site
+ *   with reference fields, and on writes that change `fields` or `collection` elsewhere.
  * - **The rows**, anchored on the entry's new hash: an anchored `DELETE`, then one plain
  *   `INSERT … SELECT` that reads `shared` from the site row as it is when the batch runs, by key
  *   or `migration.fromKey` (the exact key wins; an aggregate, not a correlated `ORDER BY`, which
- *   workerd's SQLite does not resolve). A key with no definition then yields `NULL` and fails the batch
- *   (`isSharedNullViolation` → `ConflictError`); it is never `OR IGNORE`.
+ *   workerd's SQLite does not resolve). A key with no reference or repeater definition (absent, or
+ *   retyped by a concurrent import) yields `NULL` and fails the batch (`isSharedNullViolation` →
+ *   `ConflictError`); it is never `OR IGNORE`.
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
@@ -124,7 +125,7 @@ export interface EntryRefsPlan {
   readonly guard: Cond | undefined;
   /** The `entry_refs` rows, anchored on the entry's new hash. */
   statements(hash: string): SqlStatement[];
-  /** After a write that matched no row: `unknown_entry` / `reference_target_moved` if a target went. */
+  /** After a write that matched no row: `unknown_entry` if a target went or moved away. */
   diagnose(): Promise<void>;
 }
 
@@ -161,11 +162,13 @@ function useIssue(site: Site, use: Use, members: readonly MemberRow[]): FieldIss
   const allowed = of.filter((m) => use.collections.includes(m.collection));
   const usable = allowed.filter((m) => !use.fresh || m.status !== "archived");
   if (usable.length === 0) {
+    // A write naming an entry outside the field's collections: a value to fix (422), not the
+    // move race's 409 `reference_target_moved`.
     if (of.length > 0 && allowed.length === 0)
       return {
         path: use.path,
-        code: "reference_target_moved",
-        message: `${use.groupId} has no entry in ${use.collections.join(", ")} of this site`,
+        code: "unknown_entry",
+        message: `${use.groupId} has no entry in ${use.collections.join(", ")} of this site; pick one from those collections`,
       };
     return {
       path: use.path,
@@ -217,7 +220,7 @@ function useIssues(site: Site, draft: ContentEntry, uses: readonly Use[], member
 }
 
 /** The rows statements for `draft` (an anchored `DELETE`, then the plain `INSERT … SELECT`). */
-function rowStatements(site: Site, draft: ContentEntry, hash: string): SqlStatement[] {
+export function entryRefStatements(site: Site, draft: ContentEntry, hash: string): SqlStatement[] {
   const rows = entryRefRows(fieldDefinitions(site, draft.collection), draft.fields);
   const out: SqlStatement[] = [
     {
@@ -236,6 +239,7 @@ function rowStatements(site: Site, draft: ContentEntry, hash: string): SqlStatem
                  THEN CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END END))
            FROM nodes s, json_each(json_extract(s.body, ?)) d
           WHERE s.id = ? AND s.kind = 'site'
+            AND json_extract(d.value, '$.type') IN ('reference', 'repeater')
             AND (json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
                  OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))),
         ?
@@ -260,8 +264,12 @@ const changesFields = (draft: ContentEntry, stored: ContentEntry | undefined) =>
   !stored || stored.collection !== draft.collection || !sameJson(stored.fields, draft.fields);
 
 /**
- * Plans the reference part of an entry write; throws the plan-time refusals. Sites without
- * reference fields add only the definitions anchor (to keep `field_key_in_use` true, R3).
+ * Plans the reference part of an entry write; throws the plan-time refusals.
+ *
+ * The definitions anchor: in a site with reference fields, on every write, since each one
+ * rewrites its rows and may check targets under the planned definitions (a status-only publish
+ * included, R7 under a concurrent narrowing). In other sites only on writes that change `fields`
+ * or `collection`, to keep `field_key_in_use` true (R3).
  */
 export async function planEntryRefs(
   sql: SqlDriver,
@@ -269,11 +277,12 @@ export async function planEntryRefs(
   draft: ContentEntry,
   stored: ContentEntry | undefined,
 ): Promise<EntryRefsPlan> {
-  const anchor = changesFields(draft, stored)
-    ? definitionsAnchor(site, draft.collection)
-    : undefined;
-  if (!hasReferenceFields(site))
-    return { guard: anchor, statements: () => [], diagnose: async () => {} };
+  const references = hasReferenceFields(site);
+  const anchor =
+    references || changesFields(draft, stored)
+      ? await definitionsAnchor(sql, site, draft.collection)
+      : undefined;
+  if (!references) return { guard: anchor, statements: () => [], diagnose: async () => {} };
   const defs = fieldDefinitions(site, draft.collection);
   const uses = guardedUses(defs, draft, stored);
   const groups = [...new Set(uses.map((u) => u.groupId))];
@@ -287,7 +296,7 @@ export async function planEntryRefs(
   }
   return {
     guard: and(anchor, targetGuard(site.id, [...pairs.values()])),
-    statements: (hash) => rowStatements(site, draft, hash),
+    statements: (hash) => entryRefStatements(site, draft, hash),
     diagnose: check,
   };
 }

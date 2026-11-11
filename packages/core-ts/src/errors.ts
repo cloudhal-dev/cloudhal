@@ -231,9 +231,9 @@ export type InvariantCode =
   | "reference_target_unknown"
   /** §1: more than 100 reference values in one entry, across fields and repeater items. */
   | "too_many_references"
-  /** §2.1: a reference names a group with no usable member of this site in an allowed collection. */
+  /** §2.1: a reference names a group with no usable member of this site in an allowed collection (422). */
   | "unknown_entry"
-  /** §2.1, §2.2: the group's member is in a collection the field does not allow, or a move would leave it so. */
+  /** §2.2: a move would leave a group a published entry shows without a member in a collection its field allows. */
   | "reference_target_moved"
   /** §2.2: the delete or group change would strand a reference a published entry shows (`details.referrers`). */
   | "entry_referenced"

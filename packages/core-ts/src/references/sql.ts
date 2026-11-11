@@ -6,15 +6,16 @@
  *   `nodes_translation_locale` still serve it;
  * - **"shown by a published entry"**: rows of site S naming G whose holder is published, or that a
  *   published same-site member inherits (`shared` 1, or 2 without its own value of `root_key`);
- * - the **collections anchor** and the **definitions anchor**, bound from the `Site` object the
- *   write planned with (never a second read) and compared with `json(…) IS json(?)` over
- *   canonical bodies; an absent value binds SQL `NULL`, never the string `'null'`.
+ * - the **collections anchor** and the **definitions anchor**: the stored text of the fragment,
+ *   read when the write is planned and checked against the `Site` object it planned with, then
+ *   compared as text at batch time (`fragmentAnchor`); an absent value is SQL `NULL`.
  *
  * Every probe filters `site_id`. Worker-safe; internal to core-ts.
  */
 import type { Site } from "@cloudhal/core-contracts";
-import type { SqlValue } from "@cloudhal/storage";
-import { canonicalJson } from "../hash.ts";
+import type { SqlDriver } from "@cloudhal/storage";
+import { ConflictError } from "../errors.ts";
+import { sameJson } from "../fields/types.ts";
 import type { Cond } from "../node-sql.ts";
 import { definitionsPath } from "./rows.ts";
 
@@ -38,30 +39,52 @@ export function shownRows(siteId: string, group: string): Cond {
   };
 }
 
-/** Bound canonical JSON, or SQL `NULL` for an absent value (`json(NULL) IS json(NULL)` holds). */
-const bound = (value: unknown): SqlValue => (value === undefined ? null : canonicalJson(value));
+type AnchoredSite = Pick<Site, "id" | "rev" | "collections">;
+
+/**
+ * An anchor over one JSON fragment of the site row. The fragment's stored text is read now, with
+ * the same `json_extract` the batch runs, and must equal the planned value (else the site changed
+ * since it was planned: `ConflictError`, retry). The batch then compares that exact text, so the
+ * comparison never depends on the row's key order (a site row an older import stored verbatim
+ * anchors like any other) and never on a second read the plan did not see. Absent: SQL `NULL`.
+ */
+async function fragmentAnchor(
+  sql: SqlDriver,
+  site: AnchoredSite,
+  fragment: { path: string; planned: unknown },
+): Promise<Cond> {
+  const row = await sql.get<{ rev: number; t: string | null }>(
+    "SELECT rev, json_extract(body, ?) AS t FROM nodes WHERE id = ? AND kind = 'site'",
+    [fragment.path, site.id],
+  );
+  const text = row?.t ?? null;
+  if (!row || !sameJson(text === null ? undefined : JSON.parse(text), fragment.planned))
+    throw new ConflictError("site", site.id, site.rev, row?.rev);
+  return {
+    sql: "(SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site') IS ?",
+    params: [fragment.path, site.id, text],
+  };
+}
 
 /**
  * §2.2: the site's `collections` are still those the write planned with. Every delete, move and
  * group change of an entry carries it: it holds every definition and field-operation marker, and
  * ignores `publishedSnapshotId`, theme, menus and other settings.
  */
-export function collectionsAnchor(site: Pick<Site, "id" | "collections">): Cond {
-  return {
-    sql: "json((SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)",
-    params: [site.id, bound(site.collections)],
-  };
+export function collectionsAnchor(sql: SqlDriver, site: AnchoredSite): Promise<Cond> {
+  return fragmentAnchor(sql, site, { path: "$.collections", planned: site.collections });
 }
 
 /** §2.1: one collection's definitions are still those the entry write planned with. */
 export function definitionsAnchor(
-  site: Pick<Site, "id" | "collections">,
+  sql: SqlDriver,
+  site: AnchoredSite,
   collection: string,
-): Cond {
-  return {
-    sql: "json((SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)",
-    params: [definitionsPath(collection), site.id, bound(site.collections?.[collection]?.fields)],
-  };
+): Promise<Cond> {
+  return fragmentAnchor(sql, site, {
+    path: definitionsPath(collection),
+    planned: site.collections?.[collection]?.fields,
+  });
 }
 
 /** One target-guard pair: group, allowed collections, and whether the value is newly chosen. */
@@ -89,20 +112,34 @@ export function targetGuard(siteId: string, pairs: readonly TargetPair[]): Cond 
 }
 
 /**
- * Another member of `group` than `nodeId` in this site, not archived, in one of `collections`
- * (the delete, move and group-change rules' "usable member").
+ * For every list in `needs`, another member of `group` than `nodeId` in this site, not archived,
+ * in one of that list's collections: the delete, move and group-change rules' "usable member",
+ * checked per pair (deviation 1). One JSON parameter, deduplicated by collection list, so the
+ * statement binds six parameters however many pairs block (D1: 100 per statement).
  */
-export function otherMember(
+export function usableMembers(
   siteId: string,
-  group: string,
-  nodeId: string,
-  collections: readonly string[],
-): Cond {
+  input: { group: string; nodeId: string; needs: readonly (readonly string[])[] },
+): Cond | undefined {
+  const lists = new Map<string, { c: readonly string[] }>();
+  for (const c of input.needs) {
+    const sorted = [...new Set(c)].sort();
+    lists.set(JSON.stringify(sorted), { c: sorted });
+  }
+  if (lists.size === 0) return undefined;
   return {
-    sql: `EXISTS (SELECT 1 FROM nodes n WHERE n.site_id = ? AND n.kind = 'contentEntry' AND n.id <> ?
-      AND ${memberSql("n", "?")}
-      AND json_extract(n.body, '$.status') <> 'archived'
-      AND json_extract(n.body, '$.collection') IN (SELECT value FROM json_each(?)))`,
-    params: [siteId, nodeId, group, group, JSON.stringify(collections)],
+    sql: `(SELECT count(*) FROM json_each(?) q WHERE EXISTS (
+       SELECT 1 FROM nodes n WHERE n.site_id = ? AND n.kind = 'contentEntry' AND n.id <> ?
+         AND ${memberSql("n", "?")}
+         AND json_extract(n.body, '$.status') <> 'archived'
+         AND json_extract(n.body, '$.collection') IN (SELECT value FROM json_each(json_extract(q.value, '$.c'))))) = ?`,
+    params: [
+      JSON.stringify([...lists.values()]),
+      siteId,
+      input.nodeId,
+      input.group,
+      input.group,
+      lists.size,
+    ],
   };
 }

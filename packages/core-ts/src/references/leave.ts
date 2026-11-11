@@ -24,7 +24,7 @@ import { and, type Cond } from "../node-sql.ts";
 import { hasReferenceFields } from "./issues.ts";
 import { memberGroup } from "./members.ts";
 import { definitionOfPath } from "./rows.ts";
-import { collectionsAnchor, otherMember, shownRows } from "./sql.ts";
+import { collectionsAnchor, shownRows, usableMembers } from "./sql.ts";
 
 /** What a delete, move or group change of an entry adds to its batch. */
 export interface LeavePlan {
@@ -133,13 +133,13 @@ export async function planLeave(
   const kind = kindOf(input);
   if (!kind) return undefined;
   const { stored, next } = input;
-  const anchor = collectionsAnchor(site);
   if (convertingTargets(site).has(stored.collection))
     throw new InvariantError(
       "field_operation_running",
       `a field operation is converting values into references to ${stored.collection}; wait until it finishes`,
       { collection: stored.collection },
     );
+  const anchor = await collectionsAnchor(sql, site);
   if (!hasReferenceFields(site)) return { guard: anchor, diagnose: async () => {} };
   const group = memberGroup(stored);
   const shown = shownRows(site.id, group);
@@ -157,12 +157,15 @@ export async function planLeave(
       next?.status === "archived" ||
       !p.collections.includes(next?.collection ?? ""),
   );
-  const members = needs.map((p) => otherMember(site.id, group, stored.id, p.collections));
+  const members = usableMembers(site.id, {
+    group,
+    nodeId: stored.id,
+    needs: needs.map((p) => p.collections),
+  });
   const check = async () => {
-    for (const m of members) {
-      const ok = await sql.get<{ ok: number }>(`SELECT ${m.sql} AS ok`, m.params);
-      if (!ok?.ok) refuse(kind, group, await referrers(sql, site.id, await read()));
-    }
+    if (!members) return;
+    const ok = await sql.get<{ ok: number }>(`SELECT ${members.sql} AS ok`, members.params);
+    if (!ok?.ok) refuse(kind, group, await referrers(sql, site.id, await read()));
   };
   await check();
   const unseen: Cond = {
@@ -170,7 +173,7 @@ export async function planLeave(
     params: [...shown.params, JSON.stringify(pairs.map((p) => p.key))],
   };
   const none: Cond = { sql: `NOT EXISTS (SELECT 1 FROM ${shown.sql})`, params: shown.params };
-  const kept = and(...members, unseen) as Cond;
+  const kept = and(members, unseen) as Cond;
   return {
     guard: and(anchor, {
       sql: `${none.sql} OR (${kept.sql})`,

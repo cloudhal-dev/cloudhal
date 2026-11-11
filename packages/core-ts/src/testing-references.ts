@@ -243,7 +243,8 @@ export function referencesSuite(ctx: SuiteContext): void {
         expect(await code(set({ venue: "entry_01HZX8K3QMISSING" }))).toBe("unknown_entry");
         // another site's id is refused exactly like one that does not exist
         expect(await code(set({ venue: foreign.id }))).toBe("unknown_entry");
-        expect(await code(set({ venue: person1.id }))).toBe("reference_target_moved");
+        // an entry outside the field's collections is a value to fix (422), not the move race's 409
+        expect(await code(set({ venue: person1.id }))).toBe("unknown_entry");
         expect(await code(set({ venue: archived.id }))).toBe("unknown_entry");
         expect(await code(set({ speakers: [{ person: event.id }] }))).toBe("invalid_fields");
         expect(await rows(event.id)).toEqual([]);
@@ -443,6 +444,107 @@ export function referencesSuite(ctx: SuiteContext): void {
       });
     });
 
+    describe("review of PR #205", () => {
+      /** Reverses every object's key order: a site row an older import stored verbatim. */
+      const verbatim = (value: unknown): unknown => {
+        if (Array.isArray(value)) return value.map(verbatim);
+        if (value === null || typeof value !== "object") return value;
+        return Object.fromEntries(
+          Object.entries(value)
+            .reverse()
+            .map(([k, v]) => [k, verbatim(v)]),
+        );
+      };
+
+      it("a verbatim (non-canonical) site row without reference fields takes writes, deletes and relinks", async () => {
+        const BLURB: FieldDefinition = {
+          key: "blurb",
+          type: "text",
+          labels: L("Blurb"),
+          localized: false,
+        };
+        const site = await world({ notes: { fields: [BLURB] }, places: {} });
+        const fresh0 = (await store().getSite(site.id)) as Site;
+        await ctx
+          .sql()
+          .run("UPDATE nodes SET body = ? WHERE id = ?", [
+            JSON.stringify(verbatim(fresh0)),
+            site.id,
+          ]);
+        const stored = await ctx
+          .sql()
+          .get<{ body: string }>("SELECT body FROM nodes WHERE id = ?", [site.id]);
+        expect(stored?.body).not.toBe(canonicalJson(fresh0));
+        const note = await entry(site, "notes", { fields: { blurb: "a" } });
+        expect(await code(update(note, { fields: { blurb: "b" } }))).toBe("ok");
+        const other = await entry(site, "notes", { locale: "tr", slug: "other" });
+        const relink = {
+          translation: {
+            group: note.id,
+            method: "human" as const,
+            source: await sourceOf(await fresh(note)),
+          },
+        };
+        expect(await code(update(other, relink))).toBe("ok");
+        expect(await code(update(await fresh(note), { collection: "places" }))).not.toBe(
+          "conflict",
+        );
+        expect(await code(store().deleteContentEntry(await fresh(other)))).toBe("ok");
+      });
+
+      it("20 blocking pairs bind a fixed number of parameters (delete and group change)", async () => {
+        const WHO: FieldDefinition = {
+          key: "who",
+          type: "reference",
+          labels: L("Who"),
+          localized: false,
+          collections: ["people"],
+        };
+        const many: NonNullable<Site["collections"]> = { people: {} };
+        for (let i = 0; i < 22; i++) many[`c${i}`] = { fields: [WHO] };
+        const site = await world(many);
+        const ada = await entry(site, "people");
+        const adaTr = await translate(ada);
+        for (let i = 0; i < 22; i++)
+          await entry(site, `c${i}`, { status: "published", fields: { who: ada.id } });
+        // the original's translation leaves the group: the original still holds it
+        const own = { translation: { group: adaTr.id, method: "original" as const } };
+        expect(await code(update(adaTr, own))).toBe("ok");
+        // the last member: refused as entry_referenced, never a statement-limit error
+        expect(await code(store().deleteContentEntry(await fresh(ada)))).toBe("entry_referenced");
+      });
+
+      it("adding a reference sub-field over a key items already hold is field_key_in_use", async () => {
+        const ROLES: FieldDefinition = {
+          key: "speakers",
+          type: "repeater",
+          labels: L("Speakers"),
+          localized: false,
+          fields: [{ key: "talk", type: "text", labels: L("Talk") }],
+        };
+        const site = await world({ events: { fields: [ROLES] }, people: {} });
+        const event = await entry(site, "events", { fields: { speakers: [{ talk: "x" }] } });
+        // items as an import could hold them: a key the repeater does not define (yet)
+        await ctx
+          .sql()
+          .run(
+            "UPDATE nodes SET body = json_set(body, '$.fields.speakers', json(?)) WHERE id = ?",
+            [JSON.stringify([{ talk: "x", person: "entry_01HZX8K3QPERS" }]), event.id],
+          );
+        const s = (await store().getSite(site.id)) as Site;
+        const withPerson = withFields(s, "events", [
+          {
+            ...ROLES,
+            fields: [
+              ...(ROLES as { fields: unknown[] }).fields,
+              { key: "person", type: "reference", labels: L("Person"), collections: ["people"] },
+            ],
+          } as never,
+        ]);
+        expect(await code(store().updateSite(withPerson))).toBe("field_key_in_use");
+      });
+    });
+
     describe("races (§2.3): the batch that commits second fails, then retries or refuses", () => {
       it("R1: a referrer write and deleting the target's last member", async () => {
         const site = await world();
@@ -472,7 +574,7 @@ export function referencesSuite(ctx: SuiteContext): void {
           await update(await fresh(hall), { collection: "people" });
         });
         expect(await code(write.updateContentEntry({ ...talk, fields: { room: hall.id } }))).toBe(
-          "reference_target_moved",
+          "unknown_entry",
         );
         const hall2 = await entry(site, "places");
         const move = racing(async () => {
@@ -755,70 +857,49 @@ export function referencesSuite(ctx: SuiteContext): void {
         expect(await code(created)).toBe("invalid_translation");
       });
 
-      it("R16: a title-only write racing rename_field phase A keeps its rows, through fromKey", async () => {
+      it("R16: a title-only write racing a field operation's phase A fails the definitions anchor", async () => {
+        // Since the review of PR #205 every write in a site with reference fields carries the
+        // definitions anchor, so phase A (rename, set_field_localized) fails the write, which
+        // retries under the new definitions. The batch-time `shared` read (by key or fromKey,
+        // the exact key first) is tested on its own in references-store.test.ts.
         const site = await world();
         const hall = await entry(site, "places");
         const event = await entry(site, "events", { fields: { venue: hall.id } });
         const marker = { id: "snap_01HZX8K3Q9MG", fromKey: "venue" };
-        const renamed = (s: Site) =>
-          withFields(s, "events", [
-            { ...VENUE, key: "place", migration: marker } as never,
-            SPONSOR,
-            SPEAKERS,
-          ]);
-        await racing(() => rawSite(site.id, renamed)).updateContentEntry({
-          ...event,
-          title: "Renamed",
-        });
-        expect(await rows(event.id)).toEqual([
-          {
-            target_id: hall.id,
-            field: "venue",
-            root_key: "venue",
-            shared: 1,
-            source_status: "draft",
-          },
-        ]);
-      });
-
-      it("R16: a new field reusing a running rename's old key: the exact key wins in shared", async () => {
-        const site = await world();
-        const hall = await entry(site, "places");
-        const event = await entry(site, "events", { fields: { venue: hall.id } });
-        const both = (s: Site) =>
-          withFields(s, "events", [
+        const phaseA = [
+          (s: Site) =>
+            withFields(s, "events", [
+              { ...VENUE, key: "place", migration: marker } as never,
+              SPONSOR,
+              SPEAKERS,
+            ]),
+          (s: Site) =>
+            withFields(s, "events", [
+              {
+                ...VENUE,
+                localized: true,
+                migration: { id: "snap_01HZX8K3Q9MG", fromLocalized: false },
+              } as never,
+              SPONSOR,
+              SPEAKERS,
+            ]),
+        ];
+        for (const change of phaseA) {
+          const write = racing(() => rawSite(site.id, change));
+          expect(
+            await code(write.updateContentEntry({ ...(await fresh(event)), title: "Raced" })),
+          ).toBe("conflict");
+          expect(await rows(event.id)).toEqual([
             {
-              ...VENUE,
-              key: "place",
-              migration: { id: "snap_01HZX8K3Q9MG", fromKey: "venue" },
-            } as never,
-            { ...VENUE, localized: true },
-            SPONSOR,
-            SPEAKERS,
+              target_id: hall.id,
+              field: "venue",
+              root_key: "venue",
+              shared: 1,
+              source_status: "draft",
+            },
           ]);
-        await racing(() => rawSite(site.id, both)).updateContentEntry({ ...event, title: "Both" });
-        expect((await rows(event.id))[0]?.shared).toBe(2);
-      });
-
-      it("R16: a title-only write racing set_field_localized phase A reads the new shared", async () => {
-        const site = await world();
-        const hall = await entry(site, "places");
-        const event = await entry(site, "events", { fields: { venue: hall.id } });
-        const flipped = (s: Site) =>
-          withFields(s, "events", [
-            {
-              ...VENUE,
-              localized: true,
-              migration: { id: "snap_01HZX8K3Q9MG", fromLocalized: false },
-            } as never,
-            SPONSOR,
-            SPEAKERS,
-          ]);
-        await racing(() => rawSite(site.id, flipped)).updateContentEntry({
-          ...event,
-          title: "Flip",
-        });
-        expect((await rows(event.id))[0]?.shared).toBe(2);
+          await rawSite(site.id, (s) => withFields(s, "events", [VENUE, SPONSOR, SPEAKERS]));
+        }
       });
 
       it("R16: a key with no definition at batch time fails the batch, never drops the row", async () => {
@@ -830,6 +911,89 @@ export function referencesSuite(ctx: SuiteContext): void {
         expect(await code(lost.updateContentEntry({ ...event, title: "Lost" }))).toBe("conflict");
         expect(await rows(event.id)).toHaveLength(1);
         expect((await fresh(event)).title).toBe(event.title);
+      });
+
+      it("#2: a status-only publish racing a narrowing and a move fails the definitions anchor", async () => {
+        const site = await world();
+        const target = await entry(site, "places");
+        const draft = await entry(site, "events", { fields: { venue: target.id } });
+        const publish = racing(async () => {
+          const s = (await store().getSite(site.id)) as Site;
+          await store().updateSite(
+            withFields(s, "events", [
+              { ...VENUE, collections: ["places"] } as never,
+              SPONSOR,
+              SPEAKERS,
+            ]),
+          );
+          await update(await fresh(target), { collection: "halls" });
+        });
+        expect(await code(publish.updateContentEntry({ ...draft, status: "published" }))).toBe(
+          "conflict",
+        );
+        // the retry plans under the narrowed field and refuses the dangling value
+        expect(await code(update(await fresh(draft), { status: "published" }))).toBe(
+          "unknown_entry",
+        );
+      });
+
+      it("R3: a narrowing and a referrer write, both orders", async () => {
+        const site = await world();
+        const hall = await entry(site, "halls");
+        const narrowed = (s: Site) =>
+          withFields(s, "events", [
+            { ...VENUE, collections: ["places"] } as never,
+            SPONSOR,
+            SPEAKERS,
+          ]);
+        // the referrer commits first: the narrowing's count guard fails, and it refuses on diagnosis
+        const narrowing = racing(async () => {
+          await entry(site, "events", { status: "published", fields: { venue: hall.id } });
+        });
+        expect(await code(narrowing.updateSite(narrowed(site)))).toBe(
+          "field_change_needs_operation",
+        );
+        // the narrowing commits first: the referrer's definitions anchor fails, the retry refuses
+        const other = await world();
+        const hall2 = await entry(other, "halls");
+        const event = await entry(other, "events");
+        const write = racing(async () => {
+          await store().updateSite(narrowed((await store().getSite(other.id)) as Site));
+        });
+        expect(
+          await code(write.updateContentEntry({ ...event, fields: { venue: hall2.id } })),
+        ).toBe("conflict");
+        expect(await code(update(await fresh(event), { fields: { venue: hall2.id } }))).toBe(
+          "unknown_entry",
+        );
+      });
+
+      it("R13 for a move: a field the plan did not see forces a retry", async () => {
+        const site = await world();
+        const place = await entry(site, "places");
+        await entry(site, "events", { status: "published", fields: { venue: place.id } });
+        // venue allows halls, so the move keeps it; talks.room, published meanwhile, does not
+        const move = racing(async () => {
+          await entry(site, "talks", { status: "published", fields: { room: place.id } });
+        });
+        expect(await code(move.updateContentEntry({ ...place, collection: "halls" }))).toBe(
+          "reference_target_moved",
+        );
+      });
+
+      it("R13 for a group change: a field the plan did not see forces a retry", async () => {
+        const site = await world();
+        const hall = await entry(site, "halls");
+        const member = await translate(hall, { collection: "places" } as never);
+        await entry(site, "events", { status: "published", fields: { venue: hall.id } });
+        // venue keeps the hall original; talks.room (places only) needs the member that leaves
+        const leave = racing(async () => {
+          await entry(site, "talks", { status: "published", fields: { room: hall.id } });
+        });
+        const own = { translation: { group: member.id, method: "original" as const } };
+        expect(await code(leave.updateContentEntry({ ...member, ...own }))).toBe(
+          "entry_referenced",
+        );
       });
 
       it("a foreign archive does not pin another tenant's entries", async () => {
