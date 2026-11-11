@@ -35,6 +35,26 @@ export function fieldAssetRefs(
   );
 }
 
+/**
+ * `values` as readers see them while a rename runs (RFC-0041 §6, `resolveFields`' `read`): a
+ * defined key the entry does not hold yet reads its definition's `migration.fromKey`. For the
+ * whole-site readers of stored bodies (the `asset_refs` rebuild, the purge planner's asset rule);
+ * a write's own checks read the values it writes.
+ */
+export function migratedFieldValues(
+  defs: readonly FieldDefinition[],
+  values: Readonly<Record<string, unknown>> | undefined,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!values || !defs.some((d) => d.migration?.fromKey)) return values;
+  const out: Record<string, unknown> = { ...values };
+  for (const def of defs) {
+    const from = def.migration?.fromKey;
+    if (from && !Object.hasOwn(values, def.key) && Object.hasOwn(values, from))
+      out[def.key] = values[from];
+  }
+  return out;
+}
+
 /** Field definitions per collection of a site node (`{}` when it has none). */
 export function siteFieldDefinitions(site: {
   collections?: Record<string, { fields?: FieldDefinition[] | undefined } | undefined> | undefined;

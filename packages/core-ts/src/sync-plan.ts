@@ -303,9 +303,11 @@ function nodeBatch(
       inserted++;
     }
     batch.push(...extra.lists);
+    // The derived reference index follows the node set in the same batch (RFC-0004 §4.4), and
+    // only then: beside an unchanged node set its plan-time rows could replace a concurrent
+    // write's fresher ones (#196). Its chunked `INSERT`s count against the cap below.
+    batch.push(...refsRebuild(siteId, changes.rows));
   }
-  // The derived reference index follows the node set in the same batch (RFC-0004 §4.4).
-  batch.push(...refsRebuild(siteId, changes.rows));
   const written = changes.rows.find((n) => n.kind === "site" && n.id === siteId) ?? siteRow;
   batch.push(...hostStatements(extra.hosts, { siteId, hash: written.hash }));
   if (batch.length > 1000)

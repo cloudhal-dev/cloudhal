@@ -410,6 +410,8 @@ export function fieldsSuite(ctx: SuiteContext): void {
       const { asset } = await upload(site);
       const e = await entry(site, { fields: { poster: asset.id } });
       const bundle = await exportSite({ sql: ctx.sql(), blobs: ctx.blobs() }, site.id);
+      // An edit since the export: the import writes the node set, and the index with it (#196).
+      await store().updateContentEntry({ ...e, title: "Edited since the export" });
       await ctx.sql().run("DELETE FROM asset_refs WHERE site_id = ?", [site.id]);
       await importSite({ sql: ctx.sql(), blobs: ctx.blobs() }, bundle, { mode: "replace" });
       expect(await refsOf(e.id)).toEqual([`fields.poster=${asset.id}`]);
