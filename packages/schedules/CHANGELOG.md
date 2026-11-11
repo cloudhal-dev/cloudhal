@@ -1,5 +1,12 @@
 # @cloudhal/schedules
 
+## 0.7.3
+
+### Patch Changes
+
+- @cloudhal/core-contracts@0.7.3
+  - @cloudhal/storage@0.7.3
+
 ## 0.7.2
 
 ### Patch Changes
