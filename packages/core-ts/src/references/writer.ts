@@ -11,7 +11,8 @@
  *   collection's definitions as planned.
  * - **The rows**, anchored on the entry's new hash: an anchored `DELETE`, then one plain
  *   `INSERT … SELECT` that reads `shared` from the site row as it is when the batch runs, by key
- *   or `migration.fromKey`. A key with no definition then yields `NULL` and fails the batch
+ *   or `migration.fromKey` (the exact key wins; an aggregate, not a correlated `ORDER BY`, which
+ *   workerd's SQLite does not resolve). A key with no definition then yields `NULL` and fails the batch
  *   (`isSharedNullViolation` → `ConflictError`); it is never `OR IGNORE`.
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
@@ -228,12 +229,15 @@ function rowStatements(site: Site, draft: ContentEntry, hash: string): SqlStatem
   out.push({
     sql: `INSERT INTO entry_refs (site_id, target_id, source_id, source_collection, field, root_key, shared, source_status)
       SELECT ?, json_extract(p.value, '$.t'), ?, ?, json_extract(p.value, '$.f'), json_extract(p.value, '$.k'),
-        (SELECT CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END
+        (SELECT COALESCE(
+             max(CASE WHEN json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
+                 THEN CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END END),
+             max(CASE WHEN json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k')
+                 THEN CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END END))
            FROM nodes s, json_each(json_extract(s.body, ?)) d
           WHERE s.id = ? AND s.kind = 'site'
             AND (json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
-                 OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))
-          ORDER BY json_extract(d.value, '$.key') = json_extract(p.value, '$.k') DESC LIMIT 1),
+                 OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))),
         ?
       FROM json_each(?) p WHERE ${ANCHOR}`,
     params: [
