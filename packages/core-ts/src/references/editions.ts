@@ -140,7 +140,7 @@ async function usableOn(
   };
 }
 
-/** The group ids a stored value holds for `def` (none when the key differs). */
+/** The group ids a stored value holds for `def`: the freshness test only (not a count). */
 const heldBy = (def: FieldDefinition, value: unknown): Set<string> =>
   new Set(referenceUses(def, value, "").map((u) => u.groupId));
 
@@ -167,15 +167,18 @@ export async function editionReferences(
   const budget = { left: FIELD_LIMITS.referencesPerEntry };
   const dropped: EditionDrop[] = [];
   const fields: Record<string, unknown> = { ...(entry.fields ?? {}) };
+  // Pass 1: unchanged values are the write's own business (it re-checks nothing unchanged), but
+  // every one of their references counts toward the per-entry cap, before any changed key.
+  const changed: { def: FieldDefinition; key: string }[] = [];
   for (const def of defs) {
     const key = storedKey(def, fields);
     if (key === undefined) continue;
-    // An unchanged value is the write's own business (it re-checks nothing unchanged), but its
-    // references still count toward the per-entry cap.
-    if (Object.hasOwn(before, key) && sameJson(before[key], fields[key])) {
-      budget.left -= heldBy(def, fields[key]).size;
-      continue;
-    }
+    if (Object.hasOwn(before, key) && sameJson(before[key], fields[key]))
+      budget.left -= referenceUses(def, fields[key], "").length;
+    else changed.push({ def, key });
+  }
+  // Pass 2: the changed keys, carried under what the cap leaves.
+  for (const { def, key } of changed) {
     const held = Object.hasOwn(before, key) ? heldBy(def, before[key]) : new Set<string>();
     const carry: Carry = {
       usable: (g, target) => usable(g, target, !held.has(g)),

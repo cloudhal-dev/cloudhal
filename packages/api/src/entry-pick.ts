@@ -84,8 +84,12 @@ export async function pickEntries(
   const entries: PickCard[] = [];
   let read = 0;
   let last = query.cursor;
-  for (const collection of [...new Set(query.collections)].sort()) {
-    const { prefix, upper } = rangeOf(collection, query.locale);
+  // Ranges in the order of their keys, not of the names: "post-x:" and "news2:" sort before
+  // "post:" and "news:" ('-' and digits sort below ':'), and the cursor walks key order.
+  const ranges = [...new Set(query.collections)]
+    .map((collection) => ({ collection, ...rangeOf(collection, query.locale) }))
+    .sort((a, b) => (a.prefix < b.prefix ? -1 : a.prefix > b.prefix ? 1 : 0));
+  for (const { collection, prefix, upper } of ranges) {
     if (last !== undefined && last >= upper) continue;
     // One read per range, for the rest of the budget: the range ends first, or the budget does.
     const want = budget - read;

@@ -708,6 +708,61 @@ export function referencesSuite(ctx: SuiteContext): void {
         ).toBe("ok");
       });
 
+      it("counts every unchanged reference toward the cap first, repeated targets included", async () => {
+        const PERSON = {
+          key: "person",
+          type: "reference",
+          labels: L("Person"),
+          collections: ["people"],
+        };
+        const crew = (key: string) =>
+          ({
+            key,
+            type: "repeater",
+            labels: L(key),
+            localized: false,
+            maxItems: 50,
+            fields: [PERSON],
+          }) as never;
+        const site = await world({
+          ...COLLECTIONS,
+          events: {
+            fields: [
+              { ...VENUE, multiple: true, maxItems: 5 } as never,
+              crew("speakers"),
+              crew("crew"),
+            ],
+          },
+        });
+        const hall = await entry(site, "places");
+        const ada = await entry(site, "people");
+        // 100 references to one group in two unchanged repeaters: the cap is full
+        const items = Array.from({ length: 50 }, () => ({ person: ada.id }));
+        const stored = await entry(site, "events", { fields: { speakers: items, crew: items } });
+        const { fields, dropped } = await editionReferences(
+          ctx.sql(),
+          (await store().getSite(site.id)) as Site,
+          {
+            entry: {
+              collection: "events",
+              fields: { venue: [hall.id], speakers: items, crew: items },
+            },
+            stored,
+          },
+        );
+        // the changed key comes first in the definitions, yet the unchanged ones count first
+        expect(fields).toEqual({ speakers: items, crew: items });
+        expect(dropped).toEqual([{ path: "fields/venue/0", groupId: hall.id, reason: "cap" }]);
+        expect(await code(update(await fresh(stored), { fields: fields ?? {} }))).toBe("ok");
+        expect(
+          await code(
+            update(await fresh(stored), {
+              fields: { venue: [hall.id], speakers: items, crew: items },
+            }),
+          ),
+        ).toBe("too_many_references");
+      });
+
       it("an archived same-site original still lends its where field to a translation member", async () => {
         const OPEN: FieldDefinition = {
           key: "open",

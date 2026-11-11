@@ -105,6 +105,38 @@ describe.each(drivers)("pickEntries: %s", (_, open) => {
       (await pickEntries(sql, SITE, { q: "", collections: ["places"], limit: 5 })).entries,
     ).toHaveLength(1);
   });
+
+  it("visits ranges in key order: post-x before post, news2 before news, with and without a locale", async () => {
+    const { sql, add } = await world(open);
+    const ids = new Set<string>();
+    for (const c of ["post", "post-x", "news", "news2"]) {
+      ids.add(await add(c, `${c}-a`, `Hall in ${c}`));
+      ids.add(await add(c, `${c}-b`, `Other hall in ${c}`));
+    }
+    const collections = ["post", "post-x", "news", "news2"];
+    for (const locale of [undefined, "tr"]) {
+      const one = await pickEntries(sql, SITE, { q: "hall", collections, locale, limit: 20 });
+      expect(new Set(one.entries.map((e) => e.id))).toEqual(ids);
+      expect(one.cursor).toBeUndefined();
+      // and across budget-truncated continuations, one row at a time
+      const found: string[] = [];
+      for (let cursor: string | undefined, guard = 0; guard < 50; guard++) {
+        const page = await pickEntries(sql, SITE, {
+          q: "hall",
+          collections,
+          locale,
+          limit: 20,
+          budget: 1,
+          cursor,
+        });
+        found.push(...page.entries.map((e) => e.id));
+        if (!page.cursor) break;
+        cursor = page.cursor;
+      }
+      expect(new Set(found)).toEqual(ids);
+      expect(found).toHaveLength(ids.size);
+    }
+  });
 });
 
 describe("pickEntries' query plan (better-sqlite3)", () => {

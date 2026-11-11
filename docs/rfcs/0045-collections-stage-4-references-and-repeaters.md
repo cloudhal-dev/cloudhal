@@ -642,7 +642,11 @@ All new UI follows `kumo-design`, `studio-ui` and DESIGN.md "Fields", imports on
   - **repeater:** a nested sub-field list (rows like `FieldRow`, with up/down and ⋯), the maximum and the item label;
   - the ⋯ menu's operations gain the sub-field forms and the new `change_field_type` inputs (§7).
 - **API** (site-scoped, under the `/sites/:siteId` membership check):
-  - `GET /sites/:siteId/entries/pick?collections=a,b&q=&locale=&limit=` answers at most 20 `{groupId, id, title, collection, status, locale}` per page, never archived ones. It needs `content:read`. `q` is at most 100 characters, matched as a case-folded substring on titles and slugs (`includes`, no regex: rule 13), under a per-member window of the existing `rate_limits` counters (`packages/api/src/rate-limits.ts`, migration 0030).
+  - `GET /sites/:siteId/entries/pick?collections=a,b&q=&locale=&limit=&cursor=` (amended in 2b, PR #206). It needs `content:read`.
+    - The answer is `{entries, cursor?, truncated?}`: at most 20 `{groupId, id, title, collection, status, locale}`, never archived ones, in key order (collection, locale, slug).
+    - Each allowed collection (and locale) is a key range of `nodes_site_kind_key`, read with a keyset cursor. A request reads at most 1,000 rows. When the budget ends before `limit` matches, the answer says `truncated: true` and carries the `cursor` to continue from, so any match can be found.
+    - `q` is at most 100 characters. Both it and each row's title and slug are folded with `foldName` (case, diacritics, Turkish İ/ı) and matched as a substring with no pattern (rule 13). A `q` that folds to nothing matches nothing.
+    - The existing `rate_limits` counters (`packages/api/src/rate-limits.ts`, migration 0030) give a per-member window.
   - `GET /sites/:siteId/entries/:id/references` answers the referrers from `entry_refs`, expanded to members, paged.
 - **Accessibility:**
   - Each repeater item is a `fieldset` whose `legend` is its label ("Speaker 2: Ada Lovelace"), an ICU `selectordinal`/`plural` message, never concatenated.
