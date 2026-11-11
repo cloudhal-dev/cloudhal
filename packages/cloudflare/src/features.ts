@@ -6,6 +6,7 @@
  * `expiry` until it answers `{ "gates": 2 }` (derived gates, RFC-0042 §3.6).
  */
 import { AVAILABILITY_GATES_VERSION, type GateSupport } from "@cloudhal/core-ts/availability";
+import { FIELDS_FEATURE_VERSION, type FieldTypeSupport } from "@cloudhal/core-ts/fields";
 import type { SiteFetch } from "./purge.ts";
 
 const FEATURES_URL = "https://site.internal/__cloudhal/features";
@@ -14,7 +15,7 @@ const FEATURES_URL = "https://site.internal/__cloudhal/features";
 export async function siteFeatures(
   fetch: SiteFetch,
   token: string,
-): Promise<{ gates?: number } | undefined> {
+): Promise<{ gates?: number; fields?: number } | undefined> {
   const res = await fetch(FEATURES_URL, {
     method: "GET",
     headers: { authorization: `Bearer ${token}` },
@@ -23,8 +24,13 @@ export async function siteFeatures(
     await res.body?.cancel();
     return undefined;
   }
-  const body = (await res.json().catch(() => undefined)) as { gates?: unknown } | undefined;
-  return typeof body?.gates === "number" ? { gates: body.gates } : {};
+  const body = (await res.json().catch(() => undefined)) as
+    | { gates?: unknown; fields?: unknown }
+    | undefined;
+  return {
+    ...(typeof body?.gates === "number" ? { gates: body.gates } : {}),
+    ...(typeof body?.fields === "number" ? { fields: body.fields } : {}),
+  };
 }
 
 /**
@@ -60,6 +66,39 @@ export function siteGateSupport(options: {
           );
           return false;
         }
+        return true;
+      } catch (e) {
+        options.log?.(`features check failed: ${e instanceof Error ? e.message : String(e)}`);
+        return false;
+      }
+    },
+  };
+}
+
+/**
+ * RFC-0045 §1: the store's reference and repeater capability for one admin Worker isolate, the
+ * twin of `siteGateSupport`: yes once the site Worker answers `{ "fields": 2 }` or more (kept as
+ * a plain value); a refusal or an error is asked again. Built in rollout step 2; nothing passes it
+ * to a store until step 7 enables the types.
+ */
+export function siteFieldTypeSupport(options: {
+  readonly fetch: SiteFetch | undefined;
+  readonly token: string | undefined;
+  readonly confirmed: () => boolean;
+  readonly remember: () => void;
+  readonly log?: (line: string) => void;
+}): FieldTypeSupport {
+  return {
+    supported: async () => {
+      if (options.confirmed()) return true;
+      if (!options.fetch || !options.token) return false;
+      try {
+        const fields = (await siteFeatures(options.fetch, options.token))?.fields ?? 0;
+        if (fields < FIELDS_FEATURE_VERSION) {
+          options.log?.("site Worker does not read reference and repeater fields yet");
+          return false;
+        }
+        options.remember();
         return true;
       } catch (e) {
         options.log?.(`features check failed: ${e instanceof Error ? e.message : String(e)}`);

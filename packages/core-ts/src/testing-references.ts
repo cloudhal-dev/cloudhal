@@ -13,9 +13,13 @@
 import type { Actor, ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import { GATES_ENFORCED } from "./availability.ts";
+import { forEdition } from "./cross-site.ts";
 import { ConflictError, InvariantError } from "./errors.ts";
 import { runFieldOperation } from "./fields-operations/index.ts";
+import { loadEntries, rewritePass } from "./fields-operations/rewrite.ts";
+import { operationContext } from "./fields-operations/types.ts";
 import { canonicalJson, nodeHash } from "./hash.ts";
+import { PNG_1X1 } from "./media/fixtures.ts";
 import { SiteGraphStore } from "./store.ts";
 import { exportSite, importSite } from "./sync.ts";
 import { racingDriver, type SuiteContext } from "./testing-taxonomy.ts";
@@ -46,6 +50,7 @@ const SPEAKERS: FieldDefinition = {
   fields: [
     { key: "person", type: "reference", labels: L("Person"), collections: ["people"] },
     { key: "talk", type: "text", labels: L("Talk") },
+    { key: "photo", type: "image", labels: L("Photo") },
   ],
 };
 const ROOM: FieldDefinition = {
@@ -431,7 +436,124 @@ export function referencesSuite(ctx: SuiteContext): void {
       });
     });
 
+    describe("assets inside repeater items (§2.5)", () => {
+      const upload = async (siteId: string, bytes: Uint8Array, filename: string) =>
+        (
+          await store().ingestAsset({
+            siteId,
+            bytes,
+            filename,
+            uploadedBy: person,
+            source: { kind: "upload" },
+            fields: { decorative: true },
+          })
+        ).asset;
+      const assetRows = (nodeId: string) =>
+        ctx
+          .sql()
+          .all<{ asset_id: string; field: string }>(
+            "SELECT asset_id, field FROM asset_refs WHERE node_id = ? AND field LIKE 'fields.%'",
+            [nodeId],
+          );
+
+      it("records an item's image, keeps it through a rebuild, and blocks its delete", async () => {
+        const site = await world();
+        const photo = await upload(site.id, PNG_1X1, "dot.png");
+        const event = await entry(site, "events", {
+          fields: { speakers: [{ talk: "Opening" }, { talk: "Talk", photo: photo.id }] },
+        });
+        expect(await assetRows(event.id)).toEqual([
+          { asset_id: photo.id, field: "fields.speakers.photo" },
+        ]);
+        expect(await code(store().deleteAsset(photo))).toBe("in_use");
+        const bundle = await exportSite(storage(), site.id);
+        await update(await fresh(event), { title: "Moved on" });
+        await importSite(storage(), bundle, { mode: "replace", fieldTypes: ENABLED });
+        expect(await assetRows(event.id)).toHaveLength(1);
+      });
+
+      it("refuses a non-image in an image sub-field at its item path", async () => {
+        const site = await world();
+        const csv = await upload(site.id, new TextEncoder().encode("a,b\n1,2\n"), "data.csv");
+        try {
+          await entry(site, "events", { fields: { speakers: [{ talk: "x" }, { photo: csv.id }] } });
+          throw new Error("expected a refusal");
+        } catch (e) {
+          const issues = (e as InvariantError).details.issues as { path: string }[];
+          expect(issues.map((i) => i.path)).toEqual(["fields/speakers/1/photo"]);
+        }
+      });
+    });
+
     describe("field operations (§2.6)", () => {
+      const BLURB: FieldDefinition = {
+        key: "blurb",
+        type: "text",
+        labels: L("Blurb"),
+        localized: true,
+      };
+
+      it("a text field's rename rewrites entries holding references and keeps their rows", async () => {
+        const site = await world({ ...COLLECTIONS, events: { fields: [VENUE, BLURB] } });
+        const hall = await entry(site, "places");
+        const event = await entry(site, "events", {
+          status: "published",
+          fields: { venue: hall.id, blurb: "Hi" },
+        });
+        const op = {
+          op: "rename_field",
+          collection: "events",
+          from: "blurb",
+          to: "teaser",
+        } as const;
+        await runFieldOperation(store(), site.id, op, { actor: person });
+        expect((await fresh(event)).fields).toEqual({ venue: hall.id, teaser: "Hi" });
+        expect(await rows(event.id)).toEqual([
+          {
+            target_id: hall.id,
+            field: "venue",
+            root_key: "venue",
+            shared: 1,
+            source_status: "published",
+          },
+        ]);
+      });
+
+      it("R9: a rewrite changing a reference value skips the entry when its target goes first", async () => {
+        // Operations that convert into references come with rollout step 4; the rewrite path they
+        // will use is driven directly here, with a decision that changes a reference value.
+        const site = await world();
+        const hall = await entry(site, "places");
+        const event = await entry(site, "events", { fields: { venue: hall.id } });
+        const pass = async (on: SiteGraphStore, target: string) => {
+          const ctx2 = operationContext(on, {});
+          return rewritePass({
+            ctx: ctx2,
+            site: (await store().getSite(site.id)) as Site,
+            rows: await loadEntries(ctx2, site.id, "events"),
+            defs: [VENUE, SPONSOR, SPEAKERS],
+            decide: (row) =>
+              row.entry.id === event.id ? { fields: { venue: target } } : undefined,
+            guard: undefined,
+            done: 0,
+            lists: { collection: "events", keys: ["venue"] },
+          });
+        };
+        const gone = await entry(site, "places");
+        const raced = racing(async () => {
+          await store().deleteContentEntry(await fresh(gone));
+        });
+        const r = await pass(raced, gone.id);
+        expect(r.rewritten).toBe(0);
+        expect(r.skipped.map((x) => x.entryId)).toEqual([event.id]);
+        expect((await fresh(event)).fields?.venue).toBe(hall.id);
+        expect((await rows(event.id)).map((x) => x.target_id)).toEqual([hall.id]);
+        // without the race the rewrite lands, rows and all
+        const kept = await entry(site, "places");
+        expect((await pass(store(), kept.id)).rewritten).toBe(1);
+        expect((await rows(event.id)).map((x) => x.target_id)).toEqual([kept.id]);
+      });
+
       it("refuses operations that name a reference or repeater field (step 4)", async () => {
         const site = await world();
         for (const op of [
@@ -441,6 +563,65 @@ export function referencesSuite(ctx: SuiteContext): void {
           expect(await code(runFieldOperation(store(), site.id, op, { actor: person }))).toBe(
             "field_operation_unsupported",
           );
+      });
+    });
+
+    describe("language editions (§3)", () => {
+      it("carries ids the edition can resolve, drops the rest and emptied items, and guards the group there", async () => {
+        const site = await world();
+        const edition = await store().createSite({
+          projectId: site.projectId,
+          name: "Edition",
+          slug: `refs-edition-${n}`,
+          defaultLocale: "de",
+          locales: ["de"],
+          domains: [],
+          pageIds: [],
+          theme: { name: "blog" },
+          collections: COLLECTIONS,
+        });
+        const hall = await entry(site, "places", { status: "published" });
+        const ada = await entry(site, "people");
+        const hallDe = await entry(edition, "places", {
+          locale: "de",
+          translation: {
+            group: hall.id,
+            method: "human",
+            source: { ...(await sourceOf(hall)), siteId: site.id },
+          },
+        });
+        const event = await entry(site, "events", {
+          fields: {
+            venue: hall.id,
+            speakers: [{ person: ada.id }, { person: ada.id, talk: "Hi" }],
+          },
+        });
+        let dropped: { path: string; groupId?: string }[] = [];
+        const copy = await forEdition(store(), event, {
+          fromSiteId: site.id,
+          toSiteId: edition.id,
+          actor: person,
+          onDropped: (d) => {
+            dropped = d;
+          },
+        });
+        expect(copy.fields).toEqual({ venue: hall.id, speakers: [{ talk: "Hi" }] });
+        expect(dropped).toEqual([
+          { path: "fields/speakers/0/person", groupId: ada.id },
+          { path: "fields/speakers/0" },
+          { path: "fields/speakers/1/person", groupId: ada.id },
+        ]);
+        // the edition's event names the source site's group id, resolved by the edition's member
+        await entry(edition, "events", {
+          locale: "de",
+          status: "published",
+          fields: { venue: hall.id },
+        });
+        expect(await code(store().deleteContentEntry(await fresh(hallDe)))).toBe(
+          "entry_referenced",
+        );
+        // and the source site's original is free: the edition's rows pin nothing there
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
       });
     });
 

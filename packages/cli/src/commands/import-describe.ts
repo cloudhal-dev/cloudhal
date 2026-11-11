@@ -297,6 +297,7 @@ export function describeImport(result: ImportArchiveResult): string[] {
     ...manifestLines(result),
     ...(plan ? planLines(result, plan) : []),
     ...replaceLines(result.replace, { dryRun: true, plan, from: "the archive" }),
+    ...(result.warnings ?? []),
     ...result.refusals.map((r) => `would refuse: ${r}`),
     "nothing written (dry run)",
   ];

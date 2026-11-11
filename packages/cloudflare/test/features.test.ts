@@ -6,7 +6,7 @@
  * packages/cli/test/cloudflare-gates.test.ts.
  */
 import { describe, expect, it } from "vitest";
-import { siteFeatures, siteGateSupport } from "../src/features.ts";
+import { siteFeatures, siteFieldTypeSupport, siteGateSupport } from "../src/features.ts";
 
 function site(answer: () => Response) {
   const calls: { url: string; auth: string | null; method: string | undefined }[] = [];
@@ -100,5 +100,35 @@ describe("features handshake (admin side)", () => {
     expect(await gates.enforced("site_a", 2)).toBe(true);
     expect(await gates.enforced("site_a")).toBe(true);
     expect(s.calls).toHaveLength(after);
+  });
+});
+
+describe("fields: 2 (RFC-0045 §1, admin side)", () => {
+  it("says yes once the site Worker reports fields 2, remembers it, and asks again after a no", async () => {
+    let remembered = false;
+    let answer = { gates: 2, fields: 1 };
+    const s = site(() => Response.json(answer));
+    const support = siteFieldTypeSupport({
+      fetch: s.fetch,
+      token: "tok",
+      confirmed: () => remembered,
+      remember: () => {
+        remembered = true;
+      },
+    });
+    expect(await support.supported("site_01HZX8K3Q9AB")).toBe(false);
+    answer = { gates: 2, fields: 2 };
+    expect(await support.supported("site_01HZX8K3Q9AB")).toBe(true);
+    expect(remembered).toBe(true);
+    expect(await support.supported("site_01HZX8K3Q9AB")).toBe(true);
+    expect(s.calls).toHaveLength(2);
+    // no binding or token: refused, never asked
+    const none = siteFieldTypeSupport({
+      fetch: undefined,
+      token: undefined,
+      confirmed: () => false,
+      remember: () => {},
+    });
+    expect(await none.supported("site_01HZX8K3Q9AB")).toBe(false);
   });
 });

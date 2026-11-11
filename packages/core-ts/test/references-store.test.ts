@@ -18,6 +18,7 @@ import { entryRefsRebuild } from "../src/references/rebuild.ts";
 import { entryRefRows } from "../src/references/rows.ts";
 import { collectionsAnchor, definitionsAnchor } from "../src/references/sql.ts";
 import { entryRefStatements } from "../src/references/writer.ts";
+import { releaseDepsOf, stripReferences } from "../src/release-deps.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../core-contracts/fixtures/valid/site");
 const L = (label: string) => ({ en: { label } });
@@ -236,5 +237,61 @@ describe("the rows INSERT reads shared from the site row at batch time", () => {
     const text = { key: "venue", type: "text", labels: L("venue"), localized: false };
     await expect(run([text])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
     await expect(run([])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
+  });
+});
+
+describe("release dependencies (§2.7)", () => {
+  const site = {
+    collections: {
+      events: {
+        fields: [
+          {
+            key: "place",
+            type: "reference",
+            labels: L("Venue"),
+            localized: false,
+            collections: ["places"],
+            migration: { id: "snap_01HZX8K3Q9MG", fromKey: "venue" },
+          },
+          {
+            key: "speakers",
+            type: "repeater",
+            labels: L("Speakers"),
+            localized: false,
+            fields: [
+              { key: "person", type: "reference", labels: L("Person"), collections: ["people"] },
+              { key: "photo", type: "image", labels: L("Photo") },
+            ],
+          },
+        ],
+      },
+    },
+  } as unknown as Site;
+  const body = {
+    id: "entry_01HZX8K3QSELF",
+    collection: "events",
+    coverImage: { assetId: "asset_01HZX8K3QCOVR" },
+    terms: { tag: { ids: ["term_01HZX8K3QTAG1"] } },
+    fields: {
+      venue: "entry_01HZX8K3QVENU",
+      speakers: [{ person: "entry_01HZX8K3QPERS", photo: "asset_01HZX8K3QFACE" }],
+    },
+  };
+
+  it("drops reference values, top level and in items, and keeps every other dependency", async () => {
+    const deps = releaseDepsOf(site, async () => JSON.stringify(body));
+    expect(await deps({ id: body.id, kind: "contentEntry", rev: 1, hash: "h" })).toEqual([
+      "asset_01HZX8K3QCOVR",
+      "asset_01HZX8K3QFACE",
+      "term_01HZX8K3QTAG1",
+    ]);
+    // other kinds are walked as before
+    expect(await deps({ id: "page_01HZX8K3QPAGE", kind: "page", rev: 1, hash: "h" })).toContain(
+      "entry_01HZX8K3QVENU",
+    );
+  });
+
+  it("leaves bodies without reference definitions as they are", () => {
+    expect(stripReferences({ collections: {} }, body)).toBe(body);
   });
 });

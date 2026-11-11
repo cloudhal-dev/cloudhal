@@ -15,6 +15,7 @@ import { editsLiveCorrections, entryLimit, personOf } from "../own.ts";
 import { param } from "../params.ts";
 import { type DraftPreview, previewResponse } from "../preview.ts";
 import { previewStructuredData } from "../structured-data.ts";
+import { entryReferences } from "./entry-references.ts";
 
 const STATUSES = new Set<PublishStatus>(["draft", "review", "published", "archived"]);
 
@@ -56,6 +57,8 @@ export const entries: Hono<Env> = new Hono<Env>()
     // `filter` is the RFC-0002 §5 language; a FilterError maps to 400 with suggestions.
     return c.json(await c.get("store").listContentEntries(param(c, "siteId"), base));
   })
+  // RFC-0045 §5: the entry picker and an entry's referrers (before `/:entryId`).
+  .route("/", entryReferences)
   .post("/", async (c) => {
     const siteId = param(c, "siteId");
     if (!(await c.get("store").getSite(siteId))) throw notFound("site not found");

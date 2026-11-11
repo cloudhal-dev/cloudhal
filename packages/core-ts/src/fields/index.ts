@@ -11,6 +11,8 @@
  */
 
 export {
+  FIELDS_FEATURE_VERSION,
+  FIELDS_SUPPORTED,
   type FieldTypeSupport,
   type ReferenceDefinitionOptions,
   referenceDefinitionIssues,

@@ -77,6 +77,7 @@ import {
 } from "./import-checks.ts";
 import { writeMedia } from "./import-media.ts";
 import { archiveSize, readPass, siteSummary, statOrUndefined } from "./import-read.ts";
+import { referenceLines } from "./import-references.ts";
 import {
   hostRefusal,
   importBracket,
@@ -128,6 +129,8 @@ export interface ImportArchiveResult {
   readonly plan?: ImportPlan | undefined;
   /** Why the import is refused (a dry run reports them; an import throws the first). */
   readonly refusals: readonly string[];
+  /** RFC-0045: a dry run's reference warnings (`referenceLines`), never refusals. */
+  readonly warnings?: readonly string[] | undefined;
   readonly imported?:
     | {
         readonly nodes: CopySiteResult["nodes"];
@@ -350,7 +353,10 @@ async function runImport(options: ImportArchiveOptions, state: State) {
         incoming: base.site.published,
       })
     : undefined;
-  if (options.dryRun) return { ...base, plan, refusals, replace: outcome };
+  if (options.dryRun) {
+    const warnings = referenceLines(first.bundle as SiteBundle, Date.now());
+    return { ...base, plan, refusals, warnings, replace: outcome };
+  }
   if (refusals[0] !== undefined) throw new ImportRefusal(refusals[0]);
   options.signal?.throwIfAborted();
   const bundle = await copyMedia(run, first, plan);

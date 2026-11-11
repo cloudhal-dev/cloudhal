@@ -259,6 +259,31 @@ export function entryRefStatements(site: Site, draft: ContentEntry, hash: string
   return out;
 }
 
+/** The guard pairs of the uses a write checks (changed keys; all own values going live). */
+function pairsOf(uses: readonly Use[]): TargetPair[] {
+  const pairs = new Map<string, TargetPair>();
+  for (const u of uses) {
+    const pair: TargetPair = { t: u.groupId, c: u.collections, f: u.fresh ? 1 : 0 };
+    pairs.set(JSON.stringify(pair), pair);
+  }
+  return [...pairs.values()];
+}
+
+/**
+ * §2.6: the target guard of a field-operation rewrite, over the reference values it changes
+ * (undefined when none change). A miss skips the entry for the next pass, like a concurrent edit.
+ * The rewrite's own statements are guarded on the site still carrying the operation's marker, so
+ * the definitions the pairs come from cannot change under it.
+ */
+export function rewriteTargetGuard(
+  site: Site,
+  next: ContentEntry,
+  stored: ContentEntry,
+): Cond | undefined {
+  const defs = fieldDefinitions(site, next.collection);
+  return targetGuard(site.id, pairsOf(guardedUses(defs, next, stored)));
+}
+
 /** True when the write changes the entry's values or collection (the definitions anchor applies). */
 const changesFields = (draft: ContentEntry, stored: ContentEntry | undefined) =>
   !stored || stored.collection !== draft.collection || !sameJson(stored.fields, draft.fields);
@@ -289,13 +314,8 @@ export async function planEntryRefs(
   const check = async () =>
     refuseFieldIssues(useIssues(site, draft, uses, await readMembers(sql, site.id, groups)));
   await check();
-  const pairs = new Map<string, TargetPair>();
-  for (const u of uses) {
-    const pair: TargetPair = { t: u.groupId, c: u.collections, f: u.fresh ? 1 : 0 };
-    pairs.set(JSON.stringify(pair), pair);
-  }
   return {
-    guard: and(anchor, targetGuard(site.id, [...pairs.values()])),
+    guard: and(anchor, targetGuard(site.id, pairsOf(uses))),
     statements: (hash) => entryRefStatements(site, draft, hash),
     diagnose: check,
   };

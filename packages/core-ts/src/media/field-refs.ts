@@ -8,27 +8,53 @@
  */
 import type { Asset, FieldDefinition } from "@cloudhal/core-contracts";
 import { ASSET_ID_PATTERN } from "../fields/props.ts";
-import type { FieldIssue } from "../fields/types.ts";
+import { type FieldIssue, isRecord } from "../fields/types.ts";
 import { type AssetRefUse, markdownAssetIds } from "./refs.ts";
 
 const ASSET_ID = new RegExp(ASSET_ID_PATTERN);
 
-/** Every asset reference of an entry's field values under `defs`, sorted like `assetRefsOf`. */
+/**
+ * A field's asset reference with where it sits: `fields/cover`, or inside a repeater item
+ * `fields/speakers/2/photo` (RFC-0045 §2.5), so issues map to their control.
+ */
+export interface FieldAssetRef extends AssetRefUse {
+  readonly path: string;
+}
+
+type Slot = { type: string };
+
+/** One value's assets: an image's id, a rich text's `asset:` links. */
+function valueAssets(slot: Slot, value: unknown): string[] {
+  if (typeof value !== "string") return [];
+  if (slot.type === "image") return ASSET_ID.test(value) ? [value] : [];
+  return slot.type === "richText" && value.includes("asset:") ? markdownAssetIds(value) : [];
+}
+
+/**
+ * Every asset reference of an entry's field values under `defs`, sorted like `assetRefsOf`: top
+ * level under `fields.<key>`, and in repeater items under `fields.<key>.<sub>` (one row per asset
+ * and field; the first use's item path is kept).
+ */
 export function fieldAssetRefs(
   defs: readonly FieldDefinition[],
   values: Readonly<Record<string, unknown>> | undefined,
-): AssetRefUse[] {
+): FieldAssetRef[] {
   if (!values || defs.length === 0) return [];
-  const out = new Map<string, AssetRefUse>();
-  const add = (assetId: string, field: string) =>
-    out.set(`${assetId}\n${field}`, { assetId, field });
+  const out = new Map<string, FieldAssetRef>();
+  const add = (assetId: string, field: string, path: string) => {
+    const id = `${assetId}\n${field}`;
+    if (!out.has(id)) out.set(id, { assetId, field, path });
+  };
   for (const def of defs) {
-    const value = values[def.key];
-    if (typeof value !== "string") continue;
-    const field = `fields.${def.key}`;
-    if (def.type === "image" && ASSET_ID.test(value)) add(value, field);
-    else if (def.type === "richText" && value.includes("asset:"))
-      for (const id of markdownAssetIds(value)) add(id, field);
+    const value = Object.hasOwn(values, def.key) ? values[def.key] : undefined;
+    for (const id of valueAssets(def, value)) add(id, `fields.${def.key}`, `fields/${def.key}`);
+    if (def.type !== "repeater" || !Array.isArray(value)) continue;
+    value.forEach((item, i) => {
+      if (!isRecord(item)) return;
+      for (const sub of def.fields)
+        for (const id of valueAssets(sub, Object.hasOwn(item, sub.key) ? item[sub.key] : undefined))
+          add(id, `fields.${def.key}.${sub.key}`, `fields/${def.key}/${i}/${sub.key}`);
+    });
   }
   return [...out.values()].sort(
     (a, b) => a.assetId.localeCompare(b.assetId) || a.field.localeCompare(b.field),
@@ -73,12 +99,15 @@ export interface FieldAssetCheck {
   /** The entry's field definitions (its new collection's). */
   readonly defs: readonly FieldDefinition[];
   /** `fieldAssetRefs` of the values being written. */
-  readonly refs: readonly AssetRefUse[];
+  readonly refs: readonly (AssetRefUse & { readonly path?: string })[];
   /** `fieldAssetRefs` of the stored entry (empty for a new one). */
   readonly kept: readonly AssetRefUse[];
   /** Assets of the entry's site, by id. */
   readonly lookup: SiteAssetLookup;
-  /** Paths (`fields/<key>`) whose value already has an issue: their references are not checked. */
+  /**
+   * Issue paths (`fields/<key>`, `fields/speakers/2/person`) whose value already has an issue:
+   * a reference is not checked when one of these is a prefix of its path, or it of one.
+   */
   readonly skip?: ReadonlySet<string>;
 }
 
@@ -91,37 +120,55 @@ export function newFieldAssetRefs(
   return refs.filter((r) => !held.has(`${r.assetId}\n${r.field}`));
 }
 
+/** A ref's item path (`fieldAssetRefs`), else its field's (`fields.<key>` → `fields/<key>`). */
+const pathOf = (r: AssetRefUse & { readonly path?: string }) =>
+  r.path ?? `fields/${r.field.slice("fields.".length)}`;
+
+/** One path lies at or under the other (`fields/speakers` and `fields/speakers/2/photo`). */
+const nested = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+
+/** Field and sub-field types by `<key>` and `<key>.<sub>`. */
+function slotTypes(defs: readonly FieldDefinition[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const d of defs) {
+    out.set(d.key, d.type);
+    if (d.type === "repeater") for (const s of d.fields) out.set(`${d.key}.${s.key}`, s.type);
+  }
+  return out;
+}
+
 /**
- * RFC-0041 §2: every reference a write adds names a file of the site; an image field's is an
- * image; a retired file is not newly used unless the entry already used it. Issues are
- * `invalid_value` at `fields/<key>`.
+ * RFC-0041 §2: every reference a write adds names a file of the site; an image field's (or image
+ * sub-field's) is an image; a retired file is not newly used unless the entry already used it.
+ * Issues are `invalid_value` at the reference's path (`fields/<key>`, or an item path).
  */
 export async function fieldAssetIssues(check: FieldAssetCheck): Promise<FieldIssue[]> {
   const { defs, kept, skip } = check;
+  const skipped = [...(skip ?? [])];
   const refs = newFieldAssetRefs(check.refs, kept).filter(
-    (r) => !skip?.has(r.field.replace(".", "/")),
+    (r) => !skipped.some((s) => nested(pathOf(r), s)),
   );
   if (refs.length === 0) return [];
   const assets = await check.lookup(refs.map((r) => r.assetId));
   const keptIds = new Set(kept.map((r) => r.assetId));
-  const types = new Map(defs.map((d) => [d.key, d.type]));
+  const types = slotTypes(defs);
   const out: FieldIssue[] = [];
   for (const ref of refs) {
-    const key = ref.field.slice("fields.".length);
-    const problem = assetProblem(assets.get(ref.assetId), types.get(key), keptIds.has(ref.assetId));
+    const slot = ref.field.slice("fields.".length);
+    const problem = assetProblem(
+      assets.get(ref.assetId),
+      types.get(slot),
+      keptIds.has(ref.assetId),
+    );
     if (problem)
-      out.push({
-        path: `fields/${key}`,
-        code: "invalid_value",
-        message: `${ref.assetId} ${problem}`,
-      });
+      out.push({ path: pathOf(ref), code: "invalid_value", message: `${ref.assetId} ${problem}` });
   }
   return out;
 }
 
 function assetProblem(
   asset: Asset | undefined,
-  type: FieldDefinition["type"] | undefined,
+  type: string | undefined,
   kept: boolean,
 ): string | undefined {
   if (!asset) return "is not a file of this site";
