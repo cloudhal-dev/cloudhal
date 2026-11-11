@@ -4,6 +4,7 @@ import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import type { GateSupport } from "../availability.ts";
 import type { BlockRegistry, PropsSchema } from "../blocks.ts";
 import type { BlockWriter } from "../body-index.ts";
+import type { FieldTypeSupport } from "../references/definitions.ts";
 import type { SearchProvider } from "../search-provider.ts";
 
 export interface SiteGraphStoreOptions {
@@ -50,6 +51,12 @@ export interface SiteGraphStoreOptions {
   readonly themeSettings?: PropsSchema;
   /** RFC-0021 §1: the theme's DESIGN.md (`src/DESIGN.md`), read by agents with the site's rules. */
   readonly themeDesign?: string;
+  /**
+   * RFC-0045 §1: whether the renderer serving a site reads `reference` and `repeater` fields.
+   * Without it both types are refused on every write path (`fields_unsupported`); the shared
+   * suites pass one, production stores pass none until rollout step 7.
+   */
+  readonly fieldTypes?: FieldTypeSupport;
 }
 
 /**

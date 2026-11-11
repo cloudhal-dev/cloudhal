@@ -16,6 +16,11 @@ import {
 } from "../fields/index.ts";
 import { sameJson } from "../fields/types.ts";
 import { and, type Cond } from "../node-sql.ts";
+import { referenceDefinitionOptions } from "../references/capability.ts";
+import {
+  type ReferenceDataChange,
+  referenceDefinitionChanges,
+} from "../references/definition-changes.ts";
 import type { StoreContext } from "./context.ts";
 
 /** What a site write's definition changes add: the guard that keeps "no entry uses it" true. */
@@ -84,23 +89,46 @@ export async function planFieldDefinitions(
   if (!stored?.collections && !next.collections) return undefined;
   // Only a change is checked: other site writes never re-run the caps on stored settings.
   if (stored && sameJson(stored.collections, next.collections)) return undefined;
-  refuseFieldIssues(checkFieldDefinitions(next, stored));
+  const options = await referenceDefinitionOptions(ctx.graph, next, stored !== undefined);
+  refuseFieldIssues(checkFieldDefinitions(next, stored, options));
   if (!stored) return undefined;
+  // RFC-0045 §2.8: reference and repeater changes that depend on stored values.
+  const references = referenceDefinitionChanges(next.id, stored, next);
+  refuseFieldIssues(references.refused);
+  const guards = await checkReferenceUsage(ctx, references.data);
   // A collection that goes away entirely is RFC-0040's (`collection_in_use` while it has entries).
   const changes = fieldDefinitionChanges(stored, next).filter(
     (c): c is DataChange =>
       (c.change === "removed" || c.change === "optionsRemoved") &&
       next.collections?.[c.collection] !== undefined,
   );
-  if (changes.length === 0) return undefined;
+  if (changes.length === 0 && !guards) return undefined;
   await checkUsage(ctx, next.id, changes);
   return {
     guard: and(
+      guards,
       ...changes.map((c) => {
         const q = usage(next.id, c);
         return { sql: `(${q.sql}) = 0`, params: q.params };
       }),
     ),
-    diagnose: () => checkUsage(ctx, next.id, changes),
+    diagnose: async () => {
+      await checkUsage(ctx, next.id, changes);
+      await checkReferenceUsage(ctx, references.data);
+    },
   };
+}
+
+/** Counts each reference change's stranded values; throws when any; returns the batch guard. */
+async function checkReferenceUsage(
+  ctx: StoreContext,
+  changes: readonly ReferenceDataChange[],
+): Promise<Cond | undefined> {
+  const issues: FieldIssue[] = [];
+  for (const c of changes) {
+    const n = Number((await ctx.sql.get<{ n: number }>(c.count.sql, c.count.params))?.n ?? 0);
+    if (n > 0) issues.push(c.issue(n));
+  }
+  refuseFieldIssues(issues);
+  return and(...changes.map((c) => ({ sql: `(${c.count.sql}) = 0`, params: c.count.params })));
 }

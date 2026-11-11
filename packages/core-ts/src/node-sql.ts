@@ -7,6 +7,7 @@ import {
   ConflictError,
   InvariantError,
   isOpGuardViolation,
+  isSharedNullViolation,
   isTranslationViolation,
   isUniqueViolation,
   UniqueConstraintError,
@@ -297,6 +298,12 @@ export function parseRows<T>(rows: { body: string }[]): T[] {
  * took the locale in the group) or a node key; anything else is returned unchanged.
  */
 export function mapUniqueViolation(e: unknown, kind: string, key: string): unknown {
+  // RFC-0045 §2.1: a reference key lost its definition between plan and batch; retry.
+  if (isSharedNullViolation(e)) {
+    const conflict = new ConflictError(kind, key, 0, undefined);
+    conflict.message = `${kind} ${key}: the collection's field definitions changed; reload and retry`;
+    return conflict;
+  }
   if (isTranslationViolation(e))
     return new InvariantError(
       "translation_exists",

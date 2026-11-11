@@ -48,6 +48,19 @@ export function isTranslationViolation(error: unknown): boolean {
   return /nodes_translation_locale|json_extract\(body, '\$\.translation\.group'\)/i.test(msg);
 }
 
+/**
+ * RFC-0045 §2.1: the `entry_refs` rows `INSERT` found no definition for a key at batch time (a
+ * concurrent definitions change). Matched by message only, so any other constraint failure still
+ * surfaces as itself.
+ */
+export function isSharedNullViolation(error: unknown): boolean {
+  const msg =
+    error instanceof Error
+      ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+      : String(error);
+  return /NOT NULL constraint failed: entry_refs\.shared/.test(msg);
+}
+
 export function isUniqueViolation(error: unknown): boolean {
   const msg =
     error instanceof Error
@@ -217,7 +230,21 @@ export type InvariantCode =
   /** §1: a reference's `collections` names a collection the site neither declares nor uses. */
   | "reference_target_unknown"
   /** §1: more than 100 reference values in one entry, across fields and repeater items. */
-  | "too_many_references";
+  | "too_many_references"
+  /** §2.1: a reference names a group with no usable member of this site in an allowed collection. */
+  | "unknown_entry"
+  /** §2.1, §2.2: the group's member is in a collection the field does not allow, or a move would leave it so. */
+  | "reference_target_moved"
+  /** §2.2: the delete or group change would strand a reference a published entry shows (`details.referrers`). */
+  | "entry_referenced"
+  /** §1, §2.2: other nodes of the site use this node's id as their translation group. */
+  | "translation_group_in_use"
+  /** §2.2: a field operation converting text into references is running in a target collection. */
+  | "field_operation_running"
+  /** §2.6: field operations on reference and repeater fields come with rollout step 4. */
+  | "field_operation_unsupported"
+  /** §2.8: adding a reference or repeater field over a key entries already hold. */
+  | "field_key_in_use";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

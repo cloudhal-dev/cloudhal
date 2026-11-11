@@ -44,6 +44,20 @@ const HINTS: Partial<Record<InvariantCode, string>> = {
     "a reference field's collections must be collections of this site (list_collections)",
   too_many_references:
     "an entry holds at most 100 references across its fields and repeater items; remove some",
+  unknown_entry:
+    "each reference names the groupId of an entry of this site in one of the field's collections (list_entries); remove or replace the ids at the paths in details.issues",
+  reference_target_moved:
+    "published entries show this entry through a field that does not allow the new collection: keep it where it is, or ask a person to unpublish or edit those entries first",
+  entry_referenced:
+    "published entries (details.referrers) show this entry, and it is the last one of its group here: ask a person to unpublish or edit them first; archiving it does not release them",
+  translation_group_in_use:
+    "other language versions use this entry as their original: unlink or move them first, then change its translation",
+  field_operation_running:
+    "a field operation is converting values into references to this collection: wait until it finishes, then try again",
+  field_operation_unsupported:
+    "field operations on reference and repeater fields are not available on this server yet; edit the entries instead",
+  field_key_in_use:
+    "entries of the collection already hold a value under that key: pick another key, or convert the existing field with change_field_type",
   list_field_in_use:
     "contentList sections on the pages in details.pages still filter or sort by that field: change their where/orderBy first (update_page), then try again",
 };

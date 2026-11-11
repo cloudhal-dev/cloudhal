@@ -7,6 +7,7 @@
 import type { ContentEntry, Page, Site, TranslationMethod } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
 import { InvariantError } from "../errors.ts";
+import { and, type Cond } from "../node-sql.ts";
 import type { SiteGraphStore } from "../store.ts";
 
 type Localized = Page | ContentEntry;
@@ -97,20 +98,79 @@ export function checkLocalizedNode(kind: LocalizedKind, site: Site, node: Locali
     );
 }
 
-/** Invariants 2–3 that read the graph: the source exists, belongs to the group, stays in the project; one node per locale. */
+/**
+ * RFC-0045 §1, §2.2: the guards a write that sets or changes a node's translation group carries.
+ *
+ * - **Written group.** A write whose `translation.group` (or `source`) is set or changed joins
+ *   group X: X's node, if it is in this site, still has its own id as its group (R15). Omitted when
+ *   X is the node's own id (a translation becoming an original), where it would read the
+ *   pre-update row and fail every retry.
+ * - **Dependants.** A node whose id other same-site nodes use as their group cannot leave it
+ *   (`translation_group_in_use`): its translations move first, so a group never loses its original
+ *   while members still inherit from it.
+ */
+function groupGuards(
+  kind: LocalizedKind,
+  siteId: string,
+  write: { node: Localized; stored?: Localized | undefined; joins: boolean },
+): { written?: Cond; dependants?: Cond } {
+  const { node, stored } = write;
+  const group = node.translation?.group ?? node.id;
+  const out: { written?: Cond; dependants?: Cond } = {};
+  if (write.joins && group !== node.id)
+    out.written = {
+      sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE id = ? AND site_id = ?
+        AND json_extract(body, '$.translation.group') IS NOT NULL AND json_extract(body, '$.translation.group') <> ?)`,
+      params: [group, siteId, group],
+    };
+  if (stored && (stored.translation?.group ?? stored.id) === stored.id && group !== stored.id)
+    out.dependants = {
+      sql: `NOT EXISTS (SELECT 1 FROM nodes WHERE site_id = ? AND kind = ?
+        AND json_extract(body, '$.translation.group') = ? AND id <> ?)`,
+      params: [siteId, kind, stored.id, stored.id],
+    };
+  return out;
+}
+
+async function holds(sql: SqlDriver, cond: Cond | undefined): Promise<boolean> {
+  if (!cond) return true;
+  return (await sql.get<{ ok: number }>(`SELECT ${cond.sql} AS ok`, cond.params))?.ok === 1;
+}
+
+/**
+ * Invariants 2–3 that read the graph: the source exists, belongs to the group, stays in the
+ * project; one node per locale. Returns the batch guard of RFC-0045's group rules
+ * (`groupGuards`), checked here first; undefined when the write changes no group.
+ */
 export async function checkTranslationLinks(
   { graph, sql }: { graph: SiteGraphStore; sql: SqlDriver },
   write: { kind: LocalizedKind; site: Site; node: Localized; stored?: Localized | undefined },
-): Promise<void> {
+): Promise<Cond | undefined> {
   const { kind, site, node, stored } = write;
   const t = node.translation;
-  if (!t) return;
-  const source = t.source;
   const before = stored?.translation;
+  const source = t?.source;
   const sourceChanged =
     source !== undefined &&
     (before?.source?.id !== source.id || before.source.siteId !== source.siteId);
-  if (source && sourceChanged) {
+  // RFC-0045 §2.2: a group-only change is checked like a source change.
+  const groupChanged = t !== undefined && before?.group !== t.group;
+  const guards = groupGuards(kind, site.id, {
+    node,
+    stored,
+    joins: sourceChanged || groupChanged,
+  });
+  if (!(await holds(sql, guards.dependants)))
+    throw new InvariantError(
+      "translation_group_in_use",
+      `other language versions use ${node.id} as their group; move or unlink them first`,
+      { id: node.id },
+    );
+  if (!(await holds(sql, guards.written)))
+    fail("translation.group names a node that is itself a translation", { group: t?.group });
+  const guard = and(guards.written, guards.dependants);
+  if (!t) return guard;
+  if (source && (sourceChanged || groupChanged)) {
     const sourceSiteId = source.siteId ?? site.id;
     if (sourceSiteId !== site.id) {
       const other = await graph.getSite(sourceSiteId);
@@ -131,7 +191,7 @@ export async function checkTranslationLinks(
     if ((src.translation?.group ?? src.id) !== t.group)
       fail("translation.group is the source's group (its original's id)", { group: t.group });
   }
-  if (before?.group === t.group && stored?.locale === node.locale) return;
+  if (before?.group === t.group && stored?.locale === node.locale) return guard;
   const taken = await sql.get<{ id: string }>(
     `SELECT id FROM nodes WHERE site_id = ? AND kind = ? AND id != ?
        AND json_extract(body, '$.translation.group') = ? AND json_extract(body, '$.locale') = ?`,
@@ -143,6 +203,7 @@ export async function checkTranslationLinks(
       `the group already has a ${node.locale} version (${taken.id}); update that one instead`,
       { id: taken.id, locale: node.locale },
     );
+  return guard;
 }
 
 /** Every language version of `group` across the sites of `site`'s project, with staleness. */

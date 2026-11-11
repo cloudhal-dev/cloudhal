@@ -15,7 +15,11 @@ const KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
 const COLLECTION = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 function refuse(
-  code: "unknown_field" | "field_key_duplicate" | "field_key_reserved" | "fields_unsupported",
+  code:
+    | "unknown_field"
+    | "field_key_duplicate"
+    | "field_key_reserved"
+    | "field_operation_unsupported",
   msg: string,
 ) {
   return new InvariantError(code, msg, { issues: [] });
@@ -93,9 +97,16 @@ export function targetDefinition(def: FieldDefinition, op: FieldOperation): Fiel
 /** Checks the request against the collection; throws when it can never run as written. */
 export function checkOperation(site: Site, op: FieldOperation): void {
   const { defs, def } = currentDefinition(site, op);
-  // RFC-0045: no operation turns a field into, or rewrites, a reference or repeater yet.
-  if (op.op === "change_field_type" && isReferenceFieldType(op.type))
-    throw refuse("fields_unsupported", `${op.type} fields are not enabled on this server yet`);
+  // RFC-0045 §2.6: no operation turns a field into, or rewrites, a reference or repeater until
+  // rollout step 4.
+  if (
+    isReferenceFieldType(def.type) ||
+    (op.op === "change_field_type" && isReferenceFieldType(op.type))
+  )
+    throw refuse(
+      "field_operation_unsupported",
+      `field operations on reference and repeater fields are not available yet (${def.key})`,
+    );
   if (op.op === "rename_field") {
     if (!KEY.test(op.to))
       throw refuse("field_key_reserved", `${op.to} is not a field key (lower camelCase)`);

@@ -6,6 +6,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { GATES_ENFORCED } from "./availability.ts";
 import type { BlockRegistry, PropsSchema } from "./blocks.ts";
 import { rebuildListValues } from "./list-values/backfill.ts";
+import { canonicalizeSiteRows } from "./references/canonical-rows.ts";
 import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
 export interface LocalStore {
@@ -45,6 +46,8 @@ export async function openLocalStore(
   await migrate(sql, migrations);
   // RFC-0042 §4: list values for collections listed before migration 0029 or left unfinished.
   await rebuildListValues(sql);
+  // RFC-0045 §2.4: site rows stored verbatim by older imports, in canonical form for the anchors.
+  await canonicalizeSiteRows(sql);
   const blobs = new FsBlobStore(path.join(dir, "blobs"));
   // The renderer that serves this store runs in the same process and enforces gates (S15).
   const store = new SiteGraphStore({

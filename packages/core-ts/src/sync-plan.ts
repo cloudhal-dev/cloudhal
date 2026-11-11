@@ -17,6 +17,8 @@ import { canonicalJson, sha256Hex } from "./hash.ts";
 import { checkHosts, hostStatements, hostsOf, type SiteHost } from "./hosts.ts";
 import { importListStatements } from "./list-values/site-plan.ts";
 import { refsRebuild } from "./media/refs-rebuild.ts";
+import { type FieldTypeSupport, referenceTypesSupported } from "./references/definitions.ts";
+import { entryRefsRebuild } from "./references/rebuild.ts";
 import {
   type BundleMedia,
   type NodeRow,
@@ -41,6 +43,7 @@ export interface ImportPlanOptions {
   mode?: "bootstrap" | "replace" | undefined;
   gates?: GateSupport | undefined;
   published?: "source" | "target" | undefined;
+  fieldTypes?: FieldTypeSupport | undefined;
   /**
    * Return a bootstrap conflict (`conflict`) and missing media (`media.missing`) instead of
    * throwing them (`cloudhal import` before it copies media, and `--dry-run`). Every other
@@ -183,6 +186,35 @@ async function bodiesToWrite(
   return out;
 }
 
+/**
+ * The site bodies the bundle's *new* snapshots name that the target already holds. Node bodies
+ * are content-addressed and shared by every site, so a site body held for a site whose renderer
+ * reads the RFC-0045 types could be re-pointed by another site's new snapshot: the gate checks
+ * them too. Snapshots the target has were accepted already, and a capable site needs no read.
+ * Unreadable ones are left to `assertSnapshotsBacked`.
+ */
+async function heldSiteBodies(
+  to: StoragePair,
+  siteHashes: ReadonlySet<string>,
+  gate: { written: readonly VerifiedBody[]; support: FieldTypeSupport | undefined; siteId: string },
+): Promise<{ hash: string; body: unknown }[]> {
+  const { written, support, siteId } = gate;
+  if (siteHashes.size === 0 || (await referenceTypesSupported(siteId, support))) return [];
+  const mine = new Set(written.map((b) => b.hash));
+  const out: { hash: string; body: unknown }[] = [];
+  for (const hash of siteHashes) {
+    if (mine.has(hash) || !HASH.test(hash)) continue;
+    const blob = await to.blobs.get(`nodes/${hash}.json`);
+    if (!blob) continue;
+    try {
+      out.push({ hash, body: JSON.parse(new TextDecoder().decode(blob)) });
+    } catch {
+      // Not JSON: not a site body this gate can read; the snapshot's own checks stand.
+    }
+  }
+  return out;
+}
+
 /** Every snapshot must be fully backed by blobs: the bundle's or the target's. */
 async function assertSnapshotsBacked(
   to: StoragePair,
@@ -297,9 +329,12 @@ function nodeBatch(
     batch.push({ sql: "DELETE FROM nodes WHERE site_id = ?", params: [siteId] });
     deleted = changes.target.length;
     for (const n of changes.rows) {
+      // RFC-0045 §2.1: bodies are stored canonically, as store writes are, so the definitions
+      // and collections anchors compare equal text (the hash is over canonical JSON already).
+      const body = canonicalJson(JSON.parse(n.body));
       batch.push({
         sql: "INSERT INTO nodes (id, site_id, kind, key, rev, hash, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        params: [n.id, n.site_id, n.kind, n.key, n.rev, n.hash, n.body, n.created_at, n.updated_at],
+        params: [n.id, n.site_id, n.kind, n.key, n.rev, n.hash, body, n.created_at, n.updated_at],
       });
       inserted++;
     }
@@ -308,6 +343,8 @@ function nodeBatch(
     // only then: beside an unchanged node set its plan-time rows could replace a concurrent
     // write's fresher ones (#196). Its chunked `INSERT`s count against the cap below.
     batch.push(...refsRebuild(siteId, changes.rows));
+    // RFC-0045 §2.4: `entry_refs` likewise, under exactly the same condition (R10).
+    batch.push(...entryRefsRebuild(siteId, changes.rows));
   }
   const written = changes.rows.find((n) => n.kind === "site" && n.id === siteId) ?? siteRow;
   batch.push(...hostStatements(extra.hosts, { siteId, hash: written.hash }));
@@ -340,7 +377,7 @@ export async function prepareImport(
 ): Promise<{ plan: ImportPlan; writes: ImportWrites }> {
   const mode = options.mode ?? "bootstrap";
   const { siteId } = bundle;
-  const siteRow = await checkBundle(bundle, options.gates);
+  const siteRow = await checkBundle(bundle, options.gates, options.fieldTypes);
   await assertTimeZone(to, siteId, bundle);
   const down = await takenDown(to, siteId);
   const media = await mediaOnTarget(to, bundle, { report: options.report === true, down });
@@ -350,14 +387,24 @@ export async function prepareImport(
   await assertIdsFree(to, bundle);
   const refs = bundle.snapshots.map((s) => ({ id: s.id, refs: snapshotRefs(s) }));
   const blobs = await bodiesToWrite(to, bundle, refs);
-  // RFC-0045 §1: the site bodies of snapshots too, once verified (rollout step 2 passes the
-  // capability, CopySiteOptions.fieldTypes, here and to checkBundle).
+  // RFC-0045 §1: the site bodies of snapshots too, once verified, and the held ones they name.
   const siteHashes = new Set(
     refs.flatMap((s) => s.refs.filter((r) => r.kind === "site").map((r) => r.hash)),
   );
-  await assertSnapshotFieldTypes(siteId, blobs, siteHashes, undefined);
-  await assertSnapshotsBacked(to, bundle, refs);
   const snapshots = await snapshotsToAdd(to, bundle);
+  const added = new Set(snapshots.ids);
+  const newSiteHashes = new Set(
+    refs
+      .filter((s) => added.has(s.id))
+      .flatMap((s) => s.refs.filter((r) => r.kind === "site").map((r) => r.hash)),
+  );
+  const held = await heldSiteBodies(to, newSiteHashes, {
+    written: blobs,
+    support: options.fieldTypes,
+    siteId,
+  });
+  await assertSnapshotFieldTypes(siteId, [...blobs, ...held], siteHashes, options.fieldTypes);
+  await assertSnapshotsBacked(to, bundle, refs);
   const project = await projectToAdd(to, bundle);
   const changes = await nodeChanges(to, bundle, mode, options);
   // RFC-0042 §4: the list values start over with the node set (rebuilt after the batch).

@@ -62,6 +62,7 @@ import { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import type { SqlDriver } from "@cloudhal/storage";
 import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
+import { canonicalRowsJob } from "./canonical-rows-job.ts";
 import { flushCommentPurges, runCommentsHourly } from "./comments.ts";
 import { listValuesJob } from "./list-values-job.ts";
 import { PURGE_MAX_REQUESTS, PURGE_TAGS_PER_REQUEST } from "./purge.ts";
@@ -273,6 +274,7 @@ export function adminSystemJobs(
     },
     listValuesJob(sql, { paid: env.CLOUDHAL_TICK_BUDGET === "paid", log }),
     oauthClientsPruneJob(sql, log),
+    canonicalRowsJob(sql, log),
   ];
   if (o.commentsOn)
     jobs.push({

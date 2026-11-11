@@ -6,6 +6,7 @@
  */
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import type { GateSupport } from "./availability.ts";
+import type { FieldTypeSupport } from "./references/definitions.ts";
 
 export interface StoragePair {
   sql: SqlDriver;
@@ -33,6 +34,11 @@ export interface CopySiteOptions {
    * published takes the bundle's, as a first deploy does.
    */
   published?: "source" | "target";
+  /**
+   * RFC-0045 §1: whether the target's renderer reads reference and repeater fields. Without it a
+   * bundle defining them is refused (`fields_unsupported`), unlike `gates`.
+   */
+  fieldTypes?: FieldTypeSupport;
 }
 
 export interface CopySiteResult {
