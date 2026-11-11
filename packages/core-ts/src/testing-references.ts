@@ -20,6 +20,7 @@ import { loadEntries, rewritePass } from "./fields-operations/rewrite.ts";
 import { operationContext } from "./fields-operations/types.ts";
 import { canonicalJson, nodeHash } from "./hash.ts";
 import { PNG_1X1 } from "./media/fixtures.ts";
+import { editionReferences } from "./references/editions.ts";
 import { SiteGraphStore } from "./store.ts";
 import { exportSite, importSite } from "./sync.ts";
 import { racingDriver, type SuiteContext } from "./testing-taxonomy.ts";
@@ -639,6 +640,110 @@ export function referencesSuite(ctx: SuiteContext): void {
         // and the source site's original is free: the edition's rows pin nothing there
         expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
       });
+      it("a re-save keeps the values the stored edition entry already holds (not fresh)", async () => {
+        const OPEN: FieldDefinition = {
+          key: "open",
+          type: "boolean",
+          labels: L("Open"),
+          localized: false,
+        };
+        const source = await world();
+        const edition = await store().createSite({
+          projectId: source.projectId,
+          name: "Edition",
+          slug: `refs-edition-resave-${n}`,
+          defaultLocale: "de",
+          locales: ["de"],
+          domains: [],
+          pageIds: [],
+          theme: { name: "blog" },
+          collections: {
+            ...COLLECTIONS,
+            places: { fields: [OPEN], listFields: ["open"] },
+            events: {
+              fields: [
+                {
+                  ...VENUE,
+                  collections: ["places"],
+                  where: [{ field: "open", op: "eq", value: "true" }],
+                } as never,
+                SPONSOR,
+                SPEAKERS,
+              ],
+            },
+          },
+        });
+        const hall = await entry(source, "places", { status: "published" });
+        const hallDe = await entry(edition, "places", {
+          locale: "de",
+          fields: { open: true },
+          translation: {
+            group: hall.id,
+            method: "human",
+            source: { ...(await sourceOf(hall)), siteId: source.id },
+          },
+        });
+        const event = await entry(source, "events", { fields: { venue: hall.id } });
+        const stored = await entry(edition, "events", { locale: "de", fields: { venue: hall.id } });
+        // the target closes and is archived after the edition entry chose it
+        await update(await fresh(hallDe), { fields: { open: false }, status: "archived" });
+        let dropped: unknown[] = [];
+        const copy = await forEdition(
+          store(),
+          { ...event, id: stored.id },
+          {
+            fromSiteId: source.id,
+            toSiteId: edition.id,
+            actor: person,
+            onDropped: (d) => {
+              dropped = d;
+            },
+          },
+        );
+        expect(copy.fields).toEqual({ venue: hall.id });
+        expect(dropped).toEqual([]);
+        // and the edition's write keeps it too: an unchanged value is not re-checked
+        expect(
+          await code(update(await fresh(stored), { title: "Wieder", fields: copy.fields })),
+        ).toBe("ok");
+      });
+
+      it("an archived same-site original still lends its where field to a translation member", async () => {
+        const OPEN: FieldDefinition = {
+          key: "open",
+          type: "boolean",
+          labels: L("Open"),
+          localized: false,
+        };
+        const site = await world({
+          ...COLLECTIONS,
+          places: { fields: [OPEN], listFields: ["open"] },
+          events: {
+            fields: [
+              {
+                ...VENUE,
+                collections: ["places"],
+                where: [{ field: "open", op: "eq", value: "true" }],
+              } as never,
+              SPONSOR,
+              SPEAKERS,
+            ],
+          },
+        });
+        const original = await entry(site, "places", { fields: { open: true } });
+        await translate(original, { fields: {} });
+        await update(await fresh(original), { status: "archived" });
+        const { fields, dropped } = await editionReferences(
+          ctx.sql(),
+          (await store().getSite(site.id)) as Site,
+          {
+            entry: { collection: "events", fields: { venue: original.id } },
+          },
+        );
+        expect(dropped).toEqual([]);
+        expect(fields).toEqual({ venue: original.id });
+      });
+
       it("keeps only what the edition's field accepts: where, a single target, maxItems, fromKey", async () => {
         const OPEN: FieldDefinition = {
           key: "open",

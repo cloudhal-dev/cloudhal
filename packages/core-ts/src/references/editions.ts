@@ -17,11 +17,16 @@
  */
 import type { ContentEntry, FieldCondition, FieldDefinition } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
-import { matchesFieldQuery, parseFieldQuery } from "../fields/query.ts";
-import { resolveFields } from "../fields/resolve.ts";
-import { FIELD_LIMITS, fieldDefinitions, isRecord, type SiteFields } from "../fields/types.ts";
-import { memberGroup } from "./members.ts";
+import {
+  FIELD_LIMITS,
+  fieldDefinitions,
+  isRecord,
+  type SiteFields,
+  sameJson,
+} from "../fields/types.ts";
 import { entryRefRows, holdsReferences, storedKey } from "./rows.ts";
+import { readMembers, targetProblem } from "./targets.ts";
+import { referenceUses } from "./values.ts";
 
 /** Why a value was not carried. */
 export type EditionDropReason = "missing" | "where" | "single" | "maxItems" | "cap" | "empty";
@@ -122,37 +127,22 @@ function carryRepeater(
   return items.length > 0 ? items : undefined;
 }
 
-/** The edition's members of `ids`, and the test a target applies to them. */
+/** The edition's members of `ids` (any status), and the write's own target rule over them. */
 async function usableOn(
   sql: SqlDriver,
   site: SiteFields & { id: string },
   ids: readonly string[],
-): Promise<Usable> {
-  const rows = await sql.all<{ id: string; body: string }>(
-    `SELECT id, body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
-      AND json_extract(body, '$.status') <> 'archived'
-      AND ((id IN (SELECT value FROM json_each(?)) AND json_extract(body, '$.translation.group') IS NULL)
-           OR json_extract(body, '$.translation.group') IN (SELECT value FROM json_each(?)))`,
-    [site.id, JSON.stringify(ids), JSON.stringify(ids)],
-  );
-  const members = rows.map((r) => JSON.parse(r.body) as ContentEntry);
-  const byId = new Map(members.map((m) => [m.id, m]));
-  return (groupId, target) => {
-    const of = members.filter(
-      (m) => memberGroup(m) === groupId && target.collections.includes(m.collection),
-    );
-    if (of.length === 0) return "missing";
-    const [one] = target.collections;
-    if (!target.where || one === undefined) return undefined;
-    const parsed = parseFieldQuery(site, one, { where: [...target.where] });
-    if (!parsed.ok) return undefined;
-    // `where` cannot use `now` (§1), so the instant is irrelevant.
-    const meets = of.some((m) =>
-      matchesFieldQuery(resolveFields(site, m, byId.get(memberGroup(m))), parsed.query, 0),
-    );
-    return meets ? undefined : "where";
+): Promise<(groupId: string, target: Target, fresh: boolean) => "missing" | "where" | undefined> {
+  const members = await readMembers(sql, site.id, ids);
+  return (groupId, target, fresh) => {
+    const problem = targetProblem(site, { groupId, ...target, fresh }, members);
+    return problem === undefined ? undefined : problem === "where" ? "where" : "missing";
   };
 }
+
+/** The group ids a stored value holds for `def` (none when the key differs). */
+const heldBy = (def: FieldDefinition, value: unknown): Set<string> =>
+  new Set(referenceUses(def, value, "").map((u) => u.groupId));
 
 /**
  * `entry`'s fields as written on site `toSite` (its own definitions), with what was dropped.
@@ -161,20 +151,37 @@ async function usableOn(
 export async function editionReferences(
   sql: SqlDriver,
   toSite: SiteFields & { id: string },
-  entry: Pick<ContentEntry, "collection" | "fields">,
+  input: {
+    entry: Pick<ContentEntry, "collection" | "fields">;
+    /** The edition's stored version of the entry (a re-save): its values are not fresh. */
+    stored?: Pick<ContentEntry, "collection" | "fields"> | undefined;
+  },
 ): Promise<{ fields: ContentEntry["fields"]; dropped: EditionDrop[] }> {
+  const { entry } = input;
   const defs = fieldDefinitions(toSite, entry.collection).filter(holdsReferences);
   const ids = [...new Set(entryRefRows(defs, entry.fields).map((r) => r.t))];
   if (ids.length === 0) return { fields: entry.fields, dropped: [] };
-  const carry: Carry = {
-    usable: await usableOn(sql, toSite, ids),
-    dropped: [],
-    budget: { left: FIELD_LIMITS.referencesPerEntry },
-  };
+  const usable = await usableOn(sql, toSite, ids);
+  const before: Record<string, unknown> =
+    input.stored?.collection === entry.collection ? { ...(input.stored.fields ?? {}) } : {};
+  const budget = { left: FIELD_LIMITS.referencesPerEntry };
+  const dropped: EditionDrop[] = [];
   const fields: Record<string, unknown> = { ...(entry.fields ?? {}) };
   for (const def of defs) {
     const key = storedKey(def, fields);
     if (key === undefined) continue;
+    // An unchanged value is the write's own business (it re-checks nothing unchanged), but its
+    // references still count toward the per-entry cap.
+    if (Object.hasOwn(before, key) && sameJson(before[key], fields[key])) {
+      budget.left -= heldBy(def, fields[key]).size;
+      continue;
+    }
+    const held = Object.hasOwn(before, key) ? heldBy(def, before[key]) : new Set<string>();
+    const carry: Carry = {
+      usable: (g, target) => usable(g, target, !held.has(g)),
+      dropped,
+      budget,
+    };
     const at = { path: `fields/${key}`, carry };
     const value =
       def.type === "reference"
@@ -185,5 +192,5 @@ export async function editionReferences(
     if (value === undefined) delete fields[key];
     else fields[key] = value;
   }
-  return { fields, dropped: carry.dropped };
+  return { fields, dropped };
 }

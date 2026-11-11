@@ -131,7 +131,10 @@ export async function forEdition<T extends Localized>(
   if ("sections" in moved) return moved;
   const entry = moved as ContentEntry;
   const site = await store.getSite(input.toSiteId);
-  const refs = site ? await editionReferences(store.sql, site, entry) : undefined;
+  // A re-save of an existing edition translation: its stored values are not fresh.
+  const held = await store.getContentEntry(entry.id);
+  const stored = held?.siteId === input.toSiteId ? held : undefined;
+  const refs = site ? await editionReferences(store.sql, site, { entry, stored }) : undefined;
   if (refs && refs.dropped.length > 0) input.onDropped?.(refs.dropped);
   return {
     ...entry,
