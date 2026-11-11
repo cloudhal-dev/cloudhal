@@ -31,6 +31,7 @@ import { migration0029EntryListValues } from "./0029_entry_list_values.ts";
 import { migration0030RateLimits } from "./0030_rate_limits.ts";
 import { migration0031Oauth } from "./0031_oauth.ts";
 import { migration0032OauthClientKindIndex } from "./0032_oauth_client_kind_index.ts";
+import { migration0033EntryRefs } from "./0033_entry_refs.ts";
 
 /** All Cloudhal storage migrations, in order. */
 export const migrations: readonly Migration[] = [
@@ -66,4 +67,5 @@ export const migrations: readonly Migration[] = [
   migration0030RateLimits,
   migration0031Oauth,
   migration0032OauthClientKindIndex,
+  migration0033EntryRefs,
 ];

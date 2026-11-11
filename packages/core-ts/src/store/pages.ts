@@ -45,7 +45,7 @@ export class PageEngine {
     checkLocalizedNode("page", site, draft);
     // RFC-0042 §4: field queries run against the site this batch's site CAS writes over.
     checkPageQueries(site, draft);
-    await checkTranslationLinks(this.#ctx, { kind: "page", site, node: draft });
+    const linked = await checkTranslationLinks(this.#ctx, { kind: "page", site, node: draft });
     await this.#ctx.checkGates(site.id, undefined, draft.availability);
     const refs = await this.#ctx.assets.planRefs("page", site.id, draft, undefined);
     const page = refs.node;
@@ -67,7 +67,7 @@ export class PageEngine {
     });
     const batch = new OpBatch(this.#ctx.newId(ID_PREFIX.operation), site.id, ts);
     await batch.update("site", site, nextSite);
-    await batch.insert("page", page, and(pageGuard(this.#ctx, page), refs.guard));
+    await batch.insert("page", page, and(pageGuard(this.#ctx, page), refs.guard, linked));
     batch.append(...refs.statements(await nodeHash(page)));
     await plan?.emit(batch);
     await runOpBatch(this.#ctx.sql, batch, {
@@ -104,7 +104,12 @@ export class PageEngine {
     const siteGuard = checkPageQueries(site, next, stored)
       ? hashIs(site.id, await nodeHash(site))
       : undefined;
-    await checkTranslationLinks(this.#ctx, { kind: "page", site, node: next, stored });
+    const linked = await checkTranslationLinks(this.#ctx, {
+      kind: "page",
+      site,
+      node: next,
+      stored,
+    });
     const sameLocale = stored.locale === next.locale;
     const plan = await this.#ctx.tax.planPathChange(site, ts, {
       locale: next.locale,
@@ -122,7 +127,7 @@ export class PageEngine {
           "page",
           next,
           page.rev,
-          and(pageGuard(this.#ctx, next), refs.guard, siteGuard),
+          and(pageGuard(this.#ctx, next), refs.guard, siteGuard, linked),
         ),
         "page",
         key,
@@ -143,7 +148,7 @@ export class PageEngine {
       "page",
       stored,
       next,
-      and(pageGuard(this.#ctx, next), refs.guard, siteGuard),
+      and(pageGuard(this.#ctx, next), refs.guard, siteGuard, linked),
     );
     batch.append(...extra);
     await plan.emit(batch);

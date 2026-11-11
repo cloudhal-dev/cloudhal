@@ -1,6 +1,6 @@
 # RFC-0045: Collections stage 4: reference fields and repeaters
 
-- Status: Accepted (2026-11-10, by Halil), with the three Owner decisions ratified; see "Decisions (2026-11-10)". The ADR lands with rollout step 2.
+- Status: Accepted (2026-11-10, by Halil), with the three Owner decisions ratified; see "Decisions (2026-11-10)". ADR-0046 lands with rollout step 2a; step 2 is split into 2a (store and integrity) and 2b (its consumers), see PR #205.
   Drafted in PR #193 and revised six times after an independent review and five verification passes; the review log and the implementation watch list are at the end.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-10
 - Related:
@@ -308,13 +308,19 @@ The member probe uses `nodes_translation_locale` (migration 0025: `site_id, kind
        AND json_extract(n.body, '$.collection') IN (SELECT value FROM json_each(json_extract(p.value, '$.c')))
        AND (json_extract(p.value, '$.f') = 0 OR json_extract(n.body, '$.status') <> 'archived'))) = ?
   ```
-- **The definitions anchor**, on every entry write that changes `fields` or `collection`. The writer binds its collection's definitions *as planned*: the canonical JSON of `site.collections[c].fields` from the very `Site` object it planned with (`entries.ts:39-41`), so there is no second read and no gap.
+- **The definitions anchor** (amended in 2a, PR #205). It is on **every** entry write in a site with reference fields: each such write rewrites its rows and may check targets under the planned definitions, a status-only publish included. Elsewhere it is on writes that change `fields` or `collection`, to keep `field_key_in_use` true.
+  - *When the write is planned*, the writer reads the fragment's stored text with the same expression the batch runs: `SELECT rev, json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site'`.
+  - It parses that text and checks it (`sameJson`) against `site.collections[c].fields` of the very `Site` object it planned with (`entries.ts:39-41`). A mismatch means the site changed after the plan read it, and it is a `ConflictError` (retry).
+  - *At batch time* it compares that exact text:
   ```sql
-  json((SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)
+  (SELECT json_extract(body, ?) FROM nodes WHERE id = ? AND kind = 'site') IS ?
   ```
-  The path is `$.collections."<key>".fields`, and both sides are normalized by `json()`. `NULL IS NULL` holds for a collection without definitions. A unit test round-trips every fixture definition through the stored form (fractional bounds included).
+  The path is `$.collections."<key>".fields`. An absent fragment reads and binds SQL `NULL`, so `NULL IS NULL` holds for a collection without definitions.
+  - What the batch compares is exactly what was read and validated, so there is no unseen second read.
+  - Key order does not matter: a site row an older import stored verbatim anchors like any other.
+  - A unit test runs every fixture site, stored canonically and with every key order reversed, fractional bounds included.
 
-  Equality needs stored bodies in canonical form. Store writes are canonical (`canonicalJson`, `node-sql.ts:62/91`), but `importSite` inserts a bundle's body text verbatim (`sync-plan.ts:300-301`), and SQLite's `json()` keeps key order. So from phase 2, `importSite` stores `canonicalJson(JSON.parse(body))` for every row. The hash is computed over canonical JSON already, so it does not change. A hand-made archive with unsorted keys therefore cannot leave a collection whose writes always conflict.
+  `importSite` still stores `canonicalJson(JSON.parse(body))` for every row (the hash is over canonical JSON already, so it does not change), as hygiene only: no anchor depends on it. The first draft of this section compared `json(…) IS json(canonical)`. That needed canonical rows, and a site row stored verbatim would have made every write of the site conflict until it was rewritten.
 
   The anchor conflicts only when that collection's definitions change, never on other site edits. The loser retries under the new definitions, where `field_key_in_use` then sees its value. This is RFC-0042's rule that list-value rows are valid only "under the fingerprint they were built with" (`list-values/fingerprint.ts`), applied to writes.
 - **The rows**, anchored on the entry's new hash: `DELETE FROM entry_refs WHERE source_id = ? AND <anchor>`, then one plain `INSERT … SELECT … FROM json_each(?) WHERE <anchor>`, appended to `own` (`entries.ts:110`). Every write of the holder rewrites all its rows, so `source_status` stays current.
@@ -354,10 +360,13 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
                          AND r.source_collection || '.' || r.field NOT IN (SELECT value FROM json_each(:P))) )
     ```
     The second `NOT EXISTS` makes a blocking row from a field the plan did not see, committed in between, fail the batch, so the write retries and re-plans with that field. The first revision's form let it through: `events.venue` allows `[places, halls]` and `talks.room` allows `[places]`; a talk published meanwhile with `room` = G is stranded once the last member in `places` goes.
-  - **The collections anchor**, `json((SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site')) IS json(?)`, bound with the canonical JSON of `site.collections` of the `Site` object the write planned with. When the planned site has no `collections`, the write binds SQL `NULL`, never the string `'null'` (`json('null') IS NULL` is false), so `NULL IS NULL` holds.
+  - **The collections anchor** (amended in 2a, PR #205) works like the definitions anchor, over `$.collections`:
+    - when planned, the stored text of `json_extract(body, '$.collections')` is read and checked with `sameJson` against `site.collections` of the `Site` object the write planned with (a mismatch is a `ConflictError`);
+    - at batch time, `(SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site') IS ?` compares that exact text;
+    - a site without `collections` reads and binds SQL `NULL`, never the string `'null'`, so `NULL IS NULL` holds.
     - It holds every collection's definitions and every field-operation marker, so it covers the referrer fields whose allowed collections the guard used (R4) and the markers `field_operation_running` reads (R12).
     - Unlike the site hash used in the fourth revision, it ignores `publishedSnapshotId`, theme, menus and other settings, so a publish no longer makes concurrent deletes and moves answer 409.
-    - Canonical bodies (§2.1, §2.4) keep the comparison live.
+    - It compares stored text read when the write was planned, so key order never makes it fail (§2.1).
 
     These writes are rare, so **every** delete, move and group change of a `contentEntry` carries the collections anchor, whether or not the plan saw blocking rows. The first revisions added it only when rows were seen. That left R12 open: during a text → reference conversion, the values that will become references have no rows yet, so a delete planned before the marker committed carried no anchor and went through. With the anchor always present, the batch fails once the marker lands in `collections`, the retry plans against the marker, and `field_operation_running` refuses it.
   - A refusal answers `409 entry_referenced`, with up to 20 published referrers (id, title, collection, field) and the total. For a group change, it also names the group.
@@ -412,7 +421,9 @@ A target deleted or moved between check and batch fails the guard, and `diagnose
   - A node whose hash moved since the read matches nothing and is skipped: its writer has already rewritten its rows.
   - Rows of nodes that no longer exist go with `DELETE FROM entry_refs WHERE site_id = ? AND source_id NOT IN (SELECT id FROM nodes WHERE site_id = ?)`.
   - Its `shared` is computed in JS from the site row read with the chunk, and each chunk also carries the collections anchor, so a definitions change between read and batch fails the chunk, which is retried.
-  - **Canonical rows, from phase 2, not step 7.** The anchors ship in phase 2, so phase 2 also ships an admin job that rewrites existing node rows canonically. It is per row and guarded by CAS (`UPDATE nodes SET body = ? WHERE id = ? AND hash = ?`, hash unchanged, rule 4), so it cannot race a write. That covers rows imported verbatim before phase 2, and imports that planned `unchanged` (`sync-plan.ts:257, 295`), so the anchors are live on every collection. Step 7 runs it once more.
+  - **No canonical-rows job** (amended in 2a, PR #205). Earlier revisions shipped an admin job in phase 2 that rewrote existing rows canonically, and ran it again at step 7, because the anchors compared canonical JSON.
+    - The anchors now compare the stored text read when the write is planned (§2.1, §2.2), so verbatim rows work. The job is dropped, and step 7 does not run it.
+    - Canonical import bodies stay as hygiene only.
   - It is a safety net: the gate (§1) means it should find nothing.
 
 **5. Assets inside repeaters.** Each of these needs its own change, because none follows from the others:
@@ -1010,7 +1021,10 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
 
 1. **Batch-time guard SQL** (phase 2).
    - **The target guard.** Membership in its index-friendly form, the per-pair `fresh` flag, and `n.site_id = ?`.
-   - **The definitions anchor and the collections anchor.** Bound from the planned `Site` and never from a second read, compared with `json(...) IS json(?)` over canonical bodies.
+   - **The definitions anchor and the collections anchor.**
+     - The fragment's stored text is read when the write is planned and validated with `sameJson` against the planned `Site` (a mismatch is a `ConflictError`). The batch compares exactly that text with `IS`.
+     - Key order never matters, and nothing the batch compares was read without that check.
+     - The definitions anchor is on every entry write in a site with reference fields (amended in 2a, PR #205).
    - **The delete, move and group-change condition.** The blocking-rows fragment, the planned pairs `:P` with the unseen-field `NOT EXISTS`, and "another member, not archived, in `A`".
    - **The rows `INSERT`.** It is a plain `INSERT`, never `OR IGNORE` on the writer path; `shared` is read in SQL by `key` or `migration.fromKey`; a `NULL` must fail the batch and map to `ConflictError`.
    - **The written-group guard.** Present on every group or source change, absent when the group is the node's own id.
@@ -1037,7 +1051,7 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - `translation_group_in_use`.
    - The `readsOriginal`/`originalOf` tightening (OQ 14).
    - The group check on group-only changes.
-   - Canonical bodies on import, and the CAS-guarded canonicalization job.
+   - Canonical bodies on import, as hygiene: the canonicalization job was dropped in 2a, because the anchors compare stored text.
    - The always-on collections anchor's liveness: watch 409 rates in the #105 benchmark and in agents' retry loops.
    - Each of these is listed in the changeset.
 
@@ -1078,7 +1092,7 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | Group ids change (`translation.group` is writable), so stored ids escape the guards (blocking, two verifiers) | Leaving a group is guarded like a delete, with the site anchor, and refused while a published entry shows the reference (§1, §2.2, R6, tests). Rewriting referrers and a new immutable id are both rejected (Alternatives). |
 | Import, push, pull and restore bypass the gate (blocking, two verifiers) | `checkBundle` gains `assertFieldTypes`, covering every row path through `importSite`, with one capability shared with interactive writes (§1). Step 7 runs a one-time per-site rebuild (§2.4, §9). |
 | The blocking expansion treats every row as inherited (blocking, three verifiers) | Rows carry `shared` and `root_key`, mirroring `resolveFields`. One SQL fragment serves the guards, the live `referencedBy` and the purge planner, so live equals snapshot. The policy is stated explicitly (§2, §4, §8). |
-| The definitions anchor is read separately from the planned `Site` (blocking) | The anchor binds the definitions of the very `Site` object the write planned with, compared with `json(...) IS json(?)` (§2.1). |
+| The definitions anchor is read separately from the planned `Site` (blocking) | The anchor binds the definitions of the very `Site` object the write planned with (§2.1). *Amended in 2a (PR #205):* the fragment's stored text is read when the write is planned, checked against that `Site` with `sameJson`, and compared as text at batch time, not `json(...) IS json(?)`. |
 | The move guard anchors the wrong collection, and the delete exception ignores allowed collections | Moves, deletes and group changes anchor on the hash of the planned site when rows exist. The exception counts only usable members in collections every blocking field allows (§2.2, R4, R5). |
 | No emission path for `cloudhal-ref-` tags; old Workers refuse new prefixes; budget; privacy (blocking) | Tags dropped. The purge planner adds referrers' own node tags through `entry_refs`, covering newly visible targets and changed covers. No new prefix, no header ids, no theme code (§2, Purges). |
 | Rows depend on membership and are not re-created | Rows are kept for every stored value; the site filter is the isolation (§2 invariant, R11). |
@@ -1101,7 +1115,7 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | One-hop purges missed depth-2 cards, rollbacks, release runs and "used by" lists (blocking) | Closure to the render depth (two hops), "used by" pages via the groups changed entries name, index mode for ordinary publishes and snapshot mode for rollbacks, releases (re-planned at run time) and restores. Time gates rely on the gate-index TTL. Bounded by `maxReads`/`maxTags`, with purge-everything as the fallback (§2, Purges). |
 | `set_field_localized` left `shared` stale; text→reference rendered references without rows (blocking) | Phase A flips `shared` in the site write's batch (§7). Conversions into references refuse deletes, moves and group changes of target entries until phase C (`field_operation_running`, R12). The `rename_field` `root_key` lag only over-blocks (§2). |
 | The bundle gate accepted when support was absent | An absent capability refuses; `CopySiteOptions.fieldTypes` and the Node constant `FIELDS_SUPPORTED` (§1). |
-| Imported bodies with unsorted keys break the anchor | `importSite` stores canonical bodies from phase 2 (§2.1). |
+| Imported bodies with unsorted keys break the anchor | `importSite` stores canonical bodies from phase 2 (§2.1). *Amended in 2a (PR #205):* the anchors no longer depend on canonical bodies; they compare the stored text read when the write is planned. |
 | The `skip` set cannot hold item paths | Changed in `planEntryFields` too (§9 step 2). |
 | The `unused` asset filter is unscoped | Added to step 0 (§9). |
 | `null` inside items | Means unset in that item, and the schema descriptions say so (§6). |
@@ -1122,7 +1136,7 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | Index-mode purges assumed `to` equals the working copy, but any snapshot can be published (blocking, two verifiers) | Chosen: the hybrid. One method for every path: index rows for entries whose working copy equals `to`, plus a `from`/`to` body scan of the entries whose hash differs, found by one `json_each` comparison. `PublishChange` is unchanged. There are tests for an approved request publishing an older snapshot after the referrer was edited, and for a write between `createSnapshot` and `publish` (§2, Purges point 4). |
 | `shared` was bound from plan-time definitions on writes the definitions anchor does not cover (blocking) | Chosen: derive it inside the single `INSERT … SELECT` from the site row at batch time. Phase A's `UPDATE` corrects rows written before it (§2.1, R16). |
 | The group check ran only when `source` changed | It runs, with a guard keyed on the written group, whenever `translation.group` or `translation.source` is set or changed (§2.2, R15). |
-| Legacy non-canonical rows | The step-7 job rewrites the site's rows canonically (§2.4). |
+| Legacy non-canonical rows | The step-7 job rewrites the site's rows canonically (§2.4). *Superseded in 2a (PR #205):* the anchors compare stored text, so no job is needed. |
 | The `field-refs.ts:81` skip filter path format | It switches to item paths, with the `planEntryFields` skip set (§9 step 2). |
 | "Used by" should use resolved values; `referencedBy` cards | Resolved values with the same-site original; `referencedBy` results are cards, and drawing their fields is outside the guarantee (§2, Purges point 3). |
 | Wording: "usable member", "drafts never lock", "the one accepted exception" | The guard protects a member's existence; a draft locks only through a published translation that inherits its value; R8 and R14 are both accepted (Summary, §2). |
@@ -1141,7 +1155,7 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 | Purges ignored references shown through in-flight conversions (blocking) | Any field-operation marker on `from` or `to` purges everything (§2, Purges point 4). |
 | The always-on site anchor covers `publishedSnapshotId`, so every publish causes 409s | The collections anchor, `json(json_extract(body, '$.collections'))`, holds the definitions and the markers. The threat-model line is corrected (§2.2, §8). |
 | The written-group guard blocks a translation becoming its own original | Omitted when the group is the node's own id (§2.2). |
-| The canonical rewrite needs CAS and must start with the anchors | A CAS `UPDATE … WHERE hash = ?` job ships in phase 2, and step 7 runs it again (§2.4). |
+| The canonical rewrite needs CAS and must start with the anchors | A CAS `UPDATE … WHERE hash = ?` job ships in phase 2, and step 7 runs it again (§2.4). *Superseded in 2a (PR #205):* the job is dropped. |
 | Skip filter exact match misses list- and item-level issues | Prefix match (§9 step 2). |
 | A large `json_each(:toEntryRefs)` parameter | Moot: purges no longer compare against the working copy. |
 | A rebuild during a rename drops rows | `entryRefsRebuild` reads through `migration.fromKey` (§2.4). |
@@ -1170,3 +1184,19 @@ Three verifiers found 34 earlier findings resolved. The unresolved ones and the 
 ### Acceptance (2026-11-10)
 
 The owner accepted the RFC with the three decisions ratified ("Kabul ediyorum"). "Owner decisions" became "Decisions (2026-11-10)", and [#196](https://github.com/cloudhal-dev/cloudhal/issues/196) is linked from step 0.
+
+### Amended in 2a (PR #205, 2026-11-11)
+
+Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumers. The review of 2a changed these parts of the design, and the sections above now say so:
+
+- **The anchors (§2.1, §2.2).**
+  - Both read the fragment's stored text with `json_extract` when the write is planned, check it with `sameJson` against the planned `Site`, and compare that exact text at batch time.
+  - Key order does not matter, and no canonical form is needed.
+  - In a site with reference fields, the definitions anchor is on every entry write.
+- **No canonical-rows job (§2.4).** It is dropped, and step 7 does not run it. Canonical import bodies stay as hygiene.
+- **Other changes, recorded as deviations in PR #205 and in ADR-0046:**
+  - usable members are checked per pair, with one `json_each` parameter;
+  - a referrer write naming an entry outside the field's collections is refused as `unknown_entry` (422), and `reference_target_moved` (409) is only for moves;
+  - a reference sub-field added over a key that items already hold is `field_key_in_use`;
+  - the `shared` subquery matches only reference and repeater definitions, as an aggregate, not a correlated `ORDER BY`, which workerd's SQLite does not resolve;
+  - the list-values fingerprint format is 2, so listed collections rebuild once after the `readsOriginal` tightening.

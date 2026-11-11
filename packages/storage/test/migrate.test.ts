@@ -50,6 +50,7 @@ describe("migrate", () => {
       "0030_rate_limits",
       "0031_oauth",
       "0032_oauth_client_kind_index",
+      "0033_entry_refs",
     ]);
     expect((await migrate(driver, migrations)).applied).toEqual([]);
     expect(await appliedMigrations(driver)).toEqual([
@@ -85,6 +86,7 @@ describe("migrate", () => {
       "0030_rate_limits",
       "0031_oauth",
       "0032_oauth_client_kind_index",
+      "0033_entry_refs",
     ]);
     const tables = await driver.all<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
@@ -121,6 +123,7 @@ describe("migrate", () => {
       "comments",
       "entry_list_state",
       "entry_list_values",
+      "entry_refs",
       "invitation",
       "jwks",
       "media_blobs",
@@ -209,6 +212,7 @@ describe("migrate", () => {
       "0030_rate_limits",
       "0031_oauth",
       "0032_oauth_client_kind_index",
+      "0033_entry_refs",
     ]);
     expect(await appliedMigrations(driver)).toEqual([
       "0001_init",
@@ -243,6 +247,7 @@ describe("migrate", () => {
       "0030_rate_limits",
       "0031_oauth",
       "0032_oauth_client_kind_index",
+      "0033_entry_refs",
     ]);
     await h.dispose();
   });
@@ -284,6 +289,7 @@ describe("migrate", () => {
       "0030_rate_limits",
       "0031_oauth",
       "0032_oauth_client_kind_index",
+      "0033_entry_refs",
     ]);
     const ok = await driver.get("SELECT name FROM sqlite_master WHERE name = 'ok'");
     expect(ok).toBeUndefined();

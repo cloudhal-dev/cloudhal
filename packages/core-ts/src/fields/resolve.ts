@@ -41,13 +41,20 @@ export type ResolvedFields = Record<string, ResolvedField>;
 export type FieldsEntry = Pick<ContentEntry, "id" | "collection" | "fields"> & {
   translation?: ContentEntry["translation"] | undefined;
 };
-export type FieldsOriginal = Pick<ContentEntry, "id" | "fields">;
+export type FieldsOriginal = Pick<ContentEntry, "id" | "fields"> & {
+  translation?: Pick<NonNullable<ContentEntry["translation"]>, "group"> | undefined;
+};
 
-/** True when the entry is a translation whose original is in the same site. */
+/**
+ * True when the entry is a translation whose original is in the same site, and that original
+ * still has its own id as its group (RFC-0045 §2 "Membership", OQ 14: a relinked node inherits
+ * to nobody, so it never shows another group's values).
+ */
 function readsOriginal(entry: FieldsEntry, original: FieldsOriginal | undefined): boolean {
   const t = entry.translation;
   if (!t || t.group === entry.id || t.source?.siteId !== undefined) return false;
-  return original !== undefined && original.id === t.group;
+  if (original === undefined || original.id !== t.group) return false;
+  return (original.translation?.group ?? original.id) === original.id;
 }
 
 function read(values: unknown, def: FieldDefinition): unknown {

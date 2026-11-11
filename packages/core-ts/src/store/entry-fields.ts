@@ -58,6 +58,8 @@ async function originalOf(
   const t = entry.translation;
   if (!t || t.group === entry.id || t.source?.siteId !== undefined) return undefined;
   const original = await ctx.graph.getContentEntry(t.group);
+  // RFC-0045 OQ 14: an original that was relinked into another group is nobody's original.
+  if ((original?.translation?.group ?? original?.id) !== t.group) return undefined;
   return original?.siteId === entry.siteId ? original : undefined;
 }
 

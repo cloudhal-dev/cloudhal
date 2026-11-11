@@ -61,7 +61,9 @@ export async function listFingerprint(site: SiteFields, collection: string): Pro
   });
   return sha256Hex(
     canonicalJson({
-      format: 1,
+      // 2: RFC-0045 OQ 14, `resolveFields` no longer lends a relinked original's values, so rows
+      // built under format 1 rebuild once (`lists.backfill`; listings scan until then).
+      format: 2,
       sort: settings?.sort ?? "newest",
       listFields,
       defs,

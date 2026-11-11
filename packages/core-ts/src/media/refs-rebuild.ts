@@ -28,7 +28,7 @@ const INSERT_SQL = `INSERT INTO asset_refs (site_id, asset_id, node_id, node_kin
 const encoder = new TextEncoder();
 
 /** The JSON-encoded rows, in `json_each` arrays of at most `budget` bytes each. */
-function chunks(items: readonly string[], budget: number): string[] {
+export function chunks(items: readonly string[], budget: number): string[] {
   const out: string[] = [];
   let open: string[] = [];
   let bytes = 2;

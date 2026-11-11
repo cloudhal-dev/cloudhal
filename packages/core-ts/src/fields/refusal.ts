@@ -19,6 +19,7 @@ const DEFINITION_CODES = new Set<FieldIssueCode>([
   "field_change_needs_operation",
   "fields_unsupported",
   "reference_target_unknown",
+  "field_key_in_use",
 ]);
 
 const asInvariant = (code: FieldIssueCode): InvariantCode =>

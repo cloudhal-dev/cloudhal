@@ -11,12 +11,16 @@ import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { uniquenessKey } from "../nodes.ts";
 import { entryPath } from "../permalinks.ts";
+import { planLeave } from "../references/leave.ts";
+import { dropEntryRefsStatement } from "../references/rebuild.ts";
+import { canonicalReferences } from "../references/writer.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import { entersCollection, planNewCollection } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
 import { normalizeEntryFields, planEntryFields } from "./entry-fields.ts";
+import { planEntryIntegrity } from "./entry-integrity.ts";
 import { planSourceForward } from "./source-forward.ts";
-import { checkLocalizedNode, checkTranslationLinks } from "./translations.ts";
+import { checkLocalizedNode } from "./translations.ts";
 import type { NodeWriteOptions } from "./types.ts";
 import { checkBodyDirectives } from "./validation.ts";
 
@@ -60,11 +64,14 @@ export class EntryEngine {
       draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
     }
     draft = normalizeEntryFields(site, draft);
+    // RFC-0045 §1: a member's id is stored as its group's.
+    draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored });
     assertValid("content-entry", canonicalTerms(draft));
     checkLocalizedNode("contentEntry", site, draft);
-    await checkTranslationLinks(this.#ctx, { kind: "contentEntry", site, node: draft, stored });
     // RFC-0041 §3: typed field values, requiredToPublish and their asset references.
     const fields = await planEntryFields(this.#ctx, site, draft, stored);
+    // RFC-0033 links; RFC-0045 §2 targets, anchors, `entry_refs`, a move or group change.
+    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored });
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {
@@ -101,13 +108,18 @@ export class EntryEngine {
     const opening = entersCollection(stored, entry)
       ? await planNewCollection(this.#ctx, site, entry.collection, entry.id)
       : undefined;
-    const guard = and(prepared.guard, refs.guard, opening?.guard, fields.guard);
+    const guard = and(prepared.guard, refs.guard, opening?.guard, fields.guard, integrity.guard);
     const hash = await nodeHash(entry);
     // RFC-0041 §5: a change to non-localized values alone leaves translations fresh.
     const forward = await planSourceForward(this.#ctx, site, { stored, entry, ts });
     // RFC-0042 §4: list values before source-forward, which changes the translations' hashes.
     const lists = await planListValues(this.#ctx.sql, site, { stored, entry, at: ts });
-    const own = [...refs.statements(hash), ...fields.statements(hash), ...lists(hash)];
+    const own = [
+      ...refs.statements(hash),
+      ...fields.statements(hash),
+      ...integrity.statements(hash),
+      ...lists(hash),
+    ];
     const extra = [...own, ...(await forward(hash))];
     const key = uniquenessKey("contentEntry", entry);
     const sameLocale = stored?.locale === entry.locale;
@@ -133,6 +145,7 @@ export class EntryEngine {
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
         await fields.diagnose();
+        await integrity.diagnose(entry);
         await opening?.diagnose();
         throw new ConflictError("contentEntry", entry.id, stored?.rev ?? 0, rev);
       }
@@ -152,26 +165,36 @@ export class EntryEngine {
         await this.#ctx.tax.diagnoseEntry(entry);
         await refs.diagnose();
         await fields.diagnose();
+        await integrity.diagnose(entry);
         await opening?.diagnose();
       },
     });
     return entry;
   }
 
-  /** CAS delete with its asset references and list values (RFC-0042 §4), in one batch. */
+  /**
+   * CAS delete with its asset references, list values (RFC-0042 §4) and reference rows, in one
+   * batch; refused while it would strand a reference a published entry shows (RFC-0045 §2.2).
+   */
   async delete(entry: ContentEntry): Promise<void> {
     await assertUnlocked(this.#ctx.sql, entry.siteId, [entry.id]);
     const site = await this.#ctx.graph.getSite(entry.siteId);
     const lists = await planListValuesDelete(this.#ctx.sql, site, entry, this.#ctx.stamp());
+    const leave = site ? await planLeave(this.#ctx.sql, site, { stored: entry }) : undefined;
+    const guard = leave ? ` AND ${leave.guard.sql}` : "";
     const [r] = await this.#ctx.sql.batch([
       {
-        sql: "DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?",
-        params: [entry.id, entry.rev, entry.siteId],
+        sql: `DELETE FROM nodes WHERE id = ? AND rev = ? AND kind = 'contentEntry' AND site_id = ?${guard}`,
+        params: [entry.id, entry.rev, entry.siteId, ...(leave?.guard.params ?? [])],
       },
       this.#ctx.assets.dropRefsStatement(entry.id),
+      dropEntryRefsStatement(entry.id),
       ...lists,
     ]);
-    if (r?.changes !== 1)
-      throw new ConflictError("contentEntry", entry.id, entry.rev, await this.#ctx.revOf(entry.id));
+    if (r?.changes !== 1) {
+      const rev = await this.#ctx.revOf(entry.id);
+      if (rev === entry.rev) await leave?.diagnose();
+      throw new ConflictError("contentEntry", entry.id, entry.rev, rev);
+    }
   }
 }

@@ -5,6 +5,7 @@
  * CAS itself, not `updateSite`: the plain-edit guard refuses markers by design, so only these
  * writes may set or drop one. They still pass the precompiled validator and the definition rules.
  */
+
 import { assertValid, type Site, type Snapshot } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import { ConflictError, InvariantError, NotFoundError } from "../errors.ts";
@@ -14,6 +15,7 @@ import { ID_PREFIX, newId } from "../ids.ts";
 import { settleListValues } from "../list-values/backfill.ts";
 import { planListState } from "../list-values/site-plan.ts";
 import { type Cond, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
+import { referenceDefinitionOptions } from "../references/capability.ts";
 import type { PageRewrite } from "./references.ts";
 import {
   FIELD_MIGRATION,
@@ -91,7 +93,13 @@ export async function writeSite(
     if (!changed) return "unchanged";
     const next: Site = { ...changed, rev: site.rev + 1, updatedAt: ctx.stamp() };
     assertValid("site", next);
-    refuseFieldIssues(checkFieldDefinitions(next));
+    refuseFieldIssues(
+      checkFieldDefinitions(
+        next,
+        undefined,
+        await referenceDefinitionOptions(ctx.store, next, true),
+      ),
+    );
     const rewrites = (await pages?.(site)) ?? [];
     // RFC-0042 §4: a marker on a listed field changes its fingerprint (phases A and C both).
     const lists = (await planListState(site, next)).statements(

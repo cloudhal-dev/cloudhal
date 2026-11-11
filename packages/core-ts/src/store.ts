@@ -59,6 +59,7 @@ import { type Cond, mapUniqueViolation, type Row } from "./node-sql.ts";
 import type { Creatable, NodeKind, SiteNode } from "./nodes.ts";
 import { BodyProposals } from "./proposals.ts";
 import type { RedirectMatch } from "./redirects.ts";
+import type { FieldTypeSupport } from "./references/definitions.ts";
 import {
   type PublishReleaseInput,
   type PublishReleaseResult,
@@ -148,6 +149,7 @@ export class SiteGraphStore {
     this.blocks = options.blocks ?? createBlockRegistry();
     this.themeSettings = options.themeSettings;
     this.themeDesign = options.themeDesign;
+    this.fieldTypes = options.fieldTypes;
     this.#onPublished = options.onPublished;
     this.#onHookError = options.onHookError ?? ((e) => console.error("onPublished failed:", e));
     this.proposals = new BodyProposals({
@@ -212,13 +214,11 @@ export class SiteGraphStore {
   readonly blocks: BlockRegistry;
   /** RFC-0017: the theme's design settings, when it declares any. */
   readonly themeSettings: PropsSchema | undefined;
-  /** RFC-0021: the theme's DESIGN.md, when it ships one. */
-  readonly themeDesign: string | undefined;
+  readonly themeDesign: string | undefined; // RFC-0021: the theme's DESIGN.md, when it ships one
+  /** RFC-0045 §1: reads reference and repeater fields (absent: both types refused). */
+  readonly fieldTypes: FieldTypeSupport | undefined;
 
-  /**
-   * Whether `availability` may be written for this site (S15): the renderer serving it has
-   * confirmed it enforces gates (`version` 2: derived gates, RFC-0042 §3.6). Imports ask it too.
-   */
+  /** S15: the renderer confirmed it enforces gates (`version` 2: derived gates). Imports ask too. */
   async gatesEnforced(siteId: string, version = 1): Promise<boolean> {
     return (await this.#gates?.enforced(siteId, version)) === true;
   }

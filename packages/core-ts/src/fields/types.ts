@@ -151,7 +151,14 @@ export type FieldIssueCode =
   /** RFC-0045: a reference's `where` does not fit its target collection's list fields. */
   | "invalid_query"
   /** RFC-0045: more than 100 reference values in one entry. */
-  | "too_many_references";
+  | "too_many_references"
+  /**
+   * RFC-0045 §2.1: a reference to a group without a usable member of this site in one of the
+   * field's collections (missing, foreign, archived, or only in other collections).
+   */
+  | "unknown_entry"
+  /** RFC-0045 §2.8: a new reference or repeater field over a key entries already hold. */
+  | "field_key_in_use";
 
 /** One problem, at a slash path (`fields/startsAt/at`, `collections/events/fields/2/key`). */
 export interface FieldIssue {
