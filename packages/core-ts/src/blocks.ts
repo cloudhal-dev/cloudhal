@@ -454,8 +454,10 @@ function validateObject(
     return;
   }
   const at = (key: string) => (path ? `${path}/${key}` : key);
+  // Own keys only: `constructor`, `toString` or `__proto__` are not props of a block.
   for (const key of Object.keys(v))
-    if (!(key in s.properties)) out.push({ path: at(key), message: "not a prop of this block" });
+    if (!Object.hasOwn(s.properties, key))
+      out.push({ path: at(key), message: "not a prop of this block" });
   for (const key of s.required ?? [])
     if (v[key] === undefined) out.push({ path: at(key), message: "required" });
   for (const [key, child] of Object.entries(s.properties)) {

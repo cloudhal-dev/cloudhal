@@ -254,18 +254,48 @@ export async function assertIdsFree(to: StoragePair, bundle: SiteBundle): Promis
 }
 
 /**
- * RFC-0045 §1: a bundle whose site defines a reference or repeater field (or a marker converting
- * one) is refused (`fields_unsupported`) unless `support` says the site's renderer reads them.
- * Without a capability the types are refused, unlike `assertGates`. One check for `importSite`,
- * so for pull, push, `cloudhal import --replace` and `--revert`, and snapshot restores.
+ * The site bodies a bundle would write: its working site row, and every blob a snapshot ref of
+ * kind `site` names (a publish or rollback can make any of them live). Blobs that do not parse are
+ * left to `bodiesToWrite`, which refuses them.
+ */
+function bundleSiteBodies(bundle: SiteBundle, site: NodeRow): { at: string; body: unknown }[] {
+  const out: { at: string; body: unknown }[] = [{ at: "site", body: JSON.parse(site.body) }];
+  const hashes = new Set<string>();
+  for (const row of bundle.snapshots)
+    for (const ref of snapshotRefs(row)) if (ref.kind === "site") hashes.add(ref.hash);
+  for (const hash of [...hashes].sort()) {
+    const text = bundle.blobs[hash];
+    if (text === undefined) continue;
+    try {
+      const body: unknown = JSON.parse(text);
+      if (typeof body === "object" && body !== null) out.push({ at: `blobs/${hash}`, body });
+    } catch {
+      // not JSON: bodiesToWrite refuses it without quoting it
+    }
+  }
+  return out;
+}
+
+/**
+ * RFC-0045 §1: a bundle whose site, working copy or any snapshot's, defines a reference or
+ * repeater field (or a marker converting one) is refused (`fields_unsupported`) unless `support`
+ * says the site's renderer reads them. Without a capability the types are refused, unlike
+ * `assertGates`. One check for `importSite`, so for pull, push, `cloudhal import --replace` and
+ * `--revert`, and snapshot restores. Entry values need no check of their own: they mean nothing
+ * without a definition, and every site body that could define one is checked here.
  */
 export async function assertFieldTypes(
   siteId: string,
-  site: NodeRow,
+  bundle: SiteBundle,
   support: FieldTypeSupport | undefined,
 ): Promise<void> {
-  const body = JSON.parse(site.body) as Parameters<typeof unsupportedFieldTypeIssues>[0];
-  const issues = unsupportedFieldTypeIssues(body);
+  const site = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId);
+  if (!site) return;
+  const issues = bundleSiteBodies(bundle, site).flatMap(({ at, body }) =>
+    unsupportedFieldTypeIssues(body as Parameters<typeof unsupportedFieldTypeIssues>[0]).map((i) =>
+      at === "site" ? i : { ...i, path: `${at}/${i.path}` },
+    ),
+  );
   if (issues.length === 0 || (await referenceTypesSupported(siteId, support))) return;
   refuseFieldIssues(issues, { siteId });
 }
@@ -294,7 +324,7 @@ export async function checkBundle(
   await assertValidRows(siteId, bundle);
   assertDistinctRows(bundle);
   await assertGates(siteId, bundle, gates);
-  await assertFieldTypes(siteId, siteRow, fieldTypes);
+  await assertFieldTypes(siteId, bundle, fieldTypes);
   return siteRow;
 }
 

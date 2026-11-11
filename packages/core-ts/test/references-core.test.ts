@@ -94,10 +94,14 @@ const siteWith = (events: FieldDefinition[], more: Collections = {}) => ({
           type: "select",
           labels: L("Team"),
           localized: false,
-          options: [{ value: "core", labels: { en: "Core" } }],
+          options: [
+            { value: "core", labels: { en: "Core" } },
+            { value: "now", labels: { en: "Now" } },
+          ],
         },
+        { key: "joined", type: "date", labels: L("Joined"), localized: false },
       ],
-      listFields: ["team"],
+      listFields: ["team", "joined"],
     },
     ...more,
   } as unknown as Collections,
@@ -169,7 +173,13 @@ describe("definition rules (with the capability)", () => {
     expect(where({ field: "nope", op: "eq", value: "x" })[0]?.path).toBe(
       "collections/events/fields/0/where/0/field",
     );
-    expect(codes(where({ field: "team", op: "eq", value: "now" }))).toContain("invalid_query");
+    // `now` is refused as the clock on a date field, and is a plain option value on a select
+    expect(where({ field: "joined", op: "lt", value: "now" }).map((i) => [i.path, i.code])).toEqual(
+      [["collections/events/fields/0/where/0", "invalid_query"]],
+    );
+    expect(where({ field: "team", op: "eq", value: "now" })).toEqual([]);
+    expect(where({ field: "team", op: "in", values: ["core", "now"] })).toEqual([]);
+    expect(where({ field: "joined", op: "lt", value: "2026-01-01" })).toEqual([]);
   });
 
   it("refuses maxItems without multiple, bad sub-fields and a bad itemLabel", () => {
@@ -254,6 +264,12 @@ describe("values", () => {
     expect(at([{ person: G1, talk: "Hi", day: "2026-11-11", slides: "/s" }])).toEqual([]);
     expect(at([{}])).toEqual(["fields/speakers/0"]);
     expect(at([{ nope: 1 }])).toEqual(["fields/speakers/0/nope"]);
+    // prototype names are not sub-fields, and do not make an item non-empty
+    expect(at([{ constructor: { deep: [1, { x: "y" }] } }])).toEqual([
+      "fields/speakers/0/constructor",
+    ]);
+    expect(at([{ toString: 1, talk: "x" }])).toEqual(["fields/speakers/0/toString"]);
+    expect(at([JSON.parse('{"__proto__": {"a": 1}}')])).toEqual(["fields/speakers/0/__proto__"]);
     expect(at([{ talk: "a\u0007b" }])).toEqual(["fields/speakers/0/talk"]);
     expect(at([{ day: "2026-02-30" }])).toEqual(["fields/speakers/0/day"]);
     expect(at([{ slides: "asset:asset_01HZX8K3Q9P1" }])).toEqual(["fields/speakers/0/slides"]);

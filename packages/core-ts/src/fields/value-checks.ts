@@ -136,7 +136,8 @@ const EXTRA: Partial<Record<FieldDefinition["type"], Extra>> = {
     if (def.type !== "repeater" || !Array.isArray(value)) return [];
     const out: FieldIssue[] = [];
     (value as Record<string, unknown>[]).forEach((item, i) => {
-      if (Object.keys(item).length === 0) out.push(issue(`${path}/${i}`, "an item needs a value"));
+      if (!def.fields.some((sub) => Object.hasOwn(item, sub.key) && item[sub.key] !== undefined))
+        out.push(issue(`${path}/${i}`, "an item needs a value"));
       for (const sub of def.fields) {
         const v = item[sub.key];
         const extra = EXTRA[sub.type];

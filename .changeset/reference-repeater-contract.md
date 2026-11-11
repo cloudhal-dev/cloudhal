@@ -13,7 +13,7 @@ The contract gains two field types for collections, `reference` and `repeater` (
   - field operations;
   - every bundle `importSite` takes: import, pull, push, `cloudhal import --replace` and `--revert`, snapshot restores and edition copies.
 
-  `checkBundle` gained `assertFieldTypes`, which refuses the types when no capability is given.
+  `checkBundle` gained `assertFieldTypes`. It checks the working site row and every site body the bundle's snapshots carry, and refuses the types when no capability is given. A push answers `409 fields_unsupported` with its issues, not `400 bad_request`.
 - **Pure core** (`@cloudhal/core-ts/fields`), with no effect on stored data yet:
   - the definition rules: `reference_target_unknown`, `where`, `itemLabel`, and caps on sub-fields and leaves;
   - value checks for both types, the per-item `requiredToPublish`, and `too_many_references`;
@@ -23,3 +23,4 @@ The contract gains two field types for collections, `reference` and `repeater` (
 
   `FIELD_TYPES` keeps the nine enabled types (`EnabledFieldType`). `ALL_FIELD_TYPES` lists all eleven.
 - **MCP.** `update_collection`'s input now builds its `$defs` with `defsClosure` and offers only the enabled types. A test checks that every `$ref` in every tool's input and output schema resolves. Before this change, `pnpm gen` alone would have left the input pointing at `$defs` it did not carry.
+- **Fix, existing sites:** block props and typed-field objects no longer accept keys named after `Object.prototype` members (`constructor`, `toString`, `__proto__`, …) as known props. The props interpreter (`validateProps`) now checks own keys only, so such keys are refused as unknown.

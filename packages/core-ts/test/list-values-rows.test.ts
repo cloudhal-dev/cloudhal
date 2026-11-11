@@ -207,7 +207,8 @@ describe("list fingerprint (RFC-0042 §4)", () => {
       $defs: { FieldDefinition: { oneOf: { properties: Record<string, { type?: string }> }[] } };
     };
     const variants = schema.$defs.FieldDefinition.oneOf;
-    expect(variants.length).toBe(9);
+    // the nine RFC-0041 types and RFC-0045's reference and repeater
+    expect(variants.length).toBe(11);
     const sentinel = (name: string, type: string | undefined): unknown => {
       if (name === "migration") return { id: "op_1", fromLocalized: true };
       if (name === "options") return [{ value: "z", labels: { en: "Z" } }];
@@ -222,6 +223,10 @@ describe("list fingerprint (RFC-0042 §4)", () => {
         key: "a",
         type,
         ...(type === "select" ? { options: [{ value: "q", labels: { en: "Q" } }] } : {}),
+        ...(type === "reference" ? { collections: ["places"] } : {}),
+        ...(type === "repeater"
+          ? { fields: [{ key: "s", type: "text", labels: { en: { label: "S" } } }] }
+          : {}),
       } as never);
       const before = await listFingerprint(site([base], ["a"]), "c");
       for (const [name, p] of Object.entries(props)) {

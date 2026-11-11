@@ -118,14 +118,18 @@ function whereIssues(
   const [target, ...more] = def.collections;
   if (more.length > 0 || target === undefined)
     return [issue(`${at}/where`, "where needs exactly one target collection")];
+  const settings = collections[target];
+  const types = new Map((settings?.fields ?? []).map((d) => [d.key, d.type]));
   const out: FieldIssue[] = [];
   where.forEach((c, i) => {
-    if (c.value === "now" || c.values?.includes("now"))
+    // `now` is the clock only on date and datetime fields; elsewhere it is a literal value.
+    const type = types.get(c.field);
+    const clock = type === "date" || type === "datetime";
+    if (clock && (c.value === "now" || c.values?.includes("now")))
       out.push(
         issue(`${at}/where/${i}`, "where cannot use now: it is checked when a target is chosen"),
       );
   });
-  const settings = collections[target];
   for (const q of checkFieldQuery(settings?.fields ?? [], settings?.listFields, { where }))
     out.push(issue(`${at}/${q.path}`, q.message));
   return out;

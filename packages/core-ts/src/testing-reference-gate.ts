@@ -5,7 +5,7 @@
  * push, `cloudhal import --replace` and `--revert`, snapshot restores and edition copies all go
  * through its `checkBundle`). Called by `describeSiteGraphStore`, so it runs on every backend.
  */
-import type { Actor, FieldDefinition, Site } from "@cloudhal/core-contracts";
+import type { Actor, FieldDefinition, NodeRef, Site } from "@cloudhal/core-contracts";
 import { describe, expect, it } from "vitest";
 import { InvariantError } from "./errors.ts";
 import { runFieldOperation } from "./fields-operations/index.ts";
@@ -56,6 +56,30 @@ async function withCollections(bundle: SiteBundle, collections: Site["collection
   const body = { ...(JSON.parse(row.body) as Site), collections };
   row.body = canonicalJson(body);
   row.hash = await nodeHash(body);
+  return copy;
+}
+
+/**
+ * `bundle` with a clean working copy, whose snapshot `snapshotId` names a site body of the same id
+ * and rev with `collections` replaced: what a hand-made archive or a newer store could send.
+ */
+async function withSnapshotSite(
+  bundle: SiteBundle,
+  snapshotId: string,
+  collections: Site["collections"],
+) {
+  const copy = structuredClone(bundle);
+  const row = copy.snapshots.find((s) => s.id === snapshotId);
+  if (!row) throw new Error("no snapshot row");
+  const snapshot = JSON.parse(row.body) as { nodes: NodeRef[] };
+  const ref = snapshot.nodes.find((r) => r.kind === "site");
+  const text = ref ? copy.blobs[ref.hash] : undefined;
+  if (!ref || text === undefined) throw new Error("no site blob");
+  const body = { ...(JSON.parse(text) as Site), collections };
+  const hash = await nodeHash(body);
+  copy.blobs[hash] = canonicalJson(body);
+  ref.hash = hash;
+  row.body = canonicalJson(snapshot);
   return copy;
 }
 
@@ -118,7 +142,7 @@ export function referenceGateSuite(ctx: SuiteContext): void {
       expect((await store().getSite(site.id))?.collections).toEqual(site.collections);
     });
 
-    it("refuses bundles that define them: merge and replace imports alike", async () => {
+    it("refuses bundles that define them: bootstrap and replace imports alike", async () => {
       const site = await setup();
       const bundle = await exportSite(storage(), site.id);
       for (const def of [VENUE, SPEAKERS]) {
@@ -139,6 +163,31 @@ export function referenceGateSuite(ctx: SuiteContext): void {
       expect((await store().getSite(site.id))?.collections).toEqual(site.collections);
       // the untouched bundle still imports
       expect((await importSite(storage(), bundle)).nodes.unchanged).toBe(true);
+    });
+
+    it("refuses bundles whose snapshots' site bodies define them, the working copy clean", async () => {
+      const site = await setup();
+      const snap = await store().createSnapshot(site.id, { actor: person, reason: "manual" });
+      const bundle = await exportSite(storage(), site.id);
+      for (const collections of [
+        events([TEXT, VENUE]),
+        events([TEXT, SPEAKERS]),
+        events([{ ...TEXT, migration: { id: snap.id, fromType: "reference" } }]),
+        events([{ ...TEXT, migration: { id: snap.id, sub: "name" } }]),
+      ]) {
+        const tainted = await withSnapshotSite(bundle, snap.id, collections);
+        for (const mode of ["bootstrap", "replace"] as const)
+          expect(await code(importSite(storage(), tainted, { mode })), mode).toBe(
+            "fields_unsupported",
+          );
+      }
+      // the same rewrite with clean definitions passes the gate (and fails later, elsewhere)
+      const clean = await withSnapshotSite(bundle, snap.id, events([TEXT]));
+      const later = await importSite(storage(), clean, { mode: "replace" }).then(
+        () => "",
+        (e: unknown) => (e instanceof InvariantError ? e.code : "other"),
+      );
+      expect(later).not.toBe("fields_unsupported");
     });
   });
 }

@@ -11,6 +11,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
 import { FIELD_DEFINITIONS_INPUT } from "../src/collection-fields.ts";
 import type { JsonSchema } from "../src/common.ts";
+import { fieldHint } from "../src/field-hints.ts";
 import { defsClosure } from "../src/schema-transforms.ts";
 import { defineTools, runTool, toolPolicies } from "../src/tools.ts";
 
@@ -110,6 +111,13 @@ describe("defsClosure", () => {
 });
 
 describe("update_collection and the RFC-0045 gate", () => {
+  it("hints at the types update_collection takes, from the enabled list", () => {
+    const hint = fieldHint("fields_unsupported", {}) ?? "";
+    expect(hint).toContain("update_collection's fields input");
+    expect(hint).toContain("text, richText, number, boolean, date, datetime, url, image, select");
+    expect(hint).not.toContain("list_collections");
+  });
+
   it("refuses a reference or repeater definition with fields_unsupported", async () => {
     const sql = await BetterSqlite3Driver.open(":memory:");
     await migrate(sql, migrations);
