@@ -1,0 +1,97 @@
+{
+  "reason": "a migration's fromType is one of the eleven types",
+  "data": {
+    "schemaVersion": 1,
+    "id": "site_01HZX8K3Q9T1",
+    "projectId": "proj_01HZX8K3Q9AB",
+    "name": "Events",
+    "slug": "events",
+    "defaultLocale": "en",
+    "locales": ["en", "tr"],
+    "domains": [],
+    "pageIds": [],
+    "theme": {
+      "name": "blog"
+    },
+    "rev": 0,
+    "createdAt": "2026-11-11T09:00:00Z",
+    "updatedAt": "2026-11-11T09:00:00Z",
+    "collections": {
+      "events": {
+        "fields": [
+          {
+            "key": "speakers",
+            "type": "repeater",
+            "labels": {
+              "en": {
+                "label": "Speakers"
+              }
+            },
+            "localized": false,
+            "maxItems": 20,
+            "itemLabel": "person",
+            "fields": [
+              {
+                "key": "person",
+                "type": "reference",
+                "labels": {
+                  "en": {
+                    "label": "Person"
+                  }
+                },
+                "requiredToPublish": true,
+                "collections": ["people"]
+              },
+              {
+                "key": "role",
+                "type": "select",
+                "labels": {
+                  "en": {
+                    "label": "Role"
+                  }
+                },
+                "options": [
+                  {
+                    "value": "host",
+                    "labels": {
+                      "en": "Host"
+                    }
+                  },
+                  {
+                    "value": "speaker",
+                    "labels": {
+                      "en": "Speaker"
+                    }
+                  }
+                ]
+              },
+              {
+                "key": "photo",
+                "type": "image",
+                "labels": {
+                  "en": {
+                    "label": "Photo"
+                  }
+                }
+              },
+              {
+                "key": "talk",
+                "type": "text",
+                "labels": {
+                  "en": {
+                    "label": "Talk"
+                  }
+                },
+                "maxLength": 200
+              }
+            ],
+            "migration": {
+              "id": "snap_01HZX8K3Q9MG",
+              "fromType": "blocks"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

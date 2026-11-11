@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "id": "site_01HZX8K3Q9T1",
+  "projectId": "proj_01HZX8K3Q9AB",
+  "name": "Events",
+  "slug": "events",
+  "defaultLocale": "en",
+  "locales": ["en", "tr"],
+  "domains": [],
+  "pageIds": [],
+  "theme": {
+    "name": "blog"
+  },
+  "rev": 0,
+  "createdAt": "2026-11-11T09:00:00Z",
+  "updatedAt": "2026-11-11T09:00:00Z",
+  "collections": {
+    "events": {
+      "fields": [
+        {
+          "key": "venue",
+          "type": "reference",
+          "labels": {
+            "en": {
+              "label": "Venue"
+            }
+          },
+          "localized": false,
+          "collections": ["places"]
+        },
+        {
+          "key": "partners",
+          "type": "reference",
+          "labels": {
+            "en": {
+              "label": "Partners"
+            }
+          },
+          "localized": true,
+          "collections": ["places", "people"],
+          "multiple": true,
+          "maxItems": 50,
+          "requiredToPublish": true
+        },
+        {
+          "key": "host",
+          "type": "reference",
+          "labels": {
+            "en": {
+              "label": "Host"
+            }
+          },
+          "localized": false,
+          "collections": ["people"],
+          "where": [
+            {
+              "field": "role",
+              "op": "eq",
+              "value": "speaker"
+            }
+          ]
+        },
+        {
+          "key": "speakers",
+          "type": "repeater",
+          "labels": {
+            "en": {
+              "label": "Speakers"
+            }
+          },
+          "localized": false,
+          "maxItems": 20,
+          "itemLabel": "person",
+          "fields": [
+            {
+              "key": "person",
+              "type": "reference",
+              "labels": {
+                "en": {
+                  "label": "Person"
+                }
+              },
+              "requiredToPublish": true,
+              "collections": ["people"]
+            },
+            {
+              "key": "role",
+              "type": "select",
+              "labels": {
+                "en": {
+                  "label": "Role"
+                }
+              },
+              "options": [
+                {
+                  "value": "host",
+                  "labels": {
+                    "en": "Host"
+                  }
+                },
+                {
+                  "value": "speaker",
+                  "labels": {
+                    "en": "Speaker"
+                  }
+                }
+              ]
+            },
+            {
+              "key": "photo",
+              "type": "image",
+              "labels": {
+                "en": {
+                  "label": "Photo"
+                }
+              }
+            },
+            {
+              "key": "talk",
+              "type": "text",
+              "labels": {
+                "en": {
+                  "label": "Talk"
+                }
+              },
+              "maxLength": 200
+            }
+          ]
+        },
+        {
+          "key": "agenda",
+          "type": "repeater",
+          "labels": {
+            "en": {
+              "label": "Agenda"
+            }
+          },
+          "localized": true,
+          "fields": [
+            {
+              "key": "title",
+              "type": "text",
+              "labels": {
+                "en": {
+                  "label": "Title"
+                }
+              },
+              "multiline": true,
+              "requiredToPublish": true
+            },
+            {
+              "key": "notes",
+              "type": "richText",
+              "labels": {
+                "en": {
+                  "label": "Notes"
+                }
+              }
+            },
+            {
+              "key": "minutes",
+              "type": "number",
+              "labels": {
+                "en": {
+                  "label": "Minutes"
+                }
+              },
+              "integer": true,
+              "minimum": 0.5,
+              "maximum": 240.5
+            },
+            {
+              "key": "break",
+              "type": "boolean",
+              "labels": {
+                "en": {
+                  "label": "Break"
+                }
+              }
+            },
+            {
+              "key": "day",
+              "type": "date",
+              "labels": {
+                "en": {
+                  "label": "Day"
+                }
+              }
+            },
+            {
+              "key": "slides",
+              "type": "url",
+              "labels": {
+                "en": {
+                  "label": "Slides"
+                }
+              }
+            }
+          ],
+          "migration": {
+            "id": "snap_01HZX8K3Q9MG",
+            "fromKey": "program",
+            "fromType": "text",
+            "sub": "title"
+          }
+        }
+      ]
+    },
+    "places": {
+      "fields": [
+        {
+          "key": "street",
+          "type": "text",
+          "labels": {
+            "en": {
+              "label": "Street"
+            }
+          },
+          "localized": false
+        }
+      ]
+    },
+    "people": {}
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "reason": "a migration's fromType is one of the nine types",
+  "reason": "a migration's fromType is one of the eleven types",
   "data": {
     "schemaVersion": 1,
     "id": "site_01HZX8K3Q9T1",

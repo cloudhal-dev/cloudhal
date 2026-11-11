@@ -48,7 +48,9 @@ export type FieldDefinition =
   | DateTimeField
   | UrlField
   | ImageField
-  | SelectField;
+  | SelectField
+  | ReferenceField
+  | RepeaterField;
 /**
  * The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code).
  *
@@ -56,6 +58,22 @@ export type FieldDefinition =
  * via the `definition` "FieldKey".
  */
 export type FieldKey = string;
+/**
+ * RFC-0045: one sub-field of a repeater item, discriminated by `type`. Only types whose value is a scalar: no datetime, no multiple select or reference, no repeater. No localized and no migration: the repeater's apply.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "SubFieldDefinition".
+ */
+export type SubFieldDefinition =
+  | TextSubField
+  | RichTextSubField
+  | NumberSubField
+  | BooleanSubField
+  | DateSubField
+  | UrlSubField
+  | ImageSubField
+  | SelectSubField
+  | ReferenceSubField;
 /**
  * RFC-0042: where one JSON-LD property's value comes from, discriminated by `kind`.
  *
@@ -365,8 +383,22 @@ export interface FieldMigration {
   id: string;
   fromKey?: FieldKey;
   fromType?:
-    "text" | "richText" | "number" | "boolean" | "date" | "datetime" | "url" | "image" | "select";
+    | "text"
+    | "richText"
+    | "number"
+    | "boolean"
+    | "date"
+    | "datetime"
+    | "url"
+    | "image"
+    | "select"
+    | "reference"
+    | "repeater";
   fromLocalized?: boolean;
+  /**
+   * The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code).
+   */
+  sub?: string;
 }
 /**
  * Cloudhal Markdown v1 (ADR-0028), at most 50 000 characters.
@@ -533,6 +565,447 @@ export interface FieldOption {
   labels: {
     [k: string]: string | undefined;
   };
+}
+/**
+ * RFC-0045: entries of other (or this) collections of the same site, by translation group id (entry_…): the id of the group's original, which every language version and edition carries in translation.group.
+ */
+export interface ReferenceField {
+  key: FieldKey;
+  type: "reference";
+  labels: FieldLabels;
+  /**
+   * true: each language version picks its own targets; false: only the translation group's original holds them, and every version resolves them in its own language.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs at least one target. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * The collections a target may belong to: declared collections of this site (checked in code).
+   *
+   * @minItems 1
+   * @maxItems 5
+   */
+  collections:
+    | [Slug]
+    | [Slug, Slug]
+    | [Slug, Slug, Slug]
+    | [Slug, Slug, Slug, Slug]
+    | [Slug, Slug, Slug, Slug, Slug];
+  /**
+   * The value is an ordered list of targets. Absent: false.
+   */
+  multiple?: boolean;
+  /**
+   * With multiple: at most this many targets. Absent: 20.
+   */
+  maxItems?: number;
+  /**
+   * Only with one target collection: conditions on its list fields that a newly chosen target must meet (no `now`; checked in code). Narrows the picker; not re-checked when the target changes later.
+   *
+   * @minItems 1
+   * @maxItems 4
+   */
+  where?:
+    | [FieldCondition]
+    | [FieldCondition, FieldCondition]
+    | [FieldCondition, FieldCondition, FieldCondition]
+    | [FieldCondition, FieldCondition, FieldCondition, FieldCondition];
+}
+/**
+ * RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.
+ *
+ * This interface was referenced by `Site`'s JSON-Schema
+ * via the `definition` "FieldCondition".
+ */
+export interface FieldCondition {
+  /**
+   * A field key (site.schema.json FieldKey's pattern, repeated).
+   */
+  field: string;
+  op: "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "in" | "set" | "unset";
+  value?: string;
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  values?:
+    | [string]
+    | [string, string]
+    | [string, string, string]
+    | [string, string, string, string]
+    | [string, string, string, string, string]
+    | [string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string]
+    | [string, string, string, string, string, string, string, string, string, string, string]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ]
+    | [
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+        string,
+      ];
+}
+/**
+ * RFC-0045: an ordered list of items, each a flat object of sub-fields. A repeater cannot contain a repeater.
+ */
+export interface RepeaterField {
+  key: FieldKey;
+  type: "repeater";
+  labels: FieldLabels;
+  /**
+   * true: each language version has its own list (missing reads the original's); false: only the original holds the list.
+   */
+  localized: boolean;
+  /**
+   * An entry in review or published needs at least one item. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  migration?: FieldMigration;
+  /**
+   * The sub-fields of every item, in form order. Unique keys (checked in code).
+   *
+   * @minItems 1
+   * @maxItems 10
+   */
+  fields:
+    | [SubFieldDefinition]
+    | [SubFieldDefinition, SubFieldDefinition]
+    | [SubFieldDefinition, SubFieldDefinition, SubFieldDefinition]
+    | [SubFieldDefinition, SubFieldDefinition, SubFieldDefinition, SubFieldDefinition]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ]
+    | [
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+        SubFieldDefinition,
+      ];
+  /**
+   * At most this many items. Absent: 20.
+   */
+  maxItems?: number;
+  /**
+   * The field's key in ContentEntry.fields: lower camelCase, a JavaScript identifier. Unique in its collection; built-in entry property names are reserved (checked in code).
+   */
+  itemLabel?: string;
+}
+export interface TextSubField {
+  key: FieldKey;
+  type: "text";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  /**
+   * Absent: 5000.
+   */
+  maxLength?: number;
+  /**
+   * Line breaks allowed. Absent: false.
+   */
+  multiline?: boolean;
+}
+export interface RichTextSubField {
+  key: FieldKey;
+  type: "richText";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+}
+export interface NumberSubField {
+  key: FieldKey;
+  type: "number";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  /**
+   * Whole numbers only. Absent: false.
+   */
+  integer?: boolean;
+  minimum?: number;
+  maximum?: number;
+}
+export interface BooleanSubField {
+  key: FieldKey;
+  type: "boolean";
+  labels: FieldLabels;
+}
+export interface DateSubField {
+  key: FieldKey;
+  type: "date";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+}
+export interface UrlSubField {
+  key: FieldKey;
+  type: "url";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+}
+export interface ImageSubField {
+  key: FieldKey;
+  type: "image";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+}
+export interface SelectSubField {
+  key: FieldKey;
+  type: "select";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  /**
+   * @minItems 1
+   * @maxItems 50
+   */
+  options: [FieldOption, ...FieldOption[]];
+}
+export interface ReferenceSubField {
+  key: FieldKey;
+  type: "reference";
+  labels: FieldLabels;
+  /**
+   * Every item of an entry in review or published needs a value. Absent: false.
+   */
+  requiredToPublish?: boolean;
+  /**
+   * The collections a target may belong to (checked in code).
+   *
+   * @minItems 1
+   * @maxItems 5
+   */
+  collections:
+    | [Slug]
+    | [Slug, Slug]
+    | [Slug, Slug, Slug]
+    | [Slug, Slug, Slug, Slug]
+    | [Slug, Slug, Slug, Slug, Slug];
 }
 /**
  * RFC-0042: a time gate every entry derives from one of its date or datetime fields, checked at render time like Availability.until. A date ends at the start of the next day in the site's time zone.
@@ -877,198 +1350,6 @@ export interface ContentListSection {
     | [FieldCondition, FieldCondition, FieldCondition]
     | [FieldCondition, FieldCondition, FieldCondition, FieldCondition];
   orderBy?: FieldOrder;
-}
-/**
- * RFC-0042: one condition on a typed field of the listed collection. `value` is read by the field's type: a number, YYYY-MM-DD, an RFC 3339 instant, true/false, an option value, or `now`. `values` only with `in`.
- *
- * This interface was referenced by `Site`'s JSON-Schema
- * via the `definition` "FieldCondition".
- */
-export interface FieldCondition {
-  /**
-   * A field key (site.schema.json FieldKey's pattern, repeated).
-   */
-  field: string;
-  op: "eq" | "ne" | "lt" | "lte" | "gt" | "gte" | "in" | "set" | "unset";
-  value?: string;
-  /**
-   * @minItems 1
-   * @maxItems 20
-   */
-  values?:
-    | [string]
-    | [string, string]
-    | [string, string, string]
-    | [string, string, string, string]
-    | [string, string, string, string, string]
-    | [string, string, string, string, string, string]
-    | [string, string, string, string, string, string, string]
-    | [string, string, string, string, string, string, string, string]
-    | [string, string, string, string, string, string, string, string, string]
-    | [string, string, string, string, string, string, string, string, string, string]
-    | [string, string, string, string, string, string, string, string, string, string, string]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ]
-    | [
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-        string,
-      ];
 }
 /**
  * RFC-0042: order a listing by a number, date or datetime field. Entries without a value sort last.
