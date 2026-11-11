@@ -18,7 +18,10 @@ const ASSET_ID = new RegExp(ASSET_ID_PATTERN);
  * `fields/speakers/2/photo` (RFC-0045 §2.5), so issues map to their control.
  */
 export interface FieldAssetRef extends AssetRefUse {
+  /** The first use's path. */
   readonly path: string;
+  /** Every use's path, in order (one asset in several items is one row, but several uses). */
+  readonly paths: readonly string[];
 }
 
 type Slot = { type: string };
@@ -40,10 +43,12 @@ export function fieldAssetRefs(
   values: Readonly<Record<string, unknown>> | undefined,
 ): FieldAssetRef[] {
   if (!values || defs.length === 0) return [];
-  const out = new Map<string, FieldAssetRef>();
+  const out = new Map<string, { assetId: string; field: string; path: string; paths: string[] }>();
   const add = (assetId: string, field: string, path: string) => {
     const id = `${assetId}\n${field}`;
-    if (!out.has(id)) out.set(id, { assetId, field, path });
+    const held = out.get(id);
+    if (held) held.paths.push(path);
+    else out.set(id, { assetId, field, path, paths: [path] });
   };
   for (const def of defs) {
     const value = Object.hasOwn(values, def.key) ? values[def.key] : undefined;
@@ -99,7 +104,7 @@ export interface FieldAssetCheck {
   /** The entry's field definitions (its new collection's). */
   readonly defs: readonly FieldDefinition[];
   /** `fieldAssetRefs` of the values being written. */
-  readonly refs: readonly (AssetRefUse & { readonly path?: string })[];
+  readonly refs: readonly UseRef[];
   /** `fieldAssetRefs` of the stored entry (empty for a new one). */
   readonly kept: readonly AssetRefUse[];
   /** Assets of the entry's site, by id. */
@@ -112,17 +117,20 @@ export interface FieldAssetCheck {
 }
 
 /** References a write adds: not held by the stored entry under the same field. */
-export function newFieldAssetRefs(
-  refs: readonly AssetRefUse[],
+export function newFieldAssetRefs<R extends AssetRefUse>(
+  refs: readonly R[],
   kept: readonly AssetRefUse[],
-): AssetRefUse[] {
+): R[] {
   const held = new Set(kept.map((r) => `${r.assetId}\n${r.field}`));
   return refs.filter((r) => !held.has(`${r.assetId}\n${r.field}`));
 }
 
-/** A ref's item path (`fieldAssetRefs`), else its field's (`fields.<key>` → `fields/<key>`). */
-const pathOf = (r: AssetRefUse & { readonly path?: string }) =>
-  r.path ?? `fields/${r.field.slice("fields.".length)}`;
+/** A reference with where it is used: `fieldAssetRefs`' item paths, or none (a top-level ref). */
+type UseRef = AssetRefUse & { readonly path?: string; readonly paths?: readonly string[] };
+
+/** A ref's use paths, else its field's (`fields.<key>` → `fields/<key>`). */
+const pathsOf = (r: UseRef): readonly string[] =>
+  r.paths ?? [r.path ?? `fields/${r.field.slice("fields.".length)}`];
 
 /** One path lies at or under the other (`fields/speakers` and `fields/speakers/2/photo`). */
 const nested = (a: string, b: string) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
@@ -145,23 +153,26 @@ function slotTypes(defs: readonly FieldDefinition[]): Map<string, string> {
 export async function fieldAssetIssues(check: FieldAssetCheck): Promise<FieldIssue[]> {
   const { defs, kept, skip } = check;
   const skipped = [...(skip ?? [])];
-  const refs = newFieldAssetRefs(check.refs, kept).filter(
-    (r) => !skipped.some((s) => nested(pathOf(r), s)),
+  // Every use no skip path covers: one asset in several items is reported at each item.
+  const uses = newFieldAssetRefs(check.refs, kept).flatMap((ref) =>
+    pathsOf(ref)
+      .filter((path) => !skipped.some((s) => nested(path, s)))
+      .map((path) => ({ ref, path })),
   );
-  if (refs.length === 0) return [];
+  if (uses.length === 0) return [];
+  const refs = [...new Set(uses.map((u) => u.ref))];
   const assets = await check.lookup(refs.map((r) => r.assetId));
   const keptIds = new Set(kept.map((r) => r.assetId));
   const types = slotTypes(defs);
   const out: FieldIssue[] = [];
-  for (const ref of refs) {
+  for (const { ref, path } of uses) {
     const slot = ref.field.slice("fields.".length);
     const problem = assetProblem(
       assets.get(ref.assetId),
       types.get(slot),
       keptIds.has(ref.assetId),
     );
-    if (problem)
-      out.push({ path: pathOf(ref), code: "invalid_value", message: `${ref.assetId} ${problem}` });
+    if (problem) out.push({ path, code: "invalid_value", message: `${ref.assetId} ${problem}` });
   }
   return out;
 }

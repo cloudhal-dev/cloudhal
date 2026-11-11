@@ -4,7 +4,7 @@
  * production; the suite wraps the factory's storage in a store with `fieldTypes`.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
-import { SiteGraphStore } from "@cloudhal/core-ts";
+import { nodeHash, SiteGraphStore } from "@cloudhal/core-ts";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createApi } from "./app.ts";
 import type { ApiStoreFactory } from "./testing.ts";
@@ -71,6 +71,13 @@ export function describeReferencesApi(label: string, factory: ApiStoreFactory): 
                 localized: false,
                 collections: ["places"],
               },
+              {
+                key: "altVenue",
+                type: "reference",
+                labels: L("Alternative venue"),
+                localized: true,
+                collections: ["places"],
+              },
             ],
           },
         },
@@ -110,6 +117,72 @@ export function describeReferencesApi(label: string, factory: ApiStoreFactory): 
       expect(
         (await call("/api/sites/site_01HZX8K3QNONE/entries/pick?collections=places")).status,
       ).toBe(404);
+    });
+
+    it("folds case and diacritics on both sides, Turkish İ and ı included", async () => {
+      const cicek = await entry("places", { title: "Çiçek Pasajı", slug: "cicek-pasaji" });
+      const kongre = await entry("places", { title: "İstanbul Kongre", slug: "kongre" });
+      const pick = async (q: string) =>
+        (
+          (
+            await call(
+              `/api/sites/${site.id}/entries/pick?collections=places&q=${encodeURIComponent(q)}`,
+            )
+          ).body.entries as { id: string }[]
+        ).map((e) => e.id);
+      expect(await pick("ÇİÇEK")).toEqual([cicek.id]);
+      expect(await pick("Çiçek")).toEqual([cicek.id]);
+      expect(await pick("pasaji")).toEqual([cicek.id]);
+      expect(await pick("istanbul")).toEqual([kongre.id]);
+      expect(await pick("İSTANBUL")).toEqual([kongre.id]);
+      expect(await pick("KONG")).toEqual([kongre.id]);
+    });
+
+    it("shows a translation under the original's non-localized row even when it holds a row itself", async () => {
+      const hall = await entry("places", { title: "Main Hall" });
+      const original = await entry("events", {
+        title: "Launch",
+        status: "published",
+        fields: { venue: hall.id },
+      });
+      const translation = await entry("events", {
+        title: "Lansman",
+        locale: "tr",
+        slug: `${original.slug}-tr`,
+        status: "published",
+        fields: { altVenue: hall.id },
+        translation: {
+          group: original.id,
+          method: "human",
+          source: {
+            id: original.id,
+            locale: original.locale,
+            rev: original.rev,
+            hash: await nodeHash(original),
+          },
+        },
+      });
+      // every page, for a page size: the result must not depend on where the pages are cut
+      const rows = async (limit: number) => {
+        const out: { id: string; field: string; shownBy: { id: string }[] }[] = [];
+        for (let offset: number | undefined = 0; offset !== undefined; ) {
+          const page = (
+            await call(
+              `/api/sites/${site.id}/entries/${hall.id}/references?limit=${limit}&offset=${offset}`,
+            )
+          ).body as { referrers: typeof out; next?: number };
+          out.push(...page.referrers);
+          offset = page.next;
+        }
+        return out;
+      };
+      for (const limit of [20, 1]) {
+        const venue = (await rows(limit)).find((r) => r.field === "venue");
+        expect(venue?.id).toBe(original.id);
+        expect(venue?.shownBy.map((m) => m.id)).toEqual([translation.id]);
+      }
+      const alt = (await rows(20)).find((r) => r.field === "altVenue");
+      expect(alt).toMatchObject({ id: translation.id, shownBy: [] });
     });
 
     it("lists referrers with the members that show their value, and refuses what strands them", async () => {

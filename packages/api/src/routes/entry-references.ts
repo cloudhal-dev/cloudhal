@@ -4,15 +4,17 @@
  *
  * - `GET …/entries/pick?collections=a,b&q=&locale=&limit=`: at most 20 `{groupId, id, title,
  *   collection, status, locale}` of the allowed collections, never archived ones. `q` is at most
- *   100 characters, refused before it is read further, and matched as a case-folded substring of
- *   titles and slugs with `instr` (no pattern, rule 13), under a per-member window of the
- *   `rate_limits` counters.
+ *   100 characters, refused before it is read further, and matched as a substring of titles and
+ *   slugs with both sides folded by `foldName` (case, diacritics, Turkish İ/ı; no pattern over
+ *   input, rule 13), over at most 5,000 candidates in title order, under a per-member window of
+ *   the `rate_limits` counters.
  * - `GET …/entries/:entryId/references?limit=&offset=`: the referrers of the entry's translation
  *   group from `entry_refs`, published holders first, each holder with the same-site members that
  *   show its value (`shared` 1, or 2 without their own value), paged.
  */
 import type { ContentEntry } from "@cloudhal/core-contracts";
 import { memberGroup } from "@cloudhal/core-ts/fields";
+import { foldName } from "@cloudhal/core-ts/names";
 import type { SqlDriver } from "@cloudhal/storage";
 import type { Context } from "hono";
 import { Hono } from "hono";
@@ -24,6 +26,8 @@ import { countHit } from "../rate-limits.ts";
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LOCALE = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}$/;
 const MAX_Q = 100;
+/** Candidates one picker search folds and matches at most (title order). */
+const PICK_SCAN = 5000;
 const PICK_LIMIT = 20;
 /** Picker searches per member and site per minute. */
 const PICK_WINDOW = { hits: 120, ms: 60_000 };
@@ -46,7 +50,7 @@ function pickQuery(c: Context<Env>) {
   const locale = c.req.query("locale") || undefined;
   if (locale !== undefined && !LOCALE.test(locale)) throw badRequest("locale is a language tag");
   const limit = Math.max(1, intParam(c.req.query("limit"), PICK_LIMIT, PICK_LIMIT));
-  return { q: q.trim().toLowerCase(), collections, locale, limit };
+  return { q, collections, locale, limit };
 }
 
 async function rateLimited(c: Context<Env>, siteId: string): Promise<boolean> {
@@ -77,27 +81,56 @@ const cardOf = (e: ContentEntry): Card => ({
   locale: e.locale,
 });
 
+/** A picker candidate: only the columns a card and the match need, never the whole body. */
+interface Candidate extends Record<string, unknown> {
+  id: string;
+  title: string | null;
+  slug: string | null;
+  collection: string;
+  status: ContentEntry["status"];
+  locale: string;
+  grp: string | null;
+}
+
+/**
+ * At most `limit` cards whose folded title or slug contains the folded `q`. Both sides fold in
+ * JS with `foldName` (case, diacritics, Turkish İ/ı: "ÇİÇEK" finds "Çiçek Pasajı"), over at most
+ * `PICK_SCAN` candidates of the allowed collections in title order, read as small columns.
+ */
 async function pick(sql: SqlDriver, siteId: string, query: ReturnType<typeof pickQuery>) {
-  const rows = await sql.all<{ body: string }>(
-    `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
+  const rows = await sql.all<Candidate>(
+    `SELECT id, json_extract(body, '$.title') AS title, json_extract(body, '$.slug') AS slug,
+        json_extract(body, '$.collection') AS collection, json_extract(body, '$.status') AS status,
+        json_extract(body, '$.locale') AS locale, json_extract(body, '$.translation.group') AS grp
+      FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
       AND json_extract(body, '$.collection') IN (SELECT value FROM json_each(?))
       AND json_extract(body, '$.status') <> 'archived'
       AND (? IS NULL OR json_extract(body, '$.locale') = ?)
-      AND (? = '' OR instr(lower(json_extract(body, '$.title')), ?) > 0
-                  OR instr(lower(json_extract(body, '$.slug')), ?) > 0)
-      ORDER BY lower(json_extract(body, '$.title')), id LIMIT ?`,
+      ORDER BY json_extract(body, '$.title'), id LIMIT ?`,
     [
       siteId,
       JSON.stringify(query.collections),
       query.locale ?? null,
       query.locale ?? null,
-      query.q,
-      query.q,
-      query.q,
-      query.limit,
+      PICK_SCAN,
     ],
   );
-  return rows.map((r) => cardOf(JSON.parse(r.body) as ContentEntry));
+  const q = foldName(query.q);
+  const hits = (text: string | null) => text !== null && foldName(text).includes(q);
+  const out: Card[] = [];
+  for (const r of rows) {
+    if (out.length >= query.limit) break;
+    if (q !== "" && !hits(r.title) && !hits(r.slug)) continue;
+    out.push({
+      groupId: r.grp ?? r.id,
+      id: r.id,
+      title: r.title ?? "",
+      collection: r.collection,
+      status: r.status,
+      locale: r.locale,
+    });
+  }
+  return out;
 }
 
 interface RefRow {
@@ -129,9 +162,8 @@ async function referrers(
     ? await sql.all<{ body: string }>(
         `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
           AND json_extract(body, '$.translation.group') IN (SELECT value FROM json_each(?))
-          AND id NOT IN (SELECT value FROM json_each(?))
           AND json_extract(body, '$.translation.source.siteId') IS NULL`,
-        [siteId, JSON.stringify(holders), JSON.stringify(holders)],
+        [siteId, JSON.stringify(holders)],
       )
     : [];
   const inheriting = members.map((m) => JSON.parse(m.body) as ContentEntry);
@@ -142,6 +174,8 @@ async function referrers(
       .filter(
         (m) =>
           m.translation?.group === r.holder &&
+          // Only the row's own holder is left out: another holder on this page may still show it.
+          m.id !== r.holder &&
           (r.shared === 1 || !Object.hasOwn(m.fields ?? {}, r.root_key)),
       )
       .map(cardOf),

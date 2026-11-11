@@ -483,6 +483,22 @@ export function referencesSuite(ctx: SuiteContext): void {
           expect(issues.map((i) => i.path)).toEqual(["fields/speakers/1/photo"]);
         }
       });
+
+      it("reports a bad asset at every item that uses it", async () => {
+        const site = await world();
+        const csv = await upload(site.id, new TextEncoder().encode("a,b\n1,2\n"), "data.csv");
+        const speakers = [{ photo: csv.id }, { talk: "x" }, { photo: csv.id }];
+        try {
+          await entry(site, "events", { fields: { speakers } });
+          throw new Error("expected a refusal");
+        } catch (e) {
+          const issues = (e as InvariantError).details.issues as { path: string }[];
+          expect(issues.map((i) => i.path)).toEqual([
+            "fields/speakers/0/photo",
+            "fields/speakers/2/photo",
+          ]);
+        }
+      });
     });
 
     describe("field operations (§2.6)", () => {
@@ -607,9 +623,9 @@ export function referencesSuite(ctx: SuiteContext): void {
         });
         expect(copy.fields).toEqual({ venue: hall.id, speakers: [{ talk: "Hi" }] });
         expect(dropped).toEqual([
-          { path: "fields/speakers/0/person", groupId: ada.id },
-          { path: "fields/speakers/0" },
-          { path: "fields/speakers/1/person", groupId: ada.id },
+          { path: "fields/speakers/0/person", groupId: ada.id, reason: "missing" },
+          { path: "fields/speakers/0", reason: "empty" },
+          { path: "fields/speakers/1/person", groupId: ada.id, reason: "missing" },
         ]);
         // the edition's event names the source site's group id, resolved by the edition's member
         await entry(edition, "events", {
@@ -622,6 +638,107 @@ export function referencesSuite(ctx: SuiteContext): void {
         );
         // and the source site's original is free: the edition's rows pin nothing there
         expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+      });
+      it("keeps only what the edition's field accepts: where, a single target, maxItems, fromKey", async () => {
+        const OPEN: FieldDefinition = {
+          key: "open",
+          type: "boolean",
+          labels: L("Open"),
+          localized: false,
+        };
+        const source = await world({
+          ...COLLECTIONS,
+          events: { fields: [{ ...VENUE, multiple: true } as never, SPONSOR, SPEAKERS] },
+        });
+        const edition = await store().createSite({
+          projectId: source.projectId,
+          name: "Edition",
+          slug: `refs-edition-rules-${n}`,
+          defaultLocale: "de",
+          locales: ["de"],
+          domains: [],
+          pageIds: [],
+          theme: { name: "blog" },
+          collections: {
+            ...COLLECTIONS,
+            places: { fields: [OPEN], listFields: ["open"] },
+            events: {
+              fields: [
+                {
+                  ...VENUE,
+                  collections: ["places"],
+                  where: [{ field: "open", op: "eq", value: "true" }],
+                } as never,
+                SPONSOR,
+                { ...SPEAKERS, maxItems: 1 } as never,
+              ],
+            },
+          },
+        });
+        const member = async (open: boolean) => {
+          const original = await entry(source, "places", { status: "published" });
+          await entry(edition, "places", {
+            locale: "de",
+            fields: { open },
+            translation: {
+              group: original.id,
+              method: "human",
+              source: { ...(await sourceOf(original)), siteId: source.id },
+            },
+          });
+          return original;
+        };
+        const closed = await member(false);
+        const open1 = await member(true);
+        const open2 = await member(true);
+        const event = await entry(source, "events", {
+          fields: {
+            venue: [closed.id, open1.id, open2.id],
+            speakers: [{ talk: "One" }, { talk: "Two" }],
+          },
+        });
+        let dropped: { path: string; groupId?: string; reason: string }[] = [];
+        const copy = await forEdition(store(), event, {
+          fromSiteId: source.id,
+          toSiteId: edition.id,
+          actor: person,
+          onDropped: (d) => {
+            dropped = d;
+          },
+        });
+        expect(copy.fields).toEqual({ venue: open1.id, speakers: [{ talk: "One" }] });
+        expect(dropped).toEqual([
+          { path: "fields/venue/0", groupId: closed.id, reason: "where" },
+          { path: "fields/venue/2", groupId: open2.id, reason: "single" },
+          { path: "fields/speakers/1", reason: "maxItems" },
+        ]);
+        // the copy is a write the edition accepts
+        expect(await code(entry(edition, "events", { locale: "de", fields: copy.fields }))).toBe(
+          "ok",
+        );
+        // a running rename on the edition: values are read, filtered and kept under the old key
+        await rawSite(edition.id, (s) =>
+          withFields(s, "events", [
+            {
+              ...VENUE,
+              key: "place",
+              collections: ["places"],
+              migration: { id: "snap_01HZX8K3Q9MG", fromKey: "venue" },
+            } as never,
+            SPONSOR,
+            SPEAKERS,
+          ]),
+        );
+        const renamed = await forEdition(
+          store(),
+          { ...event, fields: { venue: ["entry_01HZX8K3QGONE"] } },
+          {
+            fromSiteId: source.id,
+            toSiteId: edition.id,
+            actor: person,
+          },
+        );
+        expect(renamed.fields).toEqual({});
       });
     });
 

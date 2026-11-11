@@ -32,7 +32,10 @@ export const definitionsPath = (collection: string): string =>
   `$.collections."${collection}".fields`;
 
 /** The key `def`'s value is stored under in `values`: its own, else a running rename's old one. */
-function storedKey(def: FieldDefinition, values: Record<string, unknown>): string | undefined {
+export function storedKey(
+  def: FieldDefinition,
+  values: Record<string, unknown>,
+): string | undefined {
   if (Object.hasOwn(values, def.key)) return def.key;
   const from = def.migration?.fromKey;
   return from !== undefined && Object.hasOwn(values, from) ? from : undefined;

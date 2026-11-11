@@ -12,6 +12,7 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
 import { ConflictError } from "../src/errors.ts";
 import { canonicalJson } from "../src/hash.ts";
+import { fieldAssetIssues, fieldAssetRefs } from "../src/media/field-refs.ts";
 import { REFS_STATEMENT_BYTES } from "../src/media/refs-rebuild.ts";
 import { mapUniqueViolation } from "../src/node-sql.ts";
 import { entryRefsRebuild } from "../src/references/rebuild.ts";
@@ -293,5 +294,43 @@ describe("release dependencies (§2.7)", () => {
 
   it("leaves bodies without reference definitions as they are", () => {
     expect(stripReferences({ collections: {} }, body)).toBe(body);
+  });
+});
+
+describe("asset issues inside repeater items (§2.5)", () => {
+  const speakers: FieldDefinition = {
+    key: "speakers",
+    type: "repeater",
+    labels: L("Speakers"),
+    localized: false,
+    fields: [
+      { key: "talk", type: "text", labels: L("Talk") },
+      { key: "photo", type: "image", labels: L("Photo") },
+    ],
+  };
+  const CSV = "asset_01HZX8K3QCSV1";
+  const lookup = async () => new Map([[CSV, { id: CSV, kind: "file", status: "active" } as never]]);
+  const values = { speakers: [{ photo: CSV }, { talk: "x" }, { photo: CSV }] };
+
+  it("one row per asset and field, every use's path kept", () => {
+    expect(fieldAssetRefs([speakers], values)).toEqual([
+      {
+        assetId: CSV,
+        field: "fields.speakers.photo",
+        path: "fields/speakers/0/photo",
+        paths: ["fields/speakers/0/photo", "fields/speakers/2/photo"],
+      },
+    ]);
+  });
+
+  it("reports each use, and skips only the uses under a skip path", async () => {
+    const refs = fieldAssetRefs([speakers], values);
+    const paths = async (skip: string[]) =>
+      (
+        await fieldAssetIssues({ defs: [speakers], refs, kept: [], lookup, skip: new Set(skip) })
+      ).map((i) => i.path);
+    expect(await paths([])).toEqual(["fields/speakers/0/photo", "fields/speakers/2/photo"]);
+    expect(await paths(["fields/speakers/0"])).toEqual(["fields/speakers/2/photo"]);
+    expect(await paths(["fields/speakers"])).toEqual([]);
   });
 });
