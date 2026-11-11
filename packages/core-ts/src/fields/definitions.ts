@@ -6,6 +6,11 @@
  */
 import type { CollectionSettings, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import {
+  type ReferenceDefinitionOptions,
+  referenceDefinitionIssues,
+  subFieldCount,
+} from "../references/definitions.ts";
+import {
   FIELD_LIMITS,
   type FieldIssue,
   jsonBytes,
@@ -173,14 +178,22 @@ const OPERATION: Record<string, string> = {
  * guard for changes no plain edit may make (type, localization, `multiple`, the migration marker);
  * removals and removed options are listed by `fieldDefinitionChanges`, since refusing them depends
  * on stored values.
+ *
+ * RFC-0045: `reference` and `repeater` definitions are refused (`fields_unsupported`) unless
+ * `options.referenceTypes` says the writer's capability allows them; then their own rules run.
+ * Sub-fields count toward the per-site cap.
  */
-export function checkFieldDefinitions(site: SiteFields, before?: SiteFields): FieldIssue[] {
+export function checkFieldDefinitions(
+  site: SiteFields,
+  before?: SiteFields,
+  options: ReferenceDefinitionOptions = {},
+): FieldIssue[] {
   const collections: Collections = site.collections ?? {};
-  const out: FieldIssue[] = [];
+  const out: FieldIssue[] = referenceDefinitionIssues(site, options);
   let total = 0;
   for (const [key, settings] of Object.entries(collections)) {
     if (!settings) continue;
-    total += settings.fields?.length ?? 0;
+    total += (settings.fields?.length ?? 0) + subFieldCount(settings.fields);
     out.push(...checkCollection(key, settings));
   }
   if (total > FIELD_LIMITS.fieldsPerSite)

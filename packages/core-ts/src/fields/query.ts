@@ -60,6 +60,9 @@ export const FIELD_QUERY_OPS: Readonly<Record<FieldType, readonly FieldQueryOp[]
   url: ["eq", "set", "unset"],
   richText: ["set", "unset"],
   image: ["set", "unset"],
+  // RFC-0045: not listable until rollout step 8 (references) or ever (repeaters, `list_field_type`).
+  reference: [],
+  repeater: [],
 };
 
 /** True when a listing may be ordered by a field of this type. */

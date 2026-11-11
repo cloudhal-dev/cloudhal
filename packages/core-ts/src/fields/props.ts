@@ -4,8 +4,14 @@
  * checks. What the subset cannot say (calendar days, zones, repeats, C0 controls, rich text over
  * the subset's 10 000-character string ceiling) is in `values.ts`.
  */
-import type { FieldDefinition } from "@cloudhal/core-contracts";
-import type { Localized, PropSchema, PropsSchema } from "../blocks.ts";
+import type { FieldDefinition, SubFieldDefinition } from "@cloudhal/core-contracts";
+import type {
+  FlatObjectPropSchema,
+  Localized,
+  PropSchema,
+  PropsSchema,
+  ScalarPropSchema,
+} from "../blocks.ts";
 import { FIELD_LIMITS } from "./types.ts";
 
 /** `YYYY-MM-DD`; whether the day exists is checked in code. */
@@ -17,6 +23,8 @@ export const INSTANT_PATTERN =
 export const TIME_ZONE_SHAPE = "^(?:UTC|[A-Z][A-Za-z_-]+(?:/[A-Za-z0-9_+-]+){1,2})$";
 /** A bare asset id, `common.schema.json#/$defs/Id` with the `asset` prefix. */
 export const ASSET_ID_PATTERN = "^asset_[A-Za-z0-9]{6,32}$";
+/** RFC-0045: a translation group id, an entry id (`common.schema.json#/$defs/Id`, `entry` prefix). */
+export const GROUP_ID_PATTERN = "^entry_[A-Za-z0-9]{6,32}$";
 
 /** The subset's `Localized`: per-locale words when `en` is among them, else the first one. */
 function localized(
@@ -28,7 +36,10 @@ function localized(
   return entries[0]?.[1] ?? fallback;
 }
 
-function annotations(def: FieldDefinition): { title: Localized; description?: Localized } {
+function annotations(def: Pick<FieldDefinition, "key" | "labels">): {
+  title: Localized;
+  description?: Localized;
+} {
   const labels: Record<string, string> = {};
   const help: Record<string, string> = {};
   for (const [locale, l] of Object.entries(def.labels)) {
@@ -81,7 +92,34 @@ const COMPILE: Record<FieldDefinition["type"], Compile> = {
       ? { type: "array", items: one, maxItems: values.length }
       : one;
   },
+  // RFC-0045: a group id, or a list of them (repeats are checked in value-checks.ts).
+  reference: (def) => {
+    const one = { type: "string" as const, pattern: GROUP_ID_PATTERN };
+    return def.type === "reference" && def.multiple
+      ? { type: "array", items: one, maxItems: def.maxItems ?? FIELD_LIMITS.listItems }
+      : one;
+  },
+  // RFC-0045: ADR-0030's array of flat objects; every sub-field compiles to a scalar.
+  repeater: (def) => {
+    const subs = def.type === "repeater" ? def.fields : [];
+    const items: FlatObjectPropSchema = {
+      type: "object",
+      properties: Object.fromEntries(subs.map((sub) => [sub.key, subFieldPropSchema(sub)])),
+      additionalProperties: false,
+    };
+    const maxItems = (def.type === "repeater" && def.maxItems) || FIELD_LIMITS.listItems;
+    return { type: "array", items, maxItems };
+  },
 };
+
+/**
+ * A repeater sub-field's prop schema: its type's compiler (a sub-field is a field without
+ * `localized` and `migration`, and never `multiple`), with its labels as `title`/`description`.
+ */
+export function subFieldPropSchema(sub: SubFieldDefinition): ScalarPropSchema {
+  const def = sub as unknown as FieldDefinition;
+  return { ...COMPILE[sub.type](def), ...annotations(sub) } as ScalarPropSchema;
+}
 
 const fieldCache = new WeakMap<FieldDefinition, PropSchema>();
 const listCache = new WeakMap<readonly FieldDefinition[], PropsSchema>();

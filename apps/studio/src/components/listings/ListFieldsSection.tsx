@@ -1,5 +1,5 @@
 import type { CollectionSettings, FieldDefinition, Site } from "@cloudhal/core-contracts";
-import { fieldLabel } from "@cloudhal/core-ts/fields";
+import { fieldLabel, isReferenceFieldType } from "@cloudhal/core-ts/fields";
 import { Badge, Button, Link, SectionEmpty, Select, Text } from "@cloudhal/ui";
 import { ArrowDown, ArrowUp, Columns, Trash } from "@phosphor-icons/react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -181,7 +181,9 @@ function ListFieldRow({
           <Text as="span" variant="mono-secondary">
             {fieldKey}
           </Text>
-          {def && <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>}
+          {def && !isReferenceFieldType(def.type) && (
+            <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>
+          )}
           {def && sortable(def) && (
             <Badge variant="outline">{t("listings.listFields.sortable")}</Badge>
           )}

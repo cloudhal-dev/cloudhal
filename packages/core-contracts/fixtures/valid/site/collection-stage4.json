@@ -138,7 +138,7 @@
           "localized": true,
           "fields": [
             {
-              "key": "title",
+              "key": "heading",
               "type": "text",
               "labels": {
                 "en": {
@@ -201,7 +201,7 @@
             "id": "snap_01HZX8K3Q9MG",
             "fromKey": "program",
             "fromType": "text",
-            "sub": "title"
+            "sub": "heading"
           }
         }
       ]
@@ -220,6 +220,34 @@
         }
       ]
     },
-    "people": {}
+    "people": {
+      "fields": [
+        {
+          "key": "role",
+          "type": "select",
+          "labels": {
+            "en": {
+              "label": "Role"
+            }
+          },
+          "localized": false,
+          "options": [
+            {
+              "value": "speaker",
+              "labels": {
+                "en": "Speaker"
+              }
+            },
+            {
+              "value": "staff",
+              "labels": {
+                "en": "Staff"
+              }
+            }
+          ]
+        }
+      ],
+      "listFields": ["role"]
+    }
   }
 }

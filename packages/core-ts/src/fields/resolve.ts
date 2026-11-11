@@ -8,12 +8,21 @@
  * - during a field operation the `migration` marker is read through: a missing key falls back to
  *   `fromKey`; a value still in `fromType` that does not fit the new type is converted by RFC-0041
  *   §6's closed table (`conversions.ts`), and resolves to `undefined` with an issue only when the
- *   table cannot convert it; a field being removed is already gone.
+ *   table cannot convert it; a field being removed is already gone;
+ * - RFC-0045: a reference resolves to its group ids and a repeater to its items, each sub-value
+ *   checked as a field is (loading targets is the renderer's job); a definition of a type this
+ *   version does not know is skipped, so a newer writer's type never breaks an older reader.
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { convertFieldValue } from "./conversions.ts";
 import { convertContext, isBeingRemoved } from "./migration.ts";
-import { type FieldIssue, fieldDefinitions, isRecord, type SiteFields } from "./types.ts";
+import {
+  type FieldIssue,
+  fieldDefinitions,
+  isKnownFieldType,
+  isRecord,
+  type SiteFields,
+} from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
 export interface ResolvedField {
@@ -72,7 +81,7 @@ export function resolveFields(
 ): ResolvedFields {
   const out: ResolvedFields = {};
   for (const def of fieldDefinitions(site, entry.collection)) {
-    if (isBeingRemoved(def)) continue;
+    if (isBeingRemoved(def) || !isKnownFieldType(def.type)) continue;
     const { value, fromOriginal } = pick(def, entry, original);
     if (value === undefined) {
       out[def.key] = { def, value: undefined, fromOriginal: false };

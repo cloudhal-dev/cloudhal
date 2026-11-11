@@ -1,4 +1,5 @@
 import type { FieldDefinition } from "@cloudhal/core-contracts";
+import { isReferenceFieldType } from "@cloudhal/core-ts/fields";
 import { Badge, Button, DropdownMenu, Text, Tooltip } from "@cloudhal/ui";
 import {
   ArrowDown,
@@ -59,7 +60,10 @@ export function FieldRow({
           <Text as="span" variant="mono-secondary">
             {def.key}
           </Text>
-          <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>
+          {/* RFC-0045: reference and repeater get their words with their blocks (rollout step 6). */}
+          {!isReferenceFieldType(def.type) && (
+            <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>
+          )}
           {def.localized && <Badge variant="info">{t("fields.builder.localized")}</Badge>}
           {def.type !== "boolean" && def.requiredToPublish && (
             <Badge variant="outline">{t("fields.editor.neededToPublish")}</Badge>

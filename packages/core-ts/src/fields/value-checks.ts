@@ -125,7 +125,47 @@ const EXTRA: Partial<Record<FieldDefinition["type"], Extra>> = {
     const list = value as string[];
     return new Set(list).size === list.length ? [] : [issue(path, "each option at most once")];
   },
+  // RFC-0045 §1: a multiple reference names each group once.
+  reference(def, value, path) {
+    if (def.type !== "reference" || !def.multiple) return [];
+    const list = value as string[];
+    return new Set(list).size === list.length ? [] : [issue(path, "each entry at most once")];
+  },
+  // RFC-0045 §1: no empty item; each sub-value gets its type's own checks.
+  repeater(def, value, path, options) {
+    if (def.type !== "repeater" || !Array.isArray(value)) return [];
+    const out: FieldIssue[] = [];
+    (value as Record<string, unknown>[]).forEach((item, i) => {
+      if (Object.keys(item).length === 0) out.push(issue(`${path}/${i}`, "an item needs a value"));
+      for (const sub of def.fields) {
+        const v = item[sub.key];
+        const extra = EXTRA[sub.type];
+        if (v !== undefined && extra)
+          out.push(
+            ...extra(sub as unknown as FieldDefinition, v, `${path}/${i}/${sub.key}`, options),
+          );
+      }
+    });
+    return out;
+  },
 };
+
+/**
+ * What the props subset checks: rich text, top-level or in a repeater item, as "" (the subset caps
+ * strings at 10 000 characters; rich text's own 50 000 limit is checked by `EXTRA`).
+ */
+function forSubset(def: FieldDefinition, value: unknown): unknown {
+  if (def.type === "richText") return typeof value === "string" ? "" : value;
+  if (def.type !== "repeater" || !Array.isArray(value)) return value;
+  const rich = def.fields.filter((s) => s.type === "richText").map((s) => s.key);
+  if (rich.length === 0) return value;
+  return value.map((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return item;
+    const copy: Record<string, unknown> = { ...item };
+    for (const key of rich) if (typeof copy[key] === "string") copy[key] = "";
+    return copy;
+  });
+}
 
 /** Problems with one value (`path` is where it sits, e.g. `fields/startsAt`). */
 export function valueIssues(
@@ -136,8 +176,7 @@ export function valueIssues(
 ): FieldIssue[] {
   if (value === null)
     return [issue(path, "null is never stored: leave the key out to remove the value")];
-  // The subset caps strings at 10 000 characters; rich text's own limit is checked below.
-  const typed = def.type === "richText" && typeof value === "string" ? "" : value;
+  const typed = forSubset(def, value);
   const found = validateProps(
     { type: "object", properties: { v: fieldPropSchema(def) }, additionalProperties: false },
     { v: typed },

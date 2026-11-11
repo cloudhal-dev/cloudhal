@@ -17,7 +17,7 @@ import {
   revertFieldOperation,
   runFieldOperation,
 } from "@cloudhal/core-ts";
-import { FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
+import { type EnabledFieldType, FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { humanizeSlug } from "@cloudhal/core-ts/names";
 import type { CliCommand } from "../cli/types.ts";
@@ -90,7 +90,7 @@ export function parseFieldsArgs(
       };
     case "retype": {
       need(a, b);
-      if (!FIELD_TYPES.includes(b as FieldType))
+      if (!FIELD_TYPES.includes(b as EnabledFieldType))
         throw new Error(`the type is one of ${FIELD_TYPES.join(", ")}`);
       const op: FieldOperation = {
         op: "change_field_type",

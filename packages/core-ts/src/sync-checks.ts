@@ -2,8 +2,8 @@
  * The checks a site bundle passes before anything of it is written (`planImport`): the format, the
  * site node, rows of this site only, every row a valid contract document whose columns agree with
  * its body (precompiled validators only, AGENTS.md rule 6), rows the node batch's keys accept,
- * gates, the time zone, the media and takedowns the bundle lists, and every node body a snapshot
- * references. Worker-safe; not exported from the package (`planImport` is the public surface).
+ * gates, field types (RFC-0045), the time zone, the media and takedowns the bundle lists, and every
+ * node body a snapshot references. Worker-safe; not exported from the package (`planImport` is the public surface).
  */
 import { type Asset, assertValid, type NodeRef } from "@cloudhal/core-contracts";
 import {
@@ -14,9 +14,15 @@ import {
   isTimeZone,
 } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
+import { refuseFieldIssues } from "./fields/refusal.ts";
 import { nodeHash } from "./hash.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
+import {
+  type FieldTypeSupport,
+  referenceTypesSupported,
+  unsupportedFieldTypeIssues,
+} from "./references/definitions.ts";
 import {
   type BundleMedia,
   type NodeRow,
@@ -248,13 +254,32 @@ export async function assertIdsFree(to: StoragePair, bundle: SiteBundle): Promis
 }
 
 /**
+ * RFC-0045 §1: a bundle whose site defines a reference or repeater field (or a marker converting
+ * one) is refused (`fields_unsupported`) unless `support` says the site's renderer reads them.
+ * Without a capability the types are refused, unlike `assertGates`. One check for `importSite`,
+ * so for pull, push, `cloudhal import --replace` and `--revert`, and snapshot restores.
+ */
+export async function assertFieldTypes(
+  siteId: string,
+  site: NodeRow,
+  support: FieldTypeSupport | undefined,
+): Promise<void> {
+  const body = JSON.parse(site.body) as Parameters<typeof unsupportedFieldTypeIssues>[0];
+  const issues = unsupportedFieldTypeIssues(body);
+  if (issues.length === 0 || (await referenceTypesSupported(siteId, support))) return;
+  refuseFieldIssues(issues, { siteId });
+}
+
+/**
  * The checks that need no target, in `importSite`'s order: the format, the site node, rows of this
- * site only, valid rows (`assertValidRows`), distinct rows (`assertDistinctRows`) and gates.
- * Returns the validated site row.
+ * site only, valid rows (`assertValidRows`), distinct rows (`assertDistinctRows`), gates and
+ * field types (`assertFieldTypes`; no `fieldTypes` refuses the RFC-0045 types). Returns the
+ * validated site row.
  */
 export async function checkBundle(
   bundle: SiteBundle,
   gates: GateSupport | undefined,
+  fieldTypes?: FieldTypeSupport | undefined,
 ): Promise<NodeRow> {
   if (bundle.format !== SITE_BUNDLE_FORMAT)
     throw new Error(`unsupported bundle format ${bundle.format}`);
@@ -269,6 +294,7 @@ export async function checkBundle(
   await assertValidRows(siteId, bundle);
   assertDistinctRows(bundle);
   await assertGates(siteId, bundle, gates);
+  await assertFieldTypes(siteId, siteRow, fieldTypes);
   return siteRow;
 }
 
