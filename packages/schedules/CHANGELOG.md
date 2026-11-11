@@ -1,5 +1,14 @@
 # @cloudhal/schedules
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [b6cf70f]
+- Updated dependencies [d107895]
+  - @cloudhal/core-contracts@0.8.0
+  - @cloudhal/storage@0.8.0
+
 ## 0.7.3
 
 ### Patch Changes

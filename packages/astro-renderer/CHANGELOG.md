@@ -1,5 +1,18 @@
 # @cloudhal/astro-renderer
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [dc519c0]
+- Updated dependencies [b6cf70f]
+- Updated dependencies [d107895]
+  - @cloudhal/core-ts@0.8.0
+  - @cloudhal/core-contracts@0.8.0
+  - @cloudhal/storage@0.8.0
+  - @cloudhal/comments@0.8.0
+  - @cloudhal/analytics@0.8.0
+
 ## 0.7.3
 
 ### Patch Changes

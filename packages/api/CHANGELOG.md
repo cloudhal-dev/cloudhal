@@ -1,5 +1,67 @@
 # @cloudhal/api
 
+## 0.8.0
+
+### Minor Changes
+
+- dc519c0: The consumers of reference fields (RFC-0045 §2, rollout step 2b, #114). Both new field types stay refused on every write path in production, so none of this is reachable before rollout step 7. The shared suites run it through `SiteGraphStoreOptions.fieldTypes`.
+  
+  - **Assets inside repeater items.** `fieldAssetRefs` walks items and records `fields.<key>.<sub>` with each use's item path. `fieldAssetIssues` checks sub-field types (a PDF in an image sub-field is refused) and reports at every item that uses the file. Skips match issue paths by prefix, in the store and in the MCP precheck alike, so top-level behaviour is unchanged.
+  - **Field-operation rewrites** write their entries' `entry_refs` rows. A rewrite that changes a reference value is guarded on its target, and every rewrite in a site with reference fields is guarded on the collection's definitions.
+  - **Releases** no longer treat reference values as dependencies, so a referenced entry is neither locked nor required live.
+  - **Language editions** (`forEdition`) keep only what the edition's own write accepts. A reference needs a member of its group in an allowed collection that meets the field's `where`. A single-target field keeps one id, and a multiple field keeps at most `maxItems`. An entry holds at most 100 references, and a repeater at most `maxItems` items. Values are read through a running rename's old key. Everything not carried, including repeater items left empty, is reported with its reason through `onDropped`. A re-save keeps the values the edition entry already holds, as its own write would.
+  - **CLI.** `cloudhal import --dry-run` warns about references that will show nothing, and about originals relinked into another group.
+  - **Cloudflare.** `siteFieldTypeSupport` reads the site Worker's `fields` feature. `FIELDS_FEATURE_VERSION` and `FIELDS_SUPPORTED` are exported from `@cloudhal/core-ts/fields`. Nothing passes them to a store before step 7.
+  - **API.** `GET /sites/:siteId/entries/pick` is the entry picker. Its search folds case and diacritics on both sides with `foldName`, Turkish İ and ı included, and reads at most 1,000 entries per request. When that runs out before 20 matches, it answers `truncated: true` with a `cursor` to continue from. `GET /sites/:siteId/entries/:entryId/references` lists an entry's referrers, each with the language versions that show it. Both need `content:read`.
+
+### Patch Changes
+
+- b6cf70f: The contract gains two field types for collections, `reference` and `repeater` (RFC-0045 §1, rollout step 1, #114). Every write path still refuses them, so existing sites behave exactly as before.
+  
+  - **Contract.** `FieldDefinition` gains `ReferenceField` and `RepeaterField`. A new `SubFieldDefinition` union holds a repeater's sub-fields: scalar values only, so a repeater cannot contain a repeater. `FieldMigration.fromType` gains both types, and `FieldMigration` gains an optional `sub`. There is no `schemaVersion` bump, and existing documents stay valid.
+  - **The gate.** Until rollout step 7 enables them, a reference or repeater definition, or a migration marker that names one, is refused with `fields_unsupported`: API status 409, with an MCP hint. The refusal covers:
+    - site creates and updates, so Studio, MCP and the API;
+    - field operations;
+    - every bundle `importSite` takes: import, pull, push, `cloudhal import --replace` and `--revert`, snapshot restores and edition copies.
+  
+    `checkBundle` gained `assertFieldTypes`. It checks the working site row, and `prepareImport` checks every snapshot site body the import writes once it has been verified (bodies the target already holds are its own), and refuses the types when no capability is given. A push answers `409 fields_unsupported` with its issues, not `400 bad_request`.
+  - **Pure core** (`@cloudhal/core-ts/fields`), with no effect on stored data yet:
+    - the definition rules: `reference_target_unknown`, `where`, `itemLabel`, and caps on sub-fields and leaves;
+    - value checks for both types, the per-item `requiredToPublish`, and `too_many_references`;
+    - `resolveFields` skips types it does not know;
+    - `fieldsJsonSchema(…, { strict: true })` and `strictSchemaCost`;
+    - `pickMember`, `referenceIssues`, and `FIELD_QUERY_OPS` and structured-data entries that make neither type listable or mappable.
+  
+    `FIELD_TYPES` keeps the nine enabled types (`EnabledFieldType`). `ALL_FIELD_TYPES` lists all eleven.
+  - **MCP.** `update_collection`'s input now builds its `$defs` with `defsClosure` and offers only the enabled types. A test checks that every `$ref` in every tool's input and output schema resolves. Before this change, `pnpm gen` alone would have left the input pointing at `$defs` it did not carry.
+  - **Fix, existing sites:** block props and typed-field objects no longer accept keys named after `Object.prototype` members (`constructor`, `toString`, `__proto__`, …) as known props. The props interpreter (`validateProps`) now checks and reads own keys only. Such keys are refused as unknown, and a prop the value leaves out is absent, not the prototype's function. `toLocaleString`, `isPrototypeOf` and `propertyIsEnumerable` join the reserved field keys, beside `toString`, `valueOf` and `hasOwnProperty`.
+- d107895: Reference fields get their index and integrity rules (RFC-0045 §2, rollout step 2a, #114). Both new field types stay refused on every write path in production, so no reference value can exist yet; the store and the shared suites run them through `SiteGraphStoreOptions.fieldTypes` and `CopySiteOptions.fieldTypes`.
+  
+  - **Storage.** Migration `0033_entry_refs` adds `entry_refs`, one row per stored reference value, removed with its site.
+  - **Store.** Entry writes keep the rows in their own batch and check their targets at batch time (`unknown_entry`, `reference_target_moved`). Deletes, moves and group changes are refused while a published entry shows a reference to the group's last usable member (`entry_referenced`, `reference_target_moved`, `field_operation_running`). Imports rebuild the rows beside a written node set. Field operations naming a reference or repeater field answer `field_operation_unsupported`. Definition changes that would strand values are refused (`field_key_in_use`, removed target collections or sub-fields, `multiple`).
+  - **API and MCP.** The new refusals answer 409 or 422, with MCP hints.
+  
+  **Behaviour changes on existing sites** (RFC-0045 decision 3):
+  
+  - relinking a node that other nodes use as their translation group is refused (`translation_group_in_use`, 409);
+  - `resolveFields` and the store read an original's non-localized values only when the original's own group is its id: a node relinked into another group lends them to nobody (OQ 14). The list-values fingerprint format moves to 2, so every listed collection's `entry_list_values` rebuild once (`lists.backfill`); listings scan until they are ready;
+  - a change of `translation.group` alone gets the same source-group check as a source change, and a write joining a group checks that its node is still that group's original;
+  - imports store node bodies in canonical form (the hash is unchanged);
+  - deletes, moves and group changes of entries carry the collections anchor, and entry writes that change `fields` or `collection` carry the definitions anchor: a concurrent change of the collections' settings makes them answer 409, and a retry succeeds. The anchors compare the stored text read when the write is planned, so site rows stored with any key order work;
+  - field operations that would turn a field into a reference or repeater answer `field_operation_unsupported` (409) instead of `fields_unsupported`.
+- Updated dependencies [dc519c0]
+- Updated dependencies [b6cf70f]
+- Updated dependencies [d107895]
+  - @cloudhal/core-ts@0.8.0
+  - @cloudhal/mcp-server@0.8.0
+  - @cloudhal/core-contracts@0.8.0
+  - @cloudhal/storage@0.8.0
+  - @cloudhal/astro-renderer@0.8.0
+  - @cloudhal/comments@0.8.0
+  - @cloudhal/agent-runtime@0.8.0
+  - @cloudhal/analytics@0.8.0
+  - @cloudhal/schedules@0.8.0
+
 ## 0.7.3
 
 ### Patch Changes
