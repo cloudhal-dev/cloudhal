@@ -114,6 +114,9 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   "toString",
   "valueOf",
   "hasOwnProperty",
+  "toLocaleString",
+  "isPrototypeOf",
+  "propertyIsEnumerable",
 ]);
 
 export type FieldIssueCode =
@@ -164,6 +167,10 @@ export function fieldDefinitions(site: SiteFields, collection: string): readonly
 
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** `record[key]` when it is the record's own property; never a prototype member (`isPrototypeOf`). */
+export const ownValue = (record: Readonly<Record<string, unknown>>, key: string): unknown =>
+  Object.hasOwn(record, key) ? record[key] : undefined;
 
 /** Structural equality of JSON values (key order ignored). */
 export function sameJson(a: unknown, b: unknown): boolean {

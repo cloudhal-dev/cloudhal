@@ -4,7 +4,7 @@
  * sub-fields in every item. Pure; the store's target guard (rollout step 2) checks the targets.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { FIELD_LIMITS, type FieldIssue, isRecord } from "../fields/types.ts";
+import { FIELD_LIMITS, type FieldIssue, isRecord, ownValue } from "../fields/types.ts";
 
 /** "Has a value" for one sub-value: not absent, not an empty string. */
 const hasSubValue = (v: unknown): boolean =>
@@ -34,7 +34,7 @@ export function referenceUses(def: FieldDefinition, value: unknown, path: string
   value.forEach((item, i) => {
     if (!isRecord(item)) return;
     for (const sub of subs) {
-      const v = item[sub.key];
+      const v = ownValue(item, sub.key);
       if (typeof v === "string" && sub.type === "reference")
         out.push({ path: `${path}/${i}/${sub.key}`, groupId: v, collections: sub.collections });
     }
@@ -76,7 +76,7 @@ export function requiredSubFieldIssues(
   const out: FieldIssue[] = [];
   value.forEach((item, i) => {
     for (const sub of required)
-      if (!isRecord(item) || !hasSubValue(item[sub.key]))
+      if (!isRecord(item) || !hasSubValue(ownValue(item, sub.key)))
         out.push({
           path: `${path}/${i}/${sub.key}`,
           code: "required_field",

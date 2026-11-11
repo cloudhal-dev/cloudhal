@@ -15,6 +15,7 @@ import {
 } from "./availability.ts";
 import { InvariantError } from "./errors.ts";
 import { refuseFieldIssues } from "./fields/refusal.ts";
+import type { FieldIssue } from "./fields/types.ts";
 import { nodeHash } from "./hash.ts";
 import { validateMenuTree } from "./menu.ts";
 import { isNodeKind, NODE_SPEC, type NodeKind, type NodeTypes } from "./nodes.ts";
@@ -253,36 +254,28 @@ export async function assertIdsFree(to: StoragePair, bundle: SiteBundle): Promis
     }
 }
 
-/**
- * The site bodies a bundle would write: its working site row, and every blob a snapshot ref of
- * kind `site` names (a publish or rollback can make any of them live). Blobs that do not parse are
- * left to `bodiesToWrite`, which refuses them.
- */
-function bundleSiteBodies(bundle: SiteBundle, site: NodeRow): { at: string; body: unknown }[] {
-  const out: { at: string; body: unknown }[] = [{ at: "site", body: JSON.parse(site.body) }];
-  const hashes = new Set<string>();
-  for (const row of bundle.snapshots)
-    for (const ref of snapshotRefs(row)) if (ref.kind === "site") hashes.add(ref.hash);
-  for (const hash of [...hashes].sort()) {
-    const text = bundle.blobs[hash];
-    if (text === undefined) continue;
-    try {
-      const body: unknown = JSON.parse(text);
-      if (typeof body === "object" && body !== null) out.push({ at: `blobs/${hash}`, body });
-    } catch {
-      // not JSON: bodiesToWrite refuses it without quoting it
-    }
-  }
-  return out;
+/** At most this many issues travel in a field-type refusal's `details.issues` (with `total`). */
+const MAX_TYPE_ISSUES = 50;
+
+type SiteBody = Parameters<typeof unsupportedFieldTypeIssues>[0];
+
+/** The gate's refusal over `issues`, unless `support` allows the types for the site. */
+async function refuseUnsupportedTypes(
+  siteId: string,
+  issues: readonly FieldIssue[],
+  support: FieldTypeSupport | undefined,
+): Promise<void> {
+  if (issues.length === 0 || (await referenceTypesSupported(siteId, support))) return;
+  refuseFieldIssues(issues.slice(0, MAX_TYPE_ISSUES), { siteId, total: issues.length });
 }
 
 /**
- * RFC-0045 §1: a bundle whose site, working copy or any snapshot's, defines a reference or
- * repeater field (or a marker converting one) is refused (`fields_unsupported`) unless `support`
- * says the site's renderer reads them. Without a capability the types are refused, unlike
- * `assertGates`. One check for `importSite`, so for pull, push, `cloudhal import --replace` and
- * `--revert`, and snapshot restores. Entry values need no check of their own: they mean nothing
- * without a definition, and every site body that could define one is checked here.
+ * RFC-0045 §1: a bundle whose working site defines a reference or repeater field (or a marker
+ * converting one) is refused (`fields_unsupported`) unless `support` says the site's renderer
+ * reads them. Without a capability the types are refused, unlike `assertGates`. One check for
+ * `importSite`, so for pull, push, `cloudhal import --replace` and `--revert`, and snapshot
+ * restores. The site bodies of the bundle's snapshots are checked by
+ * `assertSnapshotFieldTypes`, once `bodiesToWrite` has verified them.
  */
 export async function assertFieldTypes(
   siteId: string,
@@ -291,13 +284,31 @@ export async function assertFieldTypes(
 ): Promise<void> {
   const site = bundle.nodes.find((n) => n.kind === "site" && n.id === siteId);
   if (!site) return;
-  const issues = bundleSiteBodies(bundle, site).flatMap(({ at, body }) =>
-    unsupportedFieldTypeIssues(body as Parameters<typeof unsupportedFieldTypeIssues>[0]).map((i) =>
-      at === "site" ? i : { ...i, path: `${at}/${i.path}` },
-    ),
-  );
-  if (issues.length === 0 || (await referenceTypesSupported(siteId, support))) return;
-  refuseFieldIssues(issues, { siteId });
+  const issues = unsupportedFieldTypeIssues(JSON.parse(site.body) as SiteBody);
+  await refuseUnsupportedTypes(siteId, issues, support);
+}
+
+/**
+ * RFC-0045 §1 for snapshots: the site bodies an import writes (hash-checked and validated as the
+ * site of every snapshot ref to them, `bodiesToWrite`), since a publish or rollback can make any
+ * of them live. Bodies the target already holds are its own and are not written, so not checked.
+ * Entry bodies need no check: a value means nothing without a definition.
+ */
+export async function assertSnapshotFieldTypes(
+  siteId: string,
+  written: readonly { hash: string; body: unknown }[],
+  siteHashes: ReadonlySet<string>,
+  support: FieldTypeSupport | undefined,
+): Promise<void> {
+  const issues = written
+    .filter((b) => siteHashes.has(b.hash))
+    .flatMap((b) =>
+      unsupportedFieldTypeIssues(b.body as SiteBody).map((i) => ({
+        ...i,
+        path: `blobs/${b.hash}/${i.path}`,
+      })),
+    );
+  await refuseUnsupportedTypes(siteId, issues, support);
 }
 
 /**

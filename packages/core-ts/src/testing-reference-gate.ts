@@ -181,6 +181,27 @@ export function referenceGateSuite(ctx: SuiteContext): void {
             "fields_unsupported",
           );
       }
+      // an invalid site body is refused as before, by its schema, never by the gate's walk
+      for (const broken of [{ events: { fields: {} } }, { events: { fields: [null] } }]) {
+        const bad = await withSnapshotSite(bundle, snap.id, broken as never);
+        await expect(importSite(storage(), bad, { mode: "replace" })).rejects.toThrow(
+          /is not a valid site/,
+        );
+      }
+      // a body the target already holds is its own: a forged text under its hash is not read
+      const forged = structuredClone(bundle);
+      const ref = (
+        JSON.parse(forged.snapshots.find((r) => r.id === snap.id)?.body ?? "{}") as {
+          nodes: NodeRef[];
+        }
+      ).nodes.find((r) => r.kind === "site");
+      if (!ref) throw new Error("no site ref");
+      const text = forged.blobs[ref.hash] ?? "{}";
+      forged.blobs[ref.hash] = canonicalJson({
+        ...(JSON.parse(text) as Site),
+        collections: events([TEXT, VENUE]),
+      });
+      expect((await importSite(storage(), forged)).nodes.unchanged).toBe(true);
       // the same rewrite with clean definitions passes the gate (and fails later, elsewhere)
       const clean = await withSnapshotSite(bundle, snap.id, events([TEXT]));
       const later = await importSite(storage(), clean, { mode: "replace" }).then(

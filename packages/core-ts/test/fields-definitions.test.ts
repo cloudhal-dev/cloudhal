@@ -59,7 +59,8 @@ describe("checkFieldDefinitions", () => {
         }),
       ]);
     }
-    expect(RESERVED_FIELD_KEYS.size).toBe(32);
+    // RFC-0045 review: three more Object.prototype names (toLocaleString, isPrototypeOf, propertyIsEnumerable)
+    expect(RESERVED_FIELD_KEYS.size).toBe(35);
   });
 
   it("reserves every ContentEntry property of the contract", async () => {

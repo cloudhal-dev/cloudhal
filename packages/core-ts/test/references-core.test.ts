@@ -281,6 +281,45 @@ describe("values", () => {
     expect(at([{ abstract: "a".repeat(50_001) }])).toEqual(["fields/speakers/0/abstract"]);
   });
 
+  it("reads only an item's own values, so prototype-named sub-fields are simply absent", () => {
+    const odd = {
+      ...SPEAKERS,
+      fields: ["isPrototypeOf", "toLocaleString", "propertyIsEnumerable"].map((key) => ({
+        key,
+        type: "text",
+        labels: L(key),
+      })),
+    } as unknown as FieldDefinition;
+    expect(valueIssues(odd, [{ isPrototypeOf: "x" }], "fields/odd")).toEqual([]);
+    expect(
+      valueIssues(odd, [{ toLocaleString: "y" }, { propertyIsEnumerable: "z" }], "fields/odd"),
+    ).toEqual([]);
+    // a required prop the value leaves out is missing, not Object.prototype's function
+    expect(
+      validateProps(
+        {
+          type: "object",
+          properties: { isPrototypeOf: { type: "string" as const } },
+          required: ["isPrototypeOf"],
+          additionalProperties: false,
+        },
+        {},
+      ),
+    ).toEqual([{ path: "isPrototypeOf", message: "required" }]);
+    // and the names are reserved as keys, top-level and in a repeater
+    const reserved = checkFieldDefinitions(
+      siteWith([odd, { ...STARTS, key: "isPrototypeOf" }]),
+      undefined,
+      ENABLED,
+    );
+    expect(reserved.map((i) => i.path)).toEqual([
+      "collections/events/fields/0/fields/0/key",
+      "collections/events/fields/0/fields/1/key",
+      "collections/events/fields/0/fields/2/key",
+      "collections/events/fields/1/key",
+    ]);
+  });
+
   it("caps references per entry across fields and items", () => {
     const many = {
       key: "many",

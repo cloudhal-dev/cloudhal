@@ -9,7 +9,7 @@ import { bodyDirectives } from "../body-blocks.ts";
 import { checkDirective } from "../directives.ts";
 import { checkBodySurfaces, createCatalog } from "../surfaces.ts";
 import { fieldPropSchema } from "./props.ts";
-import { FIELD_LIMITS, type FieldIssue } from "./types.ts";
+import { FIELD_LIMITS, type FieldIssue, ownValue } from "./types.ts";
 
 export interface ValueCheckOptions {
   /** Directives and surface fences in rich text are checked against it (absent: shape only). */
@@ -136,10 +136,10 @@ const EXTRA: Partial<Record<FieldDefinition["type"], Extra>> = {
     if (def.type !== "repeater" || !Array.isArray(value)) return [];
     const out: FieldIssue[] = [];
     (value as Record<string, unknown>[]).forEach((item, i) => {
-      if (!def.fields.some((sub) => Object.hasOwn(item, sub.key) && item[sub.key] !== undefined))
+      if (!def.fields.some((sub) => ownValue(item, sub.key) !== undefined))
         out.push(issue(`${path}/${i}`, "an item needs a value"));
       for (const sub of def.fields) {
-        const v = item[sub.key];
+        const v = ownValue(item, sub.key);
         const extra = EXTRA[sub.type];
         if (v !== undefined && extra)
           out.push(
