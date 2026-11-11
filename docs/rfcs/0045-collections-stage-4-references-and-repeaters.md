@@ -1,6 +1,6 @@
 # RFC-0045: Collections stage 4: reference fields and repeaters
 
-- Status: Accepted (2026-11-10, by Halil), with the three Owner decisions ratified; see "Decisions (2026-11-10)". ADR-0046 landed with rollout step 2.
+- Status: Accepted (2026-11-10, by Halil), with the three Owner decisions ratified; see "Decisions (2026-11-10)". ADR-0046 lands with rollout step 2a; step 2 is split into 2a (store and integrity) and 2b (its consumers), see PR #205.
   Drafted in PR #193 and revised six times after an independent review and five verification passes; the review log and the implementation watch list are at the end.
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-10
 - Related:
