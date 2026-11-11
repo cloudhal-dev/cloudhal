@@ -1,15 +1,17 @@
 /**
  * `asset_refs` for a whole site from its node rows (RFC-0004 §4.4): sync import and repair. Entry
  * rows also count their typed fields' references (RFC-0041 §2) when the site's own row is among
- * them. Only references to assets of the same site are recorded (RFC-0045 §2.5): the `INSERT`
- * joins `nodes`, so a foreign archive naming another site's asset neither blocks that asset's
- * delete nor hides it from that site's unused list. Run it only in a batch that also writes the
- * site's node set (after the node `INSERT`s): a rebuild beside an unchanged node set would replace
- * rows a concurrent write committed with plan-time ones (#196). Worker-safe.
+ * them, read through a running rename's `migration.fromKey` like `resolveFields` (an archive
+ * exported mid-operation keeps the rows of entries not rewritten yet). Only references to assets
+ * of the same site are recorded (RFC-0045 §2.5): the `INSERT` joins `nodes`, so a foreign archive
+ * naming another site's asset neither blocks that asset's delete nor hides it from that site's
+ * unused list. Run it only in a batch that also writes the site's node set (after the node
+ * `INSERT`s): a rebuild beside an unchanged node set would replace rows a concurrent write
+ * committed with plan-time ones (#196). Worker-safe.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
-import { fieldAssetRefs, siteFieldDefinitions } from "./field-refs.ts";
+import { fieldAssetRefs, migratedFieldValues, siteFieldDefinitions } from "./field-refs.ts";
 import { assetRefsOf } from "./refs.ts";
 
 /** Each rebuild `INSERT` stays below this many bytes, SQL and parameters together (D1: 100 KB). */
@@ -57,7 +59,8 @@ export function refsRebuild(
     const refs = assetRefsOf(r.kind, node);
     if (r.kind === "contentEntry") {
       const entry = node as ContentEntry;
-      refs.push(...fieldAssetRefs(defs[entry.collection] ?? [], entry.fields));
+      const own = defs[entry.collection] ?? [];
+      refs.push(...fieldAssetRefs(own, migratedFieldValues(own, entry.fields)));
     }
     for (const ref of refs)
       all.add(JSON.stringify({ a: ref.assetId, n: r.id, k: r.kind, f: ref.field }));

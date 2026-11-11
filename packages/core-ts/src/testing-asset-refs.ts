@@ -104,6 +104,37 @@ export function assetRefsSuite(ctx: SuiteContext): void {
       expect(await store().getAsset(theirs.id)).toBeUndefined();
     });
 
+    it("a rebuild mid-rename reads entries not rewritten yet through the marker's fromKey", async () => {
+      const { site: s, entry } = await site("rename");
+      const asset = await upload(s.id);
+      type Row = { id: string; kind: string; body: string };
+      const rows = await ctx
+        .sql()
+        .all<Row>("SELECT id, kind, body FROM nodes WHERE site_id = ?", [s.id]);
+      // Phase A of `rename_field posts.poster → cover` ran; phase B has not reached the entry.
+      const cover = {
+        key: "cover",
+        type: "image",
+        labels: { en: { label: "Cover" } },
+        localized: false,
+        migration: { id: "snap_01HZX8K3Q9CD", fromKey: "poster" },
+      };
+      const siteRow = rows.find((r) => r.kind === "site") as Row;
+      const body = JSON.parse(siteRow.body) as Site;
+      const posts = { ...body.collections?.[entry.collection], fields: [cover] };
+      siteRow.body = JSON.stringify({
+        ...body,
+        collections: { ...body.collections, [entry.collection]: posts },
+      });
+      const entryRow = rows.find((r) => r.id === entry.id) as Row;
+      entryRow.body = JSON.stringify({
+        ...JSON.parse(entryRow.body),
+        fields: { poster: asset.id },
+      });
+      await ctx.sql().batch(refsRebuild(s.id, rows));
+      expect(await rowsOf(s.id)).toEqual([{ asset_id: asset.id, node_id: entry.id }]);
+    });
+
     it("a large rebuild stays under the statement size limit, in few statements", async () => {
       const { site: s } = await site("large");
       const asset = await upload(s.id);

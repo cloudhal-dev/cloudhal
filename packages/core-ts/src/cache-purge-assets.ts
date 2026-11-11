@@ -4,13 +4,14 @@
  * since they resolve its URL, alt, caption and size when they render: the node tag of every entry
  * and page that refers to it, and the term tag (with ancestors) of every term that does. An
  * entry's typed fields count too (RFC-0045 §2.5): an `image` field's value and a `richText`
- * field's `asset:` links, read through the target snapshot's own field definitions. A newly added
+ * field's `asset:` links, read through the target snapshot's own field definitions (and, while a
+ * rename runs, through its `migration.fromKey`, as the renderer reads them). A newly added
  * asset purges nothing (404s are never cached, and whatever starts showing it changed itself).
  * Part of `planCachePurge` (`cache-purge.ts`); reads through its counted, hash-keyed `read`.
  */
 import type { Asset, ContentEntry, NodeRef, Site, Snapshot } from "@cloudhal/core-contracts";
 import { assetCacheTag, nodeCacheTag, termCacheTag } from "./cache-tags.ts";
-import { fieldAssetRefs, siteFieldDefinitions } from "./media/field-refs.ts";
+import { fieldAssetRefs, migratedFieldValues, siteFieldDefinitions } from "./media/field-refs.ts";
 import { type AssetRefUse, assetRefsOf } from "./media/refs.ts";
 
 export interface AssetPurgeInput {
@@ -67,6 +68,7 @@ async function referencesIn(
     const refs = assetRefsOf(kind, body);
     if (kind !== "contentEntry") return refs;
     const entry = body as ContentEntry;
-    return [...refs, ...fieldAssetRefs(defs[entry.collection] ?? [], entry.fields)];
+    const own = defs[entry.collection] ?? [];
+    return [...refs, ...fieldAssetRefs(own, migratedFieldValues(own, entry.fields))];
   };
 }

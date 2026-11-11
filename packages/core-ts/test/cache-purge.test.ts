@@ -13,6 +13,7 @@ import {
   siteCacheTag,
   termCacheTag,
 } from "../src/cache-tags.ts";
+import { runFieldOperation } from "../src/fields-operations/index.ts";
 import { PNG_1X1 } from "../src/media/fixtures.ts";
 import { seedStarterSite } from "../src/seed.ts";
 import { type PublishChange, SiteGraphStore } from "../src/store.ts";
@@ -214,6 +215,50 @@ describe("planCachePurge", () => {
     // Only the field shows the asset: its new slug moves the URL the article renders.
     await store.updateAsset({ ...asset, slug: "poster-renamed" });
     expect(await tagsOf()).toEqual([assetCacheTag(asset.id), nodeCacheTag(hello.id)].sort());
+  });
+
+  it("media (RFC-0045 §2.5): mid-rename, entries still holding the old key are purged too", async () => {
+    const { asset } = await store.ingestAsset({
+      siteId: site.id,
+      bytes: PNG_1X1,
+      filename: "poster.png",
+      uploadedBy: human,
+      source: { kind: "upload" },
+      fields: { decorative: true },
+    });
+    const poster = {
+      key: "poster",
+      type: "image",
+      labels: { en: { label: "Poster" } },
+      localized: false,
+    } as FieldDefinition;
+    const s = (await store.getSite(site.id)) as Site;
+    const posts = { ...s.collections?.posts, fields: [poster] } as never;
+    await store.updateSite({ ...s, collections: { ...s.collections, posts } });
+    const shown = [hello.id];
+    await store.updateContentEntry({ ...hello, fields: { poster: asset.id } });
+    for (const slug of ["second", "third"]) {
+      const e = await entry(slug, hello.terms, "published");
+      await store.updateContentEntry({ ...e, fields: { poster: asset.id } });
+      shown.push(e.id);
+    }
+    // Phase A wrote the marker (`cover`, from `poster`); phase B stopped on its budget.
+    const part = await runFieldOperation(
+      store,
+      site.id,
+      { op: "rename_field", collection: "posts", from: "poster", to: "cover" },
+      { actor: human, budget: { entries: 1 } },
+    );
+    expect(part.done).toBe(false);
+    const stale = [];
+    for (const id of shown)
+      if ((await store.getContentEntry(id))?.fields?.poster !== undefined) stale.push(id);
+    expect(stale.length).toBeGreaterThan(0);
+    await publish();
+    await store.updateAsset({ ...asset, slug: "poster-renamed" });
+    expect(await tagsOf()).toEqual(
+      [assetCacheTag(asset.id), ...shown.map((id) => nodeCacheTag(id))].sort(),
+    );
   });
 
   it("structure purges the site: pages, redirects, term slugs, the site's settings", async () => {

@@ -8,3 +8,4 @@
 - The rebuild records only references to assets of the same site, and splits its `INSERT` so each statement stays below 90 KB (large sites could exceed D1's statement limit). Its statements count against the import's 1,000-statement cap.
 - Deleting an asset and the media library's "unused" filter look only at references from the asset's own site, so a foreign archive naming another site's asset no longer blocks its delete or hides it.
 - A publish that changes an asset now also purges the pages that show it through a typed `image` or `richText` field (RFC-0041), not only through covers, bodies and sections.
+- While a field rename runs, entries not rewritten yet still hold the old key. Both the rebuild and the purge planner now read those entries through the definition's `migration.fromKey`, as the renderer does. An archive exported mid-rename keeps those entries' rows, and an asset change purges their pages.
