@@ -48,7 +48,6 @@ import {
   type PinnedItem,
   pinItems,
   RELEASE_LEASE_MS,
-  referencedNodeIds,
   releaseWhen,
   runClaimedRelease,
   runDue,
@@ -74,6 +73,7 @@ import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
 import * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
+import { releaseDepsOf } from "./release-deps.ts";
 import { releaseExecutor } from "./release-executor.ts";
 import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
@@ -468,7 +468,7 @@ export class ReleaseService {
       items,
       working,
       live: liveRefs,
-      depsOf: async (ref) => referencedNodeIds(JSON.parse(await bodyOf(ref))),
+      depsOf: releaseDepsOf(site, bodyOf), // RFC-0045 §2.7: references are not dependencies
       blobOf: async (ref) => {
         const a = JSON.parse(await bodyOf(ref)) as { storage?: { kind?: string }; sha256?: string };
         return a.storage?.kind === "blob" ? a.sha256 : undefined;

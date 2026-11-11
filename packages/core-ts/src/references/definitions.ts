@@ -26,6 +26,18 @@ export interface FieldTypeSupport {
   supported(siteId: string): boolean | Promise<boolean>;
 }
 
+/**
+ * The `fields` value of `GET /__cloudhal/features` from which a site Worker reads reference and
+ * repeater fields (rollout step 3 reports it; step 7 starts asking it).
+ */
+export const FIELDS_FEATURE_VERSION = 2;
+
+/**
+ * The renderer in this process reads both types (Node: `cloudhal dev`, `studio`, self-host), the
+ * twin of `GATES_ENFORCED`. Not passed by any production caller before rollout step 7.
+ */
+export const FIELDS_SUPPORTED: FieldTypeSupport = { supported: () => true };
+
 /** True only when a capability is given and says yes for the site. */
 export async function referenceTypesSupported(
   siteId: string,

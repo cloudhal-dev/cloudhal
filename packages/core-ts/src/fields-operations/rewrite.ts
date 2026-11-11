@@ -6,6 +6,7 @@
  * at the source's new hash in the same pass, guarded on that new hash (rule 4), so an operation
  * never makes translations look stale. `asset_refs` rows under `fields.*` follow each entry.
  */
+
 import {
   assertValid,
   type ContentEntry,
@@ -13,12 +14,16 @@ import {
   type Site,
 } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
+import { ConflictError } from "../errors.ts";
 import type { ValueChange } from "../fields/migration.ts";
 import { sameJson } from "../fields/types.ts";
 import { nodeHash } from "../hash.ts";
 import { passResetStatement } from "../list-values/state-sql.ts";
 import { fieldAssetRefs } from "../media/field-refs.ts";
 import { and, type Cond, casUpdateStatement, hashIs } from "../node-sql.ts";
+import { hasReferenceFields } from "../references/issues.ts";
+import { definitionsAnchor } from "../references/sql.ts";
+import { entryRefStatements, rewriteTargetGuard } from "../references/writer.ts";
 import { fieldRefStatements } from "../store/entry-fields.ts";
 import { forwardedSource } from "../store/source-forward.ts";
 import { FIELD_OPERATION_BATCH, type OperationContext } from "./types.ts";
@@ -145,17 +150,29 @@ async function planPass(input: PassInput, ts: string) {
   return { planned: [...planned.values()], decisions };
 }
 
-/** The statements of one entry: its CAS, then its `fields.*` asset rows when values moved. */
-async function statementsOf(input: PassInput, p: Planned): Promise<SqlStatement[]> {
+/**
+ * The statements of one entry: its CAS, then its `fields.*` asset rows and `entry_refs` rows
+ * when values moved. `anchor` is the pass's definitions anchor (sites with reference fields).
+ */
+async function statementsOf(
+  input: PassInput,
+  p: Planned,
+  anchor: Cond | undefined,
+): Promise<SqlStatement[]> {
+  // RFC-0045 §2.6: a rewrite that changes reference values writes them only under the target guard.
+  const targets = p.fieldsChanged
+    ? rewriteTargetGuard(input.site, p.next, p.stored.entry)
+    : undefined;
   const cas = await casUpdateStatement(
     "contentEntry",
     p.next,
     p.stored.entry.rev,
-    and(input.guard, p.anchor),
+    and(input.guard, p.anchor, targets, anchor),
   );
   if (!p.fieldsChanged) return [cas];
   const refs = fieldAssetRefs(input.defs, p.next.fields);
-  return [cas, ...fieldRefStatements(input.site.id, p.next.id, refs, p.hash)];
+  const rows = hasReferenceFields(input.site) ? entryRefStatements(input.site, p.next, p.hash) : [];
+  return [cas, ...fieldRefStatements(input.site.id, p.next.id, refs, p.hash), ...rows];
 }
 
 const outOfBudget = (ctx: OperationContext, done: number) =>
@@ -177,6 +194,20 @@ export async function rewritePass(input: PassInput): Promise<PassResult> {
   const { ctx } = input;
   const { planned, decisions } = await planPass(input, ctx.stamp());
   const out: PassResult = { rewritten: 0, skipped: [], written: [], exhausted: false };
+  // RFC-0045 §2.1: rows and target pairs come from the pass's definitions, so anchor them.
+  let anchor: Cond | undefined;
+  if (hasReferenceFields(input.site))
+    try {
+      anchor = await definitionsAnchor(ctx.store.sql, input.site, input.lists.collection);
+    } catch (e) {
+      if (!(e instanceof ConflictError)) throw e;
+      for (const p of planned)
+        out.skipped.push({
+          entryId: p.next.id,
+          reason: "the site changed during the operation; retried",
+        });
+      return out;
+    }
   let i = 0;
   while (i < planned.length) {
     if (outOfBudget(ctx, input.done + out.rewritten)) {
@@ -189,7 +220,7 @@ export async function rewritePass(input: PassInput): Promise<PassResult> {
     while (i < planned.length && statements.length < FIELD_OPERATION_BATCH && heads.length < room) {
       const p = planned[i++] as Planned;
       heads.push({ index: statements.length, p });
-      statements.push(...(await statementsOf(input, p)));
+      statements.push(...(await statementsOf(input, p, anchor)));
     }
     const batch = heads.map((h) => h.p);
     const ids = batch.map((p) => p.next.id);

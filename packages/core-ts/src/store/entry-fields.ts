@@ -106,7 +106,8 @@ export async function planEntryFields(
   const kept = stored
     ? fieldAssetRefs(fieldDefinitions(site, stored.collection), stored.fields)
     : [];
-  const skip = new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/")));
+  // RFC-0045 §2.5: issue paths as they are; `fieldAssetIssues` matches them by prefix.
+  const skip = new Set(issues.map((i) => i.path));
   const lookup = (ids: readonly string[]) => ctx.assets.getAssets(site.id, ids);
   issues.push(...(await fieldAssetIssues({ defs, refs, kept, lookup, skip })));
   issues.push(...checkRequiredToPublish(site, draft, original));

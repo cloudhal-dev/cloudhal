@@ -12,12 +12,14 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
 import { ConflictError } from "../src/errors.ts";
 import { canonicalJson } from "../src/hash.ts";
+import { fieldAssetIssues, fieldAssetRefs } from "../src/media/field-refs.ts";
 import { REFS_STATEMENT_BYTES } from "../src/media/refs-rebuild.ts";
 import { mapUniqueViolation } from "../src/node-sql.ts";
 import { entryRefsRebuild } from "../src/references/rebuild.ts";
 import { entryRefRows } from "../src/references/rows.ts";
 import { collectionsAnchor, definitionsAnchor } from "../src/references/sql.ts";
 import { entryRefStatements } from "../src/references/writer.ts";
+import { releaseDepsOf, stripReferences } from "../src/release-deps.ts";
 
 const FIXTURES = join(import.meta.dirname, "../../core-contracts/fixtures/valid/site");
 const L = (label: string) => ({ en: { label } });
@@ -236,5 +238,99 @@ describe("the rows INSERT reads shared from the site row at batch time", () => {
     const text = { key: "venue", type: "text", labels: L("venue"), localized: false };
     await expect(run([text])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
     await expect(run([])).rejects.toThrow(/NOT NULL constraint failed: entry_refs\.shared/);
+  });
+});
+
+describe("release dependencies (§2.7)", () => {
+  const site = {
+    collections: {
+      events: {
+        fields: [
+          {
+            key: "place",
+            type: "reference",
+            labels: L("Venue"),
+            localized: false,
+            collections: ["places"],
+            migration: { id: "snap_01HZX8K3Q9MG", fromKey: "venue" },
+          },
+          {
+            key: "speakers",
+            type: "repeater",
+            labels: L("Speakers"),
+            localized: false,
+            fields: [
+              { key: "person", type: "reference", labels: L("Person"), collections: ["people"] },
+              { key: "photo", type: "image", labels: L("Photo") },
+            ],
+          },
+        ],
+      },
+    },
+  } as unknown as Site;
+  const body = {
+    id: "entry_01HZX8K3QSELF",
+    collection: "events",
+    coverImage: { assetId: "asset_01HZX8K3QCOVR" },
+    terms: { tag: { ids: ["term_01HZX8K3QTAG1"] } },
+    fields: {
+      venue: "entry_01HZX8K3QVENU",
+      speakers: [{ person: "entry_01HZX8K3QPERS", photo: "asset_01HZX8K3QFACE" }],
+    },
+  };
+
+  it("drops reference values, top level and in items, and keeps every other dependency", async () => {
+    const deps = releaseDepsOf(site, async () => JSON.stringify(body));
+    expect(await deps({ id: body.id, kind: "contentEntry", rev: 1, hash: "h" })).toEqual([
+      "asset_01HZX8K3QCOVR",
+      "asset_01HZX8K3QFACE",
+      "term_01HZX8K3QTAG1",
+    ]);
+    // other kinds are walked as before
+    expect(await deps({ id: "page_01HZX8K3QPAGE", kind: "page", rev: 1, hash: "h" })).toContain(
+      "entry_01HZX8K3QVENU",
+    );
+  });
+
+  it("leaves bodies without reference definitions as they are", () => {
+    expect(stripReferences({ collections: {} }, body)).toBe(body);
+  });
+});
+
+describe("asset issues inside repeater items (§2.5)", () => {
+  const speakers: FieldDefinition = {
+    key: "speakers",
+    type: "repeater",
+    labels: L("Speakers"),
+    localized: false,
+    fields: [
+      { key: "talk", type: "text", labels: L("Talk") },
+      { key: "photo", type: "image", labels: L("Photo") },
+    ],
+  };
+  const CSV = "asset_01HZX8K3QCSV1";
+  const lookup = async () => new Map([[CSV, { id: CSV, kind: "file", status: "active" } as never]]);
+  const values = { speakers: [{ photo: CSV }, { talk: "x" }, { photo: CSV }] };
+
+  it("one row per asset and field, every use's path kept", () => {
+    expect(fieldAssetRefs([speakers], values)).toEqual([
+      {
+        assetId: CSV,
+        field: "fields.speakers.photo",
+        path: "fields/speakers/0/photo",
+        paths: ["fields/speakers/0/photo", "fields/speakers/2/photo"],
+      },
+    ]);
+  });
+
+  it("reports each use, and skips only the uses under a skip path", async () => {
+    const refs = fieldAssetRefs([speakers], values);
+    const paths = async (skip: string[]) =>
+      (
+        await fieldAssetIssues({ defs: [speakers], refs, kept: [], lookup, skip: new Set(skip) })
+      ).map((i) => i.path);
+    expect(await paths([])).toEqual(["fields/speakers/0/photo", "fields/speakers/2/photo"]);
+    expect(await paths(["fields/speakers/0"])).toEqual(["fields/speakers/2/photo"]);
+    expect(await paths(["fields/speakers"])).toEqual([]);
   });
 });

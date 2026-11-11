@@ -172,6 +172,9 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   ["POST", `${S}/entries/:entryId/preview`, "content:read"],
   // the body editor's inline preview of one ```surface (writes nothing)
   ["POST", `${S}/entries/preview-fragment`, "content:read"],
+  // RFC-0045 §5: the entry picker and an entry's referrers
+  ["GET", `${S}/entries/pick`, "content:read"],
+  ["GET", `${S}/entries/:entryId/references`, "content:read"],
   ["GET", `${S}/entries/:entryId`, "content:read"],
   ["PUT", `${S}/entries/:entryId`, "content:draft:own"],
   ["DELETE", `${S}/entries/:entryId`, "content:draft:own"],

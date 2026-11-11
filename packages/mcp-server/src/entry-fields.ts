@@ -111,7 +111,8 @@ export async function checkEntryFields(ctx: ToolContext, check: FieldsCheck): Pr
       refs: fieldAssetRefs(defs, values),
       kept: stored ? fieldAssetRefs(fieldDefinitions(site, stored.collection), stored.fields) : [],
       lookup: (ids) => ctx.store.getAssets(site.id, ids),
-      skip: new Set(issues.map((i) => i.path.split("/").slice(0, 2).join("/"))),
+      // RFC-0045 §2.5: issue paths as they are, as the store's check builds them.
+      skip: new Set(issues.map((i) => i.path)),
     })),
   );
   issues.push(...checkRequiredToPublish(site, { ...next, fields: values }, original));

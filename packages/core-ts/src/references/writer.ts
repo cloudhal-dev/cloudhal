@@ -18,51 +18,17 @@
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
-import { matchesFieldQuery, parseFieldQuery } from "../fields/query.ts";
 import { refuseFieldIssues } from "../fields/refusal.ts";
-import { resolveFields } from "../fields/resolve.ts";
 import { type FieldIssue, fieldDefinitions, isRecord, sameJson } from "../fields/types.ts";
 import { and, type Cond } from "../node-sql.ts";
 import { hasReferenceFields } from "./issues.ts";
 import { memberGroup } from "./members.ts";
 import { definitionsPath, entryRefRows, holdsReferences } from "./rows.ts";
 import { definitionsAnchor, type TargetPair, targetGuard } from "./sql.ts";
+import { type MemberRow, readMembers, targetProblem } from "./targets.ts";
 import { type ReferenceUse, referenceUses } from "./values.ts";
 
 const ANCHOR = "EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)";
-
-interface MemberRow {
-  id: string;
-  group: string;
-  collection: string;
-  status: string;
-  body: ContentEntry;
-}
-
-/** The members of `groups` (and the nodes named by id) in this site, one read. */
-async function readMembers(
-  sql: SqlDriver,
-  siteId: string,
-  ids: readonly string[],
-): Promise<MemberRow[]> {
-  if (ids.length === 0) return [];
-  const rows = await sql.all<{ id: string; body: string }>(
-    `SELECT n.id AS id, n.body AS body FROM nodes n WHERE n.site_id = ? AND n.kind = 'contentEntry'
-      AND (n.id IN (SELECT value FROM json_each(?))
-           OR json_extract(n.body, '$.translation.group') IN (SELECT value FROM json_each(?)))`,
-    [siteId, JSON.stringify(ids), JSON.stringify(ids)],
-  );
-  return rows.map((r) => {
-    const body = JSON.parse(r.body) as ContentEntry;
-    return {
-      id: r.id,
-      group: memberGroup(body),
-      collection: body.collection,
-      status: body.status,
-      body,
-    };
-  });
-}
 
 /** Every group id a body's values name under `defs`. */
 const namedIds = (defs: readonly FieldDefinition[], values: unknown): string[] => [
@@ -156,48 +122,35 @@ function guardedUses(
   return out;
 }
 
-/** Why `use` fails against the members read; undefined when a member satisfies it. */
+/** Why `use` fails against the members read (`targetProblem`); undefined when it does not. */
 function useIssue(site: Site, use: Use, members: readonly MemberRow[]): FieldIssue | undefined {
-  const of = members.filter((m) => m.group === use.groupId);
-  const allowed = of.filter((m) => use.collections.includes(m.collection));
-  const usable = allowed.filter((m) => !use.fresh || m.status !== "archived");
-  if (usable.length === 0) {
+  const where = use.def.type === "reference" ? use.def.where : undefined;
+  const problem = targetProblem(site, { ...use, where }, members);
+  const issue = (code: FieldIssue["code"], message: string): FieldIssue => ({
+    path: use.path,
+    code,
+    message,
+  });
+  switch (problem) {
+    case undefined:
+      return undefined;
     // A write naming an entry outside the field's collections: a value to fix (422), not the
     // move race's 409 `reference_target_moved`.
-    if (of.length > 0 && allowed.length === 0)
-      return {
-        path: use.path,
-        code: "unknown_entry",
-        message: `${use.groupId} has no entry in ${use.collections.join(", ")} of this site; pick one from those collections`,
-      };
-    return {
-      path: use.path,
-      code: "unknown_entry",
-      message:
-        allowed.length > 0
-          ? `${use.groupId} is archived; choose an entry that is not`
-          : `${use.groupId} is not an entry of this site`,
-    };
+    case "collection":
+      return issue(
+        "unknown_entry",
+        `${use.groupId} has no entry in ${use.collections.join(", ")} of this site; pick one from those collections`,
+      );
+    case "archived":
+      return issue("unknown_entry", `${use.groupId} is archived; choose an entry that is not`);
+    case "where":
+      return issue(
+        "invalid_value",
+        `${use.groupId} does not meet the conditions of ${use.def.key}`,
+      );
+    default:
+      return issue("unknown_entry", `${use.groupId} is not an entry of this site`);
   }
-  const where = use.def.type === "reference" && use.fresh ? use.def.where : undefined;
-  if (!where) return undefined;
-  const target = use.collections[0] as string;
-  const parsed = parseFieldQuery(site, target, { where });
-  if (!parsed.ok) return undefined;
-  const byId = new Map(members.map((m) => [m.id, m.body]));
-  const meets = usable.some((m) => {
-    const original = byId.get(m.group);
-    const resolved = resolveFields(site, m.body, original);
-    // `where` cannot use `now` (§1), so the instant is irrelevant.
-    return matchesFieldQuery(resolved, parsed.query, 0);
-  });
-  return meets
-    ? undefined
-    : {
-        path: use.path,
-        code: "invalid_value",
-        message: `${use.groupId} does not meet the conditions of ${use.def.key}`,
-      };
 }
 
 /** The plan-time checks of the guarded uses: own group, targets, `where`. */
@@ -259,6 +212,31 @@ export function entryRefStatements(site: Site, draft: ContentEntry, hash: string
   return out;
 }
 
+/** The guard pairs of the uses a write checks (changed keys; all own values going live). */
+function pairsOf(uses: readonly Use[]): TargetPair[] {
+  const pairs = new Map<string, TargetPair>();
+  for (const u of uses) {
+    const pair: TargetPair = { t: u.groupId, c: u.collections, f: u.fresh ? 1 : 0 };
+    pairs.set(JSON.stringify(pair), pair);
+  }
+  return [...pairs.values()];
+}
+
+/**
+ * §2.6: the target guard of a field-operation rewrite, over the reference values it changes
+ * (undefined when none change). A miss skips the entry for the next pass, like a concurrent edit.
+ * The rewrite's own statements are guarded on the site still carrying the operation's marker, so
+ * the definitions the pairs come from cannot change under it.
+ */
+export function rewriteTargetGuard(
+  site: Site,
+  next: ContentEntry,
+  stored: ContentEntry,
+): Cond | undefined {
+  const defs = fieldDefinitions(site, next.collection);
+  return targetGuard(site.id, pairsOf(guardedUses(defs, next, stored)));
+}
+
 /** True when the write changes the entry's values or collection (the definitions anchor applies). */
 const changesFields = (draft: ContentEntry, stored: ContentEntry | undefined) =>
   !stored || stored.collection !== draft.collection || !sameJson(stored.fields, draft.fields);
@@ -289,13 +267,8 @@ export async function planEntryRefs(
   const check = async () =>
     refuseFieldIssues(useIssues(site, draft, uses, await readMembers(sql, site.id, groups)));
   await check();
-  const pairs = new Map<string, TargetPair>();
-  for (const u of uses) {
-    const pair: TargetPair = { t: u.groupId, c: u.collections, f: u.fresh ? 1 : 0 };
-    pairs.set(JSON.stringify(pair), pair);
-  }
   return {
-    guard: and(anchor, targetGuard(site.id, [...pairs.values()])),
+    guard: and(anchor, targetGuard(site.id, pairsOf(uses))),
     statements: (hash) => entryRefStatements(site, draft, hash),
     diagnose: check,
   };

@@ -7,6 +7,7 @@
 import type { ContentEntry, Page } from "@cloudhal/core-contracts";
 import { mediaBlobKey } from "./assets.ts";
 import { InvariantError } from "./errors.ts";
+import { type EditionDrop, editionReferences } from "./references/editions.ts";
 import type { SiteGraphStore } from "./store.ts";
 
 type Localized = Page | ContentEntry;
@@ -111,7 +112,10 @@ export async function termsOnSite(
   return out as ContentEntry["terms"];
 }
 
-/** The node as written on the edition: its media copied, its terms the edition's. */
+/**
+ * The node as written on the edition: its media copied, its terms the edition's, and only the
+ * references the edition can resolve (RFC-0045 §3); `onDropped` hears what was not carried.
+ */
 export async function forEdition<T extends Localized>(
   store: SiteGraphStore,
   node: T,
@@ -119,10 +123,22 @@ export async function forEdition<T extends Localized>(
     fromSiteId: string;
     toSiteId: string;
     actor: Parameters<typeof copyAssetsToSite>[1]["actor"];
+    onDropped?: ((dropped: EditionDrop[]) => void) | undefined;
   },
 ): Promise<T> {
   const ids = await copyAssetsToSite(store, { ...input, ids: assetIdsOf(node) });
   const moved = withAssets({ ...node, siteId: input.toSiteId }, ids);
   if ("sections" in moved) return moved;
-  return { ...moved, terms: await termsOnSite(store, node as ContentEntry, input.toSiteId) } as T;
+  const entry = moved as ContentEntry;
+  const site = await store.getSite(input.toSiteId);
+  // A re-save of an existing edition translation: its stored values are not fresh.
+  const held = await store.getContentEntry(entry.id);
+  const stored = held?.siteId === input.toSiteId ? held : undefined;
+  const refs = site ? await editionReferences(store.sql, site, { entry, stored }) : undefined;
+  if (refs && refs.dropped.length > 0) input.onDropped?.(refs.dropped);
+  return {
+    ...entry,
+    ...(refs ? { fields: refs.fields ?? {} } : {}),
+    terms: await termsOnSite(store, node as ContentEntry, input.toSiteId),
+  } as T;
 }
