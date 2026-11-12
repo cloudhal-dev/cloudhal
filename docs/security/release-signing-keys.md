@@ -28,7 +28,7 @@ Statuses:
 - `retiring` verifies existing releases and signs nothing new.
 - `revoked` verifies nothing: a consumer refuses every release the key signed.
 
-Releases are immutable and can never gain an asset, so a release signed by a revoked key can never be re-signed. The remedy is a new version signed by an active key. Later, the signed `keys.json` and yank list of RFC-0046 §9 will record that decision. Releases up to and including `v0.7.3` carry no bundle and no signature.
+Releases are immutable and can never gain an asset, so a release signed by a revoked key can never be re-signed. The remedy is a new version signed by an active key. Later, the signed `keys.json` and yank list of RFC-0046 §9 will record that decision. Releases up to and including `v0.8.0` carry no bundle and no signature.
 
 ## Custody
 

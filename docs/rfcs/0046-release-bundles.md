@@ -7,7 +7,7 @@
   - RFC-0008 (`schedulesLevel`, the downgrade guard), RFC-0034 (several site Workers), RFC-0042 / RFC-0043 (the `gates` and `status` feature levels).
   - Code read: `.github/workflows/release.yml` (job graph; npm's trusted-publisher entry names this file and the `npm-publish` environment), `scripts/publish-ci.ts` (today: npm publish, then `gh release create --verify-tag --latest`), `packages/cli/src/archive/` (RFC-0039's deterministic tar and fixed-header gzip), `packages/cli/src/commands/deploy/`, `packages/core-contracts/schemas/common.schema.json`.
   - Sources (checked 2026-11-11):
-    - GitHub, [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases): once published, a release's assets cannot be added, changed or deleted, and the tag of a deleted immutable release cannot be reused. This repository has immutable releases on; `v0.7.3` is immutable with no assets.
+    - GitHub, [immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases): once published, a release's assets cannot be added, changed or deleted, and the tag of a deleted immutable release cannot be reused. This repository has immutable releases on; `v0.8.0` (the latest when this RFC was written) is immutable with no assets.
     - GitHub, [artifact attestations with reusable workflows](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-and-reusable-workflows-to-achieve-slsa-v1-build-level-3): the build steps move into a reusable workflow, which must also produce the attestation; `gh attestation verify --signer-workflow` checks it.
     - AWS KMS [`Sign`](https://docs.aws.amazon.com/kms/latest/APIReference/API_Sign.html): a `RAW` message is at most 4096 bytes (pure Ed25519 signs the message itself).
     - WebCrypto Ed25519 `verify`; Workers `DecompressionStream` (gzip and deflate, no zstd); Workers static assets (20,000 files and 25 MiB per file per Worker).
@@ -22,7 +22,7 @@ Every Cloudhal version `vX.Y.Z` gains a **release bundle**: the built site and a
 - **Deploy without a toolchain.** `cloudhal deploy` needs Node, wrangler and an Astro build. A prebuilt, verifiable bundle lets any remote deployer install or update the standard theme by uploading known-good artifacts, and gives every one of them the same bytes.
 - **One checkable answer to "what exactly is X.Y.Z".** Per-file hashes under a project signature make a release a fact a user or a reviewer can check, instead of N different customer-side builds of the same version.
 - **Safe updates, downgrades and rollbacks.** The downgrade guard (RFC-0008) and the maintenance guard need the target version's feature levels and migration range, and a code rollback is safe only when the target's migrations are compatible with the previous code and no Durable Object class changed. Today those facts come from the running code; the manifest states them before anything is uploaded.
-- **Why now.** Releases are immutable in this repository, and today's `publish-ci.ts` publishes the release at once. An asset cannot be added afterwards, so the order has to change before the first bundle ships; `v0.7.3` can never gain one, and the first bundled release is the next version.
+- **Why now.** Releases are immutable in this repository, and today's `publish-ci.ts` publishes the release at once. An asset cannot be added afterwards, so the order has to change before the first bundle ships; `v0.8.0` and older can never gain one, and the first bundled release is the next version.
 
 ## Proposal
 
@@ -211,7 +211,7 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
 
 - **Contracts:** two new `core-contracts` roots, `release-manifest` and `release-statement`, both `schemaVersion: 1`, with golden fixtures and the Rust round trip (`ReleaseManifest`, `ReleaseStatement`). No existing contract changes; the content `release` root (RFC-0008) is unrelated.
 - **npm users:** nothing changes. Packages are published as today, after the bundle is attached.
-- **Releases:** `v0.7.3` and older have no bundle and never will (immutable); a consumer treats them as unbundled. The first bundled version is the next one.
+- **Releases:** `v0.8.0` and older have no bundle and never will (immutable); a consumer treats them as unbundled. The first bundled version is the next one.
 - **Rollout:** (1) the contracts and this RFC; (2) the builder, `bundle-build.yml`, `bundle-sign`, the reordered `publish-ci.ts` and the dry run, merged with `RELEASE_BUNDLES` off; (3) the maintainer creates `release-signing` and its secret, runs the dry run and turns `RELEASE_BUNDLES` on; (4) the first bundle ships, preferably on a `next` prerelease.
 - **Rollback:** set `RELEASE_BUNDLES` off. Releases go on without assets in the same order; nothing in an installation depends on a bundle.
 
