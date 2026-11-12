@@ -1364,3 +1364,9 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **Phase B's guard on a converting path** treats an id that already has its row for the path as carried, read from the pass's rows, as `guardedUses` does. An accepted item whose target was archived later no longer skips the entry forever.
 - **The edition's held check is per path:** on the converting sub-field only `rows.has`, and other sub-fields' stored ids only for those sub-fields.
 
+#### Final gate (2026-11-13, PM verification of cff168d6)
+
+- **Per-occurrence held subtraction applies only to paths converting to references** (`fromType: "text"`), where another occurrence gets its own guard and row. Converting from references, every stored failing id stays held, so a copy of a failing item cannot drop its rows and turn a dangling id into text unreported.
+- **Rebuilds read a running reference (multiple) ↔ repeater conversion through its old type** (`reshapedRows`, top level). A stored value still in the old shape keeps its rows: from a reference, each id-shaped string at the field path; from a repeater, each item's id-shaped sub-value at `<field>.<sub>`. A mid-operation import therefore keeps the target locked.
+- **The edition's per-sub-field held check applies only while a text → reference marker runs on the definition.** Otherwise every stored id of the field is held, as before step 4.
+

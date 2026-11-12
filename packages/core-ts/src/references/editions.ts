@@ -204,15 +204,19 @@ async function textConverts(
 
 /**
  * Whether a stored value already holds a group for `def` (the freshness test only, not a count).
- * On a path converting from text, only an id with its row is held (RFC-0045 §7). Every other
- * path, a repeater's other sub-fields included, holds its own stored ids only.
+ * While a text → reference conversion runs on `def`, only an id with its row is held on the
+ * converting path, and a repeater's other sub-fields hold their own stored ids only (RFC-0045 §7).
+ * Otherwise every stored id of the field is held, as before step 4.
  */
 function heldByRows(
   def: FieldDefinition,
   value: unknown,
   rows: FieldRows | undefined,
 ): (group: string, sub?: string) => boolean {
+  const all = new Set(referenceUses(def, value, "").map((u) => u.groupId));
   const fromText = convertingPath(def) !== undefined && def.migration?.fromType === "text";
+  // Without such a marker: every stored id of the field, as before RFC-0045 step 4.
+  if (!fromText) return (g) => all.has(g);
   const converting = def.migration?.sub;
   // Per path: a sub-field's stored ids hold only for that sub-field.
   const ids = new Map<string, Set<string>>();
@@ -221,7 +225,7 @@ function heldByRows(
     ids.set(at, (ids.get(at) ?? new Set()).add(u.groupId));
   }
   return (g, sub = "") =>
-    fromText && (converting === undefined || converting === sub)
+    converting === undefined || converting === sub
       ? rows?.has(g) === true
       : ids.get(sub)?.has(g) === true;
 }

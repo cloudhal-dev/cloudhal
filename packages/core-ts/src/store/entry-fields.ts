@@ -122,8 +122,9 @@ function idsAtPath(def: FieldDefinition, fields: ContentEntry["fields"]): string
 }
 
 /**
- * The held pairs, per occurrence: an id the draft also holds in an accepted or converted item (it
- * occurs more often than in the failing stored ones) is not held, so it gets its guard and row.
+ * The held pairs. Converting to references, per occurrence: an id the draft also holds in an
+ * accepted or converted item (it occurs more often than in the failing stored ones) is not held,
+ * so it gets its guard and row. Converting from references, every stored failing id is held.
  */
 function heldRefs(
   failures: readonly { def: FieldDefinition; f: string; ids: readonly string[] }[],
@@ -133,7 +134,11 @@ function heldRefs(
   for (const { def, f, ids } of failures) {
     const count = (list: readonly string[], id: string) => list.filter((x) => x === id).length;
     const all = idsAtPath(def, fields);
-    for (const t of new Set(ids)) if (count(all, t) <= count(ids, t)) out.push({ f, t });
+    // Only converting to references does another occurrence get its own guard and row; from
+    // references, every stored failing id keeps its rows until phase B reports it.
+    const toReference = def.migration?.fromType === "text";
+    for (const t of new Set(ids))
+      if (!toReference || count(all, t) <= count(ids, t)) out.push({ f, t });
   }
   return out;
 }

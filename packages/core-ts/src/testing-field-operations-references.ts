@@ -1222,6 +1222,60 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
       });
     });
 
+    describe("final gate", () => {
+      it("reference → text sub: a failing stored item and a written copy of its id keep the row", async () => {
+        const site = await world([SPEAKERS]);
+        const r = await place(site, "R place");
+        const e = await entry(site, "events", { fields: { speakers: [{ person: r.id }] } });
+        const part = await run(
+          site,
+          {
+            op: "change_field_type",
+            collection: "events",
+            key: "speakers",
+            sub: "person",
+            type: "text",
+          },
+          { budget: { entries: 0 } },
+        );
+        expect(await code(store().deleteContentEntry(await fresh(r)))).toBe("ok");
+        await store().updateContentEntry({
+          ...(await fresh(e)),
+          fields: { speakers: [{ person: r.id }, { person: r.id, name: "copy" }] },
+        });
+        expect(await rows(e.id)).toEqual([{ t: r.id, f: "speakers.person", k: "speakers", s: 1 }]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.done).toBe(false);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+      });
+
+      it("a mid-operation reimport keeps reference → repeater rows, so the target stays locked", async () => {
+        const site = await world([reference("hosts", { multiple: true })]);
+        const p = await place(site, "P place");
+        const e = await entry(site, "events", { status: "published", fields: { hosts: [p.id] } });
+        await run(
+          site,
+          {
+            op: "change_field_type",
+            collection: "events",
+            key: "hosts",
+            type: "repeater",
+            subFields: [
+              { key: "person", type: "reference", labels: L("Person"), collections: ["places"] },
+            ],
+          },
+          { budget: { entries: 0 } },
+        );
+        const storage = { sql: ctx.sql(), blobs: ctx.blobs() };
+        await importSite(storage, await exportSite(storage, site.id), {
+          mode: "replace",
+          fieldTypes: ENABLED,
+        });
+        expect(await rows(e.id)).toEqual([{ t: p.id, f: "hosts", k: "hosts", s: 1 }]);
+        expect(await code(store().deleteContentEntry(await fresh(p)))).toBe("entry_referenced");
+      });
+    });
+
     describe("revert, after edits", () => {
       it("text → reference: an entry edited after the operation converts back to its title", async () => {
         const site = await world([text("venue")]);

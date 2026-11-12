@@ -11,7 +11,7 @@
  * `INSERT` is chunked below 90 KB a statement; the chunks count against the import batch's cap.
  * Worker-safe.
  */
-import type { ContentEntry, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import { GROUP_ID_PATTERN } from "../fields/props.ts";
 import { fieldDefinitions, isRecord } from "../fields/types.ts";
@@ -36,7 +36,10 @@ export function rebuildRows(site: Pick<Site, "collections">, entry: ContentEntry
   const out = [...rows];
   for (const def of defs) {
     const f = convertingPath(def);
-    if (f === undefined) continue;
+    if (f === undefined) {
+      out.push(...reshapedRows(def, values, out));
+      continue;
+    }
     const k = storedKey(def, values) ?? def.key;
     const sub = def.migration?.sub;
     const stored = values[k];
@@ -56,6 +59,38 @@ export function rebuildRows(site: Pick<Site, "collections">, entry: ContentEntry
           : [];
     for (const t of new Set(found))
       if (typeof t === "string" && GROUP_ID.test(t)) out.push({ t, f, k, shared: sharedOf(def) });
+  }
+  return out;
+}
+
+/**
+ * A running reference (multiple) ↔ repeater conversion (top level): a stored value still in the
+ * old shape is read through the old type, so its rows stand until phase B rewrites it. From a
+ * reference, each id-shaped string of the list gets a row at the field path; from a repeater,
+ * each item's id-shaped sub-value at `<field>.<sub>`.
+ */
+function reshapedRows(
+  def: FieldDefinition,
+  values: Readonly<Record<string, unknown>>,
+  have: readonly EntryRefRow[],
+): EntryRefRow[] {
+  const from = def.migration?.fromType;
+  if (def.migration?.sub !== undefined || (from !== "reference" && from !== "repeater")) return [];
+  const k = storedKey(def, values) ?? def.key;
+  const stored = values[k];
+  const found: { f: string; t: string }[] = [];
+  const id = (v: unknown): v is string => typeof v === "string" && GROUP_ID.test(v);
+  for (const v of Array.isArray(stored) ? stored : [stored]) {
+    if (from === "reference" && id(v)) found.push({ f: k, t: v });
+    if (from === "repeater" && isRecord(v))
+      for (const [sub, t] of Object.entries(v)) if (id(t)) found.push({ f: `${k}.${sub}`, t });
+  }
+  const seen = new Set(have.map((r) => `${r.f} ${r.t}`));
+  const out: EntryRefRow[] = [];
+  for (const { f, t } of found) {
+    if (seen.has(`${f} ${t}`)) continue;
+    seen.add(`${f} ${t}`);
+    out.push({ t, f, k, shared: sharedOf(def) });
   }
   return out;
 }
