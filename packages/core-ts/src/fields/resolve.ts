@@ -14,7 +14,7 @@
  *   version does not know is skipped, so a newer writer's type never breaks an older reader.
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
-import { convertFieldValue } from "./conversions.ts";
+import { type ConvertContext, convertFieldValue } from "./conversions.ts";
 import { convertContext, isBeingRemoved } from "./migration.ts";
 import {
   type FieldIssue,
@@ -80,11 +80,16 @@ function pick(
   return { value: theirs, fromOriginal: theirs !== undefined };
 }
 
-/** The entry's typed values under its collection's definitions (`{}` when it has none). */
+/**
+ * The entry's typed values under its collection's definitions (`{}` when it has none). `convert`
+ * adds to the site's conversion context: RFC-0045's prefetched entry maps, which readers build
+ * only while a text ↔ reference conversion runs.
+ */
 export function resolveFields(
   site: SiteFields,
   entry: FieldsEntry,
   original?: FieldsOriginal,
+  convert?: Pick<ConvertContext, "entries">,
 ): ResolvedFields {
   const out: ResolvedFields = {};
   for (const def of fieldDefinitions(site, entry.collection)) {
@@ -102,7 +107,7 @@ export function resolveFields(
     }
     const converting = def.migration?.fromType;
     const converted = converting
-      ? convertFieldValue(converting, def, value, convertContext(site))
+      ? convertFieldValue(converting, def, value, { ...convertContext(site), ...convert })
       : undefined;
     if (converted?.ok) {
       out[def.key] = {

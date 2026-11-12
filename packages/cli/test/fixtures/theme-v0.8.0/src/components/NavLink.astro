@@ -1,0 +1,27 @@
+---
+/**
+ * One navigation link (RFC-0003 §7.3). `aria-current` is `page` on the exact match and `true` on a
+ * prefix or context match. External links never pass referrer or opener; only `newTab` opens one.
+ * A group shown without its children (past the theme's depth) is plain text.
+ */
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+
+interface Props {
+  item: ActiveNavItem;
+  /** Classes for the current (or in-trail) link and for the others. */
+  on: string;
+  off: string;
+}
+const { item, on, off } = Astro.props;
+---
+{item.href === undefined ? (
+  <span>{item.label}</span>
+) : (
+  <a
+    href={item.href}
+    aria-current={item.current}
+    class={(item.current || item.inTrail ? on : off) || undefined}
+    rel={item.external ? "noopener noreferrer" : undefined}
+    target={item.newTab ? "_blank" : undefined}
+  >{item.label}</a>
+)}

@@ -1,0 +1,75 @@
+/* Reader comments (RFC-0007): `<Comments />` renders plain HTML; these rules only style it. */
+.cloudhal-comments {
+  @apply space-y-4 border-t border-zinc-200 py-8;
+}
+.cloudhal-comments h2 {
+  @apply text-2xl font-semibold;
+}
+.cloudhal-comment-list,
+.cloudhal-comment-replies {
+  @apply space-y-4;
+}
+.cloudhal-comment-replies {
+  @apply mt-4 border-l border-zinc-200 pl-4;
+}
+.cloudhal-comment-meta {
+  @apply flex flex-wrap items-baseline gap-2 text-sm text-zinc-500;
+}
+.cloudhal-comment-author {
+  @apply font-semibold text-zinc-900;
+}
+.cloudhal-comment-badge {
+  @apply rounded bg-zinc-100 px-1.5 text-xs text-zinc-700;
+}
+.cloudhal-comment-body {
+  @apply mt-1 space-y-2 leading-relaxed;
+}
+.cloudhal-comment-body a,
+.cloudhal-comment-context {
+  @apply underline underline-offset-4;
+}
+.cloudhal-comment-actions {
+  @apply mt-1 flex flex-wrap items-start gap-3 text-sm text-zinc-500;
+}
+.cloudhal-comment-actions summary,
+.cloudhal-comment-reply {
+  @apply cursor-pointer underline-offset-4 hover:underline;
+}
+.cloudhal-comment-removed > p {
+  @apply text-sm text-zinc-500 italic;
+}
+.cloudhal-comment-note {
+  @apply rounded border border-zinc-300 bg-zinc-50 p-3 text-sm;
+}
+.cloudhal-comment-form,
+.cloudhal-report-form {
+  @apply max-w-xl space-y-3;
+}
+.cloudhal-comment-form h3 {
+  @apply text-lg font-semibold;
+}
+.cloudhal-comment-form label,
+.cloudhal-report-form label {
+  @apply block text-sm font-medium;
+}
+.cloudhal-comment-form small,
+.cloudhal-comment-privacy {
+  @apply block text-xs text-zinc-500;
+}
+.cloudhal-comment-form :is(input, textarea),
+.cloudhal-report-form :is(input, textarea, select) {
+  @apply w-full rounded border border-zinc-300 px-2 py-1;
+}
+.cloudhal-comment-form [aria-invalid="true"] {
+  @apply border-red-600;
+}
+.cloudhal-comment-form button,
+.cloudhal-report-form button {
+  @apply rounded px-4 py-2 bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
+}
+.cloudhal-comment-form button[data-cancel-reply] {
+  @apply bg-zinc-200 text-zinc-900;
+}
+.cloudhal-comments-pages a {
+  @apply text-sm underline underline-offset-4;
+}

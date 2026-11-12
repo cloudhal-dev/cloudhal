@@ -1,0 +1,193 @@
+/*
+ * Site chrome (RFC-0025 §2): the header and footer from `resolveChrome`. The defaults (logo-left,
+ * static, content width, plain; a simple footer) reproduce the former header and footer.
+ */
+.ch-skip {
+  @apply sr-only;
+}
+.ch-skip:focus {
+  @apply not-sr-only fixed top-2 left-2 z-50 rounded bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow;
+}
+#main:focus {
+  outline: none;
+}
+.ch-header {
+  @apply relative z-30;
+}
+.ch-header__inner {
+  @apply mx-auto flex max-w-3xl flex-wrap items-center justify-between gap-3 px-4 py-6;
+}
+.ch-header[data-width="wide"] .ch-header__inner {
+  @apply max-w-6xl;
+}
+.ch-header[data-width="full"] .ch-header__inner {
+  @apply max-w-none sm:px-8;
+}
+.ch-header__brand {
+  @apply shrink-0 text-lg font-semibold whitespace-nowrap;
+}
+.ch-header__nav,
+.ch-header__utility {
+  @apply flex flex-wrap gap-4 text-sm text-zinc-600;
+}
+.ch-header__utility {
+  @apply text-xs;
+}
+.ch-header__actions {
+  @apply flex items-center gap-3;
+}
+.ch-header__actions:empty {
+  display: none;
+}
+.ch-header__actions .ch-button {
+  @apply px-3 py-1.5 text-sm whitespace-nowrap;
+}
+/* Layouts: the nav in the middle; everything centered on its own rows; brand and actions apart. */
+@media (min-width: 768px) {
+  .ch-header[data-layout="logo-left-nav-center"] .ch-header__inner {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+  }
+  .ch-header[data-layout="logo-left-nav-center"] .ch-header__actions {
+    justify-self: end;
+  }
+  .ch-header[data-layout="split"] .ch-header__nav {
+    margin-inline-end: auto;
+  }
+  .ch-header[data-layout="split"] .ch-header__brand {
+    order: 2;
+    margin-inline-end: auto;
+  }
+  .ch-header[data-layout="split"] .ch-header__nav {
+    order: 1;
+  }
+  .ch-header[data-layout="split"] .ch-header__actions {
+    order: 3;
+  }
+}
+.ch-header[data-layout="centered"] .ch-header__inner {
+  @apply flex-col justify-center text-center;
+}
+.ch-header[data-layout="centered"] .ch-header__nav {
+  @apply justify-center;
+}
+/* Behaviors: sticky; hide-on-scroll and fixed are sticky too (the chrome module hides the first). */
+.ch-header:is([data-behavior="sticky"], [data-behavior="hide-on-scroll"], [data-behavior="fixed"]) {
+  position: sticky;
+  top: 0;
+  background: var(--ch-color-surface, #fff);
+  border-bottom: 1px solid rgb(0 0 0 / 0.08);
+}
+:root:has(
+  .ch-header:is([data-behavior="sticky"], [data-behavior="hide-on-scroll"], [data-behavior="fixed"])
+) {
+  scroll-padding-top: var(--ch-header-h);
+}
+/* Surfaces: the same color roles as bands. */
+:is(.ch-header, .ch-footer)[data-surface="muted"] {
+  background: var(--ch-color-surface-muted);
+}
+.ch-header[data-surface="raised"] {
+  background: var(--ch-color-surface-raised);
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.05),
+    0 6px 20px -6px rgb(0 0 0 / 0.12);
+}
+:is(.ch-header, .ch-footer)[data-surface="inverse"] {
+  background: var(--ch-color-surface-inverse);
+  color: var(--ch-color-text-inverse);
+}
+.ch-header[data-surface="brand"] {
+  background: var(--ch-color-brand);
+  color: var(--ch-color-on-brand);
+}
+:is(.ch-header, .ch-footer):is([data-surface="inverse"], [data-surface="brand"])
+  :is(.ch-header__nav, .ch-header__utility, .ch-footer__inner) {
+  color: inherit;
+}
+:is(.ch-header, .ch-footer):is([data-surface="inverse"], [data-surface="brand"]) a {
+  color: inherit;
+}
+.ch-logo {
+  @apply block w-auto;
+  height: 1.75rem;
+}
+.ch-logo[data-size="s"] {
+  height: 1.25rem;
+}
+.ch-logo[data-size="l"] {
+  height: 2.5rem;
+}
+.ch-logo[data-variant="dark"] {
+  display: none;
+}
+:root[data-ch-mode="dark"] .ch-logo[data-variant="light"] {
+  display: none;
+}
+:root[data-ch-mode="dark"] .ch-logo[data-variant="dark"] {
+  display: block;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-ch-mode="auto"] .ch-logo[data-variant="light"] {
+    display: none;
+  }
+  :root[data-ch-mode="auto"] .ch-logo[data-variant="dark"] {
+    display: block;
+  }
+}
+.ch-footer__inner {
+  @apply mx-auto max-w-3xl px-4 py-8 text-xs text-zinc-500;
+}
+/* On the muted surface, the role checked against it (text-muted on surface-muted, 4.5:1). */
+.ch-footer[data-surface="muted"] :is(.ch-footer__inner, .ch-footer__tagline) {
+  color: var(--ch-color-text-muted);
+}
+.ch-footer:not([data-layout="simple"], [data-layout="minimal"]) .ch-footer__inner {
+  @apply max-w-6xl py-12;
+}
+.ch-footer__legal {
+  @apply flex flex-wrap items-center justify-between gap-4;
+}
+.ch-footer[data-layout="minimal"] .ch-footer__legal {
+  @apply justify-center;
+}
+.ch-footer__top {
+  @apply mb-8 grid gap-8 text-sm sm:grid-cols-2 lg:grid-cols-4;
+}
+.ch-footer__brand {
+  @apply text-base font-semibold text-zinc-900;
+}
+.ch-footer__tagline {
+  @apply mt-2 max-w-xs text-zinc-600;
+}
+.ch-footer__social {
+  @apply mt-3 flex flex-wrap gap-3;
+}
+.ch-footer__legal .ch-footer__social {
+  @apply mt-0;
+}
+.ch-footer__social a,
+.ch-footer__col a {
+  @apply hover:text-zinc-700;
+}
+.ch-footer__heading {
+  @apply mb-3 font-medium text-zinc-900;
+}
+.ch-footer__col ul {
+  @apply space-y-2;
+}
+.ch-footer__cta {
+  @apply mb-10 flex flex-wrap items-center justify-between gap-4 rounded-lg px-6 py-8;
+  background: var(--ch-color-surface-muted);
+}
+.ch-footer:is([data-surface="muted"], [data-surface="inverse"]) .ch-footer__cta {
+  background: var(--ch-color-surface-raised);
+  color: var(--ch-color-text);
+}
+.ch-footer__cta-heading {
+  @apply text-xl font-semibold text-zinc-900;
+}
+:is(.ch-footer)[data-surface="inverse"]
+  :is(.ch-footer__brand, .ch-footer__heading, .ch-footer__tagline, .ch-footer__cta-heading) {
+  color: inherit;
+}

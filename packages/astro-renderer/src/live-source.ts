@@ -9,9 +9,14 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import { searchDocuments, searchRows } from "@cloudhal/core-ts";
+import {
+  getGroupMembers,
+  referrerCandidates,
+  searchDocuments,
+  searchRows,
+} from "@cloudhal/core-ts";
 import { isAvailable, nextInstant } from "@cloudhal/core-ts/availability";
-import { derivedGates, hasExpiryRules } from "@cloudhal/core-ts/fields";
+import { type ConversionEntries, derivedGates, hasExpiryRules } from "@cloudhal/core-ts/fields";
 import { matches } from "@cloudhal/core-ts/filter";
 import {
   evaluateEntryQuery,
@@ -22,6 +27,8 @@ import {
 import { type EntrySplit, gateIndex, splitEntries } from "./entry-views.ts";
 import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
+import { conversionMaps } from "./reference-conversions.ts";
+import { membersIn, type ReferencedByQuery, referrerRecords, referrersIn } from "./references.ts";
 import type { GraphSource, SourceSearchOptions } from "./source.ts";
 import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
 
@@ -204,6 +211,42 @@ export class LiveSource implements GraphSource {
 
   entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
     return entryFields(this, entry, options);
+  }
+
+  /** RFC-0045 §4: one store read (`getGroupMembers`), then this view's gates. */
+  async groupMembers(groupIds: readonly string[]): Promise<Map<string, ContentEntry[]>> {
+    const read = await getGroupMembers(this.#store.sql, this.#siteId, groupIds);
+    const split = await this.#split([...read.values()].flat());
+    return membersIn(read, groupIds, { listed: split.listed, reachable: split.reachable });
+  }
+
+  /**
+   * RFC-0045 §4: the `entry_refs` rows naming the group, expanded by the `shared` rule, each
+   * candidate then resolved like the snapshot's index (its original from the same pool), so both
+   * sources answer alike on the same graph.
+   */
+  async referencedBy(groupId: string, q: ReferencedByQuery = {}): Promise<ContentEntry[]> {
+    const [site, read] = await Promise.all([
+      this.site(),
+      referrerCandidates(this.#store.sql, this.#siteId, groupId),
+    ]);
+    const pool = visible([...read.byId.values()], this.#includeDrafts);
+    const ids = new Map(pool.map((e) => [e.id, e]));
+    const originalOf = (e: ContentEntry) => {
+      const g = e.translation?.group;
+      return g && g !== e.id ? ids.get(g) : undefined;
+    };
+    const shownHere = read.candidates.filter((e) => ids.has(e.id));
+    const records = referrerRecords(site, shownHere, originalOf, groupId).get(groupId) ?? [];
+    const split = await this.#split(pool);
+    return referrersIn(records, q, { listed: split.listed, reachable: split.reachable });
+  }
+
+  /** RFC-0045 §7: built from the working copy, only while the collection runs a conversion. */
+  async conversionEntries(collection: string): Promise<ConversionEntries | undefined> {
+    return conversionMaps(await this.site(), collection, async () =>
+      visible(await this.#store.listContentEntries(this.#siteId), true),
+    );
   }
 
   taxonomies(): Promise<Taxonomy[]> {

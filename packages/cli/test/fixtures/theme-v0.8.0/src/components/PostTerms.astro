@@ -1,0 +1,33 @@
+---
+/** An article's public categories and tags as chips linking to their archives. */
+import type { EntryTaxonomy } from "@cloudhal/astro-renderer/taxonomy";
+
+interface Props {
+  taxonomy: EntryTaxonomy;
+  locale: string;
+}
+const { taxonomy, locale } = Astro.props;
+// Authors are the byline (RFC-0019 §1), not chips.
+const groups = taxonomy.groups.filter((g) => g.taxonomy.key !== "author");
+---
+{groups.length > 0 && (
+  <div class="ch-terms">
+    {groups.map((group) => (
+      <ul
+        class="ch-terms__group"
+        data-taxonomy={group.taxonomy.key}
+        aria-label={group.taxonomy.labels[locale]?.plural ?? group.taxonomy.key}
+      >
+        {group.terms.map((term) => (
+          <li>
+            {term.href ? (
+              <a class="ch-chip" href={term.href} rel="tag">{term.name}</a>
+            ) : (
+              <span class="ch-chip">{term.name}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    ))}
+  </div>
+)}

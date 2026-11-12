@@ -13,7 +13,12 @@ import type {
 import type { RedirectMatch, SearchKind, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
 import { matchRedirect, redirectLocale } from "@cloudhal/core-ts";
 import { hasGates, inheritedGate, isAvailable, nextInstant } from "@cloudhal/core-ts/availability";
-import { type DerivedGate, derivedGates, type ResolvedFields } from "@cloudhal/core-ts/fields";
+import {
+  type ConversionEntries,
+  type DerivedGate,
+  derivedGates,
+  type ResolvedFields,
+} from "@cloudhal/core-ts/fields";
 import { matches } from "@cloudhal/core-ts/filter";
 import { assetRefsOf } from "@cloudhal/core-ts/media";
 import {
@@ -25,9 +30,12 @@ import {
 import { gateIndex, splitEntries } from "./entry-views.ts";
 import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
+import { cachedConversionMaps, siteConverts } from "./reference-conversions.ts";
+import { membersIn, type ReferencedByQuery, ReferenceIndex, referrersIn } from "./references.ts";
 import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
 
 export { LiveSource } from "./live-source.ts";
+export type { ReferencedByQuery } from "./references.ts";
 
 /**
  * What a renderer needs from a site, independent of whether it reads live nodes (dev) or a
@@ -132,6 +140,19 @@ export interface GraphSource {
    * with the standalone `entryFields(source, entry)`.
    */
   entryFields?(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields>;
+  /**
+   * RFC-0045 §4: the members of these translation groups that this view shows, in this site, by
+   * group (one call per resolution level; the live source reads the store once, a snapshot never).
+   * Optional for sources that predate references: their references resolve to nothing.
+   */
+  groupMembers?(groupIds: readonly string[]): Promise<Map<string, ContentEntry[]>>;
+  /**
+   * RFC-0045 §4 "who references me": entries this view lists whose resolved values name the
+   * group (a translation inheriting its original's value included), newest first, at most 100.
+   */
+  referencedBy?(groupId: string, q?: ReferencedByQuery): Promise<ContentEntry[]>;
+  /** RFC-0045 §7: the entry maps of a running text ↔ reference conversion in a collection. */
+  conversionEntries?(collection: string): Promise<ConversionEntries | undefined>;
 }
 
 export interface SourceSearchOptions {
@@ -153,6 +174,8 @@ interface Loaded {
   published: ContentEntry[];
   /** Published entries with a public URL (unlisted ones too); `entries` holds the listed. */
   reachable: ContentEntry[];
+  /** RFC-0045 §7: every entry not archived, drafts included; kept only while a conversion runs. */
+  current: ContentEntry[];
   /** Every published entry's derived gate (RFC-0042 §3), computed once per snapshot. */
   derived: ReadonlyMap<string, DerivedGate>;
   /** Resolved field values by entry id, filled as queries need them (the snapshot is immutable). */
@@ -200,6 +223,10 @@ interface Shared {
   bundle?: "present" | "missing" | "persisting";
   /** Bodies read node by node (no bundle), as stored JSON text, kept to write the bundle. */
   fetched?: Map<string, string> | undefined;
+  /** RFC-0045 §4: members and referrers by group over the published entries, gates aside. */
+  references?: ReferenceIndex;
+  /** RFC-0045 §7: conversion maps by collection, while a text ↔ reference conversion runs. */
+  conversions?: Map<string, Promise<ConversionEntries | undefined>>;
 }
 
 /** Who may see the nodes of a snapshot: the clock gates are checked against, or nobody (previews). */
@@ -358,6 +385,7 @@ export class SnapshotSource implements GraphSource {
         entries: shownEntries,
         published: shownEntries,
         reachable: shownEntries,
+        current: siteConverts(site as Site) ? visible(entries, true) : [],
         derived,
         resolved: new Map(),
         taxonomies,
@@ -514,6 +542,40 @@ export class SnapshotSource implements GraphSource {
 
   entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
     return entryFields(this, entry, options);
+  }
+
+  async #references(): Promise<ReferenceIndex> {
+    const loaded = await this.#load();
+    this.#shared.references ??= new ReferenceIndex(loaded.site, loaded.published);
+    return this.#shared.references;
+  }
+
+  /** RFC-0045 §4: in memory, through this view's gates (`reachable`: unlisted targets resolve). */
+  async groupMembers(groupIds: readonly string[]): Promise<Map<string, ContentEntry[]>> {
+    const [index, view] = [await this.#references(), await this.#current()];
+    return membersIn(index.members(), groupIds, {
+      listed: view.entries,
+      reachable: view.reachable,
+    });
+  }
+
+  async referencedBy(groupId: string, q: ReferencedByQuery = {}): Promise<ContentEntry[]> {
+    const [index, view] = [await this.#references(), await this.#current()];
+    return referrersIn(index.referrers(groupId), q, {
+      listed: view.entries,
+      reachable: view.reachable,
+    });
+  }
+
+  async conversionEntries(collection: string): Promise<ConversionEntries | undefined> {
+    const loaded = await this.#load();
+    this.#shared.conversions ??= new Map();
+    return cachedConversionMaps(
+      this.#shared.conversions,
+      loaded.site,
+      collection,
+      () => loaded.current,
+    );
   }
 
   async taxonomies(): Promise<Taxonomy[]> {

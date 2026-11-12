@@ -19,6 +19,7 @@
  * Every result must also fit the new definition (`valueIssues`); anything else is unconvertible.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
+import type { ConversionEntries } from "../references/conversion-maps.ts";
 import { escapeAtLineStarts, unlink } from "./markdown-scan.ts";
 import type { FieldType } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
@@ -29,6 +30,11 @@ export interface ConvertContext {
   readonly timeZone: string;
   /** The site's default language (`text → select` labels). */
   readonly defaultLocale: string;
+  /**
+   * RFC-0045 §7: the prefetched entry maps of the text ↔ reference rows, present only while such
+   * a conversion runs (`conversion-maps.ts`).
+   */
+  readonly entries?: ConversionEntries | undefined;
 }
 
 /** `value: undefined` means "no value" (the key is removed). */

@@ -1,0 +1,217 @@
+/* Heading effects: a highlighted phrase, the brand gradient, words that take turns. */
+.ch-hl {
+  background-image: linear-gradient(
+    color-mix(in oklch, var(--ch-color-accent) 38%, transparent),
+    color-mix(in oklch, var(--ch-color-accent) 38%, transparent)
+  );
+  background-repeat: no-repeat;
+  background-position: 0 88%;
+  background-size: 100% 0.36em;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-hl {
+    transition: background-size var(--ch-dur-slow) var(--ch-ease-standard) var(--ch-dur-normal);
+  }
+  :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-pre
+    .ch-hl {
+    background-size: 0% 0.36em;
+  }
+  @starting-style {
+    :root:is([data-ch-motion="subtle"], [data-ch-motion="standard"], [data-ch-motion="expressive"])
+      .ch-hl {
+      background-size: 0% 0.36em;
+    }
+  }
+}
+/* From the brand to the link color: both read on the page (the token expansion checks them). */
+.ch-gradient-text {
+  color: var(--ch-color-brand);
+}
+@supports (background-clip: text) {
+  .ch-gradient-text {
+    background-image: linear-gradient(90deg, var(--ch-color-brand), var(--ch-color-link));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+.ch-rotate {
+  display: inline-grid;
+  vertical-align: bottom;
+}
+.ch-rotate__word {
+  grid-area: 1 / 1;
+  opacity: 0;
+}
+.ch-rotate__word[data-active] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) .ch-rotate__word {
+    translate: 0 0.35em;
+    transition:
+      opacity var(--ch-dur-normal) var(--ch-ease-standard),
+      translate var(--ch-dur-normal) var(--ch-ease-standard);
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-rotate__word[data-active] {
+    translate: 0 0;
+  }
+}
+/* Marquee: a still, wrapping row until the motion module sets it moving (standard and above). */
+.ch-marquee {
+  --ch-mq-gap: calc(var(--spacing) * 10);
+  --ch-mq-dur: 34s;
+  overflow: hidden;
+}
+.ch-marquee[data-gap="s"] {
+  --ch-mq-gap: calc(var(--spacing) * 4);
+}
+.ch-marquee[data-gap="m"] {
+  --ch-mq-gap: calc(var(--spacing) * 6);
+}
+.ch-marquee[data-gap="xl"] {
+  --ch-mq-gap: calc(var(--spacing) * 16);
+}
+.ch-marquee[data-speed="slow"] {
+  --ch-mq-dur: 52s;
+}
+.ch-marquee[data-speed="fast"] {
+  --ch-mq-dur: 20s;
+}
+.ch-marquee__track {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ch-mq-gap);
+}
+.ch-marquee__track > * {
+  flex: none;
+}
+@keyframes ch-marquee {
+  to {
+    translate: calc(-50% - var(--ch-mq-gap) / 2) 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) .ch-marquee[data-ch-ready] {
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-marquee[data-ch-ready]
+    .ch-marquee__track {
+    width: max-content;
+    flex-wrap: nowrap;
+    animation: ch-marquee var(--ch-mq-dur) linear infinite;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-marquee[data-ch-ready][data-direction="end"]
+    .ch-marquee__track {
+    animation-direction: reverse;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-marquee[data-ch-ready][data-hover-pause]:is(:hover, :focus-within)
+    .ch-marquee__track {
+    animation-play-state: paused;
+  }
+}
+/* Counter: the final number holds its width while it counts. */
+.ch-counter {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--spacing) * 1);
+}
+.ch-counter__value {
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  line-height: 1.1;
+}
+.ch-counter__num {
+  display: inline-grid;
+  font-variant-numeric: tabular-nums;
+}
+.ch-counter__num > * {
+  grid-area: 1 / 1;
+}
+.ch-counter__hold {
+  visibility: hidden;
+}
+.ch-counter__label {
+  font-size: var(--text-sm);
+  color: var(--ch-color-text-muted);
+}
+/* Loops: decorative, slow, only where motion plays, and paused by the reader's control. */
+[data-ch-loop="gradient-shift"] {
+  background-image: linear-gradient(
+    120deg,
+    color-mix(in oklch, var(--ch-color-brand) 14%, var(--ch-color-surface-raised)),
+    color-mix(in oklch, var(--ch-color-accent) 14%, var(--ch-color-surface-raised)),
+    color-mix(in oklch, var(--ch-color-brand) 14%, var(--ch-color-surface-raised))
+  );
+  background-size: 220% 220%;
+}
+@keyframes ch-loop-float {
+  to {
+    translate: 0 -6px;
+  }
+}
+@keyframes ch-loop-pulse {
+  50% {
+    scale: 1.04;
+  }
+}
+@keyframes ch-loop-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes ch-loop-gradient {
+  to {
+    background-position: 100% 50%;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-loop="float"] {
+    animation: ch-loop-float 6s ease-in-out infinite alternate;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-loop="pulse"] {
+    animation: ch-loop-pulse 2.8s ease-in-out infinite;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) [data-ch-loop="spin-slow"] {
+    animation: ch-loop-spin 28s linear infinite;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    [data-ch-loop="gradient-shift"] {
+    animation: ch-loop-gradient 14s ease-in-out infinite alternate;
+  }
+}
+/* The reader's pause control: only where something actually moves on its own, once a page. */
+.ch-motion-toggle {
+  display: none;
+}
+.ch-motion-toggle[hidden] {
+  display: none !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"]) .ch-motion-toggle {
+    display: flex;
+    width: fit-content;
+    margin: calc(var(--spacing) * 4) auto 0;
+    align-items: center;
+    gap: calc(var(--spacing) * 2);
+    border: 1px solid var(--ch-color-border-strong);
+    border-radius: 9999px;
+    padding: calc(var(--spacing) * 1.5) calc(var(--spacing) * 4);
+    font-size: var(--text-sm);
+    color: var(--ch-color-text-muted);
+    background: var(--ch-color-surface);
+    cursor: pointer;
+  }
+  :root:is([data-ch-motion="standard"], [data-ch-motion="expressive"])
+    .ch-motion-toggle[aria-pressed="true"] {
+    color: var(--ch-color-text);
+    border-color: var(--ch-color-text);
+  }
+}

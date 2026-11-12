@@ -69,6 +69,20 @@ Guide: [`docs/guides/structured-data.md`](../../docs/guides/structured-data.md).
 
 Derived gates: `unlist` keeps an entry's page (200), comments and menu links but leaves `entries()`, `allEntries()`, `entriesByFilter`/`entriesByTerm` (archives, related), feeds, the sitemap and search; `hide` is a 404 like an expired `availability`. Both sources apply them, the gate index caps the edge cache at every derived instant and at every value instant of date/datetime list fields (for `now` conditions), and previews ignore them with an "Ended on …" notice. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2 }`; writers refuse `expiry` until it does.
 
+### References and repeaters (RFC-0045, rollout step 3)
+Additive, and dormant until rollout step 7 lets sites define the two types. `entryFields` (and `source.entryFields`) resolve a `reference` to cards of the targets the page's *view* shows (gates applied at its instant; draft, archived, embargoed and hidden targets resolve to nothing and leave no id, title or empty item) and a `repeater` to its items. `EntryFields.astro` draws both, so old theme copies show them with no change of their own (`theme-v0.8.0` in the compat test).
+
+| Export | Signature |
+|---|---|
+| `RenderedField.references?` | `ReferencedEntry[]`: `{ groupId, id, collection, locale, slug, title, summary?, url, image?, fromFallbackLocale, fields? }` in stored order; the member in the page's locale, else the default locale's under `localization.fallback: default-with-notice` (flagged: set `lang`) |
+| `RenderedField.items?` | `RenderedFields[]`: each repeater item's sub-fields, rendered like fields; empty items left out |
+| `EntryFieldsOptions.depth?` | `1` (default): cards; `2`: each card's own `fields`, with *their* references as cards without fields |
+| `GraphSource.groupMembers?` | `(groupIds) => Promise<Map<string, ContentEntry[]>>`: the members this view shows, by group (snapshot: in memory; live: one store read per call) |
+| `GraphSource.referencedBy?` | `(groupId, { collection?, field?, locale?, limit? }) => Promise<ContentEntry[]>`: entries this view lists whose resolved values name the group (a translation inheriting its original's value included), newest first, at most 100 |
+| `PlaceholderBudget.references?` | the request's resolved-target allowance (200, in `placeholderBudget()`); past it targets resolve to nothing, with one `console.warn` |
+
+Resolution is breadth-first over a visited set of groups, one `groupMembers` call per level, so cycles cost nothing. A "used by" list drawn from `referencedBy` is purged with the target's page when a referrer appears, goes or changes (the purge planner reads snapshot bodies, rollout step 3b); drawing *those* entries' fields is outside that guarantee. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2, "fields": 2 }`.
+
 ## Site analytics (RFC-0006)
 
 The renderer carries the site side of Cloudhal's cookie-less analytics (`@cloudhal/analytics`):

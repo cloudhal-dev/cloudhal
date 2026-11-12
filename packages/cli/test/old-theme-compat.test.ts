@@ -8,13 +8,17 @@
  * Its collection has RFC-0042's settings too (list fields, an `unlist` expiry, an `Event` preset)
  * and a page lists it by field: old themes keep the generic `BlogPosting`, and get the expiry, the
  * field listing (both live in the renderer's sources and `ContentList.astro`) and the collection's
- * feed (the renderer's middleware) on upgrade.
+ * feed (the renderer's middleware) on upgrade. RFC-0045: the collection also has a reference and a
+ * repeater (enabled on the test's own store, as the shared suites do): themes that draw fields
+ * get the target's link and the items from the renderer's `EntryFields.astro`, with no change of
+ * their own; older ones show neither.
  */
 import { spawn } from "node:child_process";
 import { cp, mkdtemp, readdir, readFile, rm, symlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { GATES_ENFORCED, SiteGraphStore } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { afterAll, describe, expect, it } from "vitest";
 import { init, readProjectConfig, snapshot } from "../src/index.ts";
@@ -22,9 +26,11 @@ import { init, readProjectConfig, snapshot } from "../src/index.ts";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const STARTER_NODE_MODULES = path.resolve(here, "../../../starters/blog/node_modules");
 const BIN = path.resolve(here, "../bin/cloudhal.ts");
-const FROZEN = ["v0.3.10", "v0.4.0", "v0.5.0"];
+const FROZEN = ["v0.3.10", "v0.4.0", "v0.5.0", "v0.8.0"];
 /** Themes from before RFC-0041 show no field values. */
-const SHOWS_FIELDS = new Set(["v0.5.0"]);
+const SHOWS_FIELDS = new Set(["v0.5.0", "v0.8.0"]);
+/** Themes from RFC-0042 on draw the collection's JSON-LD preset (`withStructuredData`). */
+const PRESETS = new Set(["v0.8.0"]);
 const TITLE = "Old Theme Site";
 
 /** Runs `cloudhal build` in its own process and returns its exit code and output. */
@@ -57,15 +63,23 @@ async function htmlFiles(dir: string): Promise<string[]> {
 async function addTypedFields(projectDir: string): Promise<void> {
   const cfg = await readProjectConfig(projectDir);
   const local = await openLocalStore(path.join(projectDir, cfg.dataDir));
+  // RFC-0045: references and repeaters stay refused in production; the test enables them
+  const store = new SiteGraphStore({
+    sql: local.sql,
+    blobs: local.blobs,
+    gates: GATES_ENFORCED,
+    fieldTypes: { supported: () => true },
+  });
   try {
-    const site = await local.store.getSite(cfg.siteId);
+    const site = await store.getSite(cfg.siteId);
     if (!site) throw new Error("no site");
     // the seed's required category applies to every collection: reuse the seeded post's terms
-    const [hello] = await local.store.listContentEntries(cfg.siteId, "posts");
-    await local.store.updateSite({
+    const [hello] = await store.listContentEntries(cfg.siteId, "posts");
+    await store.updateSite({
       ...site,
       collections: {
         ...site.collections,
+        places: {},
         events: {
           fields: [
             { key: "venue", type: "text", labels: { en: { label: "Venue" } }, localized: true },
@@ -88,6 +102,20 @@ async function addTypedFields(projectDir: string): Promise<void> {
               localized: false,
             },
             { key: "city", type: "text", labels: { en: { label: "City" } }, localized: false },
+            {
+              key: "place",
+              type: "reference",
+              labels: { en: { label: "Place" } },
+              localized: false,
+              collections: ["places"],
+            },
+            {
+              key: "lineup",
+              type: "repeater",
+              labels: { en: { label: "Lineup" } },
+              localized: false,
+              fields: [{ key: "act", type: "text", labels: { en: { label: "Act" } } }],
+            },
           ],
           listFields: ["startsAt"],
           expiry: { field: "endsAt", action: "unlist" },
@@ -105,7 +133,20 @@ async function addTypedFields(projectDir: string): Promise<void> {
     const day = 86_400_000;
     const at = (ms: number) => ({ at: new Date(ms).toISOString(), timeZone: "Europe/Istanbul" });
     const now = Date.now();
-    await local.store.createContentEntry({
+    const pier = await store.createContentEntry({
+      siteId: cfg.siteId,
+      collection: "places",
+      slug: "moda-pier",
+      locale: site.defaultLocale,
+      status: "published",
+      title: "Moda Pier",
+      body: { format: "markdown", value: "A pier on the Asian side, with a view of the old town." },
+      fields: {},
+      tags: [],
+      ...(hello?.terms ? { terms: hello.terms } : {}),
+      author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
+    } as never);
+    await store.createContentEntry({
       siteId: cfg.siteId,
       collection: "events",
       slug: "launch",
@@ -122,12 +163,14 @@ async function addTypedFields(projectDir: string): Promise<void> {
         agenda: "- Talks\n- Lunch",
         startsAt: at(now + 30 * day),
         endsAt: at(now + 30 * day + 1),
+        place: pier.id,
+        lineup: [{ act: "The Ferry Band" }, { act: "Night Owls" }],
       },
       tags: [],
       ...(hello?.terms ? { terms: hello.terms } : {}),
       author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
     } as never);
-    await local.store.createContentEntry({
+    await store.createContentEntry({
       siteId: cfg.siteId,
       collection: "events",
       slug: "retro",
@@ -140,7 +183,7 @@ async function addTypedFields(projectDir: string): Promise<void> {
       ...(hello?.terms ? { terms: hello.terms } : {}),
       author: { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" },
     } as never);
-    await local.store.createPage((await local.store.getSite(cfg.siteId)) ?? site, {
+    await store.createPage((await store.getSite(cfg.siteId)) ?? site, {
       siteId: cfg.siteId,
       path: "/events",
       title: "Events",
@@ -211,10 +254,20 @@ describe.each(FROZEN)("a theme copied at %s still builds with today's packages",
     expect(pages.article).toContain("<title>Hello, world · ");
     expect(pages.event).toContain("<title>Launch party · ");
     // themes from before RFC-0041 do not show field values
-    if (!SHOWS_FIELDS.has(version)) expect(pages.event).not.toContain("Kadıköy Hall");
-    // RFC-0042: entryHead is unchanged, so old themes keep the generic BlogPosting
-    expect(pages.event).toContain('"@type":"BlogPosting"');
-    expect(pages.event).not.toContain('"@type":"Event"');
+    if (!SHOWS_FIELDS.has(version)) {
+      expect(pages.event).not.toContain("Kadıköy Hall");
+      expect(pages.event).not.toContain("The Ferry Band");
+    } else {
+      // RFC-0045: the renderer's EntryFields draws the reference as a link, the repeater's items
+      expect(pages.event).toMatch(/<a href="\/places\/moda-pier"[^>]*>Moda Pier<\/a>/);
+      expect(pages.event).toContain("The Ferry Band");
+      expect(pages.event).toContain("Night Owls");
+    }
+    // RFC-0042: entryHead is unchanged, so themes from before it keep the generic BlogPosting;
+    // later ones call withStructuredData and get the collection's Event preset
+    const preset = PRESETS.has(version) ? "Event" : "BlogPosting";
+    expect(pages.event).toContain(`"@type":"${preset}"`);
+    expect(pages.event).not.toContain(`"@type":"${preset === "Event" ? "BlogPosting" : "Event"}"`);
     // the expiry and the field listing come with the renderer: a past event keeps its page but
     // leaves the listing, the sitemap and the feed
     expect(await read("events", "retro", "index.html")).toContain("Retro night");

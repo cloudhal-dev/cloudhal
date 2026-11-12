@@ -1,0 +1,20 @@
+---
+/** "Related posts" under an article (`relatedEntries`: shared primary category or tags). */
+import type { MediaContext } from "@cloudhal/astro-renderer/media";
+import type { ContentEntry } from "@cloudhal/core-contracts";
+import EntryList from "./EntryList.astro";
+
+interface Props {
+  title: string;
+  entries: ContentEntry[];
+  locale: string;
+  media?: MediaContext | undefined;
+}
+const { title, entries, locale, media } = Astro.props;
+---
+{entries.length > 0 && (
+  <aside class="ch-related" aria-labelledby="ch-related-title">
+    <h2 id="ch-related-title">{title}</h2>
+    <EntryList entries={entries} locale={locale} media={media} />
+  </aside>
+)}

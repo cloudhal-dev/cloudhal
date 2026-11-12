@@ -11,6 +11,13 @@
  */
 
 export {
+  type ConversionEntries,
+  conversionCollections,
+  conversionEntries,
+  conversionTargets,
+  foldText,
+} from "../references/conversion-maps.ts";
+export {
   FIELDS_FEATURE_VERSION,
   FIELDS_SUPPORTED,
   type FieldTypeSupport,

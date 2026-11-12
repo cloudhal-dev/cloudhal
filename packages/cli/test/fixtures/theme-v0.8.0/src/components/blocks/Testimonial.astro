@@ -1,0 +1,18 @@
+---
+/**
+ * The `testimonial` block (src/blocks.ts), in sections and inside bodies. `contentHtml` is the
+ * quote, already rendered by Cloudhal's safe markdown renderer; props were checked first.
+ */
+interface Props {
+  props: { author?: string; role?: string };
+  contentHtml?: string;
+}
+const { props, contentHtml = "" } = Astro.props;
+---
+<figure class="testimonial">
+  <blockquote set:html={contentHtml} />
+  <figcaption>
+    <span class="testimonial__author">{props.author}</span>
+    {props.role && <span class="testimonial__role">{props.role}</span>}
+  </figcaption>
+</figure>

@@ -5,10 +5,14 @@
  * `source.entryFields(entry, { locale, media })` (or `entryFields(source, entry, …)`) returns.
  *
  * Values are escaped text, except rich text (the body's markdown pipeline: raw HTML escaped, links
- * through `safeHref`) and images (`imageAttributes`, the asset's alt in the page's language). No
- * styles of its own: themes style `.ch-fields`, `.ch-field[data-type]` and `[data-field="<key>"]`.
+ * through `safeHref`) and images (`imageAttributes`, the asset's alt in the page's language).
+ * RFC-0045: a reference is a link to each target the page's view shows (`lang` on a card from the
+ * fallback locale; several in a list), a repeater a nested `dl` per item with something to show.
+ * Unresolved targets leave nothing: no id, no attribute, no empty link. No styles of its own:
+ * themes style `.ch-fields`, `.ch-field[data-type]`, `[data-field="<key>"]`, `.ch-references` and
+ * `.ch-items`.
  */
-import type { RenderedFields } from "../fields.ts";
+import type { RenderedField, RenderedFields } from "../fields.ts";
 
 interface Props {
   fields: RenderedFields;
@@ -19,14 +23,24 @@ interface Props {
 }
 const { fields, label, class: className } = Astro.props;
 const shown = Object.values(fields).filter((f) => !f.empty);
-const multiline = (f: (typeof shown)[number]) => f.def.type === "text" && f.def.multiline === true;
+const multiline = (f: RenderedField) => f.def.type === "text" && f.def.multiline === true;
+const langOf = (c: { fromFallbackLocale: boolean; locale: string }) =>
+  c.fromFallbackLocale ? c.locale : undefined;
 ---
 {shown.length > 0 && (
   <dl class:list={["ch-fields", className]} aria-label={label}>
     {shown.map((f) => (
       <div class="ch-field" data-field={f.key} data-type={f.def.type} data-multiline={multiline(f) ? "" : undefined} data-from-original={f.fromOriginal ? "" : undefined}>
         <dt>{f.label}</dt>
-        {f.html !== undefined ? (
+        {f.references !== undefined ? (
+          f.references.length === 1 && !Array.isArray(f.value) ? (
+            <dd><a href={f.references[0]?.url} lang={f.references[0] && langOf(f.references[0])}>{f.references[0]?.title}</a></dd>
+          ) : (
+            <dd><ul class="ch-references">{f.references.map((c) => <li><a href={c.url} lang={langOf(c)}>{c.title}</a></li>)}</ul></dd>
+          )
+        ) : f.items !== undefined ? (
+          <dd><ol class="ch-items">{f.items.map((item) => <li><Astro.self fields={item} /></li>)}</ol></dd>
+        ) : f.html !== undefined ? (
           <dd set:html={f.html} />
         ) : f.href !== undefined ? (
           <dd><a href={f.href}>{f.text}</a></dd>

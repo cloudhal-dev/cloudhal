@@ -1,0 +1,25 @@
+---
+/** `Home › … › current`: the visible twin of the `BreadcrumbList` JSON-LD in `<head>`. */
+interface Props {
+  label: string;
+  items: Array<{ name: string; href?: string | undefined }>;
+}
+const { label, items } = Astro.props;
+---
+{items.length > 1 && (
+  <nav aria-label={label} class="ch-breadcrumbs">
+    <ol>
+      {items.map((item, i) => (
+        <li>
+          {i === items.length - 1 ? (
+            <span aria-current="page">{item.name}</span>
+          ) : item.href ? (
+            <a href={item.href}>{item.name}</a>
+          ) : (
+            <span>{item.name}</span>
+          )}
+        </li>
+      ))}
+    </ol>
+  </nav>
+)}
