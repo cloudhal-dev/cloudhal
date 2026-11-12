@@ -202,7 +202,11 @@ async function slimBodies(
   const bundleOf = async (snapshot: Snapshot) => {
     if (limits?.unbundled?.has(snapshot.id)) return undefined;
     input.spend(bundleShardCount(snapshot));
-    return read(snapshot, budget);
+    const before = budget.spent.bytes;
+    const got = await read(snapshot, budget);
+    // A partial or mismatching bundle is discarded: only bodies kept count against the bytes.
+    if (!got) budget.spent.bytes = before;
+    return got;
   };
   const bundle = (await bundleOf(to)) ?? (await bundleOf(from));
   for (const [hash, s] of bundle ?? []) out.set(hash, s as Slim);
@@ -233,6 +237,9 @@ async function slimBodies(
 export async function planReferencePurge(input: ReferencePurgeInput): Promise<string | undefined> {
   const { from, to, read, tags } = input;
   if (input.limits?.references === false) return undefined;
+  // Nothing changed that a card shows: no entry and no shown asset (a term-only, asset-only or
+  // site-only publish). The closure could add no tag, so it reads nothing at all.
+  if (input.entries.length === 0 && input.reached.size === 0) return undefined;
   const siteOf = (s: Snapshot) => {
     const ref = s.nodes.find((n) => n.kind === "site" && n.id === s.siteId);
     return ref ? read<Site>(ref) : Promise.resolve(undefined);
@@ -241,9 +248,6 @@ export async function planReferencePurge(input: ReferencePurgeInput): Promise<st
   if (!a || !b) return "a snapshot has no site node";
   if (!definesReferences(a) && !definesReferences(b)) return undefined;
   if (hasMarker(a) || hasMarker(b)) return "a field operation is running in a published snapshot";
-  // Nothing changed that a card shows: no entry and no shown asset (a term-only, asset-only or
-  // site-only publish). The closure could add no tag, so it reads nothing.
-  if (input.entries.length === 0 && input.reached.size === 0) return undefined;
   if (!input.reader.readSnapshotBundle) return "the snapshot reader cannot stream bodies";
   let bodies: Map<string, Slim>;
   try {

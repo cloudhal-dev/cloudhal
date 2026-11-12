@@ -71,6 +71,7 @@ import { type BuiltinInputs, graphBuiltinRunner } from "./automations.ts";
 import { type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
+import { releaseBlobAllowance } from "./references/release-purge.ts";
 import type * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
 import { releaseDepsOf } from "./release-deps.ts";
@@ -192,6 +193,7 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       schedules,
       purge,
       counted,
+      blobReads: releaseBlobAllowance(meter.budget),
       onPublished: o.onReleasePublished,
       log: o.log,
     }),

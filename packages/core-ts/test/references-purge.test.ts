@@ -18,7 +18,7 @@ import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GATES_ENFORCED } from "../src/availability.ts";
-import type { BundleReadOptions } from "../src/bundles.ts";
+import { type BundleReadOptions, bundleKey, bundleShardCount } from "../src/bundles.ts";
 import { type CachePurgeOptions, planCachePurge, type SnapshotReader } from "../src/cache-purge.ts";
 import { nodeCacheTag, siteCacheTag } from "../src/cache-tags.ts";
 import { continueFieldOperation, runFieldOperation } from "../src/fields-operations/index.ts";
@@ -370,17 +370,41 @@ describe("planCachePurge: the referrer closure (RFC-0045 §2)", () => {
   it("the closure's own reads count against maxReads (not just the planner's)", async () => {
     const { hall, event } = await world();
     for (let i = 0; i < 20; i++) await make("events", `filler-${i}`);
+    await publish();
+    // a bundled `from` and a manual `to`: the closure spends shard reads only (the changed
+    // entry's bodies are the planner's, every other one is in `from`'s bundle)
+    const from = (await fresh()).publishedSnapshotId as string;
     await edit(hall, { title: "Great hall" });
-    const a = await snap("manual");
-    await edit(hall, { title: "Grand hall" });
-    const b = await snap("manual");
-    const change = { from: a.id, to: b.id };
-    // the planner's own reads, the closure aside
+    const to = await snap("manual");
+    const change = { from, to: to.id };
     await plan(change, { references: false });
     const own = counts.nodes;
-    const tight = await plan(change, { maxReads: own + 5 });
+    const snapshots = await Promise.all([store.getSnapshot(from), store.getSnapshot(to.id)]);
+    const shards = snapshots.reduce((n, s) => n + bundleShardCount(s as Snapshot), 0);
+    expect((await tagsOf(change, { maxReads: own + shards })).has(node(event))).toBe(true);
+    expect(counts.nodes).toBe(own);
+    const tight = await plan(change, { maxReads: own + shards - 1 });
     expect(tight.mode === "everything" ? tight.reason : "tags").toMatch(/node reads/);
-    expect((await tagsOf(change, { maxReads: own + 100 })).has(node(event))).toBe(true);
+  });
+
+  it("a discarded partial bundle's bytes do not count against the byte budget", async () => {
+    const { hall, event } = await world();
+    const from = (await fresh()).publishedSnapshotId as string;
+    const fromSnap = (await store.getSnapshot(from)) as Snapshot;
+    const fromBytes = (await store.blobs.get(bundleKey(site.id, from, 0)))?.byteLength ?? 0;
+    await edit(hall, { title: "Great hall" });
+    const to = await snap("publish");
+    // `to`'s shard is replaced by a mismatching one: within the budget alone, past it together
+    // with `from`'s, read and then discarded
+    const junk = JSON.stringify({
+      v: 1,
+      snapshotId: "snap_other0001",
+      pad: "x".repeat(Math.floor(fromBytes * 0.6)),
+    });
+    await store.blobs.put(bundleKey(site.id, to.id, 0), new TextEncoder().encode(junk));
+    expect(bundleShardCount(fromSnap)).toBe(1);
+    const tags = await tagsOf(await point(to.id), { maxBodyBytes: Math.floor(fromBytes * 1.4) });
+    expect(tags.has(node(event))).toBe(true);
   });
 
   it("spends no shard reads on a snapshot known to have no bundle", async () => {

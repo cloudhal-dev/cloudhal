@@ -1223,8 +1223,15 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
   - cut to what the closure needs, and never cached whole.
 - **The node budget** (`maxNodes`) counts the entry bodies the closure holds across both snapshots, plus the node count of the one bundle it reads.
 - **Release runs.**
-  - The purge is re-planned after the batch from the pointer it moved (`from`, the live snapshot it replaced). That is `baseSnapshotId` whenever something was live; a first publish purges everything.
-  - The re-plan runs over the tick's counting driver, never refused. If it throws, the run sends purge-everything, never the stored plan.
-  - First, the run writes its `scheduled` snapshot's bundle, best effort, for snapshots of at most 1,000 nodes. So back-to-back releases each read one bundle. A snapshot left without one is passed to the planner as `unbundled`, so no shard reads are spent on it.
-  - `RELEASE_EXECUTOR_COST` is 26: the batch, `refreshSearch`'s 7, the re-plan's and the bundle's reads, and the bookkeeping. The rare site-moved retry stays outside it, as before.
+  - **Sites without references behave exactly as before 3b.** The run sends the plan stored at pin time, or nothing when it purges nothing, and makes no extra read. The test is the site node the release publishes, which `publishRelease` returns. A site whose last reference field was removed since `from` gets the stored plan, as every site did before.
+  - **Sites with references** (or converting from them) re-plan after the batch, from the pointer it moved (`from`, the live snapshot it replaced). That is `baseSnapshotId` whenever something was live; a first publish purges everything.
+    - The re-plan runs over the tick's counting driver, never refused, and spends no shard reads on `to`, which has no bundle yet.
+    - If it throws, or the tick's blob allowance is spent, the run purges everything, never the stored plan.
+  - **Order:** send the purge first, then write `to`'s bundle, best effort, for the next run. The write happens only when `from` has a bundle. It is built from `from`'s bodies plus at most 100 changed nodes fetched one by one, for snapshots of at most 1,000 nodes. This run's re-plan reads `from`'s bundle and the changed items.
+  - **Subrequests:** a tick's release runs share one blob allowance: 400 on Workers Free, under its 1,000 R2 and D1 calls per invocation together with the tick's 40 statements; 4,000 on Paid, under its default 10,000 with 900. A re-plan reads at most 250 blobs, a bundle write at most 108.
+  - **`RELEASE_EXECUTOR_COST` is 26:**
+    - the stored plan (1), the reads (3), the batch (8) and `refreshSearch` (7);
+    - then the re-plan's two `getSnapshot` reads (the bundle write reuses them), the purge's bookkeeping (4) and `recordPurge` (1).
+
+    The rare site-moved retry stays outside it, as before.
 - **The pin-time plan skips the closure** (`references: false`). It would read every body one by one, and for sites with references it is the batch's *expected* outcome only: the run-time re-plan, or purge-everything, covers referrers.

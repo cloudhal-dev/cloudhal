@@ -17,6 +17,7 @@ import { TICK_BUDGETS } from "@cloudhal/schedules";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { bundleShardCount } from "./bundles.ts";
 import type { CachePurgePlan } from "./cache-purge.ts";
 import { ScheduledLockedError } from "./errors.ts";
 import { type PersonApproval, ReleaseService, runScheduledTick } from "./releases.ts";
@@ -494,7 +495,8 @@ export function releasesSuite(
       expect((await get(release.id)).state).toBe("published");
     });
 
-    it("re-plans the purge at run time: a referrer published after the pin is purged (RFC-0045)", async () => {
+    /** RFC-0045: a `venue` reference from events to places (enabled on this suite's store). */
+    async function venueSite() {
       const s = await fresh();
       const venue: FieldDefinition = {
         key: "venue",
@@ -508,33 +510,79 @@ export function releasesSuite(
         collections: { ...s.collections, places: {}, events: { fields: [venue] } },
       });
       const hall = await story({ collection: "places", slug: "hall", title: "Hall" });
-      await publishSite();
-      // the release retitles the hall; at pin time nothing names it
-      await store.updateContentEntry({ ...hall, title: "Main hall" });
-      await scheduled([hall.id]);
-      // a referrer goes live after the pin, by an ordinary publish
       const event = await story({
         collection: "events",
         slug: "launch",
         fields: { venue: hall.id },
       });
       await publishSite();
-      const plans: CachePurgePlan[] = [];
-      const report = await tick(T, {
-        purge: () => async (_siteId, plan) => {
-          plans.push(plan);
-          return "tags";
+      return { hall, event };
+    }
+    /** A blob store that counts gets by key. */
+    const counting = () => {
+      const gets: string[] = [];
+      const wrapped: BlobStore = new Proxy(blobs, {
+        get(target, prop, receiver) {
+          if (prop === "get")
+            return (key: string) => {
+              gets.push(key);
+              return target.get(key);
+            };
+          const v = Reflect.get(target, prop, receiver);
+          return typeof v === "function" ? v.bind(target) : v;
         },
       });
-      expect(report.ran).toBe(1);
+      return { gets, blobs: wrapped };
+    };
+    const capture =
+      (plans: CachePurgePlan[], answer: "tags" | "everything" = "tags") =>
+      () =>
+      async (_siteId: string, plan: CachePurgePlan) => {
+        plans.push(plan);
+        return answer;
+      };
+
+    it("re-plans the purge at run time: a referrer published after the pin is purged (RFC-0045)", async () => {
+      const { hall } = await venueSite();
+      // the release retitles the hall; a referrer goes live after the pin, by an ordinary publish
+      await store.updateContentEntry({
+        ...((await store.getContentEntry(hall.id)) as ContentEntry),
+        title: "Main hall",
+      });
+      await scheduled([hall.id]);
+      const late = await story({ collection: "events", slug: "late", fields: { venue: hall.id } });
+      await publishSite();
+      const plans: CachePurgePlan[] = [];
+      expect((await tick(T, { purge: capture(plans) })).ran).toBe(1);
       const tags = plans[0]?.mode === "tags" ? plans[0].tags : [];
       expect(tags).toContain(`cloudhal-node-${hall.id}`);
-      expect(tags).toContain(`cloudhal-node-${event.id}`);
+      expect(tags).toContain(`cloudhal-node-${late.id}`);
+    });
+
+    it("a site without references sends the pin-time plan and reads no more blobs than before", async () => {
+      // the same release twice: without a purger (Node: the executor sends nothing), then with
+      const first = await story();
+      await scheduled([first.id]);
+      const quiet = counting();
+      expect((await tick(T, { blobs: quiet.blobs })).ran).toBe(1);
+      const second = await story({ slug: "second-story", title: "Second story" });
+      const { release } = await scheduled([second.id], { at: T + HOUR });
+      const stored = await svc.schedules.releasePurgePlan(release.id);
+      const c = counting();
+      const plans: CachePurgePlan[] = [];
+      expect((await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) })).ran).toBe(1);
+      expect(plans).toEqual([stored]);
+      expect(c.gets.filter((k) => k.startsWith("bundles/"))).toEqual([]);
+      expect(c.gets).toHaveLength(quiet.gets.length);
     });
 
     it("a run-time re-plan that fails still purges everything, never drops the purge", async () => {
-      const s = await story();
-      await scheduled([s.id]);
+      const { hall } = await venueSite();
+      await store.updateContentEntry({
+        ...((await store.getContentEntry(hall.id)) as ContentEntry),
+        title: "Main hall",
+      });
+      await scheduled([hall.id]);
       // after the release's batch, every snapshot read fails (a transient D1 error)
       let committed = false;
       const failing: SqlDriver = {
@@ -554,42 +602,78 @@ export function releasesSuite(
         },
       };
       const plans: CachePurgePlan[] = [];
-      const report = await tick(T, {
-        sql: failing,
-        purge: () => async (_siteId, plan) => {
-          plans.push(plan);
-          return "everything";
-        },
-      });
+      const report = await tick(T, { sql: failing, purge: capture(plans, "everything") });
       expect(report.ran).toBe(1);
       expect(committed).toBe(true);
-      expect(plans).toHaveLength(1);
-      expect(plans[0]?.mode).toBe("everything");
+      expect(plans.map((p) => p.mode)).toEqual(["everything"]);
       const r = (await svc.list(site.id))[0] as Release;
       expect(r.outcome).toMatchObject({ kind: "published", purge: "everything" });
     });
 
-    it("back-to-back releases: each run writes its snapshot's bundle, so the next plan reads it", async () => {
-      const first = await story();
-      await scheduled([first.id]);
+    it("back-to-back releases on a reference site: one bundle each, never to's shards", async () => {
+      const { hall, event } = await venueSite();
+      const edit = async (title: string) =>
+        store.updateContentEntry({
+          ...((await store.getContentEntry(hall.id)) as ContentEntry),
+          title,
+        });
+      const shardsOf = (gets: string[], id: string) => gets.filter((k) => k.includes(`/${id}/`));
+      // 1: `from` (a publish) has a bundle; `to` gets one after the purge
+      const L = await live();
+      await edit("Main hall");
+      await scheduled([hall.id]);
+      const c1 = counting();
       const plans: CachePurgePlan[] = [];
-      const purge = () => async (_siteId: string, plan: CachePurgePlan) => {
-        plans.push(plan);
-        return "tags" as const;
-      };
-      await tick(T, { purge });
+      await tick(T, { blobs: c1.blobs, purge: capture(plans) });
       const S1 = await live();
       expect(S1.reason).toBe("scheduled");
+      expect(shardsOf(c1.gets, S1.id)).toEqual([]);
+      expect(shardsOf(c1.gets, L.id).length).toBeGreaterThan(0);
       expect(await store.readSnapshotBundle(S1)).toBeDefined();
-      const second = await story({ slug: "second-story", title: "Second story" });
-      await scheduled([second.id], { at: T + HOUR });
-      await tick(T + HOUR, { purge });
+      // 2: `from` is the first release's scheduled snapshot, bundled by its run
+      await edit("Great hall");
+      await scheduled([hall.id], { at: T + HOUR });
+      const c2 = counting();
+      await tick(T + HOUR, { blobs: c2.blobs, purge: capture(plans) });
       const S2 = await live();
-      expect(S2.id).not.toBe(S1.id);
-      expect(await store.readSnapshotBundle(S2)).toBeDefined();
-      expect(plans.map((p) => p.mode)).toEqual(["tags", "tags"]);
-      const tags = plans[1]?.mode === "tags" ? plans[1].tags : [];
-      expect(tags).toContain(`cloudhal-node-${second.id}`);
+      expect(shardsOf(c2.gets, S2.id)).toEqual([]);
+      // `from`'s shards: once for the re-plan, once to build `to`'s bundle (the rest of `to`
+      // comes from them; only changed nodes are fetched one by one)
+      expect(shardsOf(c2.gets, S1.id)).toHaveLength(2 * bundleShardCount(S1));
+      for (const p of plans.slice(0, 2)) {
+        expect(p.mode).toBe("tags");
+        expect(p.mode === "tags" ? p.tags : []).toContain(`cloudhal-node-${event.id}`);
+      }
+    });
+
+    it("back-to-back releases where from has no bundle: from's shards tried once, to's never", async () => {
+      const { hall, event } = await venueSite();
+      const edit = async (title: string) =>
+        store.updateContentEntry({
+          ...((await store.getContentEntry(hall.id)) as ContentEntry),
+          title,
+        });
+      // a first release run with nothing to purge (Node): its snapshot gets no bundle
+      await edit("Main hall");
+      await scheduled([hall.id]);
+      await tick(T);
+      const S1 = await live();
+      expect(await store.readSnapshotBundle(S1)).toBeUndefined();
+      await edit("Great hall");
+      await scheduled([hall.id], { at: T + HOUR });
+      const c = counting();
+      const plans: CachePurgePlan[] = [];
+      await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) });
+      const S2 = await live();
+      expect(c.gets.filter((k) => k.includes(`/${S2.id}/`))).toEqual([]);
+      expect(c.gets.filter((k) => k.includes(`/${S1.id}/`))).toHaveLength(1);
+      const p = plans[0];
+      expect(
+        p?.mode === "everything" ||
+          (p?.mode === "tags" && p.tags.includes(`cloudhal-node-${event.id}`)),
+      ).toBe(true);
+      // nor does it write `to`'s bundle without `from`'s
+      expect(await store.readSnapshotBundle(S2)).toBeUndefined();
     });
 
     it("sends the purge re-planned at run time and records a deferred purge", async () => {
