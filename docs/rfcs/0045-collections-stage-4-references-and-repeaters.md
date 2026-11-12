@@ -1271,3 +1271,27 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **The CLI and the admin API** take `collections`, `maxItems`, `subFields` and `sub`, and the API also takes `itemLabel`. MCP's operation tools keep their step-1 inputs until step 5.
 - **[#213](https://github.com/cloudhal-dev/cloudhal/issues/213)** (from 3b): the release gate's read of the published site node is retried once, then the run purges everything.
 
+#### Review round 1 (2026-11-12, PM review of PR #214)
+
+- **Values that stop converting while an operation runs** (root cause 1). The dry run sees only the start state; meanwhile a target can be archived or deleted, or a second entry can take the same title. One rule:
+  - **Phase C's pending check reads the value where the JSON type cannot tell.** For text ↔ single reference, top-level and in `sub` items, a string that is no group id is pending to a reference, and a string that still is one is pending from a reference. The test is a `GLOB` plus length bounds, the SQL form of `GROUP_ID_PATTERN`. A list of ids and a list of items are told apart by their first element.
+  - **Each pass reports its unconvertible entries** (`FieldOperationResult.unconvertible`, `FieldRevertResult.unconvertible`: `{ entryId, reason }`, next to `skipped`). They keep the marker, and with it `field_operation_running`.
+  - **The way out.** `continueFieldOperation` and `revertFieldOperation` take `onInvalid: "clear"`, which drops what no longer converts, so the marker can always be lifted. The admin API's continue and revert routes take it in the body, and the CLI's `continue` and `revert` take `--clear`. The CLI stops looping while entries are unconvertible and says how to go on.
+  - Id-shaped legacy text (`entry_…` naming no group) converting to a reference is the one value this cannot tell apart. The dry run counts it unconvertible, and readers show nothing for it.
+- **The "fits" shortcut** (root cause 2). A group id is valid text, and id-shaped text is a valid single reference. For text ↔ reference, top-level and in items, the shortcut is therefore never taken, in `retype`, `normalizeThroughMarkers`, `resolveFields` (`convertsEveryValue`), phase B and revert. Every value goes through the table, and the table keeps a value already in the new type:
+  - text → reference keeps an id of a usable target group that is not the entry's own (`ConversionEntries.usable`);
+  - reference → text keeps a string that is no group id.
+
+  This is the PM's baseline rule in value form. A value a person wrote under the new type is the value the table keeps, and a person's newly chosen id still differs from the normalized stored one, so the writer guards it with the own-group check. Readers need no baseline. Phase B's guard treats every id in a value converting from text as newly chosen (`carriedPart`), so a converted id is guarded.
+- **Revert of a sub-field removal** counts the definition as restored only once the repeater has the sub-field again, so the definition, its values, their rows and the guard come back.
+- **`hasReferenceFields`** counts any marker whose source type can hold references (`fromType` reference or repeater). A repeater converting away keeps its rows visible until each entry is rewritten.
+- **`shared` after a rename's revert** matches the definition's key and its `fromKey` (`root_key IN (key, fromKey)`), so a revert that also restores an older `localized` updates the rows of entries under either key.
+- **Release dependencies through the markers.** For a field carrying a marker, every group-id string in its value, and in its old key's value, is dropped from the dependency walk. Field values name no other entry. This covers a sub-field rename's old key and a conversion from references.
+- **The edition copy** reads a reference sub-value through a running sub-field rename, as `referenceUses` does, so an unusable id is dropped and reported.
+- **The 100-references cap** is counted by the dry run and by every pass's decider for a conversion. Over the cap, the value is unconvertible, or cleared under `onInvalid: "clear"`.
+- **Collections widen only where ids stay.** The check runs only when the field stays a reference, or becomes one with ids carried over. A sub-field reference → text is no longer held to another sub-field's collections.
+- **Titles for reference → text** come from every member, any status, so an archived target converts to its title. The title chosen is the default-locale member's, else the group's original's, else the member with the lowest locale, then id, whatever the read order. Only a group with no member in the site is unconvertible. Archived members still match no text.
+- **Repeater → multiple reference** deduplicates ids, first seen first.
+- **`multiple`** is ignored where it does not apply, as before step 4. The CLI sends `multiple: false` for a reference target without `--multiple`, so multiple → single can be asked for.
+- **Malformed `subFields`** (entries that are not objects) are a 400 in the admin API and a CLI error, never a 500.
+

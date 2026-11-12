@@ -104,6 +104,8 @@ export interface PassResult {
   written: { id: string; decision: Decision | undefined }[];
   /** The budget ran out before every planned entry was written. */
   exhausted: boolean;
+  /** RFC-0045 §7: entries left as they are because a value does not convert, with the reason. */
+  unconvertible: { entryId: string; reason: string }[];
 }
 
 /** Sources before the translations made from them (chains are short; capped at 8). */
@@ -198,7 +200,17 @@ function resetKeys(keys: readonly string[], planned: readonly Planned[]): string
 export async function rewritePass(input: PassInput): Promise<PassResult> {
   const { ctx } = input;
   const { planned, decisions } = await planPass(input, ctx.stamp());
-  const out: PassResult = { rewritten: 0, skipped: [], written: [], exhausted: false };
+  const out: PassResult = {
+    rewritten: 0,
+    skipped: [],
+    written: [],
+    exhausted: false,
+    unconvertible: [...decisions].flatMap(([entryId, d]) =>
+      d?.change?.kind === "unconvertible" && !d.fields && !d.replace
+        ? [{ entryId, reason: d.change.reason ?? "does not convert" }]
+        : [],
+    ),
+  };
   // RFC-0045 §2.1: rows and target pairs come from the pass's definitions, so anchor them.
   let anchor: Cond | undefined;
   if (hasReferenceFields(input.site))

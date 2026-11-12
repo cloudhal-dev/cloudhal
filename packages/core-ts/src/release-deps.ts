@@ -9,6 +9,7 @@
  */
 import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
 import { type NodeVersion, referencedNodeIds } from "@cloudhal/schedules/engine";
+import { GROUP_ID_PATTERN } from "./fields/props.ts";
 import { fieldDefinitions, isRecord, renamedFrom } from "./fields/types.ts";
 
 /** One value with its reference ids removed (a repeater keeps its other sub-values). */
@@ -24,16 +25,33 @@ function withoutReferences(def: FieldDefinition, value: unknown): unknown {
   );
 }
 
-/** An entry body without its reference values, under the site's definitions. */
+const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
+
+/**
+ * A value of a field an operation is rewriting, without the group ids it may still hold in its
+ * old shape (RFC-0045 §7: a running conversion from references, a sub-field rename's old key).
+ * Field values name no other entry, so every group-id string is a reference.
+ */
+function withoutIds(value: unknown): unknown {
+  if (typeof value === "string") return GROUP_ID.test(value) ? undefined : value;
+  if (Array.isArray(value)) return value.map(withoutIds).filter((v) => v !== undefined);
+  if (!isRecord(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withoutIds(v)]));
+}
+
+/** An entry body without its reference values, under the site's definitions (and markers). */
 export function stripReferences(site: Pick<Site, "collections">, body: unknown): unknown {
   if (!isRecord(body) || typeof body.collection !== "string" || !isRecord(body.fields)) return body;
   const defs = fieldDefinitions(site, body.collection);
-  if (!defs.some((d) => d.type === "reference" || d.type === "repeater")) return body;
+  if (!defs.some((d) => d.type === "reference" || d.type === "repeater" || d.migration))
+    return body;
   const fields: Record<string, unknown> = { ...body.fields };
   for (const def of defs)
     for (const key of [def.key, renamedFrom(def)])
-      if (key !== undefined && Object.hasOwn(fields, key))
-        fields[key] = withoutReferences(def, fields[key]);
+      if (key !== undefined && Object.hasOwn(fields, key)) {
+        const value = withoutReferences(def, fields[key]);
+        fields[key] = def.migration ? withoutIds(value) : value;
+      }
   return { ...body, fields };
 }
 

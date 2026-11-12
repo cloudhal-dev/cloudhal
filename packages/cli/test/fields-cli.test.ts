@@ -119,6 +119,22 @@ describe("cloudhal fields (RFC-0041 §6)", () => {
     expect(() =>
       parseFieldsArgs(["retype", "events", "venue", "reference"], { maxItems: "0" }),
     ).toThrow(/max-items/);
+    // without --multiple a reference target is single, so multiple → single can be asked for
+    expect(
+      parseFieldsArgs(["retype", "events", "venue", "reference"], { collections: "places" }),
+    ).toMatchObject({ op: { type: "reference", multiple: false } });
+    // continue and revert take --clear (RFC-0045 §7: values that stopped converting)
+    expect(parseFieldsArgs(["continue", "events", "snap_1"], { clear: true })).toEqual({
+      kind: "continue",
+      collection: "events",
+      id: "snap_1",
+      clear: true,
+    });
+    expect(parseFieldsArgs(["revert", "events", "snap_1"], {})).toEqual({
+      kind: "revert",
+      collection: "events",
+      id: "snap_1",
+    });
   });
 
   it("reads --sub-fields from a file; the local store still refuses the types (step 7)", async () => {
@@ -139,6 +155,10 @@ describe("cloudhal fields (RFC-0041 §6)", () => {
         "--dry-run",
       ]),
     ).rejects.toThrow(/not enabled on this server/);
+    await writeFile(path.join(projectDir, "bad.json"), JSON.stringify([1, "x"]));
+    await expect(
+      main(["fields", "retype", "events", "venue", "repeater", "--sub-fields", "bad.json"]),
+    ).rejects.toThrow(/JSON list of sub-field definitions/);
     cwd.mockRestore();
     expect(await fields()).toEqual({ venue: "Hall" });
   });

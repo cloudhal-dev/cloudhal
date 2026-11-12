@@ -13,9 +13,11 @@ import {
 } from "@cloudhal/core-contracts";
 import { InvariantError } from "../errors.ts";
 import { checkFieldDefinitions, refuseFieldIssues } from "../fields/index.ts";
-import { convertContext, rewriteFields } from "../fields/migration.ts";
+import { convertContext, rewriteFields, type ValueChange } from "../fields/migration.ts";
+import { fieldDefinitions } from "../fields/types.ts";
 import { referenceDefinitionOptions } from "../references/capability.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
+import { referenceCountIssues } from "../references/values.ts";
 import {
   checkOperation,
   currentDefinition,
@@ -30,7 +32,7 @@ import {
 } from "./plan.ts";
 import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
 import { buildReport } from "./report.ts";
-import { type Decide, loadEntries, rewritePass } from "./rewrite.ts";
+import { type Decide, type Decision, loadEntries, rewritePass } from "./rewrite.ts";
 import {
   labelOf,
   nothingPending,
@@ -66,12 +68,18 @@ async function decider(
   ctx: OperationContext,
   site: Site,
   def: FieldDefinition,
-  input: { op: FieldOperation; pristine: (id: string, hash: string) => boolean },
+  input: {
+    op: FieldOperation;
+    pristine: (id: string, hash: string) => boolean;
+    /** A continuing call's `onInvalid` (RFC-0045 §7), else the request's. */
+    onInvalid?: "clear" | undefined;
+  },
 ): Promise<Decide> {
   const { op, pristine } = input;
   const entries = await loadConversionEntries(ctx.store, site, [def]);
   const convert = { ...convertContext(site), entries };
-  const onInvalid = op.op === "change_field_type" ? op.onInvalid : undefined;
+  const onInvalid = input.onInvalid ?? (op.op === "change_field_type" ? op.onInvalid : undefined);
+  const defs = fieldDefinitions(site, op.collection);
   return (row, translation) => {
     const r = rewriteFields({
       def,
@@ -81,7 +89,34 @@ async function decider(
       pristine: pristine(row.entry.id, row.hash),
       onInvalid,
     });
-    return r.values || r.change ? { fields: r.values, change: r.change } : undefined;
+    if (!r.values) return r.change ? { fields: undefined, change: r.change } : undefined;
+    return withinReferenceCap(defs, def, { values: r.values, change: r.change, onInvalid });
+  };
+}
+
+/**
+ * RFC-0045 §1: a conversion into references keeps the entry within 100 reference values; over
+ * the cap the value is unconvertible, or cleared under `onInvalid: "clear"`.
+ */
+function withinReferenceCap(
+  defs: readonly FieldDefinition[],
+  def: FieldDefinition,
+  r: {
+    values: Record<string, unknown>;
+    change: ValueChange | undefined;
+    onInvalid?: "clear" | undefined;
+  },
+): Decision {
+  const over =
+    def.migration?.fromType !== undefined ? referenceCountIssues(defs, r.values)[0] : undefined;
+  if (!over) return { fields: r.values, change: r.change };
+  const before = r.change?.before;
+  if (r.onInvalid !== "clear")
+    return { change: { kind: "unconvertible", before, after: undefined, reason: over.message } };
+  const { [def.key]: _over, ...rest } = r.values;
+  return {
+    fields: rest,
+    change: { kind: "cleared", before, after: undefined, reason: over.message },
   };
 }
 
@@ -132,6 +167,7 @@ function result(
     report,
     rewritten: 0,
     skipped: [],
+    unconvertible: [],
     beforeSnapshotId: record.before.id,
     ...(record.after ? { afterSnapshotId: record.after.id } : {}),
     ...extra,
@@ -169,6 +205,7 @@ export async function runFieldOperation(
       report,
       rewritten: 0,
       skipped: [],
+      unconvertible: [],
     };
   if (report.refusal)
     throw new InvariantError("field_values_unconvertible", report.refusal.message, { report });
@@ -263,6 +300,7 @@ async function proceed(
   const hashes = new Map(before.nodes.map((n) => [n.id, n.hash]));
   let rewritten = 0;
   let skipped: FieldOperationResult["skipped"] = [];
+  let unconvertible: FieldOperationResult["unconvertible"] = [];
   for (let pass = 0; pass < PASSES; pass++) {
     site = await requireSite(ctx, siteId);
     const marked = markedField(site, op.collection, id);
@@ -275,6 +313,7 @@ async function proceed(
       decide: await decider(ctx, site, marked.def, {
         op,
         pristine: (eid, hash) => hashes.get(eid) === hash,
+        onInvalid: options.onInvalid,
       }),
       guard: markerGuard(siteId, op.collection, id),
       done: rewritten,
@@ -282,7 +321,9 @@ async function proceed(
     });
     rewritten += r.rewritten;
     skipped = r.skipped;
-    if (r.exhausted) return result(record, report, { rewritten, skipped, done: false });
+    unconvertible = r.unconvertible;
+    if (r.exhausted)
+      return result(record, report, { rewritten, skipped, unconvertible, done: false });
     if (skipped.length === 0) break;
   }
   const marked = markedField(site, op.collection, id);
@@ -291,7 +332,8 @@ async function proceed(
     const wrote = await writeSite(ctx, siteId, (s) => phaseCSite(s, op.collection, id), {
       guard: nothingPending(pending),
     });
-    if (wrote === "guarded") return result(record, report, { rewritten, skipped, done: false });
+    if (wrote === "guarded")
+      return result(record, report, { rewritten, skipped, unconvertible, done: false });
   }
   const after = await ctx.store.createSnapshot(siteId, {
     actor: options.actor,

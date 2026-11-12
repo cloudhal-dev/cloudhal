@@ -6,11 +6,12 @@
  *
  * - `byText`: case-folded slug or default-locale title → the groups with such a member among the
  *   target collections (text → reference picks the one group; none or several is unconvertible);
- * - `titles`: group → its default-locale member's title (reference → text).
+ * - `titles`: group → a member's title, chosen without regard to order (reference → text);
+ * - `usable`: groups with a member that is not archived.
  *
- * Archived entries count nothing: a converted value is a newly chosen target, which the store's
- * target guard requires to be usable (§2.1). Pure and Worker-safe; the conversion rows that read
- * the maps land with rollout step 4.
+ * Archived entries match no text: a converted value is a newly chosen target, which the store's
+ * target guard requires to be usable (§2.1). They still lend their title: reference → text finds
+ * only a group with no member in the site unconvertible. Pure and Worker-safe.
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { memberGroup } from "./members.ts";
@@ -19,8 +20,13 @@ import { memberGroup } from "./members.ts";
 export interface ConversionEntries {
   /** Case-folded slug or default-locale title → group ids, in first-seen order. */
   readonly byText: ReadonlyMap<string, readonly string[]>;
-  /** Group id → its default-locale member's title. */
+  /**
+   * Group id → a member's title, any status: the default-locale member's, else the group's
+   * original's, else the member with the lowest locale (then id). Every group with a member.
+   */
   readonly titles: ReadonlyMap<string, string>;
+  /** The groups with a member that is not archived (a value text → reference may keep). */
+  readonly usable: ReadonlySet<string>;
 }
 
 /** The one case fold every converter compares with. */
@@ -65,7 +71,8 @@ export function conversionEntries(
   collections?: ReadonlySet<string>,
 ): ConversionEntries {
   const byText = new Map<string, string[]>();
-  const titles = new Map<string, string>();
+  const titled = new Map<string, { rank: string; title: string }>();
+  const usable = new Set<string>();
   const all = collections === undefined || collections.has("*");
   const add = (text: string, group: string) => {
     const key = foldText(text);
@@ -75,13 +82,18 @@ export function conversionEntries(
     else if (!list.includes(group)) list.push(group);
   };
   for (const e of entries) {
-    if (e.status === "archived") continue;
     if (!all && !collections.has(e.collection)) continue;
     const group = memberGroup(e);
     const isDefault = e.locale === defaultLocale;
-    if (isDefault && !titles.has(group)) titles.set(group, e.title);
+    // Order-independent, so every source picks the same title for a group.
+    const rank = `${isDefault ? 0 : e.id === group ? 1 : 2}\u0000${e.locale}\u0000${e.id}`;
+    const held = titled.get(group);
+    if (!held || rank < held.rank) titled.set(group, { rank, title: e.title });
+    if (e.status === "archived") continue;
+    usable.add(group);
     add(e.slug, group);
     if (isDefault) add(e.title, group);
   }
-  return { byText, titles };
+  const titles = new Map([...titled].map(([g, t]) => [g, t.title] as const));
+  return { byText, titles, usable };
 }

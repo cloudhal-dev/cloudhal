@@ -5,10 +5,11 @@
  * handlers through `/api/admin` with the deployment token (`cloudhal fields … --remote`).
  *
  * - `POST …/collections/:key/fields/operations` ← `{ op, …, dryRun? }` → the result (`done: false`
- *   when the budget ran out); `?continue=<operationId>` resumes one instead
+ *   when the budget ran out); `?continue=<operationId>` resumes one instead, with
+ *   `{ onInvalid: "clear" }` dropping values that stopped converting (RFC-0045 §7)
  * - `GET  …/collections/:key/fields/operations/:operationId` → its status
- * - `POST …/collections/:key/fields/operations/:operationId/revert` → the revert result (call again
- *   while `done: false`)
+ * - `POST …/collections/:key/fields/operations/:operationId/revert` ← `{ onInvalid? }` → the revert
+ *   result (call again while `done: false`)
  *
  * Refusals are the store's codes: `operation_in_progress` (409), `field_values_unconvertible` (422,
  * with the dry run's report in `details.report`), `field_operation_incomplete` (409), and the
@@ -55,7 +56,8 @@ function stage4Of(b: Body) {
     throw badRequest("collections must be a list of collection keys");
   if (b.maxItems !== undefined && !Number.isInteger(b.maxItems))
     throw badRequest("maxItems must be a whole number");
-  if (b.subFields !== undefined && !Array.isArray(b.subFields))
+  const record = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (b.subFields !== undefined && (!Array.isArray(b.subFields) || !b.subFields.every(record)))
     throw badRequest("subFields must be a list of sub-field definitions");
   if (b.itemLabel !== undefined && typeof b.itemLabel !== "string")
     throw badRequest("itemLabel must be a sub-field key");
@@ -105,6 +107,16 @@ export function operationOf(collection: string, b: Body): FieldOperation {
   };
 }
 
+/**
+ * RFC-0045 §7: `{ onInvalid: "clear" }` on a continue or a revert drops the values that stopped
+ * converting while the operation ran, so it can always finish.
+ */
+function clearOf(b: Body): { onInvalid?: "clear" } {
+  if (b.onInvalid === undefined) return {};
+  if (b.onInvalid !== "clear") throw badRequest('onInvalid is "clear" or absent');
+  return { onInvalid: "clear" };
+}
+
 /** The operation must belong to the collection in the path. */
 async function ownStatus(store: SiteGraphStore, siteId: string, key: string, id: string) {
   const status = await fieldOperationStatus(store, siteId, id);
@@ -120,11 +132,14 @@ export function fieldOperationHandlers(actor: (c: Context<Env>) => Actor) {
       const siteId = param(c, "siteId");
       const key = param(c, "key");
       const resume = c.req.query("continue");
-      if (resume) {
-        await ownStatus(store, siteId, key, resume);
-        return c.json(await continueFieldOperation(store, siteId, resume, { actor: actor(c) }));
-      }
       const b = ((await c.req.json().catch(() => null)) ?? {}) as Body;
+      if (resume) {
+        const clear = clearOf(b);
+        await ownStatus(store, siteId, key, resume);
+        return c.json(
+          await continueFieldOperation(store, siteId, resume, { actor: actor(c), ...clear }),
+        );
+      }
       if (b.dryRun !== undefined && typeof b.dryRun !== "boolean")
         throw badRequest("dryRun must be a boolean");
       const op = operationOf(key, b);
@@ -147,7 +162,10 @@ export function fieldOperationHandlers(actor: (c: Context<Env>) => Actor) {
       const siteId = param(c, "siteId");
       const id = param(c, "operationId");
       await ownStatus(store, siteId, param(c, "key"), id);
-      return c.json(await revertFieldOperation(store, siteId, id, { actor: actor(c) }));
+      const b = ((await c.req.json().catch(() => null)) ?? {}) as Body;
+      return c.json(
+        await revertFieldOperation(store, siteId, id, { actor: actor(c), ...clearOf(b) }),
+      );
     });
 }
 

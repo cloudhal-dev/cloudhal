@@ -246,8 +246,12 @@ export async function revertFieldOperation(
   const beforeSite = await beforeSiteOf(ctx, before);
   let site = await requireSite(ctx, siteId);
   const removal = op.op === "remove_field";
+  // A sub-field removal is undone once the repeater has the sub-field again (RFC-0045 `sub`).
   const restoredDef = (site.collections?.[op.collection]?.fields ?? []).some((d) =>
-    removal ? d.key === op.key : d.migration?.id === operationId,
+    !removal
+      ? d.migration?.id === operationId
+      : d.key === op.key &&
+        (op.sub === undefined || (d.type === "repeater" && d.fields.some((f) => f.key === op.sub))),
   );
   if (!restoredDef) {
     const running = (site.collections?.[op.collection]?.fields ?? []).find((d) => d.migration);
@@ -264,6 +268,7 @@ export async function revertFieldOperation(
     restored: 0,
     edited: [],
     dropped: [],
+    unconvertible: [],
     skipped: [],
   };
   for (let pass = 0; pass < 3; pass++) {
@@ -284,8 +289,10 @@ export async function revertFieldOperation(
         convert: { ...convert, group: row.entry.translation?.group ?? row.entry.id },
         translation,
         pristine: false,
+        onInvalid: options.onInvalid,
       });
-      return r.values ? { fields: r.values, change: r.change } : undefined;
+      if (r.values) return { fields: r.values, change: r.change };
+      return r.change ? { change: r.change } : undefined;
     };
     const { decide, drops } = await droppingMissing(ctx, site, { rows, decide: raw });
     const r = await rewritePass({
@@ -306,6 +313,7 @@ export async function revertFieldOperation(
       for (const d of drops.get(w.id) ?? []) out.dropped.push({ entryId: w.id, ...d });
     }
     out.skipped = r.skipped;
+    out.unconvertible = r.unconvertible;
     if (r.exhausted) return out;
     if (r.skipped.length === 0) break;
   }
@@ -324,5 +332,5 @@ export async function revertFieldOperation(
     metadata: { [META.kind]: FIELD_MIGRATION, [META.id]: operationId, [META.phase]: "reverted" },
   });
   await settleLists(ctx, siteId, out.restored + out.edited.length);
-  return { ...out, done: true, skipped: [], snapshotId: snapshot.id };
+  return { ...out, done: true, skipped: [], unconvertible: [], snapshotId: snapshot.id };
 }

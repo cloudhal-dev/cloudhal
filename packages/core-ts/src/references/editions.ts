@@ -115,11 +115,17 @@ function carryRepeater(
       return;
     }
     const next: Record<string, unknown> = { ...item };
+    // A running sub-field rename's items still hold the old key (as `referenceUses` reads them).
+    const m = def.migration;
     for (const sub of def.fields) {
-      if (sub.type !== "reference" || next[sub.key] === undefined) continue;
+      if (sub.type !== "reference") continue;
+      const key =
+        next[sub.key] === undefined && m?.sub === sub.key && m.fromKey !== undefined
+          ? m.fromKey
+          : sub.key;
+      if (next[key] === undefined) continue;
       const target = { collections: sub.collections };
-      if (!keep(next[sub.key], { path: `${path}/${i}/${sub.key}`, target, carry }))
-        delete next[sub.key];
+      if (!keep(next[key], { path: `${path}/${i}/${key}`, target, carry })) delete next[key];
     }
     if (Object.keys(next).length > 0) items.push(next);
     else carry.dropped.push({ path: `${path}/${i}`, reason: "empty" });

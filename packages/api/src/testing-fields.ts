@@ -211,6 +211,23 @@ export function describeFieldsApi(label: string, factory: ApiStoreFactory): void
         }),
       });
       expect(malformed.status).toBe(400);
+      for (const subFields of [[1], "x", [["a"]]]) {
+        const bad = await call(ops, {
+          method: "POST",
+          body: JSON.stringify({
+            op: "change_field_type",
+            key: "venue",
+            type: "repeater",
+            subFields,
+          }),
+        });
+        expect(bad.status).toBe(400);
+      }
+      const unknownClear = await call(`${ops}?continue=snap_nothing`, {
+        method: "POST",
+        body: JSON.stringify({ onInvalid: "drop" }),
+      });
+      expect(unknownClear.status).toBe(400);
       expect((await site()).collections?.events?.fields?.find((d) => d.key === "venue")?.type).toBe(
         "text",
       );

@@ -243,3 +243,122 @@ describe("RFC-0045 §7 sub-field markers", () => {
     expect(resolved.speakers?.value).toEqual([{ fullName: "A" }]);
   });
 });
+
+describe("RFC-0045 §7 review round (PR #214)", () => {
+  it("reference → text: an archived target lends its title; without a default-locale member, a fixed fallback", () => {
+    const maps = conversionEntries(
+      [
+        member("entry_GONE000001", { title: "Gone", status: "archived" }),
+        // no English member: the original's title, whatever the order
+        member("entry_TRONLY0001", {
+          locale: "tr",
+          title: "Ana",
+          translation: { group: "entry_TRONLY0001" } as never,
+        }),
+        member("entry_TRONLY0002", {
+          locale: "de",
+          title: "Haupt",
+          translation: { group: "entry_TRONLY0001" } as never,
+        }),
+        // no original either: the lowest locale
+        member("entry_ORPHAN0002", {
+          locale: "tr",
+          title: "Yetim",
+          translation: { group: "entry_ORPHAN0001" } as never,
+        }),
+        member("entry_ORPHAN0003", {
+          locale: "de",
+          title: "Waise",
+          translation: { group: "entry_ORPHAN0001" } as never,
+        }),
+      ],
+      "en",
+    );
+    const reversed = conversionEntries(
+      [
+        ...[
+          member("entry_ORPHAN0003", {
+            locale: "de",
+            title: "Waise",
+            translation: { group: "entry_ORPHAN0001" } as never,
+          }),
+          member("entry_ORPHAN0002", {
+            locale: "tr",
+            title: "Yetim",
+            translation: { group: "entry_ORPHAN0001" } as never,
+          }),
+        ],
+      ],
+      "en",
+    );
+    const text = def({ type: "text" });
+    const c = { timeZone: "UTC", defaultLocale: "en", entries: maps };
+    expect(convertFieldValue("reference", text, "entry_GONE000001", c)).toEqual({
+      ok: true,
+      value: "Gone",
+    });
+    expect(convertFieldValue("reference", text, "entry_TRONLY0001", c)).toEqual({
+      ok: true,
+      value: "Ana",
+    });
+    expect(convertFieldValue("reference", text, "entry_ORPHAN0001", c)).toEqual({
+      ok: true,
+      value: "Waise",
+    });
+    expect(reversed.titles.get("entry_ORPHAN0001")).toBe("Waise");
+    // archived members still match no text
+    expect(convertFieldValue("text", ref(), "Gone", c).ok).toBe(false);
+  });
+
+  it("a value already in the new type converts to itself; a repeater's repeated ids collapse", () => {
+    // a usable target id written under the reference definition stays, never the entry's own group
+    expect(convertFieldValue("text", ref(), HALL, ctx)).toEqual({ ok: true, value: HALL });
+    expect(convertFieldValue("text", ref(), HALL, { ...ctx, group: HALL }).ok).toBe(false);
+    expect(convertFieldValue("text", ref(), "entry_Zz9xQ1AB", ctx).ok).toBe(false);
+    // plain text written under the text definition stays
+    expect(convertFieldValue("reference", def({ type: "text" }), "Main Hall", ctx)).toEqual({
+      ok: true,
+      value: "Main Hall",
+    });
+    expect(
+      convertFieldValue(
+        "repeater",
+        ref(true),
+        [{ person: HALL }, { person: ROOM }, { person: HALL }],
+        ctx,
+      ),
+    ).toEqual({ ok: true, value: [HALL, ROOM] });
+  });
+
+  it("readers never keep an unconverted string that happens to fit (text ↔ reference)", () => {
+    const venue = def({
+      key: "venue",
+      type: "reference",
+      collections: ["places"],
+      migration: { id: "snap_01HZX8K3Q9OP", fromType: "text" },
+    });
+    const site = { collections: { events: { fields: [venue] } } } as never;
+    const read = (v: string) =>
+      resolveFields(
+        site,
+        { id: "entry_EVENT00001", collection: "events", fields: { venue: v } },
+        undefined,
+        {
+          entries,
+        },
+      ).venue;
+    expect(read("Main Hall")?.value).toBe(HALL);
+    expect(read("entry_Zz9xQ1AB")).toMatchObject({
+      value: undefined,
+      issue: { code: "field_value_unreadable" },
+    });
+    const rewrite = rewriteFields({
+      def: venue,
+      values: { venue: "entry_Zz9xQ1AB" },
+      convert: ctx,
+      translation: false,
+      pristine: false,
+    });
+    expect(rewrite.change?.kind).toBe("unconvertible");
+  });
+});

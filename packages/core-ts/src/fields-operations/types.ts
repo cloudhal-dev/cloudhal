@@ -130,6 +130,12 @@ export interface FieldOperationResult {
   rewritten: number;
   /** Entries changed meanwhile, retried by the next call. */
   skipped: { entryId: string; reason: string }[];
+  /**
+   * RFC-0045 §7: entries whose value stopped converting while the operation ran (a target
+   * archived, a second entry with the same title, a target deleted). They keep the operation
+   * running; continuing it with `onInvalid: "clear"` drops them.
+   */
+  unconvertible: { entryId: string; reason: string }[];
   beforeSnapshotId?: string;
   afterSnapshotId?: string;
 }
@@ -159,6 +165,8 @@ export interface FieldRevertResult {
    * the field allows), dropped from the restored value.
    */
   dropped: { entryId: string; field: string; targetId: string }[];
+  /** Edited entries whose value does not convert back (see `FieldOperationResult`). */
+  unconvertible: { entryId: string; reason: string }[];
   skipped: { entryId: string; reason: string }[];
   snapshotId?: string;
 }
@@ -170,6 +178,11 @@ export interface FieldOperationOptions {
   now?: (() => Date) | undefined;
   /** Stop after this much and answer `done: false` (default `FIELD_OPERATION_BUDGET`). */
   budget?: { entries?: number; ms?: number } | undefined;
+  /**
+   * RFC-0045 §7: continuing or reverting, drop the values that no longer convert (the way out of
+   * an operation whose values became unconvertible while it ran).
+   */
+  onInvalid?: "clear" | undefined;
 }
 
 /** The store plus the clock. */

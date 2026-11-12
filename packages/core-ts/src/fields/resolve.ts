@@ -15,7 +15,7 @@
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { type ConvertContext, convertFieldValue } from "./conversions.ts";
-import { convertContext, isBeingRemoved, rewriteFields } from "./migration.ts";
+import { convertContext, convertsEveryValue, isBeingRemoved, rewriteFields } from "./migration.ts";
 import { rewriteItems } from "./migration-sub.ts";
 import {
   type FieldIssue,
@@ -111,7 +111,7 @@ export function resolveFields(
     }
     const issues = valueIssues(def, value, `fields/${def.key}`);
     const first = issues[0];
-    if (!first) {
+    if (!first && !convertsEveryValue(def)) {
       out[def.key] = { def, value, fromOriginal };
       continue;
     }
@@ -131,11 +131,11 @@ export function resolveFields(
       value: undefined,
       fromOriginal,
       issue: {
-        path: first.path,
+        path: first?.path ?? `fields/${def.key}`,
         code: "field_value_unreadable",
         message: converting
           ? `a ${converting} value that does not convert to ${def.type}`
-          : first.message,
+          : (first?.message ?? "unreadable"),
       },
     };
   }

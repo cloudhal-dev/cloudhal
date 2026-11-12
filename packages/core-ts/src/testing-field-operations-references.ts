@@ -21,6 +21,7 @@ import {
   revertFieldOperation,
   runFieldOperation,
 } from "./fields-operations/index.ts";
+import { nodeHash } from "./hash.ts";
 import { PNG_1X1 } from "./media/fixtures.ts";
 import { SiteGraphStore } from "./store.ts";
 import { racingDriver, type SuiteContext } from "./testing-taxonomy.ts";
@@ -375,8 +376,47 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
       });
     });
 
+    describe("request checks", () => {
+      it("a sub-field reference → text is not held to another sub-field's collections", async () => {
+        const site = await world([
+          {
+            ...SPEAKERS,
+            fields: [
+              ...(SPEAKERS.type === "repeater" ? SPEAKERS.fields : []),
+              { key: "room", type: "reference", labels: L("Room"), collections: ["events"] },
+            ],
+          } as FieldDefinition,
+        ]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { speakers: [{ person: hall.id }] } });
+        const done = await run(site, {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "person",
+          type: "text",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ speakers: [{ person: "Main Hall" }] });
+      });
+
+      it("multiple is ignored where it does not apply, as before", async () => {
+        const site = await world([text("seats")]);
+        const e = await entry(site, "events", { fields: { seats: "12" } });
+        const done = await run(site, {
+          op: "change_field_type",
+          collection: "events",
+          key: "seats",
+          type: "number",
+          multiple: false,
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ seats: 12 });
+      });
+    });
+
     describe("phase B's target guard (§2.6)", () => {
-      it("a target archived during phase B is never written; a delete waits (field_operation_running)", async () => {
+      it("a target archived during phase B is never written: reported, then continued with clear", async () => {
         const site = await world([text("venue")]);
         const hall = await place(site, "Main Hall");
         const e = await entry(site, "events", { fields: { venue: "Main Hall" } });
@@ -386,19 +426,118 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
           key: "venue",
           type: "reference",
           collections: ["places"],
-          onInvalid: "clear",
         };
         let deleted = "";
         const raced = racing(async () => {
           deleted = await code(store().deleteContentEntry(await fresh(hall)));
           await store().updateContentEntry({ ...(await fresh(hall)), status: "archived" });
         }, isAsset);
-        const done = await run(site, op, {}, raced);
+        const stuck = await run(site, op, {}, raced);
         expect(deleted).toBe("field_operation_running");
-        expect(done.done).toBe(true);
-        // the next pass read the maps again: the archived hall matches nothing, so it was cleared
+        // the guard skipped it; the next pass read the maps again, and nothing matches now
+        expect(stuck).toMatchObject({ done: false, skipped: [] });
+        expect(stuck.unconvertible).toEqual([{ entryId: e.id, reason: expect.any(String) }]);
+        expect((await fresh(e)).fields).toEqual({ venue: "Main Hall" });
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe(
+          "field_operation_running",
+        );
+        const cleared = await continueFieldOperation(store(), site.id, stuck.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(cleared.done).toBe(true);
         expect((await fresh(e)).fields).toEqual({});
         expect(await rows(e.id)).toEqual([]);
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+      });
+
+      it("a second entry with the same title during the run: single and multiple, then cleared", async () => {
+        for (const multiple of [false, true]) {
+          const site = await world([text("venue")]);
+          await place(site, "Main Hall");
+          const e = await entry(site, "events", { fields: { venue: "Main Hall" } });
+          const op: FieldOperation = {
+            op: "change_field_type",
+            collection: "events",
+            key: "venue",
+            type: "reference",
+            collections: ["places"],
+            multiple,
+          };
+          const started = await run(site, op, { budget: { entries: 0 } });
+          await place(site, "Main Hall", { slug: "main-hall-2" });
+          const stuck = await continueFieldOperation(store(), site.id, started.operationId, actor);
+          expect(stuck.done).toBe(false);
+          expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+          expect(stuck.unconvertible[0]?.reason).toMatch(/matches 2 entries/);
+          const done = await continueFieldOperation(store(), site.id, started.operationId, {
+            ...actor,
+            onInvalid: "clear",
+          });
+          expect(done.done).toBe(true);
+          expect((await fresh(e)).fields).toEqual({});
+        }
+      });
+
+      it("reference → text with a target deleted mid-run: the id is pending, then cleared", async () => {
+        const site = await world([reference("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: hall.id } });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "text",
+        };
+        const started = await run(site, op, { budget: { entries: 0 } });
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+        const stuck = await continueFieldOperation(store(), site.id, started.operationId, actor);
+        expect(stuck.done).toBe(false);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        expect((await fresh(e)).fields).toEqual({ venue: hall.id });
+        const done = await continueFieldOperation(store(), site.id, started.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({});
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a person's edit of another field mid-run converts the value through the table", async () => {
+        const site = await world([reference("venue"), text("note")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: hall.id } });
+        const toText: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "text",
+        };
+        const a = await run(site, toText, { budget: { entries: 0 } });
+        // the stored id is valid text, yet it is not left as it is
+        const edited = await store().updateContentEntry({
+          ...(await fresh(e)),
+          fields: { venue: hall.id, note: "n" },
+        });
+        expect(edited.fields).toEqual({ venue: "Main Hall", note: "n" });
+        expect(await rows(e.id)).toEqual([]);
+        expect((await continueFieldOperation(store(), site.id, a.operationId, actor)).done).toBe(
+          true,
+        );
+        // and back: id-shaped text is no reference until the table says so
+        const toRef: FieldOperation = {
+          ...toText,
+          type: "reference",
+          collections: ["places"],
+        } as FieldOperation;
+        const b = await run(site, toRef, { budget: { entries: 0 } });
+        const again = await store().updateContentEntry({ ...(await fresh(e)), title: "Edited" });
+        expect(again.fields).toEqual({ venue: hall.id, note: "n" });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+        expect((await continueFieldOperation(store(), site.id, b.operationId, actor)).done).toBe(
+          true,
+        );
       });
 
       it("a target deleted while ids are carried over stays as stored, rows kept", async () => {
@@ -479,6 +618,102 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         expect(back.dropped).toEqual([{ entryId: e.id, field: "venue", targetId: room.id }]);
         expect((await fresh(e)).fields).toEqual({ venue: [hall.id] });
         expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+      });
+    });
+
+    describe("revert, after edits", () => {
+      it("text → reference: an entry edited after the operation converts back to its title", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: "main hall" } });
+        const done = await run(site, {
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+        });
+        await store().updateContentEntry({ ...(await fresh(e)), title: "Edited after" });
+        const back = await revertFieldOperation(store(), site.id, done.operationId, actor);
+        expect(back).toMatchObject({ done: true, restored: 0, edited: [e.id] });
+        expect((await fresh(e)).fields).toEqual({ venue: "Main Hall" });
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a sub-field removal's revert restores the sub-field, its values and their rows", async () => {
+        const site = await world([SPEAKERS]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", {
+          fields: { speakers: [{ person: hall.id, name: "Ada" }, { person: hall.id }] },
+        });
+        const done = await run(site, {
+          op: "remove_field",
+          collection: "events",
+          key: "speakers",
+          sub: "person",
+        });
+        expect((await fresh(e)).fields).toEqual({ speakers: [{ name: "Ada" }] });
+        expect(await rows(e.id)).toEqual([]);
+        const back = await revertFieldOperation(store(), site.id, done.operationId, actor);
+        expect(back.done).toBe(true);
+        const speakers = await def(site, "speakers");
+        expect(speakers?.type === "repeater" && speakers.fields.map((f) => f.key)).toContain(
+          "person",
+        );
+        expect((await fresh(e)).fields).toEqual({
+          speakers: [{ person: hall.id, name: "Ada" }, { person: hall.id }],
+        });
+        expect(await rows(e.id)).toEqual([
+          { t: hall.id, f: "speakers.person", k: "speakers", s: 1 },
+        ]);
+      });
+
+      it("a repeater converting away holds its rows until rewritten, then drops them", async () => {
+        const site = await world([SPEAKERS]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", {
+          status: "published",
+          fields: { speakers: [{ person: hall.id }] },
+        });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          type: "number",
+          onInvalid: "clear",
+        };
+        const started = await run(site, op, { budget: { entries: 0 } });
+        // the stale row still locks while the marker runs
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("entry_referenced");
+        expect(
+          (await continueFieldOperation(store(), site.id, started.operationId, actor)).done,
+        ).toBe(true);
+        expect((await fresh(e)).fields).toEqual({});
+        expect(await rows(e.id)).toEqual([]);
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+      });
+
+      it("a rename's revert that also restores an older localized updates shared", async () => {
+        const site = await world([reference("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: hall.id } });
+        const renamed = await run(site, {
+          op: "rename_field",
+          collection: "events",
+          from: "venue",
+          to: "place",
+        });
+        await run(site, {
+          op: "set_field_localized",
+          collection: "events",
+          key: "place",
+          localized: true,
+        });
+        expect(await sharedOf(e.id)).toEqual([2]);
+        const back = await revertFieldOperation(store(), site.id, renamed.operationId, actor);
+        expect(back.done).toBe(true);
+        expect((await def(site, "venue"))?.localized).toBe(false);
+        expect(await sharedOf(e.id)).toEqual([1]);
       });
     });
 
@@ -565,15 +800,18 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         expect(
           await code(store().updateContentEntry({ ...(await fresh(hall)), collection: "events" })),
         ).toBe("field_operation_running");
+        // a group change: `other` joins the hall's group as a valid Turkish translation
+        const source = await fresh(hall);
+        const translation = {
+          group: hall.id,
+          method: "human" as const,
+          source: { id: hall.id, locale: "en", rev: source.rev, hash: await nodeHash(source) },
+        };
         expect(
           await code(
-            store().updateContentEntry({
-              ...(await fresh(other)),
-              locale: "tr",
-              translation: { group: hall.id, method: "human" } as never,
-            }),
+            store().updateContentEntry({ ...(await fresh(other)), locale: "tr", translation }),
           ),
-        ).not.toBe("ok");
+        ).toBe("field_operation_running");
         expect((await continueFieldOperation(store(), site.id, id, actor)).done).toBe(true);
         // phase C dropped the marker: the published referrer's row now locks the hall
         expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("entry_referenced");

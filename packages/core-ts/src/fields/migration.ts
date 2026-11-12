@@ -77,13 +77,25 @@ function without(values: Readonly<Record<string, unknown>>, key: string) {
   return rest;
 }
 
+/** Rows whose source and target values can both be one string. */
+const SAME_SHAPE: ReadonlySet<string> = new Set(["text>reference", "reference>text"]);
+
+/**
+ * RFC-0045 §7: a running text ↔ reference conversion reads every value through the table, since
+ * whether a string "fits" cannot tell a converted value from an unconverted one.
+ */
+export const convertsEveryValue = (def: FieldDefinition): boolean =>
+  def.migration?.sub === undefined && SAME_SHAPE.has(`${def.migration?.fromType}>${def.type}`);
+
 /** A value under a type change: converted, kept, or (with `onInvalid: "clear"`) dropped. */
 function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>): RewriteResult {
   const { def, convert, pristine } = input;
   const from = def.migration?.fromType;
   if (!from || !Object.hasOwn(values, def.key)) return NOTHING;
   const before = values[def.key];
-  const fits = valueIssues(def, before, "v").length === 0;
+  // RFC-0045 §7: a group id is valid text and id-shaped text a valid single reference, so for
+  // these rows "fits" says nothing; the table keeps a value already in the new type itself.
+  const fits = !SAME_SHAPE.has(`${from}>${def.type}`) && valueIssues(def, before, "v").length === 0;
   if (fits && (!pristine || from === def.type)) return NOTHING;
   const out = convertFieldValue(from, def, before, convert);
   if (out.ok) {

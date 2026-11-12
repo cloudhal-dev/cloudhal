@@ -8,7 +8,7 @@
  */
 import type { FieldDefinition, SubFieldDefinition } from "@cloudhal/core-contracts";
 import { InvariantError } from "../errors.ts";
-import type { RepeaterFieldDefinition } from "../fields/types.ts";
+import { isRecord, type RepeaterFieldDefinition } from "../fields/types.ts";
 import type { FieldOperation } from "./types.ts";
 
 type Retype = Extract<FieldOperation, { op: "change_field_type" }>;
@@ -24,8 +24,8 @@ function invalid(path: string, message: string): never {
 /** The reference collections a definition (or its one reference sub-field) holds, if any. */
 function referenceCollections(def: FieldDefinition): readonly string[] | undefined {
   if (def.type === "reference") return def.collections;
-  if (def.type !== "repeater") return undefined;
-  const subs = def.fields.filter((s) => s.type === "reference");
+  if (def.type !== "repeater" || !Array.isArray(def.fields)) return undefined;
+  const subs = def.fields.filter((s) => isRecord(s) && s.type === "reference");
   return subs.length > 0
     ? subs.flatMap((s) => (s.type === "reference" ? s.collections : []))
     : undefined;
@@ -102,12 +102,12 @@ export function retyped(def: FieldDefinition, op: Retype): FieldDefinition {
   return { ...base, ...ownProperties(def, op) } as unknown as FieldDefinition;
 }
 
-/** The inputs only some targets take: refused elsewhere, so a request means what it says. */
-const TAKES: Record<
-  "multiple" | "collections" | "maxItems" | "subFields" | "itemLabel",
-  readonly string[]
-> = {
-  multiple: ["select", "reference"],
+/**
+ * The inputs only some targets take: refused elsewhere, so a request means what it says.
+ * `multiple` is not among them: it is ignored where it does not apply, as before RFC-0045
+ * (agents often fill every optional boolean).
+ */
+const TAKES: Record<"collections" | "maxItems" | "subFields" | "itemLabel", readonly string[]> = {
   collections: ["reference"],
   maxItems: ["reference", "repeater"],
   subFields: ["repeater"],
@@ -171,8 +171,13 @@ export function checkRetype(def: FieldDefinition, op: Retype): void {
       ? sub.collections
       : undefined
     : referenceCollections(def);
+  // Only a field (or sub-field) that stays a reference keeps ids, so only it must widen.
   const target = retyped(def, op);
-  const after = referenceCollections(target);
+  const after = sub
+    ? undefined
+    : op.type === "reference" || op.type === "repeater"
+      ? referenceCollections(target)
+      : undefined;
   if (carried && after && from.type !== "text" && !carried.every((c) => after.includes(c)))
     invalid(
       "collections",

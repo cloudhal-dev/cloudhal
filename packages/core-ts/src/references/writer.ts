@@ -234,6 +234,22 @@ function strings(value: unknown, out = new Set<string>()): Set<string> {
 }
 
 /**
+ * The part of a stored value whose strings are ids carried over: none of a value converting from
+ * text (top-level, or the sub-field of a `sub` marker), whose strings name nothing yet.
+ */
+function carriedPart(def: FieldDefinition, was: unknown): unknown {
+  const m = def.migration;
+  if (m?.fromType !== "text") return was;
+  if (m.sub === undefined || !Array.isArray(was)) return undefined;
+  const sub = m.sub;
+  return was.map((item) => {
+    if (!isRecord(item)) return item;
+    const { [sub]: _converting, ...rest } = item;
+    return rest;
+  });
+}
+
+/**
  * §2.6 and §7: the target guard of a field-operation rewrite, over the reference values it
  * changes (undefined when none change). A miss skips the entry for the next pass, like a
  * concurrent edit. The rewrite's own statements are guarded on the site still carrying the
@@ -259,7 +275,7 @@ export function rewriteTargetGuard(
     const key = storedKey(def, before);
     const was = key === undefined ? undefined : before[key];
     if (sameJson(values[def.key], was)) continue;
-    const carried = strings(was);
+    const carried = strings(carriedPart(def, was));
     for (const use of referenceUses(def, values[def.key], "")) {
       if (mode === "fresh" && carried.has(use.groupId)) continue;
       const pair: TargetPair = { t: use.groupId, c: use.collections, f: mode === "fresh" ? 1 : 0 };

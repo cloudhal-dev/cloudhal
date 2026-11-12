@@ -135,8 +135,35 @@ export function subPending(
   const sub = def.fields.find((s) => s.key === m.sub);
   if (!sub) return undefined;
   const types = jsonTypes({ ...sub, localized: def.localized } as unknown as FieldDefinition);
-  return holds(m.sub, ` AND json_type(i.value, ?) NOT IN (${types.map(() => "?").join(", ")})`, [
-    `$.${m.sub}`,
-    ...types,
-  ]);
+  const at = `$.${m.sub}`;
+  const id = idPending(sub.type, m.fromType, "i.value", at);
+  return holds(
+    m.sub,
+    ` AND (json_type(i.value, ?) NOT IN (${types.map(() => "?").join(", ")})${id ? ` OR ${id.sql}` : ""})`,
+    [at, ...types, ...(id?.params ?? [])],
+  );
+}
+
+/** `expr` is a translation group id (`GROUP_ID_PATTERN`: `entry_` and 6 to 32 letters or digits). */
+const isGroupId = (expr: string) =>
+  `(${expr} GLOB 'entry_*' AND length(${expr}) BETWEEN 12 AND 38 AND substr(${expr}, 7) NOT GLOB '*[^A-Za-z0-9]*')`;
+
+/**
+ * RFC-0045 §7: text ↔ single reference store one string on both sides, so the JSON type cannot
+ * tell what is left: to a reference, a string that is no group id is pending; from one, a string
+ * that still is one. `doc` is the JSON the value sits in at `path`.
+ */
+export function idPending(
+  type: string,
+  from: string | undefined,
+  doc: string,
+  path: string,
+): Cond | undefined {
+  const toRef = type === "reference" && from === "text";
+  if (!toRef && !(type === "text" && from === "reference")) return undefined;
+  const value = `json_extract(${doc}, ?)`;
+  return {
+    sql: `(json_type(${doc}, ?) = 'text' AND ${toRef ? "NOT " : ""}${isGroupId(value)})`,
+    params: [path, path, path, path],
+  };
 }

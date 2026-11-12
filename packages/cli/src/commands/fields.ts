@@ -28,7 +28,7 @@ import { brief, deployment } from "./sync.ts";
 const CLI_ACTOR = { kind: "human", id: "user_localcli0001", name: "cloudhal CLI" } as const;
 
 export const FIELDS_USAGE =
-  "usage: cloudhal fields rename <collection> <from> <to> | retype <collection> <key> <type> [--options a,b] [--multiple] [--collections a,b] [--max-items n] [--sub-fields file.json] [--clear] | localize <collection> <key> on|off | remove <collection> <key> | continue|revert <collection> <id>  [--sub <sub-field>] [--dry-run] [--remote]";
+  "usage: cloudhal fields rename <collection> <from> <to> | retype <collection> <key> <type> [--options a,b] [--multiple] [--collections a,b] [--max-items n] [--sub-fields file.json] [--clear] | localize <collection> <key> on|off | remove <collection> <key> | continue|revert <collection> <id> [--clear]  [--sub <sub-field>] [--dry-run] [--remote]";
 
 /** What `parseFieldsArgs` takes besides the positionals (`subFields` already read from its file). */
 export interface FieldsFlags {
@@ -73,7 +73,7 @@ export interface FieldsCliOptions {
 
 type Request =
   | { kind: "run"; op: FieldOperation; dryRun: boolean }
-  | { kind: "continue" | "revert"; collection: string; id: string };
+  | { kind: "continue" | "revert"; collection: string; id: string; clear?: boolean };
 
 export type FieldsCliResult =
   | { kind: "run"; result: FieldOperationResult; theme: string[] }
@@ -146,7 +146,7 @@ export function parseFieldsArgs(
         ...sub,
         ...(flags.options ? { options: optionsOf(flags.options, locale) } : {}),
         ...(b === "select" && !flags.sub ? { multiple: flags.multiple === true } : {}),
-        ...(b === "reference" && flags.multiple !== undefined ? { multiple: flags.multiple } : {}),
+        ...(b === "reference" && !flags.sub ? { multiple: flags.multiple === true } : {}),
         ...stage4Inputs(flags),
         ...(flags.clear ? { onInvalid: "clear" as const } : {}),
       };
@@ -155,7 +155,13 @@ export function parseFieldsArgs(
     case "continue":
     case "revert":
       need(a);
-      return { kind: action, collection: c, id: a as string };
+      // RFC-0045 §7: `--clear` drops values that stopped converting while the operation ran.
+      return {
+        kind: action,
+        collection: c,
+        id: a as string,
+        ...(flags.clear ? { clear: true } : {}),
+      };
     default:
       throw new Error(FIELDS_USAGE);
   }
@@ -186,14 +192,19 @@ export async function themeReferences(projectDir: string, key: string): Promise<
 
 const keyOf = (op: FieldOperation) => (op.op === "rename_field" ? op.from : op.key);
 
+/** Another call can make progress: nothing changed meanwhile, nothing stopped converting. */
+const again = (r: { done: boolean; skipped: unknown[]; unconvertible?: unknown[] | undefined }) =>
+  !r.done && r.skipped.length === 0 && (r.unconvertible ?? []).length === 0;
+
 async function runLocal(options: FieldsCliOptions, req: Request): Promise<FieldsCliResult> {
   const cfg = await readProjectConfig(options.projectDir);
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
-  const actor = { actor: CLI_ACTOR };
+  const clear = req.kind !== "run" && req.clear ? { onInvalid: "clear" as const } : {};
+  const actor = { actor: CLI_ACTOR, ...clear };
   try {
     if (req.kind === "revert") {
       let result = await revertFieldOperation(local.store, cfg.siteId, req.id, actor);
-      while (!result.done && result.skipped.length === 0)
+      while (again(result))
         result = await revertFieldOperation(local.store, cfg.siteId, req.id, actor);
       return { kind: "revert", result };
     }
@@ -201,7 +212,7 @@ async function runLocal(options: FieldsCliOptions, req: Request): Promise<Fields
       req.kind === "run"
         ? await runFieldOperation(local.store, cfg.siteId, req.op, { ...actor, dryRun: req.dryRun })
         : await continueFieldOperation(local.store, cfg.siteId, req.id, actor);
-    while (!result.dryRun && !result.done && result.skipped.length === 0)
+    while (!result.dryRun && again(result))
       result = await continueFieldOperation(local.store, cfg.siteId, result.operationId, actor);
     const theme =
       req.kind === "run" ? await themeReferences(options.projectDir, keyOf(req.op)) : [];
@@ -225,10 +236,10 @@ async function runRemote(options: FieldsCliOptions, req: Request): Promise<Field
     if (!res.ok) throw new Error(`the deployment answered ${res.status}: ${brief(text)}`);
     return JSON.parse(text) as FieldOperationResult & FieldRevertResult;
   };
+  const clear = req.kind !== "run" && req.clear ? { onInvalid: "clear" } : {};
   if (req.kind === "revert") {
-    let result = await call(`${base}/${req.id}/revert`);
-    while (!result.done && result.skipped.length === 0)
-      result = await call(`${base}/${req.id}/revert`);
+    let result = await call(`${base}/${req.id}/revert`, clear);
+    while (again(result)) result = await call(`${base}/${req.id}/revert`, clear);
     return { kind: "revert", result };
   }
   const {
@@ -239,9 +250,9 @@ async function runRemote(options: FieldsCliOptions, req: Request): Promise<Field
   let result =
     req.kind === "run"
       ? await call(base, { op: req.op.op, ...fields, dryRun: req.dryRun })
-      : await call(`${base}?continue=${encodeURIComponent(req.id)}`);
-  while (!result.dryRun && !result.done && result.skipped.length === 0)
-    result = await call(`${base}?continue=${encodeURIComponent(result.operationId)}`);
+      : await call(`${base}?continue=${encodeURIComponent(req.id)}`, clear);
+  while (!result.dryRun && again(result))
+    result = await call(`${base}?continue=${encodeURIComponent(result.operationId)}`, clear);
   const theme = req.kind === "run" ? await themeReferences(options.projectDir, keyOf(req.op)) : [];
   return { kind: "run", result, theme };
 }
@@ -281,7 +292,12 @@ export function describeFields(r: FieldsCliResult): string[] {
       ...(x.dropped ?? []).map(
         (d) => `dropped ${d.entryId} ${d.field} → ${d.targetId} (no entry of that group is left)`,
       ),
-      ...(x.done ? [`snapshot ${x.snapshotId}`] : ["not finished: run the revert again"]),
+      ...(x.unconvertible ?? []).map((u) => `  ${u.entryId} does not convert back: ${u.reason}`),
+      ...(x.done
+        ? [`snapshot ${x.snapshotId}`]
+        : (x.unconvertible ?? []).length > 0
+          ? ["not finished: fix those values, or run the revert again with --clear"]
+          : ["not finished: run the revert again"]),
     ];
   }
   const { result: x, theme } = r;
@@ -301,8 +317,12 @@ export function describeFields(r: FieldsCliResult): string[] {
     lines.push(`theme code reads fields.${p.key} directly and needs a change: ${theme.join(", ")}`);
   if (x.dryRun) return lines;
   if (!x.done) {
+    const stuck = x.unconvertible ?? [];
+    for (const u of stuck) lines.push(`  ${u.entryId} no longer converts: ${u.reason}`);
     lines.push(
-      `not finished (${x.skipped.length} entries changed meanwhile): cloudhal fields continue ${p.collection} ${x.operationId}`,
+      stuck.length > 0
+        ? `not finished (${stuck.length} values stopped converting): fix them, or cloudhal fields continue ${p.collection} ${x.operationId} --clear`
+        : `not finished (${x.skipped.length} entries changed meanwhile): cloudhal fields continue ${p.collection} ${x.operationId}`,
     );
     return lines;
   }
@@ -317,7 +337,9 @@ export function describeFields(r: FieldsCliResult): string[] {
 async function readSubFields(projectDir: string, file: string): Promise<SubFieldDefinition[]> {
   const text = await readFile(path.resolve(projectDir, file), "utf8");
   const list = JSON.parse(text) as unknown;
-  if (!Array.isArray(list)) throw new Error(`${file} holds a JSON list of sub-field definitions`);
+  const record = (v: unknown) => typeof v === "object" && v !== null && !Array.isArray(v);
+  if (!Array.isArray(list) || !list.every(record))
+    throw new Error(`${file} holds a JSON list of sub-field definitions (objects)`);
   return list as SubFieldDefinition[];
 }
 

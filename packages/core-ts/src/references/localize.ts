@@ -7,6 +7,7 @@
  */
 import type { Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
+import { renamedFrom } from "../fields/types.ts";
 import { holdsReferences, sharedOf } from "./rows.ts";
 
 /** One `UPDATE entry_refs SET shared` per field whose `localized` the write changes. */
@@ -14,13 +15,16 @@ export function sharedUpdates(site: Site, next: Site, hash: string): SqlStatemen
   const out: SqlStatement[] = [];
   for (const [collection, settings] of Object.entries(next.collections ?? {}))
     for (const def of settings?.fields ?? []) {
-      const was = site.collections?.[collection]?.fields?.find((d) => d.key === def.key);
+      // A rename's revert restores the old key and may restore an older `localized` with it.
+      const from = renamedFrom(def);
+      const keys = [def.key, ...(from === undefined ? [] : [from])];
+      const was = site.collections?.[collection]?.fields?.find((d) => keys.includes(d.key));
       if (!was || was.localized === def.localized || !holdsReferences(def)) continue;
       out.push({
         sql: `UPDATE entry_refs SET shared = ?
-               WHERE site_id = ? AND source_collection = ? AND root_key = ?
+               WHERE site_id = ? AND source_collection = ? AND root_key IN (?, ?)
                  AND EXISTS (SELECT 1 FROM nodes WHERE id = ? AND hash = ?)`,
-        params: [sharedOf(def), site.id, collection, def.key, site.id, hash],
+        params: [sharedOf(def), site.id, collection, def.key, from ?? def.key, site.id, hash],
       });
     }
   return out;

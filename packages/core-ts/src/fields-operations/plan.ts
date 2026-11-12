@@ -11,6 +11,7 @@ import type { Cond } from "../node-sql.ts";
 import { renameSettingsReferences } from "../store/collection-settings.ts";
 import {
   checkSub,
+  idPending,
   subApplied,
   subMarkerOf,
   subPending,
@@ -215,9 +216,18 @@ export function pendingCondition(
     const types = jsonTypes(def);
     // RFC-0045 §7: a list of ids and a list of items are both arrays; their first element differs.
     const item = listItemType(def, m.fromType);
+    const multiple = "multiple" in def && def.multiple === true;
+    const id = multiple ? undefined : idPending(def.type, m.fromType, "body", path);
     return {
-      sql: `${base.sql} AND json_type(body, ?) IS NOT NULL AND (json_type(body, ?) NOT IN (${types.map(() => "?").join(", ")})${item ? " OR json_type(body, ?) = ?" : ""})`,
-      params: [...base.params, path, path, ...types, ...(item ? [`${path}[0]`, item] : [])],
+      sql: `${base.sql} AND json_type(body, ?) IS NOT NULL AND (json_type(body, ?) NOT IN (${types.map(() => "?").join(", ")})${item ? " OR json_type(body, ?) = ?" : ""}${id ? ` OR ${id.sql}` : ""})`,
+      params: [
+        ...base.params,
+        path,
+        path,
+        ...types,
+        ...(item ? [`${path}[0]`, item] : []),
+        ...(id?.params ?? []),
+      ],
     };
   }
   if (m.fromLocalized !== undefined) {
