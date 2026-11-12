@@ -32,6 +32,7 @@ import type { Cond } from "../node-sql.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
 import type { ConversionEntries } from "../references/conversion-maps.ts";
 import { convertingPath, loadNodeRows } from "../references/conversion-rows.ts";
+import type { HeldRef } from "../references/writer.ts";
 import type { StoreContext } from "./context.ts";
 
 /** What the field checks add to an entry write. */
@@ -85,7 +86,7 @@ export function normalizeEntryFields(
      */
     write?: { stored: ContentEntry | undefined } | undefined;
     /** The definitions whose value does not convert (kept as stored; the writer leaves its rows). */
-    onUnconvertible?: ((def: FieldDefinition) => void) | undefined;
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly unknown[]) => void) | undefined;
   } = {},
 ): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
@@ -118,25 +119,35 @@ export async function normalizeWrite(
   ctx: StoreContext,
   site: Site,
   write: { draft: ContentEntry; stored: ContentEntry | undefined },
-): Promise<{ draft: ContentEntry; baseline: ContentEntry | undefined; held: string[] }> {
+): Promise<{
+  draft: ContentEntry;
+  baseline: ContentEntry | undefined;
+  held: HeldRef[];
+  rows: { path: string; rows: FieldRows } | undefined;
+}> {
   const { stored } = write;
   const defs = fieldDefinitions(site, write.draft.collection);
   const entries = await loadConversionEntries(ctx.graph, site, defs);
   const rows = entries
     ? await loadNodeRows(ctx.sql, { siteId: site.id, nodeId: stored?.id, defs })
     : undefined;
-  const held: string[] = [];
+  const held: HeldRef[] = [];
   const draft = normalizeEntryFields(site, write.draft, {
     entries,
     rows,
     write: { stored },
-    onUnconvertible: (def) => {
-      const path = convertingPath(def);
-      if (path !== undefined) held.push(path);
+    // Per value: only what did not convert keeps its rows as they are.
+    onUnconvertible: (def, failed) => {
+      const f = convertingPath(def);
+      if (f === undefined) return;
+      for (const value of failed)
+        for (const t of Array.isArray(value) ? value : [value])
+          if (typeof t === "string") held.push({ f, t });
     },
   });
   const baseline = stored && normalizeEntryFields(site, stored, { entries, rows });
-  return { draft, baseline, held };
+  const path = defs.map(convertingPath).find((p) => p !== undefined);
+  return { draft, baseline, held, rows: rows && path !== undefined ? { path, rows } : undefined };
 }
 
 /** Checks the field part of an entry write and plans its asset references; throws on issues. */

@@ -20,6 +20,7 @@
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { refuseFieldIssues } from "../fields/refusal.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import { type FieldIssue, fieldDefinitions, isRecord, sameJson } from "../fields/types.ts";
 import { and, type Cond } from "../node-sql.ts";
 import { hasReferenceFields } from "./issues.ts";
@@ -106,7 +107,11 @@ function guardedUses(
   defs: readonly FieldDefinition[],
   draft: ContentEntry,
   stored: ContentEntry | undefined,
+  at: { converting?: ConvertingRows | undefined; held?: readonly HeldRef[] | undefined } = {},
 ): Use[] {
+  const { converting } = at;
+  // A value the conversion held is stored as it was: phase B reports it, no guard decides it.
+  const kept = new Set((at.held ?? []).map((h) => `${h.f} ${h.t}`));
   const values = draft.fields ?? {};
   const same = stored?.collection === draft.collection;
   const before = same ? (stored?.fields ?? {}) : {};
@@ -117,8 +122,14 @@ function guardedUses(
     const changed = !sameJson(values[def.key], before[def.key]);
     if (!changed && !goingLive) continue;
     const had = new Set(referenceUses(def, before[def.key], "").map((u) => u.groupId));
-    for (const use of referenceUses(def, values[def.key], `fields/${def.key}`))
-      out.push({ ...use, def, fresh: !had.has(use.groupId) });
+    for (const use of referenceUses(def, values[def.key], `fields/${def.key}`)) {
+      // RFC-0045 §7: on a path converting from text, only an id with its row is already held.
+      const path = def.type === "repeater" ? `${def.key}.${use.path.split("/")[3]}` : def.key;
+      if (kept.has(`${path} ${use.groupId}`)) continue;
+      const held =
+        converting?.path === path ? converting.rows.has(use.groupId) : had.has(use.groupId);
+      out.push({ ...use, def, fresh: !held });
+    }
   }
   return out;
 }
@@ -173,26 +184,41 @@ function useIssues(site: Site, draft: ContentEntry, uses: readonly Use[], member
   return issues;
 }
 
+/** A stored row a write leaves as it is: a value a running conversion did not accept (§7). */
+export interface HeldRef {
+  /** The field path (`venue`, `speakers.host`). */
+  readonly f: string;
+  readonly t: string;
+}
+
+/** The node's rows for a running text ↔ reference conversion's path, as the writer read them. */
+export interface ConvertingRows {
+  readonly path: string;
+  readonly rows: FieldRows;
+}
+
 /** The rows statements for `draft` (an anchored `DELETE`, then the plain `INSERT … SELECT`). */
 export function entryRefStatements(
   site: Site,
   draft: ContentEntry,
   hash: string,
   /**
-   * RFC-0045 §7: field paths whose rows the write leaves as they are: a value a running text ↔
-   * reference conversion did not accept gets no row, and one still converting from references
-   * keeps its rows, until phase B reports or clears it.
+   * RFC-0045 §7: the values a running text ↔ reference conversion did not accept, per value
+   * (field path and group id). Their stored rows stay as they are, and they get no new one, until
+   * phase B reports or clears them; every other row follows the draft.
    */
-  held: readonly string[] = [],
+  held: readonly HeldRef[] = [],
 ): SqlStatement[] {
+  const kept = new Set(held.map((h) => `${h.f} ${h.t}`));
   const rows = entryRefRows(fieldDefinitions(site, draft.collection), draft.fields).filter(
-    (r) => !held.includes(r.f),
+    (r) => !kept.has(`${r.f} ${r.t}`),
   );
-  const keep = held.length > 0 ? " AND field NOT IN (SELECT value FROM json_each(?))" : "";
+  const keep =
+    kept.size > 0 ? " AND field || ' ' || target_id NOT IN (SELECT value FROM json_each(?))" : "";
   const out: SqlStatement[] = [
     {
       sql: `DELETE FROM entry_refs WHERE source_id = ?${keep} AND ${ANCHOR}`,
-      params: [draft.id, ...(held.length > 0 ? [JSON.stringify(held)] : []), draft.id, hash],
+      params: [draft.id, ...(kept.size > 0 ? [JSON.stringify([...kept])] : []), draft.id, hash],
     },
   ];
   if (rows.length === 0) return out;
@@ -324,8 +350,10 @@ export async function planEntryRefs(
      * so a value an operation reshapes or renames, and the writer left alone, is not re-checked.
      */
     baseline: ContentEntry | undefined;
-    /** Field paths whose value a running conversion did not accept: their rows stay as they are. */
-    held?: readonly string[] | undefined;
+    /** Values a running conversion did not accept: their rows stay as they are. */
+    held?: readonly HeldRef[] | undefined;
+    /** The node's rows for a running text → reference path: which ids it already holds. */
+    converting?: ConvertingRows | undefined;
   },
 ): Promise<EntryRefsPlan> {
   const { draft, stored } = write;
@@ -336,7 +364,10 @@ export async function planEntryRefs(
       : undefined;
   if (!references) return { guard: anchor, statements: () => [], diagnose: async () => {} };
   const defs = fieldDefinitions(site, draft.collection);
-  const uses = guardedUses(defs, draft, write.baseline);
+  const uses = guardedUses(defs, draft, write.baseline, {
+    converting: write.converting,
+    held: write.held,
+  });
   const groups = [...new Set(uses.map((u) => u.groupId))];
   const check = async () =>
     refuseFieldIssues(useIssues(site, draft, uses, await readMembers(sql, site.id, groups)));

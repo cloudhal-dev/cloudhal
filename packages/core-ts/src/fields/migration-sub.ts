@@ -62,6 +62,8 @@ export interface ItemsResult {
   readonly next: unknown[] | undefined | "unchanged";
   /** The first unconvertible item's reason (with `onInvalid` not `clear`). */
   readonly unconvertible?: string | undefined;
+  /** Every unconvertible sub-value, as stored (its item is kept as it is in `next`). */
+  readonly failed?: readonly unknown[] | undefined;
   /** Some sub-value was dropped by `onInvalid: "clear"`. */
   readonly cleared?: string | undefined;
 }
@@ -92,6 +94,8 @@ export function rewriteItems(
   if (!sub) return { next: "unchanged" };
   let changed = false;
   let cleared: string | undefined;
+  let unconvertible: string | undefined;
+  const failed: unknown[] = [];
   const out: unknown[] = [];
   const stored = input.baseline === undefined ? undefined : storedItems(input.baseline.value);
   for (const item of value) {
@@ -113,8 +117,13 @@ export function rewriteItems(
       baseline,
       rows: input.rows,
     });
-    if (r.change?.kind === "unconvertible")
-      return { next: "unchanged", unconvertible: r.change.reason ?? "unconvertible" };
+    // Item by item: a failing sub-value stays as stored, the others convert.
+    if (r.change?.kind === "unconvertible") {
+      unconvertible ??= r.change.reason ?? "unconvertible";
+      failed.push(item[sub.key]);
+      out.push(item);
+      continue;
+    }
     if (r.change?.kind === "cleared") cleared ??= r.change.reason;
     if (!r.values) {
       out.push(item);
@@ -123,6 +132,7 @@ export function rewriteItems(
     changed = true;
     if (Object.keys(r.values).length > 0) out.push(r.values);
   }
-  if (!changed) return { next: "unchanged" };
-  return { next: out.length > 0 ? out : undefined, cleared };
+  const failures = unconvertible === undefined ? {} : { unconvertible, failed };
+  if (!changed) return { next: "unchanged", ...failures };
+  return { next: out.length > 0 ? out : undefined, cleared, ...failures };
 }

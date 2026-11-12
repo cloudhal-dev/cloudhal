@@ -8,7 +8,7 @@ import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
 import { and, type Cond } from "../node-sql.ts";
 import { planLeave } from "../references/leave.ts";
-import { planEntryRefs } from "../references/writer.ts";
+import { type ConvertingRows, type HeldRef, planEntryRefs } from "../references/writer.ts";
 import type { StoreContext } from "./context.ts";
 import { checkTranslationLinks } from "./translations.ts";
 
@@ -28,8 +28,10 @@ export async function planEntryIntegrity(
     stored: ContentEntry | undefined;
     /** `stored` through the field-operation markers, as the draft was (RFC-0045 §7). */
     baseline?: ContentEntry | undefined;
-    /** RFC-0045 §7: field paths whose value did not convert; their rows stay as they are. */
-    held?: readonly string[] | undefined;
+    /** RFC-0045 §7: values that did not convert; their rows stay as they are. */
+    held?: readonly HeldRef[] | undefined;
+    /** The node's rows for a running text → reference path (what it already holds). */
+    converting?: ConvertingRows | undefined;
   },
 ): Promise<EntryIntegrityPlan> {
   const { draft, stored } = write;
@@ -44,6 +46,7 @@ export async function planEntryIntegrity(
     stored,
     baseline: write.baseline ?? stored,
     held: write.held,
+    converting: write.converting,
   });
   const leave = stored ? await planLeave(ctx.sql, site, { stored, next: draft }) : undefined;
   return {

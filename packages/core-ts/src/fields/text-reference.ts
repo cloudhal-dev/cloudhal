@@ -14,10 +14,11 @@
  *   under the fresh guard, with its rows, when every id names a usable group; else it fails, is
  *   reported, and `clear` drops it. Any other text goes through the table (`byText`). Display: an
  *   id-shaped value naming a member group shows as a reference.
- * - **Reference → text.** A row left for the node and path means the value is still a reference:
+ * - **Reference → text**, per value. A string with its own row (`rows.has`) is still a reference:
  *   a group in `titles` converts to its title, any other fails (reported; `clear` removes it and
- *   its rows). No row left: text already, an id-shaped title included. Display: a group in
- *   `titles` shows its title, any other string as it is.
+ *   its rows). A string with no row of its own is text already, an id-shaped title included. A
+ *   non-string (a list, `[]` too) is never text yet and goes through the table (joined titles, no
+ *   value, or a failure). Display: a group in `titles` shows its title, any other string as it is.
  * - **No maps** (`checkRequiredToPublish`, prechecks): kept as stored.
  *
  * Other conversion rows keep RFC-0041's pristine rule. Pure.
@@ -105,17 +106,14 @@ export function textReferenceOutcome(input: TextReferenceInput): TextReferenceOu
     if (input.written && valueIssues(def, value, "v").length === 0) return { kind: "keep" };
     return { kind: "table" };
   }
-  // Reference → text: a row left means the value is still a reference.
+  // Reference → text, per value: a string is still a reference only with its own row; a
+  // non-string (a list, `[]` included) is never text yet, so it goes through the table.
   if (!maps) return { kind: "keep" };
   if (input.written && valueIssues(def, value, "v").length === 0) return { kind: "keep" };
-  if (!rows)
-    return typeof value === "string" && !maps.titles.has(value)
-      ? { kind: "keep" }
-      : { kind: "table" };
-  if (!rows.any) return { kind: "keep" };
-  const ids = Array.isArray(value) ? value : [value];
-  const gone = ids.find((id) => typeof id !== "string" || !maps.titles.has(id));
-  return gone === undefined
+  if (typeof value !== "string") return { kind: "table" };
+  const still = rows ? rows.has(value) : maps.titles.has(value);
+  if (!still) return { kind: "keep" };
+  return maps.titles.has(value)
     ? { kind: "table" }
-    : { kind: "fail", reason: `${String(gone)} has no entry in this site` };
+    : { kind: "fail", reason: `${value} has no entry in this site` };
 }

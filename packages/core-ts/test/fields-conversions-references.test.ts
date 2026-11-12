@@ -364,6 +364,15 @@ describe("RFC-0045 §7 review round (PR #214)", () => {
     );
     expect(at({ from: "reference", def: text, value: "entry_2025report" })).toBe("keep");
     expect(at({ from: "reference", def: text, value: HALL })).toBe("table");
+    // per value: a list is never text yet; a string with no row of its own is text already
+    expect(at({ from: "reference", def: text, value: [], rows: rows() })).toBe("table");
+    expect(at({ from: "reference", def: text, value: [HALL], rows: rows() })).toBe("table");
+    expect(at({ from: "reference", def: text, value: "Keynote", rows: rows(HALL) })).toBe("keep");
+    expect(convertFieldValue("reference", text, [], ctx)).toEqual({ ok: true, value: undefined });
+    expect(convertFieldValue("reference", text, [HALL], ctx)).toEqual({
+      ok: true,
+      value: "Main Hall",
+    });
     // other rows are not decided here
     expect(at({ from: "text", def: def({ type: "number" }) })).toBeUndefined();
   });

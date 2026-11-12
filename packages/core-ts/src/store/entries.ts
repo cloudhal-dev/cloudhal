@@ -68,7 +68,7 @@ export class EntryEngine {
     }
     // RFC-0045 §7: through the field-operation markers, stored entry too (`normalizeWrite`).
     const normalized = await normalizeWrite(this.#ctx, site, { draft, stored });
-    const { baseline, held } = normalized;
+    const { baseline, held, rows: converting } = normalized;
     draft = normalized.draft;
     // RFC-0045 §1: a member's id is stored as its group's.
     draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored: baseline });
@@ -77,7 +77,13 @@ export class EntryEngine {
     // RFC-0041 §3: typed field values, requiredToPublish and their asset references.
     const fields = await planEntryFields(this.#ctx, site, draft, stored);
     // RFC-0033 links; RFC-0045 §2 targets, anchors, `entry_refs`, a move or group change.
-    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored, baseline, held });
+    const integrity = await planEntryIntegrity(this.#ctx, site, {
+      draft,
+      stored,
+      baseline,
+      held,
+      converting,
+    });
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {

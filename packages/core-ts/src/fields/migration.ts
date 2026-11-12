@@ -65,6 +65,11 @@ export interface RewriteInput {
    * reference values for the writers (`text-reference.ts`); absent for readers.
    */
   readonly rows?: FieldRows | undefined;
+  /**
+   * A person's write: a repeater converts its items one by one, keeping a failing item as stored
+   * (phase B, the dry run and the revert treat any failing item as the entry's failure).
+   */
+  readonly partial?: boolean | undefined;
 }
 
 /** How one entry's value changes under a marker. */
@@ -79,6 +84,11 @@ export interface RewriteResult {
   /** The new `fields`, or undefined when nothing changes. */
   readonly values: Record<string, unknown> | undefined;
   readonly change: ValueChange | undefined;
+  /**
+   * RFC-0045 §7: the values that did not convert, as stored (a field's value, or a repeater's
+   * failing sub-values), so a person's write can keep their rows as they are.
+   */
+  readonly failed?: readonly unknown[] | undefined;
 }
 
 const NOTHING: RewriteResult = { values: undefined, change: undefined };
@@ -133,6 +143,7 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   return {
     values: undefined,
     change: { kind: "unconvertible", before, after: undefined, reason: out.reason },
+    failed: [before],
   };
 }
 
@@ -149,11 +160,22 @@ function rewriteSub(input: RewriteInput, values: Readonly<Record<string, unknown
     rows: input.rows,
     rewrite: rewriteFields,
   });
-  if (r.unconvertible !== undefined)
-    return {
-      values: undefined,
-      change: { kind: "unconvertible", before, after: undefined, reason: r.unconvertible },
+  if (r.unconvertible !== undefined) {
+    const change = {
+      kind: "unconvertible" as const,
+      before,
+      after: undefined,
+      reason: r.unconvertible,
     };
+    // A person's write keeps the items that converted; the operation's passes fail the entry.
+    const kept =
+      input.partial && r.next !== "unchanged"
+        ? r.next === undefined
+          ? without(values, def.key)
+          : { ...values, [def.key]: r.next }
+        : undefined;
+    return { values: kept, change, failed: r.failed };
+  }
   if (r.next === "unchanged") return NOTHING;
   const next = r.next === undefined ? without(values, def.key) : { ...values, [def.key]: r.next };
   const kind = r.cleared !== undefined ? "cleared" : SUB_KIND[migrationKind(def) ?? "remove"];
@@ -224,8 +246,8 @@ export function normalizeThroughMarkers(
     stored?: Readonly<Record<string, unknown>> | undefined;
     /** RFC-0045 §7: the node's rows for a running text ↔ reference conversion's path. */
     rows?: FieldRows | undefined;
-    /** Called for a definition whose value does not convert (kept as stored). */
-    onUnconvertible?: ((def: FieldDefinition) => void) | undefined;
+    /** Called for a definition with values that do not convert (kept as stored), with them. */
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly unknown[]) => void) | undefined;
   },
 ): Record<string, unknown> | undefined {
   let current = values;
@@ -234,8 +256,9 @@ export function normalizeThroughMarkers(
   for (const def of defs) {
     if (!def.migration) continue;
     const baseline = stored === undefined ? undefined : { value: storedValue(def, stored) };
-    const r = rewriteFields({ def, values: current, ...rest, pristine: false, baseline });
-    if (r.change?.kind === "unconvertible") onUnconvertible?.(def);
+    const partial = stored !== undefined;
+    const r = rewriteFields({ def, values: current, ...rest, pristine: false, baseline, partial });
+    if (r.change?.kind === "unconvertible") onUnconvertible?.(def, r.failed ?? []);
     if (r.values) {
       current = r.values;
       changed = true;

@@ -5,15 +5,64 @@
  * replace a concurrent writer's fresher ones (R10, the `asset_refs` lesson of #196).
  *
  * `shared` is computed in JS from the same site row, so no `NULL` can arise, and body keys are
- * read through any `migration.fromKey` the site carries (`entryRefRows`). There is no membership
+ * read through any `migration.fromKey` the site carries (`entryRefRows`); a running text ↔
+ * reference conversion's path is read through its earlier type (`rebuildRows`). There is no membership
  * join: rows are kept for every stored value, and the site filters keep them harmless. The
  * `INSERT` is chunked below 90 KB a statement; the chunks count against the import batch's cap.
  * Worker-safe.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import type { SqlStatement } from "@cloudhal/storage";
+import { GROUP_ID_PATTERN } from "../fields/props.ts";
+import { fieldDefinitions, isRecord } from "../fields/types.ts";
 import { chunks, REFS_STATEMENT_BYTES } from "../media/refs-rebuild.ts";
-import { entryRefRowsOf } from "./rows.ts";
+import { convertingPath } from "./conversion-rows.ts";
+import { memberGroup } from "./members.ts";
+import { type EntryRefRow, entryRefRows, sharedOf, storedKey } from "./rows.ts";
+
+const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
+
+/**
+ * RFC-0045 §7: an entry's rows for a rebuild, read through a running text ↔ reference
+ * conversion's earlier type, so they mean only what phase B or an accepted write left. Converting
+ * from text, the path gets no row: phase B checks every value again. Converting from references,
+ * a stored value that still is a group id of the site keeps its row (an id-shaped title naming no
+ * group stays text). Without such a marker, `entryRefRows`.
+ */
+export function rebuildRows(
+  site: Pick<Site, "collections">,
+  entry: ContentEntry,
+  /** The groups with a member in the site: an id-shaped title of no group stays text. */
+  groups: ReadonlySet<string>,
+): EntryRefRow[] {
+  const defs = fieldDefinitions(site, entry.collection);
+  const rows = entryRefRows(defs, entry.fields);
+  const values = isRecord(entry.fields) ? entry.fields : {};
+  const out = [...rows];
+  for (const def of defs) {
+    const f = convertingPath(def);
+    if (f === undefined) continue;
+    if (def.migration?.fromType === "text") {
+      out.splice(0, out.length, ...out.filter((row) => row.f !== f));
+      continue;
+    }
+    const k = storedKey(def, values) ?? def.key;
+    const sub = def.migration?.sub;
+    const stored = values[k];
+    const found =
+      sub === undefined
+        ? Array.isArray(stored)
+          ? stored
+          : [stored]
+        : Array.isArray(stored)
+          ? stored.map((i) => (isRecord(i) ? i[sub] : undefined))
+          : [];
+    for (const t of new Set(found))
+      if (typeof t === "string" && GROUP_ID.test(t) && groups.has(t))
+        out.push({ t, f, k, shared: sharedOf(def) });
+  }
+  return out;
+}
 
 const INSERT_SQL = `INSERT INTO entry_refs (site_id, target_id, source_id, source_collection, field, root_key, shared, source_status)
   SELECT ?, json_extract(r.value, '$.t'), json_extract(r.value, '$.n'), json_extract(r.value, '$.c'),
@@ -31,14 +80,16 @@ export function entryRefItems(
   if (!siteRow) return [];
   const site = JSON.parse(siteRow.body) as Pick<Site, "collections">;
   const out: string[] = [];
-  for (const r of rows) {
-    if (r.kind !== "contentEntry") continue;
-    const entry = JSON.parse(r.body) as ContentEntry;
-    for (const row of entryRefRowsOf(site, entry))
+  const entries = rows.flatMap((r) =>
+    r.kind === "contentEntry" ? [{ id: r.id, entry: JSON.parse(r.body) as ContentEntry }] : [],
+  );
+  const groups = new Set(entries.map(({ entry }) => memberGroup(entry)));
+  for (const { id, entry } of entries) {
+    for (const row of rebuildRows(site, entry, groups))
       out.push(
         JSON.stringify({
           t: row.t,
-          n: r.id,
+          n: id,
           c: entry.collection,
           f: row.f,
           k: row.k,

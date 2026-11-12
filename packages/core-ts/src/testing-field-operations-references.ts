@@ -24,6 +24,7 @@ import {
 import { nodeHash } from "./hash.ts";
 import { PNG_1X1 } from "./media/fixtures.ts";
 import { SiteGraphStore } from "./store.ts";
+import { exportSite, importSite } from "./sync.ts";
 import { racingDriver, type SuiteContext } from "./testing-taxonomy.ts";
 
 const person: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
@@ -937,6 +938,127 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         expect(doneOp.done).toBe(true);
         expect((await fresh(e)).fields).toEqual({ venue: hall.id });
         expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+      });
+    });
+
+    describe("per value (round 4)", () => {
+      const toRef = (over: Partial<Extract<FieldOperation, { op: "change_field_type" }>> = {}) =>
+        ({
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+          ...over,
+        }) as FieldOperation;
+
+      it("a sub item written as text next to a held reference item stays text", async () => {
+        const site = await world([SPEAKERS]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { speakers: [{ person: hall.id }] } });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "person",
+          type: "text",
+        };
+        const part = await run(site, op, { budget: { entries: 0 } });
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+        const written = await store().updateContentEntry({
+          ...(await fresh(e)),
+          fields: { speakers: [{ person: hall.id }, { person: "Keynote" }] },
+        });
+        expect(written.fields).toEqual({ speakers: [{ person: hall.id }, { person: "Keynote" }] });
+        // the held reference keeps its row; the text item has none
+        expect(await rows(e.id)).toEqual([
+          { t: hall.id, f: "speakers.person", k: "speakers", s: 1 },
+        ]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        const done = await continueFieldOperation(store(), site.id, part.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ speakers: [{ person: "Keynote" }] });
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("held per value: one archived legacy item is reported, a new usable item gets its row", async () => {
+        const site = await world([SPEAKERS]);
+        const hall = await place(site, "Main Hall");
+        const gone = await place(site, "Gone");
+        const e = await entry(site, "events", { fields: { speakers: [{ name: gone.id }] } });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "name",
+          type: "reference",
+          collections: ["places"],
+        };
+        const part = await run(site, op, { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(gone)), status: "archived" });
+        await store().updateContentEntry({
+          ...(await fresh(e)),
+          fields: { speakers: [{ name: gone.id }, { name: hall.id }] },
+        });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "speakers.name", k: "speakers", s: 1 }]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.done).toBe(false);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "speakers.name", k: "speakers", s: 1 }]);
+      });
+
+      it("a person writing [Y, Z] over an archived legacy Z is refused for Z", async () => {
+        const site = await world([text("venue")]);
+        const y = await place(site, "Y place");
+        const z = await place(site, "Z place");
+        const e = await entry(site, "events", { fields: { venue: z.id } });
+        await run(site, toRef({ multiple: true }), { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(z)), status: "archived" });
+        expect(
+          await code(
+            store().updateContentEntry({ ...(await fresh(e)), fields: { venue: [y.id, z.id] } }),
+          ),
+        ).toBe("unknown_entry");
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a mid-operation import rebuilds rows through the marker, then the operation continues", async () => {
+        // text → reference: an archived legacy id gets no row from the rebuild, and is reported
+        const a = await world([text("venue")]);
+        const gone = await place(a, "Gone");
+        const legacy = await entry(a, "events", { fields: { venue: gone.id } });
+        const toRefOp = await run(a, toRef(), { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(gone)), status: "archived" });
+        const storage = { sql: ctx.sql(), blobs: ctx.blobs() };
+        await importSite(storage, await exportSite(storage, a.id), {
+          mode: "replace",
+          fieldTypes: ENABLED,
+        });
+        expect(await rows(legacy.id)).toEqual([]);
+        const stuck = await continueFieldOperation(store(), a.id, toRefOp.operationId, actor);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([legacy.id]);
+        // reference → text: the rebuild keeps rows for ids, which still convert to titles
+        const b = await world([reference("venue")]);
+        const hall = await place(b, "Main Hall");
+        const e = await entry(b, "events", { fields: { venue: hall.id } });
+        const toText = await run(
+          b,
+          { op: "change_field_type", collection: "events", key: "venue", type: "text" },
+          { budget: { entries: 0 } },
+        );
+        await importSite(storage, await exportSite(storage, b.id), {
+          mode: "replace",
+          fieldTypes: ENABLED,
+        });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+        const done = await continueFieldOperation(store(), b.id, toText.operationId, actor);
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ venue: "Main Hall" });
+        expect(await rows(e.id)).toEqual([]);
       });
     });
 

@@ -1335,3 +1335,18 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
   - Round 2's accepted gap is closed: legacy text is decided by its rows, whatever wrote the entry.
 - **The edition copy** carries text a running text → reference conversion has not converted only when the edition site's maps convert it to exactly one group, so the edition's own write converts it. Any other text is dropped and reported, as in round 1.
 
+#### Review round 4 (2026-11-13, PM verification of 0d170eab)
+
+- **Reference → text is decided per value.**
+  - A string is still a reference only with its own row (`rows.has`); with no row of its own it is text already, even next to a held reference item in the same repeater.
+  - A non-string (a list, `[]` included) is never text yet and goes through the table: joined titles, no value, or a failure.
+  - `rows.any` is phase C's pending predicate only.
+- **`held` is per value.** A person's write keeps stored rows only for the (field path, group id) pairs the decision failed (`HeldRef`), writes rows for every accepted value, and deletes rows for ids no longer in the draft. `rewriteItems` returns item-level results: in a person's write (`partial`) a failing item stays as stored while the others convert, and the operation's passes still treat any failing item as the entry's failure. The writer's guard skips held values, which are stored as they were and reported by phase B.
+- **The writer's "already held" comes from the rows.** While a text → reference conversion runs on a definition or `sub`, an id counts as already held only with its row for that path (`ConvertingRows`, which `normalizeWrite` already reads); every other id is newly chosen, as `rewriteTargetGuard`'s rule treats them. The edition copy follows the same rule.
+- **Rebuilds read a converting path through its earlier type** (`rebuildRows`; pull, push, `import --replace` and `--revert`, snapshot restore).
+  - From text: no rows for the path, so phase B checks every value again.
+  - From references: a stored value that is still a group id of the site keeps its row. An id-shaped title naming no group stays text.
+
+  Sites without such a marker are unchanged, and imports are not refused.
+- **The edition's `textConverts`** uses the converter's own rule: `byText` without the entry's own group, exactly one group left.
+
