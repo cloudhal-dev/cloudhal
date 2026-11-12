@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { compile } from "json-schema-to-typescript";
 import { writeBundled } from "./bundle.ts";
-import { ROOT_SCHEMAS } from "./schema-list.ts";
+import { INDEX_EXPORTS, ROOT_SCHEMAS } from "./schema-list.ts";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = path.resolve(here, "../src/generated");
@@ -24,7 +24,8 @@ const bundled = await writeBundled();
 await mkdir(OUT_DIR, { recursive: true });
 
 // Each generated module re-declares the shared $defs it uses (Id, Timestamp, ...). The index
-// exports every name exactly once, from the first module (in ROOT_SCHEMAS order) declaring it.
+// exports every name exactly once, from the first module (in ROOT_SCHEMAS order) declaring it;
+// a root listed in INDEX_EXPORTS contributes only the names listed there.
 const exportsByModule = new Map<string, string[]>();
 const claimed = new Set<string>();
 for (const name of ROOT_SCHEMAS) {
@@ -41,8 +42,15 @@ for (const name of ROOT_SCHEMAS) {
   });
   await writeFile(path.join(OUT_DIR, `${name}.ts`), ts);
   const names: string[] = [];
-  for (const m of ts.matchAll(/^export (?:interface|type) (\w+)/gm)) {
-    const id = m[1] as string;
+  const declared = [...ts.matchAll(/^export (?:interface|type) (\w+)/gm)].map(
+    (m) => m[1] as string,
+  );
+  const only = INDEX_EXPORTS[name];
+  for (const id of only ?? []) {
+    if (!declared.includes(id)) throw new Error(`INDEX_EXPORTS: ${name} declares no ${id}`);
+  }
+  for (const id of declared) {
+    if (only && !only.includes(id)) continue;
     if (!claimed.has(id)) {
       claimed.add(id);
       names.push(id);

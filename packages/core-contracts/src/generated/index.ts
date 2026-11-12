@@ -24,3 +24,5 @@ export type { ReleaseId, ReleaseItem, ReleaseNodeKind, ReleaseWhen, LocalDateTim
 export type { AutomationId, AutomationJob, AutomationRule, AutomationState, Automation, BuiltinAutomationJob, AgentTaskAutomationJob, AutomationBudget, AutomationRecurrence, AutomationOwner } from "./automation.ts";
 export type { ScheduleRunId, ScheduleRunSubject, ScheduleRunState, ScheduleRun, ReleaseRunSubject, AutomationRunSubject, ScheduleRunWindow, ScheduleRunUsage, ScheduleRunTaint, ScheduleRunError } from "./schedule-run.ts";
 export type { Glossary, GlossaryEntry } from "./glossary.ts";
+export type { ReleaseManifest, WorkerArtifact, BindingTemplate } from "./release-manifest.ts";
+export type { ReleaseStatement, StatementAsset } from "./release-statement.ts";

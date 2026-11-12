@@ -1,0 +1,119 @@
+name: Release bundle build
+
+# Builds and attests the release bundle of one version (RFC-0046 §4), called by release.yml's
+# `bundle` job. It holds NO secret: the job can read the repository and mint an OIDC token for the
+# build-provenance attestation, nothing else. Consumers check that attestation with
+#   gh attestation verify <file> --signer-workflow cloudhal-dev/cloudhal/.github/workflows/bundle-build.yml
+# so this file's path is part of the trust chain: renaming it breaks every verifier.
+# 1. checks out the release commit without persisted credentials and installs the frozen lockfile
+#    (no Actions cache: a release build restores nothing another workflow wrote);
+# 2. builds the packages and the Studio, creates the standard `cloudhal init` starter and runs
+#    `deploy --dry-run` in it;
+# 3. `scripts/release-bundle.ts build` writes the tarball, manifest.json and the UNSIGNED
+#    release-statement.json, validated and self-verified (`--security-release` when the caller's
+#    `security_release` is true);
+# 4. attests the three files; the Sigstore bundle becomes cloudhal-release-<v>.sigstore.json;
+# 5. uploads the four files as the short-lived artifact release-bundle-unsigned-<v>.
+# release.yml's `bundle-sign` job verifies the attestation and signs the statement.
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The release version (X.Y.Z or X.Y.Z-pre), equal to packages/cli/package.json.
+        type: string
+        required: true
+      dry_run:
+        description: A dry run signs with a throwaway key id `dryrun-<run id>`.
+        type: boolean
+        required: true
+      security_release:
+        description: The manifest's and statement's securityRelease (release.yml's plan reads it from the changelogs).
+        type: boolean
+        required: true
+
+permissions: {}
+
+jobs:
+  build:
+    name: Build and attest the bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write # the attestation's Sigstore certificate
+      attestations: write # store the attestation for this repository
+    env:
+      VERSION: ${{ inputs.version }}
+      DRY_RUN: ${{ inputs.dry_run }}
+      SECURITY_RELEASE: ${{ inputs.security_release }}
+      RUN_ID: ${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Check the version
+        run: |
+          if ! [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "not a version: $VERSION" >&2
+            exit 1
+          fi
+          cli=$(node -p 'require("./packages/cli/package.json").version')
+          if [ "$cli" != "$VERSION" ]; then
+            echo "packages/cli is $cli, not $VERSION" >&2
+            exit 1
+          fi
+      # Install scripts stay on: better-sqlite3 (the starter's seeded local store), workerd and
+      # esbuild need their native builds, which pnpm-workspace.yaml's allowBuilds lists.
+      - run: pnpm install --frozen-lockfile
+      # The npm build of the same commit: a package that does not build stops the release here,
+      # before anything is signed. The bundle itself is built from the workspace sources below.
+      - run: node scripts/build-packages.ts
+      - run: pnpm --filter @cloudhal/studio build
+      - name: Build the standard starter
+        run: |
+          node packages/cli/bin/cloudhal.ts init examples/release-std
+          # The new workspace folder is not in the frozen lockfile: it uses starters/blog's
+          # installed dependencies, which are the same (init copies that package.json). No pnpm
+          # command runs after this point: pnpm would add the folder to the lockfile.
+          node -e '
+            const read = (f) => { const p = require(f); delete p.name; delete p.private; return JSON.stringify(p); };
+            if (read("./starters/blog/package.json") !== read("./examples/release-std/package.json")) {
+              console.error("examples/release-std does not depend on what starters/blog does");
+              process.exit(1);
+            }'
+          ln -s ../../starters/blog/node_modules examples/release-std/node_modules
+          cd examples/release-std
+          node ../../packages/cli/bin/cloudhal.ts deploy --dry-run
+      - name: Build the bundle
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then key_id="dryrun-$RUN_ID"; else key_id="cloudhal-release-2026a"; fi
+          flags=()
+          if [ "$SECURITY_RELEASE" = "true" ]; then flags+=(--security-release); fi
+          node scripts/release-bundle.ts build --version "$VERSION" \
+            --project examples/release-std --studio apps/studio/dist \
+            --migrations-dir packages/storage/migrations \
+            --commit "$GITHUB_SHA" --key-id "$key_id" --out "$RUNNER_TEMP/release-bundle" "${flags[@]}"
+      - id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            ${{ runner.temp }}/release-bundle/cloudhal-release-${{ inputs.version }}.tar.gz
+            ${{ runner.temp }}/release-bundle/manifest.json
+            ${{ runner.temp }}/release-bundle/release-statement.json
+      - name: Keep the attestation bundle
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" "$RUNNER_TEMP/release-bundle/cloudhal-release-$VERSION.sigstore.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-bundle-unsigned-${{ inputs.version }}
+          path: ${{ runner.temp }}/release-bundle/
+          if-no-files-found: error
+          retention-days: 7

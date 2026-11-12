@@ -54,6 +54,34 @@ export async function unpublished(
 /** Lines the fixed group writes into every changelog: dependency bumps, not changes. */
 const DEPENDENCY_ONLY = /^- (?:Updated dependencies|(?:@cloudhal\/[a-z-]+|create-cloudhal)@\d)/;
 
+/** The entries under `## <version>` of one changelog, without their changeset hash. */
+function versionEntries(text: string, version: string): string[] {
+  const start = text.indexOf(`\n## ${version}\n`);
+  if (start === -1) return [];
+  const rest = text.slice(start + version.length + 5);
+  const end = rest.search(/\n## /);
+  return rest
+    .slice(0, end === -1 ? undefined : end)
+    .split(/\n(?=- )/)
+    .map((block) => block.trim())
+    .filter((entry) => entry.startsWith("- "))
+    .map((entry) => entry.replace(/^- [0-9a-f]{7,40}: /, "- "));
+}
+
+/**
+ * How a changeset marks its release a security release (`securityRelease` in the bundle's
+ * manifest and statement, RFC-0046): its summary starts with exactly this. The release PR shows it
+ * in the changelog diff, so the reviewers who merge it see the flag.
+ */
+export const SECURITY_RELEASE_MARKER = "**Security release.**";
+
+/** Whether any package's `## <version>` entries carry `SECURITY_RELEASE_MARKER`. */
+export function isSecurityRelease(changelogs: readonly string[], version: string): boolean {
+  return changelogs.some((text) =>
+    versionEntries(text, version).some((e) => e.startsWith(`- ${SECURITY_RELEASE_MARKER}`)),
+  );
+}
+
 /**
  * Release notes for `version`: every entry under `## <version>` in the packages' changelogs,
  * once each, without the "Updated dependencies" lines the fixed group adds to every package.
@@ -61,21 +89,12 @@ const DEPENDENCY_ONLY = /^- (?:Updated dependencies|(?:@cloudhal\/[a-z-]+|create
 export function releaseNotes(changelogs: readonly string[], version: string): string {
   const seen = new Set<string>();
   const entries: string[] = [];
-  for (const text of changelogs) {
-    const start = text.indexOf(`\n## ${version}\n`);
-    if (start === -1) continue;
-    const rest = text.slice(start + version.length + 5);
-    const section = rest.slice(0, rest.search(/\n## /) === -1 ? undefined : rest.search(/\n## /));
-    for (const block of section.split(/\n(?=- )/)) {
-      const entry = block.trim();
-      if (!entry.startsWith("- ") || DEPENDENCY_ONLY.test(entry)) continue;
-      const text = entry.replace(/^- [0-9a-f]{7,40}: /, "- ");
-      if (!seen.has(text)) {
-        seen.add(text);
-        entries.push(text);
-      }
+  for (const text of changelogs)
+    for (const entry of versionEntries(text, version)) {
+      if (DEPENDENCY_ONLY.test(entry) || seen.has(entry)) continue;
+      seen.add(entry);
+      entries.push(entry);
     }
-  }
   return [
     `All \`@cloudhal/*\` packages and \`create-cloudhal\` at **${version}**.`,
     "",

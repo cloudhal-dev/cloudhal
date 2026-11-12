@@ -1,16 +1,30 @@
 name: Release
 
-# Releases from CI (ADR-0013; the decisions in CONTRIBUTING.md "Releasing"):
+# Releases from CI (ADR-0013, RFC-0046; the decisions in CONTRIBUTING.md "Releasing"):
 # 1. `version`: on every push to main, the Changesets action opens or updates the release PR
 #    `chore(release): x.y.z` from the pending changesets. Merging it is the decision to release.
-# 2. `plan`: after that merge, finds that npm lacks the packages' new version.
-# 3. `publish`: waits for the `npm-publish` environment's approval (one click, the maintainer's
-#    2FA), then scripts/publish-ci.ts builds, smoke-tests the packed tarballs, publishes them with
-#    npm trusted publishing (OIDC, provenance), and creates one `v<version>` tag and GitHub Release.
-# 4. `template`: after publishing, template-sync.yml opens or updates the cloudhal-template PR
+# 2. `plan`: after that merge, finds that npm lacks the packages' new version, and whether a
+#    changeset marks it a security release (`**Security release.**`, CONTRIBUTING.md "Releasing").
+# 3. `bundle` (only with the repository variable RELEASE_BUNDLES = 'true', or in a dry run): the
+#    reusable bundle-build.yml builds the standard theme's release bundle from this commit and
+#    attests it (build provenance). It holds no secret.
+# 4. `bundle-sign`: waits for the `release-signing` environment's approval, verifies the
+#    attestation (`gh attestation verify --signer-workflow …/bundle-build.yml`) and the
+#    statement's digests, then signs release-statement.json with the release key. It checks out
+#    nothing and installs nothing; the key reaches one step only.
+# 5. `publish`: waits for the `npm-publish` environment's approval (one click, the maintainer's
+#    2FA), then scripts/publish-ci.ts verifies the statement's signature with the pinned key,
+#    tags v<version>, creates a DRAFT GitHub Release, attaches the five bundle assets and
+#    re-checks them, builds, smoke-tests and publishes the packed tarballs with npm trusted
+#    publishing (OIDC, provenance), re-checks the draft and publishes it. Releases are
+#    immutable: nothing can be attached after that, so the order matters.
+# 6. `template`: after publishing, template-sync.yml opens or updates the cloudhal-template PR
 #    (the Deploy to Cloudflare button's repository; CONTRIBUTING.md "Releasing").
-# 5. `docker`: after publishing, docker.yml builds the self-host image from the npm release and
+# 7. `docker`: after publishing, docker.yml builds the self-host image from the npm release and
 #    pushes ghcr.io/cloudhal-dev/cloudhal:<version>, :<major.minor> and :latest (issue #143).
+# Actions › Release › Run workflow with `dry_run` runs 2–5 with a throwaway signing key on a
+# `v<version>-dryrun.<n>` draft that is deleted at the end, also when the job fails, is cancelled
+# or times out: no tag, no npm publish (`npm publish --dry-run`), no release.
 # npm's trusted-publisher entry for each package names this file and the `npm-publish`
 # environment: renaming either breaks publishing.
 
@@ -18,6 +32,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (throwaway signing key, a draft that is deleted; nothing is published)
+        type: boolean
+        required: false
+        default: false
 
 permissions: {}
 
@@ -28,7 +48,7 @@ concurrency:
 jobs:
   version:
     name: Release PR (Changesets)
-    if: vars.RELEASE_ENABLED == 'true'
+    if: vars.RELEASE_ENABLED == 'true' && !inputs.dry_run
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -54,13 +74,15 @@ jobs:
 
   plan:
     name: Anything to publish?
-    if: vars.RELEASE_ENABLED == 'true'
+    if: vars.RELEASE_ENABLED == 'true' || inputs.dry_run
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       publish: ${{ steps.plan.outputs.publish }}
       version: ${{ steps.plan.outputs.version }}
+      dry_run: ${{ steps.plan.outputs.dry_run }}
+      security_release: ${{ steps.plan.outputs.security_release }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,11 +92,146 @@ jobs:
           node-version: 24
       - id: plan
         run: node scripts/publish-ci.ts --plan
+        env:
+          RELEASE_DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+
+  bundle:
+    name: Bundle ${{ needs.plan.outputs.version }}
+    needs: plan
+    if: needs.plan.outputs.publish == 'true' && (vars.RELEASE_BUNDLES == 'true' || needs.plan.outputs.dry_run == 'true')
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/bundle-build.yml
+    with:
+      version: ${{ needs.plan.outputs.version }}
+      dry_run: ${{ needs.plan.outputs.dry_run == 'true' }}
+      security_release: ${{ needs.plan.outputs.security_release == 'true' }}
+
+  bundle-sign:
+    name: Sign the bundle of ${{ needs.plan.outputs.version }}
+    needs: [plan, bundle]
+    if: needs.bundle.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # A required reviewer and deployments from main only (CONTRIBUTING.md "Releasing"). Its one
+    # secret, RELEASE_SIGNING_KEY (PKCS#8 PEM of cloudhal-release-2026a), reaches the sign step only.
+    environment: release-signing
+    permissions:
+      contents: read
+      attestations: read
+      actions: read
+    outputs:
+      # The raw public key the statement was signed with (public): publish-ci checks a dry run's
+      # signature with it; outside a dry run it checks against its own pin of the release key.
+      public_key: ${{ steps.sign.outputs.public_key }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      DRY_RUN: ${{ needs.plan.outputs.dry_run }}
+      SECURITY_RELEASE: ${{ needs.plan.outputs.security_release }}
+      KEY_ID: ${{ needs.plan.outputs.dry_run == 'true' && format('dryrun-{0}', github.run_id) || 'cloudhal-release-2026a' }}
+    # No checkout and no package install: the checks and the signer are the inline scripts below.
+    steps:
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-bundle-unsigned-${{ needs.plan.outputs.version }}
+          path: bundle
+      - name: Verify the build attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for f in "bundle/cloudhal-release-$VERSION.tar.gz" bundle/manifest.json bundle/release-statement.json; do
+            for bundle in "" "bundle/cloudhal-release-$VERSION.sigstore.json"; do
+              gh attestation verify "$f" ${bundle:+--bundle "$bundle"} --repo cloudhal-dev/cloudhal \
+                --signer-workflow cloudhal-dev/cloudhal/.github/workflows/bundle-build.yml \
+                --source-ref refs/heads/main --source-digest "$GITHUB_SHA" --deny-self-hosted-runners
+            done
+          done
+      - name: Check the statement
+        shell: node {0}
+        run: |
+          const { createHash } = require("node:crypto");
+          const { readFileSync } = require("node:fs");
+          const fail = (m) => { console.error(`bundle-sign: ${m}`); process.exit(1); };
+          const { VERSION, KEY_ID, GITHUB_SHA, SECURITY_RELEASE } = process.env;
+          const raw = readFileSync("bundle/release-statement.json");
+          if (raw.length > 4096) fail("release-statement.json is above 4096 bytes");
+          const s = JSON.parse(raw.toString("utf8"));
+          const sortDeep = (v) => Array.isArray(v) ? v.map(sortDeep) : v && typeof v === "object"
+            ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortDeep(v[k])])) : v;
+          if (`${JSON.stringify(sortDeep(s), null, 2)}\n` !== raw.toString("utf8")) fail("the statement is not canonical JSON");
+          if (s.schemaVersion !== 1 || s.format !== "cloudhal.release-statement@1") fail("not a release statement");
+          if (s.version !== VERSION) fail("the statement is not for the planned version");
+          if (s.channel !== (VERSION.includes("-") ? "next" : "stable")) fail("the statement's channel does not match the version");
+          if (s.commit !== GITHUB_SHA) fail("the statement is not for this commit");
+          if (s.securityRelease !== (SECURITY_RELEASE === "true")) fail("the statement's securityRelease is not the planned one");
+          const sg = s.signing ?? {};
+          if (sg.keyId !== KEY_ID || sg.algorithm !== "Ed25519" || sg.signature !== "release-statement.sig") fail("the statement does not name the signing key");
+          const files = { manifest: "manifest.json", tarball: `cloudhal-release-${VERSION}.tar.gz` };
+          for (const [field, name] of Object.entries(files)) {
+            const want = s[field] ?? {};
+            const bytes = readFileSync(`bundle/${name}`);
+            const sha = createHash("sha256").update(bytes).digest("hex");
+            if (want.name !== name || want.bytes !== bytes.length || want.sha256 !== sha) fail(`${name} is not the file the statement pins`);
+          }
+          const m = JSON.parse(readFileSync("bundle/manifest.json", "utf8"));
+          for (const f of ["version", "channel", "securityRelease", "commit", "createdAt"]) if (m[f] !== s[f]) fail(`the manifest's ${f} is not the statement's`);
+          if (m.signing?.keyId !== KEY_ID || m.signing?.signature !== "release-statement.sig") fail("the manifest does not name the statement");
+          console.log(`statement ok: ${s.version} (${s.channel}) at ${s.commit}, key ${KEY_ID}`);
+      - name: Sign the statement
+        id: sign
+        shell: node {0}
+        env:
+          RELEASE_SIGNING_KEY: ${{ needs.plan.outputs.dry_run != 'true' && secrets.RELEASE_SIGNING_KEY || '' }}
+        run: |
+          const { createPrivateKey, createPublicKey, generateKeyPairSync, sign, verify } = require("node:crypto");
+          const { appendFileSync, readFileSync, writeFileSync } = require("node:fs");
+          // The active release key (docs/security/release-signing-keys.md; a test keeps them equal).
+          const PINNED_KEY_ID = "cloudhal-release-2026a";
+          const PINNED_PUBLIC_KEY = "7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=";
+          const fail = (m) => { console.error(`bundle-sign: ${m}`); process.exit(1); };
+          const dryRun = process.env.DRY_RUN === "true";
+          const keyId = dryRun ? `dryrun-${process.env.GITHUB_RUN_ID}` : PINNED_KEY_ID;
+          if (process.env.KEY_ID !== keyId) fail("KEY_ID is not the key this run signs with");
+          let key;
+          try {
+            key = dryRun ? generateKeyPairSync("ed25519").privateKey : createPrivateKey(process.env.RELEASE_SIGNING_KEY || "");
+          } catch {
+            fail("RELEASE_SIGNING_KEY is missing or not a PKCS#8 PEM key");
+          } finally {
+            delete process.env.RELEASE_SIGNING_KEY;
+          }
+          if (key.asymmetricKeyType !== "ed25519") fail("the signing key is not Ed25519");
+          const pub = createPublicKey(key);
+          const raw = pub.export({ format: "der", type: "spki" }).subarray(12).toString("base64");
+          if (!dryRun && raw !== PINNED_PUBLIC_KEY) fail(`the signing key is not ${PINNED_KEY_ID}`);
+          const statement = readFileSync("bundle/release-statement.json");
+          const sig = sign(null, statement, key);
+          if (sig.length !== 64 || !verify(null, statement, pub, sig)) fail("the signature does not verify");
+          writeFileSync("bundle/release-statement.sig", sig);
+          if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `public_key=${raw}\n`);
+          console.log(`signed release-statement.json with ${keyId} (public key ${raw})`);
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-bundle-${{ needs.plan.outputs.version }}
+          path: bundle/
+          if-no-files-found: error
+          retention-days: 90
 
   publish:
     name: Publish ${{ needs.plan.outputs.version }} to npm
-    needs: plan
-    if: needs.plan.outputs.publish == 'true'
+    needs: [plan, bundle-sign]
+    # Without bundles (RELEASE_BUNDLES off) bundle-sign is skipped and publish runs the same order
+    # with no assets; with bundles on, or in a dry run, it needs the signed bundle.
+    if: >-
+      !cancelled() && needs.plan.result == 'success' && needs.plan.outputs.publish == 'true' &&
+      (needs.bundle-sign.result == 'success' ||
+      (needs.bundle-sign.result == 'skipped' && vars.RELEASE_BUNDLES != 'true' && needs.plan.outputs.dry_run != 'true'))
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment:
@@ -87,6 +244,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false # publish-ci pushes the tag through `gh auth setup-git`
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -97,14 +255,44 @@ jobs:
       - run: npm install -g npm@12
       - run: pnpm install --frozen-lockfile
       - run: node scripts/build-packages.ts --check
-      - run: node scripts/publish-ci.ts
+      - if: needs.bundle-sign.result == 'success'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-bundle-${{ needs.plan.outputs.version }}
+          path: ${{ runner.temp }}/release-bundle
+      - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          HAS_BUNDLE: ${{ needs.bundle-sign.result == 'success' }}
+          BUNDLE_DIR: ${{ runner.temp }}/release-bundle
+          DRY_RUN: ${{ needs.plan.outputs.dry_run }}
+          RELEASE_DRYRUN_PUBLIC_KEY: ${{ needs.plan.outputs.dry_run == 'true' && needs.bundle-sign.outputs.public_key || '' }}
+        run: |
+          args=()
+          if [ "$HAS_BUNDLE" = "true" ]; then args+=(--bundle-dir "$BUNDLE_DIR"); fi
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          node scripts/publish-ci.ts "${args[@]}"
+      # publish-ci deletes a dry run's draft when a step fails; a cancelled or timed-out job never
+      # gets there. Only drafts with this run's dry-run tag name are deleted (never a release).
+      - name: Delete the dry run's draft
+        if: always() && needs.plan.outputs.dry_run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.plan.outputs.version }}-dryrun.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          ids=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft and .tag_name == env.TAG) | .id')
+          for id in $ids; do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id"
+            echo "deleted the dry run's draft $TAG ($id)"
+          done
+          if [ -z "$ids" ]; then echo "no draft $TAG is left"; fi
 
   template:
     name: cloudhal-template PR for ${{ needs.plan.outputs.version }}
     needs: [plan, publish]
-    if: needs.publish.result == 'success'
+    if: needs.publish.result == 'success' && needs.plan.outputs.dry_run != 'true'
     permissions:
       contents: read
     uses: ./.github/workflows/template-sync.yml
@@ -116,7 +304,7 @@ jobs:
   docker:
     name: Docker image ${{ needs.plan.outputs.version }}
     needs: [plan, publish]
-    if: needs.publish.result == 'success'
+    if: needs.publish.result == 'success' && needs.plan.outputs.dry_run != 'true'
     permissions:
       contents: read
       packages: write

@@ -8636,6 +8636,836 @@ export const GlossarySchema = {
   }
 } as const;
 
+export const ReleaseManifestSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release-manifest.schema.json",
+  "title": "ReleaseManifest",
+  "description": "cloudhal.release-manifest@1 (RFC-0046): the manifest of one Cloudhal release bundle, published as the release asset manifest.json next to the gzip tarball cloudhal-release-<version>.tar.gz. A project release is signed through release-statement.json, which pins this file's SHA-256 and size (signing.signature = release-statement.sig); the legacy form manifest.sig, a raw 64-byte Ed25519 signature over these exact bytes, is for development keys only. It describes every built Worker module and static asset by size and SHA-256, the binding templates, feature levels, migration range and rollback facts a remote deployer needs to install, update or refuse a version without running a build. Portable on purpose: it references common only for SchemaVersion and Timestamp; every other definition is local.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "version",
+    "channel",
+    "securityRelease",
+    "commit",
+    "createdAt",
+    "contracts",
+    "levels",
+    "migrations",
+    "durableObjects",
+    "runtime",
+    "toolchain",
+    "theme",
+    "skills",
+    "workers",
+    "bindingTemplates",
+    "requiredScopes",
+    "optionalScopes",
+    "requiredCapabilities",
+    "optionalCapabilities",
+    "starter",
+    "features",
+    "planVersion",
+    "signing"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "cloudhal.release-manifest@1"
+      ]
+    },
+    "version": {
+      "$ref": "#/$defs/CloudhalVersion"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "stable",
+        "next"
+      ]
+    },
+    "securityRelease": {
+      "type": "boolean"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "contracts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "enum": [
+            1
+          ]
+        }
+      }
+    },
+    "levels": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schedules",
+        "gates"
+      ],
+      "properties": {
+        "schedules": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gates": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first",
+        "last",
+        "count",
+        "names",
+        "compatibleWithPrevious"
+      ],
+      "properties": {
+        "first": {
+          "$ref": "#/$defs/MigrationName"
+        },
+        "last": {
+          "$ref": "#/$defs/MigrationName"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "names": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/MigrationName"
+          }
+        },
+        "compatibleWithPrevious": {
+          "type": "boolean"
+        }
+      }
+    },
+    "durableObjects": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bindings",
+        "lifecycleChange"
+      ],
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "className",
+              "migration"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/BindingName"
+              },
+              "className": {
+                "type": "string",
+                "pattern": "^[A-Z][A-Za-z0-9]*$"
+              },
+              "migration": {
+                "type": "string",
+                "pattern": "^v[1-9][0-9]*$"
+              }
+            }
+          }
+        },
+        "lifecycleChange": {
+          "type": "boolean"
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatibilityDate",
+        "compatibilityFlags"
+      ],
+      "properties": {
+        "compatibilityDate": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "compatibilityFlags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          }
+        }
+      }
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 64
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "blockTypes",
+        "settingsSha256",
+        "designSha256"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "blockTypes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "settingsSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "designSha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        }
+      }
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "sha256": {
+            "$ref": "#/$defs/Sha256Hex"
+          }
+        }
+      }
+    },
+    "workers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site",
+        "admin"
+      ],
+      "properties": {
+        "site": {
+          "$ref": "#/$defs/WorkerArtifact"
+        },
+        "admin": {
+          "$ref": "#/$defs/WorkerArtifact"
+        }
+      }
+    },
+    "bindingTemplates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site",
+        "admin"
+      ],
+      "properties": {
+        "site": {
+          "$ref": "#/$defs/BindingTemplate"
+        },
+        "admin": {
+          "$ref": "#/$defs/BindingTemplate"
+        }
+      }
+    },
+    "requiredScopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ScopeId"
+      }
+    },
+    "optionalScopes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/ScopeId"
+      }
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/Capability"
+      }
+    },
+    "optionalCapabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/Capability"
+      }
+    },
+    "starter": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "admin-api"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "path",
+            "bytes",
+            "sha256",
+            "siteId"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "enum": [
+                "bundle"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^starter/[A-Za-z0-9._-]+$"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "sha256": {
+              "$ref": "#/$defs/Sha256Hex"
+            },
+            "siteId": {
+              "$ref": "#/$defs/SiteId"
+            }
+          }
+        }
+      ]
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "boolean"
+      },
+      "required": [
+        "adminSitesAcceptsSiteId",
+        "healthReportsVersion",
+        "mediaTransformVar"
+      ],
+      "properties": {
+        "adminSitesAcceptsSiteId": {
+          "type": "boolean"
+        },
+        "healthReportsVersion": {
+          "type": "boolean"
+        },
+        "mediaTransformVar": {
+          "type": "boolean"
+        }
+      }
+    },
+    "planVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "algorithm",
+        "signature"
+      ],
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "Ed25519"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "enum": [
+            "manifest.sig",
+            "release-statement.sig"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "BindingName": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*(_\\*)?$"
+    },
+    "BindingTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bindings",
+        "vars",
+        "secrets"
+      ],
+      "properties": {
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "type",
+              "required"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/BindingName"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "d1",
+                  "r2_bucket",
+                  "assets",
+                  "service",
+                  "durable_object_namespace",
+                  "analytics_engine",
+                  "analytics_sql",
+                  "ratelimit",
+                  "ai_search",
+                  "send_email",
+                  "ai",
+                  "browser"
+                ]
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "aliases": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/BindingName"
+                }
+              }
+            }
+          }
+        },
+        "vars": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/BindingName"
+          }
+        },
+        "secrets": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/SecretName"
+          }
+        },
+        "cache": {
+          "type": "boolean"
+        },
+        "cron": {
+          "type": "string",
+          "pattern": "^[0-9*/,\\- ]+$"
+        }
+      }
+    },
+    "Capability": {
+      "type": "string",
+      "enum": [
+        "account",
+        "workers",
+        "d1",
+        "r2",
+        "analytics",
+        "domains"
+      ]
+    },
+    "CloudhalVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "MigrationName": {
+      "type": "string",
+      "pattern": "^[0-9]{4}_[a-z0-9_]+$"
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "ScopeId": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)+$"
+    },
+    "SecretName": {
+      "type": "string",
+      "enum": [
+        "BETTER_AUTH_SECRET",
+        "MCP_STATE_KEY",
+        "CLOUDHAL_PREVIEW_SECRET",
+        "CLOUDHAL_PURGE_TOKEN",
+        "CLOUDHAL_DEPLOY_TOKEN",
+        "CLOUDHAL_SETUP_TOKEN",
+        "CLOUDHAL_COMMENTS_KEY"
+      ]
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "SiteId": {
+      "type": "string",
+      "pattern": "^site_[A-Za-z0-9]{6,32}$"
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    },
+    "WorkerArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mainModule",
+        "modules",
+        "assets"
+      ],
+      "properties": {
+        "mainModule": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/-]+$"
+        },
+        "modules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "type",
+              "bytes",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "esm",
+                  "cjs",
+                  "wasm",
+                  "text",
+                  "data"
+                ]
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "$ref": "#/$defs/Sha256Hex"
+              }
+            }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "count",
+            "bytes",
+            "files",
+            "headers"
+          ],
+          "properties": {
+            "count": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 20000
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "files": {
+              "type": "array",
+              "maxItems": 20000,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "bytes",
+                  "sha256",
+                  "assetHash",
+                  "contentType"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "pattern": "^/[^\\s]*$",
+                    "maxLength": 1024
+                  },
+                  "bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 26214400
+                  },
+                  "sha256": {
+                    "$ref": "#/$defs/Sha256Hex"
+                  },
+                  "assetHash": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{32}$"
+                  },
+                  "contentType": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              }
+            },
+            "headers": {
+              "type": "string",
+              "maxLength": 100000
+            },
+            "config": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "not_found_handling": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "404-page",
+                    "single-page-application"
+                  ]
+                },
+                "run_worker_first": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^/"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "bindingTemplate": {
+          "type": "string",
+          "enum": [
+            "site",
+            "admin"
+          ]
+        }
+      }
+    }
+  }
+} as const;
+
+export const ReleaseStatementSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release-statement.schema.json",
+  "title": "ReleaseStatement",
+  "description": "cloudhal.release-statement@1 (RFC-0046): the small canonical document a Cloudhal release signs, published as the release asset release-statement.json next to release-statement.sig (a raw 64-byte Ed25519 signature over the exact bytes, at most 4096 of them). It names the version, channel, commit and key id and pins the SHA-256 and size of manifest.json and of the tarball, so a remote deployer verifies one small file and then checks every other asset by digest. Canonical bytes: keys sorted recursively, 2-space indent, a trailing newline; a consumer verifies the bytes it downloaded and never re-serialises them. Portable on purpose: it references common only for SchemaVersion and Timestamp.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "version",
+    "channel",
+    "securityRelease",
+    "commit",
+    "createdAt",
+    "signing",
+    "manifest",
+    "tarball"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "cloudhal.release-statement@1"
+      ]
+    },
+    "version": {
+      "$ref": "#/$defs/CloudhalVersion"
+    },
+    "channel": {
+      "type": "string",
+      "enum": [
+        "stable",
+        "next"
+      ]
+    },
+    "securityRelease": {
+      "type": "boolean"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "createdAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "algorithm",
+        "signature"
+      ],
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "Ed25519"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "enum": [
+            "release-statement.sig"
+          ]
+        }
+      }
+    },
+    "manifest": {
+      "$ref": "#/$defs/StatementAsset"
+    },
+    "tarball": {
+      "$ref": "#/$defs/StatementAsset"
+    }
+  },
+  "$defs": {
+    "CloudhalVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "StatementAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "sha256",
+        "bytes"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 104857600
+        }
+      }
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -8657,4 +9487,6 @@ export const schemas = {
   "automation": AutomationSchema,
   "schedule-run": ScheduleRunSchema,
   "glossary": GlossarySchema,
+  "release-manifest": ReleaseManifestSchema,
+  "release-statement": ReleaseStatementSchema,
 } as const;

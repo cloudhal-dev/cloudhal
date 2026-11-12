@@ -6,7 +6,7 @@
  */
 
 import type { ErrorObject } from "ajv";
-import type { Project, Site, Page, Section, ContentEntry, Snapshot, SkillManifest, Taxonomy, Term, Redirect, Asset, Menu, AnalyticsEvent, AnalyticsBeacon, Comment, CommentSubmission, Release, Automation, ScheduleRun, Glossary } from "./index.ts";
+import type { Project, Site, Page, Section, ContentEntry, Snapshot, SkillManifest, Taxonomy, Term, Redirect, Asset, Menu, AnalyticsEvent, AnalyticsBeacon, Comment, CommentSubmission, Release, Automation, ScheduleRun, Glossary, ReleaseManifest, ReleaseStatement } from "./index.ts";
 
 export interface StandaloneValidator<T> {
   (data: unknown): data is T;
@@ -33,3 +33,5 @@ export declare const validateRelease: StandaloneValidator<Release>;
 export declare const validateAutomation: StandaloneValidator<Automation>;
 export declare const validateScheduleRun: StandaloneValidator<ScheduleRun>;
 export declare const validateGlossary: StandaloneValidator<Glossary>;
+export declare const validateReleaseManifest: StandaloneValidator<ReleaseManifest>;
+export declare const validateReleaseStatement: StandaloneValidator<ReleaseStatement>;
