@@ -3,7 +3,12 @@ import { createHash, generateKeyPairSync, type KeyObject, sign } from "node:cryp
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadBundle, publicKeysFor, RELEASE_KEY } from "../../../scripts/publish-ci.ts";
+import {
+  loadBundle,
+  publicKeysFor,
+  RELEASE_KEY,
+  waitForDraft,
+} from "../../../scripts/publish-ci.ts";
 import { buildReleaseBundle, writeReleaseBundle } from "../../../scripts/release-bundle/build.ts";
 import { readBuildOutput, readDeploySecrets } from "../../../scripts/release-bundle/read-build.ts";
 import { releaseAssetNames } from "../../../scripts/release-bundle/statement.ts";
@@ -100,5 +105,41 @@ describe("publish-ci publicKeysFor", () => {
     });
     expect(() => publicKeysFor({ dryRun: true, runId: "42" })).toThrow(/RELEASE_DRYRUN_PUBLIC_KEY/);
     expect(() => publicKeysFor({ dryRun: true, dryRunPublicKey: k.raw })).toThrow(/GITHUB_RUN_ID/);
+  });
+});
+
+describe("publish-ci waitForDraft", () => {
+  it("returns at once when the draft is listed", () => {
+    const slept: number[] = [];
+    waitForDraft(
+      "v1.0.0",
+      () => 1,
+      (ms) => slept.push(ms),
+    );
+    expect(slept).toEqual([]);
+  });
+
+  it("waits with backoff until the list shows the draft (the dry run of 2026-11-12)", () => {
+    const seen = [0, 0, 0, 1];
+    const slept: number[] = [];
+    waitForDraft(
+      "v0.8.0-dryrun.171",
+      () => seen.shift() ?? 1,
+      (ms) => slept.push(ms),
+    );
+    expect(slept).toEqual([1000, 2000, 4000]);
+  });
+
+  it("gives up after its tries with the tag in the error", () => {
+    const slept: number[] = [];
+    expect(() =>
+      waitForDraft(
+        "v1.0.0",
+        () => 0,
+        (ms) => slept.push(ms),
+        4,
+      ),
+    ).toThrow("the draft v1.0.0 did not appear in the releases list after 4 tries");
+    expect(slept).toEqual([1000, 2000, 4000]);
   });
 });
