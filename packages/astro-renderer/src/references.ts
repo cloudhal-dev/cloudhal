@@ -13,11 +13,13 @@
  *   snapshot's published entries, gate-independent and built once per snapshot and isolate; every
  *   lookup then filters through the asking view.
  * - **`referencedBy`** equals the resolved values: a referrer is an entry whose `resolveFields`
- *   (with its published same-site original) names the group. The live source finds candidates in
+ *   names the group, with its same-site original while the view shows it and without it otherwise
+ *   (exactly what its page reads), the running conversions' maps included. The live source finds candidates in
  *   `entry_refs` and resolves them the same way (`referrerRecords`), so both answer alike.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import {
+  type ConversionEntries,
   isReferenceFieldType,
   membersByGroup,
   originalsOf,
@@ -28,6 +30,7 @@ import {
   resolveFields,
 } from "@cloudhal/core-ts/fields";
 import { itemUrl } from "@cloudhal/core-ts/locale-paths";
+import { entryPath } from "@cloudhal/core-ts/permalinks";
 import type { FieldImage, FieldsSource, RenderedFields } from "./fields.ts";
 import { type PlaceholderBudget, REFERENCE_BUDGET } from "./media.ts";
 import { conversionsFor } from "./reference-conversions.ts";
@@ -43,7 +46,12 @@ export interface ReferencedEntry {
   slug: string;
   title: string;
   summary?: string;
-  /** The member's public URL (its locale's path, or its locale's own domain). */
+  /**
+   * The member's graph path (`entryPath`, no locale prefix): link with it, as every other entry
+   * link does, so the locale middleware (`localizeLinks`) maps it to the page's locale once.
+   */
+  path: string;
+  /** The member's canonical URL: its locale's path, absolute only on a locale's own domain. */
   url: string;
   /** The member's cover image, when the view shows its asset. */
   image?: FieldImage;
@@ -144,6 +152,7 @@ async function cardsOf(level: Level, uses: readonly ReferenceUse[]): Promise<Pic
       slug: m.slug,
       title: m.title,
       ...(m.summary ? { summary: m.summary } : {}),
+      path: entryPath(site, m),
       url: itemUrl(site, undefined, m),
       ...(image ? { image } : {}),
       fromFallbackLocale: picked.fromFallbackLocale,
@@ -198,37 +207,60 @@ export async function referenceCards(
   return out;
 }
 
-/** One referrer of a group: the entry and the field whose resolved value names it. */
+/**
+ * One referrer of a group: the entry and the field whose resolved value names it. A same-site
+ * translation resolves through its original only while the view shows that original (its page
+ * reads it through the gated `entryById`), so its records carry which way they hold.
+ */
 export interface Referrer {
   readonly entry: ContentEntry;
   /** The top-level field key. */
   readonly field: string;
-  /** Set when the value came from the entry's original (which the view must show too). */
-  readonly viaOriginal?: string;
+  /** Holds only while the view shows this original (resolved with it). */
+  readonly withOriginal?: string;
+  /** Holds only while the view does not show this original (resolved without it). */
+  readonly withoutOriginal?: string;
 }
 
+/** The conversion maps by collection, for collections that run a conversion (§7). */
+export type ConversionMaps = ReadonlyMap<string, ConversionEntries>;
+
 /**
- * Referrers by group from `entries`' resolved values (`resolveFields` with `originalOf`); with
- * `only`, just that group's. The snapshot index and the live source share it.
+ * Referrers by group from `entries`' resolved values, with `only` just that group's; the snapshot
+ * index and the live source share it. An entry with an original in `originalOf`'s pool is
+ * resolved both with it and without it, so `referrersIn` can follow the view's choice.
  */
 export function referrerRecords(
   site: Site,
   entries: readonly ContentEntry[],
-  originalOf: (e: ContentEntry) => ContentEntry | undefined,
-  only?: string,
+  input: {
+    originalOf: (e: ContentEntry) => ContentEntry | undefined;
+    maps?: ConversionMaps | undefined;
+    only?: string | undefined;
+  },
 ): Map<string, Referrer[]> {
   const out = new Map<string, Referrer[]>();
-  for (const entry of entries)
-    for (const [key, f] of Object.entries(resolveFields(site, entry, originalOf(entry)))) {
+  const add = (entry: ContentEntry, original: ContentEntry | undefined, cond: object) => {
+    const maps = input.maps?.get(entry.collection);
+    const resolved = resolveFields(site, entry, original, maps ? { entries: maps } : undefined);
+    for (const [key, f] of Object.entries(resolved)) {
       if (!isReferenceFieldType(f.def.type)) continue;
-      const via = f.fromOriginal ? entry.translation?.group : undefined;
       for (const g of new Set(referenceUses(f.def, f.value, "").map((u) => u.groupId))) {
-        if (only !== undefined && g !== only) continue;
+        if (input.only !== undefined && g !== input.only) continue;
         const list = out.get(g) ?? [];
-        list.push({ entry, field: key, ...(via ? { viaOriginal: via } : {}) });
+        list.push({ entry, field: key, ...cond });
         out.set(g, list);
       }
     }
+  };
+  for (const entry of entries) {
+    const original = input.originalOf(entry);
+    if (!original) add(entry, undefined, {});
+    else {
+      add(entry, original, { withOriginal: original.id });
+      add(entry, undefined, { withoutOriginal: original.id });
+    }
+  }
   return out;
 }
 
@@ -263,12 +295,16 @@ export function referrersIn(
     if (q.collection !== undefined && e.collection !== q.collection) continue;
     if (q.field !== undefined && r.field !== q.field) continue;
     if (q.locale !== undefined && e.locale !== q.locale) continue;
-    if (!listed.has(e.id) || (r.viaOriginal !== undefined && !reachable.has(r.viaOriginal)))
-      continue;
+    if (!listed.has(e.id)) continue;
+    if (r.withOriginal !== undefined && !reachable.has(r.withOriginal)) continue;
+    if (r.withoutOriginal !== undefined && reachable.has(r.withoutOriginal)) continue;
     out.set(e.id, e);
   }
   const limit = Math.max(0, Math.min(q.limit ?? REFERENCED_BY_LIMIT, REFERENCED_BY_LIMIT));
-  return [...out.values()].sort(byNewest).slice(0, limit);
+  // A total order, so both sources agree on order and on what `limit` keeps.
+  return [...out.values()]
+    .sort((a, b) => byNewest(a, b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    .slice(0, limit);
 }
 
 /** The members of `ids` among a view's reachable entries (every id gets a list). */
@@ -285,12 +321,14 @@ export function membersIn(
 export class ReferenceIndex {
   readonly #site: Site;
   readonly #published: readonly ContentEntry[];
+  readonly #maps: ConversionMaps | undefined;
   #members: Map<string, ContentEntry[]> | undefined;
   #referrers: Map<string, Referrer[]> | undefined;
 
-  constructor(site: Site, published: readonly ContentEntry[]) {
+  constructor(site: Site, published: readonly ContentEntry[], maps?: ConversionMaps) {
     this.#site = site;
     this.#published = published;
+    this.#maps = maps;
   }
 
   members(): ReadonlyMap<string, readonly ContentEntry[]> {
@@ -299,7 +337,10 @@ export class ReferenceIndex {
   }
 
   referrers(group: string): readonly Referrer[] {
-    this.#referrers ??= referrerRecords(this.#site, this.#published, originalsOf(this.#published));
+    this.#referrers ??= referrerRecords(this.#site, this.#published, {
+      originalOf: originalsOf(this.#published),
+      maps: this.#maps,
+    });
     return this.#referrers.get(group) ?? [];
   }
 }

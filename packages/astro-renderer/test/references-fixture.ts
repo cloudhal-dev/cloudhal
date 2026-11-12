@@ -12,7 +12,11 @@
  *   `launch` names hall, ada, alan, grace twice (one item holds only her) and meetup; its Turkish
  *   translation `lansman` inherits venue, speakers and related and holds its own sponsor (alan);
  *   `meetup` names `launch` back (a cycle); `gig` names cellar; `night` names vault; `party` is a
- *   draft naming hall;
+ *   draft naming hall; `talk` holds a localized sponsor (ada) that its translation `konusma`
+ *   inherits (`shared = 2`);
+ * - `fests` (venue turned non-localized by `flipToShared`, sponsor localized): `fest` (stage,
+ *   ada) is embargoed until `T + 1h`; its published translation `senlik` holds its own copy of the
+ *   venue (hall), which its page shows only while `fest` is hidden, and inherits ada only after;
  * - an edition site (`de`): `halle` (a member of hall's group), `start` (an edition member of
  *   launch naming hall's group) and `baslangic`, a same-site translation of `start` (an edition
  *   chain: it inherits nothing and holds its own venue).
@@ -24,7 +28,7 @@ import type {
   Site,
   Translation,
 } from "@cloudhal/core-contracts";
-import { GATES_ENFORCED, nodeHash, SiteGraphStore } from "@cloudhal/core-ts";
+import { canonicalJson, GATES_ENFORCED, nodeHash, SiteGraphStore } from "@cloudhal/core-ts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 
@@ -75,9 +79,42 @@ const MENTOR: FieldDefinition = {
 
 export const COLLECTIONS: NonNullable<Site["collections"]> = {
   events: { fields: [VENUE, SPONSOR, SPEAKERS, RELATED] },
+  fests: { fields: [{ ...VENUE, localized: true } as FieldDefinition, SPONSOR] },
   places: {},
   people: { fields: [{ key: "bio", type: "text", labels: L("Bio"), localized: true }, MENTOR] },
 };
+
+/**
+ * A field turned non-localized with the translations' copies still stored: the state between a
+ * `set_field_localized` true → false's phase A (the definition and `entry_refs.shared`) and the
+ * phase B that deletes the copies, written directly as the operation's own batches would (the
+ * store refuses such a copy on a write, and the operation tools need rollout step 4).
+ */
+async function flipToShared(
+  store: SiteGraphStore,
+  siteId: string,
+  collection: string,
+  key: string,
+): Promise<void> {
+  const site = (await store.getSite(siteId)) as Site;
+  const c = site.collections?.[collection];
+  const fields = (c?.fields ?? []).map((d) => (d.key === key ? { ...d, localized: false } : d));
+  const next = {
+    ...site,
+    collections: { ...site.collections, [collection]: { ...c, fields } },
+    rev: site.rev + 1,
+  } as Site;
+  await store.sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+    next.rev,
+    await nodeHash(next),
+    canonicalJson(next),
+    site.id,
+  ]);
+  await store.sql.run(
+    "UPDATE entry_refs SET shared = 1 WHERE site_id = ? AND source_collection = ? AND root_key = ?",
+    [siteId, collection, key],
+  );
+}
 
 export interface RefsWorld {
   store: SiteGraphStore;
@@ -87,13 +124,19 @@ export interface RefsWorld {
 }
 
 export async function refsWorld(
-  options: { fallback?: "none" | "default-with-notice" } = {},
+  options: {
+    fallback?: "none" | "default-with-notice";
+    routing?: "prefix-except-default" | "prefix-all";
+    /** Every write at the same instant: equal `publishedAt`s everywhere (order ties). */
+    sameInstant?: boolean;
+  } = {},
 ): Promise<RefsWorld> {
   let tick = 0;
+  const step = options.sameInstant ? 0 : 1000;
   const store = new SiteGraphStore({
     sql: await BetterSqlite3Driver.open(":memory:"),
     blobs: new MemoryBlobStore(),
-    now: () => new Date(T - 24 * HOUR + tick++ * 1000),
+    now: () => new Date(T - 24 * HOUR + tick++ * step),
     gates: GATES_ENFORCED,
     fieldTypes: { supported: () => true },
   });
@@ -114,7 +157,14 @@ export async function refsWorld(
     pageIds: [],
     theme: { name: "blog" },
     collections: COLLECTIONS,
-    ...(options.fallback ? { localization: { fallback: options.fallback } } : {}),
+    ...(options.fallback || options.routing
+      ? {
+          localization: {
+            ...(options.fallback ? { fallback: options.fallback } : {}),
+            ...(options.routing ? { routing: options.routing } : {}),
+          },
+        }
+      : {}),
   });
   const edition = await store.createSite({
     projectId: project.id,
@@ -215,5 +265,16 @@ export async function refsWorld(
   e.launchDeTr = await translateIn(e.launchDe, edition, "baslangic", {
     fields: { venue: e.hall.id },
   });
-  return { store, site, edition, e };
+  // a localized value held by the original: one translation inherits it, one holds its own
+  e.talk = await make(site, "events", "talk", { fields: { sponsor: e.ada.id } });
+  e.talkTr = await translate(e.talk, "konusma");
+  // an original gated out at T; its translation holds its own copy of a venue that turns
+  // non-localized below, and inherits the localized sponsor only while the original is shown
+  e.fest = await make(site, "fests", "fest", {
+    availability: { from: new Date(T + HOUR).toISOString() },
+    fields: { venue: e.stage.id, sponsor: e.ada.id },
+  });
+  e.festTr = await translate(e.fest, "senlik", { fields: { venue: e.hall.id } });
+  await flipToShared(store, site.id, "fests", "venue");
+  return { store, site: (await store.getSite(site.id)) as Site, edition, e };
 }

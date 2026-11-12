@@ -1048,6 +1048,7 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - `RELEASE_EXECUTOR_COST` is updated for the re-plan.
 3. **Marker interplay** (phases 2 to 4).
    - `rename_field`'s `root_key` and `fromKey` lag in the fragment (over-blocks only) and in the rows `INSERT` (`fromKey` match).
+   - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a).
    - Text → reference conversion: readers convert on the fly, `field_operation_running` refuses target deletes, moves and group changes, and any marker on `from` or `to` purges everything.
    - `set_field_localized`'s phase-A `UPDATE` of `shared`.
    - `entryRefsRebuild` reading through `fromKey`.
@@ -1204,3 +1205,8 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
   - a reference sub-field added over a key that items already hold is `field_key_in_use`;
   - the `shared` subquery matches only reference and repeater definitions, as an aggregate, not a correlated `ORDER BY`, which workerd's SQLite does not resolve;
   - the list-values fingerprint format is 2, so listed collections rebuild once after the `readsOriginal` tightening.
+
+### Amended in 3a (PR #211, 2026-11-12)
+
+- **`ReferencedEntry.path`** (§4): the member's graph path (`entryPath`, no locale prefix). Themes link with it, so the locale middleware localizes it once, like every other entry link. `url` stays the canonical URL, already localized, and absolute only on a locale's own domain.
+- **`referencedBy` follows each page** (§4): a translation resolves with its same-site original while the view shows that original, and without it otherwise, as its page reads it through the gated `entryById`. Ties on date order by id, so both sources agree on order and on what `limit` keeps.

@@ -74,12 +74,12 @@ Additive, and dormant until rollout step 7 lets sites define the two types. `ent
 
 | Export | Signature |
 |---|---|
-| `RenderedField.references?` | `ReferencedEntry[]`: `{ groupId, id, collection, locale, slug, title, summary?, url, image?, fromFallbackLocale, fields? }` in stored order; the member in the page's locale, else the default locale's under `localization.fallback: default-with-notice` (flagged: set `lang`) |
+| `RenderedField.references?` | `ReferencedEntry[]`: `{ groupId, id, collection, locale, slug, title, summary?, path, url, image?, fromFallbackLocale, fields? }` in stored order. Link with `path` (the graph path, which the locale middleware localizes like every entry link); `url` is the canonical URL, already localized; the member in the page's locale, else the default locale's under `localization.fallback: default-with-notice` (flagged: set `lang`) |
 | `RenderedField.items?` | `RenderedFields[]`: each repeater item's sub-fields, rendered like fields; empty items left out |
 | `EntryFieldsOptions.depth?` | `1` (default): cards; `2`: each card's own `fields`, with *their* references as cards without fields |
 | `GraphSource.groupMembers?` | `(groupIds) => Promise<Map<string, ContentEntry[]>>`: the members this view shows, by group (snapshot: in memory; live: one store read per call) |
 | `GraphSource.referencedBy?` | `(groupId, { collection?, field?, locale?, limit? }) => Promise<ContentEntry[]>`: entries this view lists whose resolved values name the group (a translation inheriting its original's value included), newest first, at most 100 |
-| `PlaceholderBudget.references?` | the request's resolved-target allowance (200, in `placeholderBudget()`); past it targets resolve to nothing, with one `console.warn` |
+| `PlaceholderBudget.references?` | the request's resolved-target allowance (200, in `placeholderBudget()`); past it targets resolve to nothing, with one `console.warn`. The starter passes one `placeholderBudget()` per request in `media.budget`; a theme that calls `entryFields` itself must do the same, once per request (without one, every call gets its own 200) |
 
 Resolution is breadth-first over a visited set of groups, one `groupMembers` call per level, so cycles cost nothing. A "used by" list drawn from `referencedBy` is purged with the target's page when a referrer appears, goes or changes (the purge planner reads snapshot bodies, rollout step 3b); drawing *those* entries' fields is outside that guarantee. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2, "fields": 2 }`.
 

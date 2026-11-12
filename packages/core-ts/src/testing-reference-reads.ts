@@ -109,7 +109,13 @@ export function referenceReadsSuite(ctx: SuiteContext): void {
       const launchTr = await translate(launch, a, { fields: { sponsor: alan.id } });
       const draft = await entry(a, "events", { status: "draft", fields: { venue: hallTr.id } });
       const launchDe = await translate(launch, de, { fields: { venue: hall.id } });
-      return { a, de, hall, hallTr, hallDe, ada, alan, launch, launchTr, draft, launchDe };
+      // a localized value on the original, and a translation without its own: it inherits
+      const talk = await entry(a, "events", { fields: { sponsor: ada.id } });
+      const talkTr = await translate(talk, a);
+      return {
+        ...{ a, de, hall, hallTr, hallDe, ada, alan, launch, launchTr, draft, launchDe },
+        ...{ talk, talkTr },
+      };
     }
     const ids = (list: readonly ContentEntry[]) => list.map((e) => e.id).sort();
 
@@ -138,9 +144,10 @@ export function referenceReadsSuite(ctx: SuiteContext): void {
       // venue is shared (1): the translation inherits it; the draft holds its own (canonical) row
       const venue = await referrerCandidates(ctx.sql(), w.a.id, w.hall.id);
       expect(ids(venue.candidates)).toEqual(ids([w.launch, w.launchTr, w.draft]));
-      // sponsor is localized (2): the translation holds its own value, so it does not inherit ada
+      // sponsor is localized (2): launch's translation holds its own value, so it does not
+      // inherit ada; talk's has none, so it does
       const ada = await referrerCandidates(ctx.sql(), w.a.id, w.ada.id);
-      expect(ids(ada.candidates)).toEqual([w.launch.id]);
+      expect(ids(ada.candidates)).toEqual(ids([w.launch, w.talk, w.talkTr]));
       // a holder that is a translation comes with its original
       const alan = await referrerCandidates(ctx.sql(), w.a.id, w.alan.id);
       expect(ids(alan.candidates)).toEqual([w.launchTr.id]);

@@ -69,3 +69,18 @@ export function cachedConversionMaps(
   }
   return hit;
 }
+
+/** The maps of every collection in `collections` that runs a conversion, by collection. */
+export async function conversionMapsOf(
+  site: Site,
+  collections: Iterable<string>,
+  get: (collection: string) => Promise<ConversionEntries | undefined>,
+): Promise<Map<string, ConversionEntries>> {
+  const out = new Map<string, ConversionEntries>();
+  for (const c of new Set(collections)) {
+    if (!conversionNeeds(site, c)) continue;
+    const maps = await get(c);
+    if (maps) out.set(c, maps);
+  }
+  return out;
+}

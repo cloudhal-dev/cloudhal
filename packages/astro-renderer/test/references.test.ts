@@ -7,6 +7,7 @@
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { entryFields, type FieldsSource, type RenderedFields } from "../src/fields.ts";
+import { linkLocalizer, localizeLinks } from "../src/locales.ts";
 import { placeholderBudget } from "../src/media.ts";
 import { conversionMaps } from "../src/reference-conversions.ts";
 import { LiveSource, SnapshotSource } from "../src/source.ts";
@@ -57,6 +58,7 @@ describe("reference cards (RFC-0045 §4)", () => {
       slug: "hall",
       title: "Title hall",
       summary: "About hall",
+      path: "/places/hall",
       url: "/places/hall",
       fromFallbackLocale: false,
     });
@@ -81,7 +83,11 @@ describe("reference cards (RFC-0045 §4)", () => {
       venue: ["Title salon"],
       speakers: [{ talk: "Keynote" }, { talk: "Hidden" }],
     });
-    expect(tr.venue?.references?.[0]).toMatchObject({ url: "/tr/places/salon", locale: "tr" });
+    expect(tr.venue?.references?.[0]).toMatchObject({
+      path: "/places/salon",
+      url: "/tr/places/salon",
+      locale: "tr",
+    });
     const fb = await refsWorld({ fallback: "default-with-notice" });
     const fbSnap = await snapshotOf(fb, fb.site);
     const withFallback = await fbSnap.entryFields(fb.e.launchTr as ContentEntry);
@@ -94,6 +100,7 @@ describe("reference cards (RFC-0045 §4)", () => {
     expect(withFallback.sponsor?.references?.[0]).toMatchObject({
       fromFallbackLocale: true,
       locale: "en",
+      path: "/people/alan",
       url: "/people/alan",
     });
   });
@@ -202,7 +209,9 @@ describe("reference cards (RFC-0045 §4)", () => {
     expect(maps?.byText.get("salon")).toEqual([w.e.hall?.id]);
     expect(maps?.byText.has("vault")).toBe(false);
     expect(maps?.byText.has("ada")).toBe(false);
-    expect(maps?.titles.get(w.e.ada?.id as string)).toBe("Title ada");
+    // narrowed to the conversion's collections, titles included
+    expect(maps?.titles.get(w.e.hall?.id as string)).toBe("Title hall");
+    expect(maps?.titles.has(w.e.ada?.id as string)).toBe(false);
   });
 });
 
@@ -261,10 +270,12 @@ describe("live and snapshot sources agree (RFC-0045 §4, test plan)", () => {
     const slugs = async (g: string | undefined, q = {}) =>
       (await snap.referencedBy(g as string, q)).map((x) => x.slug).sort();
     // the Turkish launch inherits venue and speakers; the draft party is not shown
-    expect(await slugs(e.hall?.id)).toEqual(["lansman", "launch"]);
-    expect(await slugs(e.hall?.id, { locale: "tr" })).toEqual(["lansman"]);
+    // senlik holds its own copy of venue and its original is hidden at T: its page shows hall
+    expect(await slugs(e.hall?.id)).toEqual(["lansman", "launch", "senlik"]);
+    expect(await slugs(e.hall?.id, { locale: "tr" })).toEqual(["lansman", "senlik"]);
     // sponsor is localized: the translation's own value names alan, the original's ada
-    expect(await slugs(e.ada?.id)).toEqual(["alan", "launch"]);
+    // konusma has no sponsor of its own and inherits talk's localized one (shared = 2)
+    expect(await slugs(e.ada?.id)).toEqual(["alan", "konusma", "launch", "talk"]);
     expect(await slugs(e.alan?.id)).toEqual(["lansman", "launch"]);
     expect(await slugs(e.alan?.id, { field: "sponsor" })).toEqual(["lansman"]);
     // the edition: its member and the edition chain's translation each hold their own value
@@ -275,4 +286,89 @@ describe("live and snapshot sources agree (RFC-0045 §4, test plan)", () => {
     ]);
     expect(await de.referencedBy(e.ada?.id as string)).toEqual([]);
   });
+});
+
+describe("referencedBy follows what each page shows (RFC-0045 §4)", () => {
+  it("lists a translation by its own values while its original is hidden, by the original's after", async () => {
+    const w = await refsWorld();
+    const { e } = w;
+    const snapAt = async (now: number) => {
+      const snap = await w.store.createSnapshot(w.site.id, { actor: system, reason: "manual" });
+      return (await SnapshotSource.open(w.store, snap.id)).at(now);
+    };
+    for (const now of [T, T + HOUR]) {
+      const snap = await snapAt(now);
+      const live = new LiveSource(w.store, w.site.id, { includeDrafts: false, now: () => now });
+      const page = shown(await snap.entryFields(e.festTr as ContentEntry, { locale: "tr" }));
+      const hidden = now < T + HOUR;
+      // the page: its own copy of venue while fest is hidden; fest's venue and sponsor once it
+      // opens (stage has no Turkish member and the site has no fallback: no venue card then)
+      expect(page.venue).toEqual(hidden ? ["Title salon"] : undefined);
+      expect(page.sponsor).toBeUndefined();
+      for (const source of [snap, live]) {
+        const by = async (g: string | undefined) =>
+          (await source.referencedBy(g as string)).map((x) => x.slug);
+        const at = `${source.mode} at ${new Date(now).toISOString()}`;
+        expect((await by(e.hall?.id)).includes("senlik"), at).toBe(hidden);
+        expect((await by(e.stage?.id)).includes("senlik"), at).toBe(!hidden);
+        expect((await by(e.stage?.id)).includes("fest"), at).toBe(!hidden);
+        expect((await by(e.ada?.id)).includes("senlik"), at).toBe(!hidden);
+      }
+    }
+  });
+
+  it("orders ties by id, so both sources agree on order and on what limit keeps", async () => {
+    const w = await refsWorld({ sameInstant: true });
+    const snap = await snapshotOf(w, w.site);
+    const live = new LiveSource(w.store, w.site.id, { includeDrafts: false, now: () => T });
+    for (const g of [w.e.hall?.id, w.e.ada?.id, w.e.alan?.id] as string[]) {
+      const all = (await snap.referencedBy(g)).map((x) => x.id);
+      expect(all.length).toBeGreaterThan(1);
+      // equal dates everywhere: the order is the ids'
+      expect(all).toEqual([...all].sort());
+      expect((await live.referencedBy(g)).map((x) => x.id)).toEqual(all);
+      for (const limit of [1, 2])
+        expect((await live.referencedBy(g, { limit })).map((x) => x.id)).toEqual(
+          all.slice(0, limit),
+        );
+    }
+  });
+});
+
+describe("reference links go through the locale middleware once (RFC-0045 §4)", () => {
+  // what EntryFields.astro draws: each card's link by its path, repeater items' cards included
+  const html = (fields: RenderedFields): string =>
+    Object.values(fields)
+      .map((f) =>
+        f.items
+          ? f.items.map(html).join("")
+          : (f.references ?? []).map((c) => `<a href="${c.path}">${c.title}</a>`).join(""),
+      )
+      .join("");
+  const hrefs = (out: string) => [...out.matchAll(/href="([^"]*)"/g)].map((m) => m[1]);
+
+  for (const routing of ["prefix-except-default", "prefix-all"] as const)
+    it(`links the page's locale and the fallback once (${routing})`, async () => {
+      const w = await refsWorld({ fallback: "default-with-notice", routing });
+      const snap = await snapshotOf(w, w.site);
+      const origin = "https://refs.example";
+      const pre = routing === "prefix-all" ? "/en" : "";
+      // a Turkish page: its own member (salon) and a fallback card (alan, en)
+      const tr = await snap.entryFields(w.e.launchTr as ContentEntry, { locale: "tr" });
+      const trLinks = await linkLocalizer(snap, "tr", origin);
+      const trOut = trLinks ? localizeLinks(html(tr), trLinks) : html(tr);
+      expect(hrefs(trOut)).toEqual([
+        "/tr/places/salon",
+        `${pre}/people/alan`,
+        `${pre}/people/alan`,
+        `${pre}/events/meetup`,
+      ]);
+      // a default-locale page
+      const en = await snap.entryFields(w.e.launch as ContentEntry);
+      const enLinks = await linkLocalizer(snap, "en", origin);
+      const enOut = enLinks ? localizeLinks(html(en), enLinks) : html(en);
+      expect(hrefs(enOut)[0]).toBe(`${pre}/places/hall`);
+      for (const h of [...hrefs(trOut), ...hrefs(enOut)])
+        expect(h, h).not.toMatch(/^\/(en|tr)\/(en|tr)\//);
+    });
 });

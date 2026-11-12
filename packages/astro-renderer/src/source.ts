@@ -30,7 +30,7 @@ import {
 import { gateIndex, splitEntries } from "./entry-views.ts";
 import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
-import { cachedConversionMaps, siteConverts } from "./reference-conversions.ts";
+import { cachedConversionMaps, conversionMapsOf, siteConverts } from "./reference-conversions.ts";
 import { membersIn, type ReferencedByQuery, ReferenceIndex, referrersIn } from "./references.ts";
 import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
 
@@ -546,7 +546,12 @@ export class SnapshotSource implements GraphSource {
 
   async #references(): Promise<ReferenceIndex> {
     const loaded = await this.#load();
-    this.#shared.references ??= new ReferenceIndex(loaded.site, loaded.published);
+    if (this.#shared.references) return this.#shared.references;
+    const { site } = loaded;
+    const maps = await conversionMapsOf(site, Object.keys(site.collections ?? {}), (c) =>
+      this.conversionEntries(c),
+    );
+    this.#shared.references ??= new ReferenceIndex(site, loaded.published, maps);
     return this.#shared.references;
   }
 

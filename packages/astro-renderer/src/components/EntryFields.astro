@@ -6,8 +6,9 @@
  *
  * Values are escaped text, except rich text (the body's markdown pipeline: raw HTML escaped, links
  * through `safeHref`) and images (`imageAttributes`, the asset's alt in the page's language).
- * RFC-0045: a reference is a link to each target the page's view shows (`lang` on a card from the
- * fallback locale; several in a list), a repeater a nested `dl` per item with something to show.
+ * RFC-0045: a reference is a link to each target the page's view shows, by its graph path (the
+ * locale middleware localizes it, like every entry link; `lang` on a card from the fallback
+ * locale; several in a list), a repeater a nested `dl` per item with something to show.
  * Unresolved targets leave nothing: no id, no attribute, no empty link. No styles of its own:
  * themes style `.ch-fields`, `.ch-field[data-type]`, `[data-field="<key>"]`, `.ch-references` and
  * `.ch-items`.
@@ -34,9 +35,9 @@ const langOf = (c: { fromFallbackLocale: boolean; locale: string }) =>
         <dt>{f.label}</dt>
         {f.references !== undefined ? (
           f.references.length === 1 && !Array.isArray(f.value) ? (
-            <dd><a href={f.references[0]?.url} lang={f.references[0] && langOf(f.references[0])}>{f.references[0]?.title}</a></dd>
+            <dd><a href={f.references[0]?.path} lang={f.references[0] && langOf(f.references[0])}>{f.references[0]?.title}</a></dd>
           ) : (
-            <dd><ul class="ch-references">{f.references.map((c) => <li><a href={c.url} lang={langOf(c)}>{c.title}</a></li>)}</ul></dd>
+            <dd><ul class="ch-references">{f.references.map((c) => <li><a href={c.path} lang={langOf(c)}>{c.title}</a></li>)}</ul></dd>
           )
         ) : f.items !== undefined ? (
           <dd><ol class="ch-items">{f.items.map((item) => <li><Astro.self fields={item} /></li>)}</ol></dd>

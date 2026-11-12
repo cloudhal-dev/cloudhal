@@ -53,8 +53,9 @@ export function conversionCollections(
 }
 
 /**
- * The maps over `entries` (any order; archived ones are skipped). `collections` narrows `byText`
- * to the conversions' target collections (`"*"` or absent: all); titles cover every collection.
+ * The maps over `entries` (any order; archived ones are skipped), narrowed to `collections` (the
+ * conversions' target collections; `"*"` or absent: all), so a reader that loads only those
+ * collections builds the same maps as one that holds every entry.
  */
 export function conversionEntries(
   entries: Iterable<
@@ -75,10 +76,10 @@ export function conversionEntries(
   };
   for (const e of entries) {
     if (e.status === "archived") continue;
+    if (!all && !collections.has(e.collection)) continue;
     const group = memberGroup(e);
     const isDefault = e.locale === defaultLocale;
     if (isDefault && !titles.has(group)) titles.set(group, e.title);
-    if (!all && !collections.has(e.collection)) continue;
     add(e.slug, group);
     if (isDefault) add(e.title, group);
   }

@@ -64,7 +64,8 @@ export async function referrerCandidates(
   const read = await sql.all<{ body: string }>(
     `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
       AND (id IN (SELECT value FROM json_each(?))
-        OR json_extract(body, '$.translation.group') IN (SELECT value FROM json_each(?)))`,
+        OR json_extract(body, '$.translation.group') IN (SELECT value FROM json_each(?)))
+      ORDER BY id`,
     [siteId, list, list],
   );
   const byId = new Map(parseRows<ContentEntry>(read).map((e) => [e.id, e]));
@@ -88,7 +89,7 @@ export async function referrerCandidates(
   ];
   if (missing.length > 0) {
     const originals = await sql.all<{ body: string }>(
-      "SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry' AND id IN (SELECT value FROM json_each(?))",
+      "SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry' AND id IN (SELECT value FROM json_each(?)) ORDER BY id",
       [siteId, JSON.stringify(missing)],
     );
     for (const e of parseRows<ContentEntry>(originals)) byId.set(e.id, e);
