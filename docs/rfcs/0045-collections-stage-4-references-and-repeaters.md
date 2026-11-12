@@ -1350,3 +1350,17 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
   Sites without such a marker are unchanged, and imports are not refused.
 - **The edition's `textConverts`** uses the converter's own rule: `byText` without the entry's own group, exactly one group left.
 
+#### Review round 5 (2026-11-13, PM verification of 973494e9)
+
+- **Rebuilds.**
+  - Converting from text, only a bare string loses its row; a multiple's list (stored only by phase B or a guarded write) keeps its rows.
+  - Converting from references, every group-id-shaped stored string keeps its row, whether or not its group still has a member, as the live writer keeps it, so phase B reports a deleted target.
+- **Text → multiple reference's pending check follows the rows:** a list is pending while any element is not a group id with its own row for (node, path, element) (`listRowsPending`).
+- **Held only for stored values.** A person's write holds a failing value only when it is the stored one, compared per item with `rewriteItems`' canonical-item match (`FailedValue.stored`); one the person newly wrote is guarded like any choice.
+  - The own-group check runs over every use of a changed key, held or not.
+  - Held pairs are counted per occurrence: an id the draft also holds in an accepted or converted item is not held.
+- **A repeater converts item by item in a person's write only when every failing sub-value still fits the new sub-field** (an id-shaped value). Otherwise the repeater stays as stored, so the write checks; phase B reports it.
+- **`loadNodeRows` filters `source_collection`** by the draft's collection, here and in the edition copy, so a move into a converting collection holds nothing from the old one.
+- **Phase B's guard on a converting path** treats an id that already has its row for the path as carried, read from the pass's rows, as `guardedUses` does. An accepted item whose target was archived later no longer skips the entry forever.
+- **The edition's held check is per path:** on the converting sub-field only `rows.has`, and other sub-fields' stored ids only for those sub-fields.
+

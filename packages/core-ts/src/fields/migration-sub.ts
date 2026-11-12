@@ -63,7 +63,7 @@ export interface ItemsResult {
   /** The first unconvertible item's reason (with `onInvalid` not `clear`). */
   readonly unconvertible?: string | undefined;
   /** Every unconvertible sub-value, as stored (its item is kept as it is in `next`). */
-  readonly failed?: readonly unknown[] | undefined;
+  readonly failed?: readonly { readonly value: unknown; readonly stored: boolean }[] | undefined;
   /** Some sub-value was dropped by `onInvalid: "clear"`. */
   readonly cleared?: string | undefined;
 }
@@ -95,7 +95,7 @@ export function rewriteItems(
   let changed = false;
   let cleared: string | undefined;
   let unconvertible: string | undefined;
-  const failed: unknown[] = [];
+  const failed: { value: unknown; stored: boolean }[] = [];
   const out: unknown[] = [];
   const stored = input.baseline === undefined ? undefined : storedItems(input.baseline.value);
   for (const item of value) {
@@ -120,7 +120,8 @@ export function rewriteItems(
     // Item by item: a failing sub-value stays as stored, the others convert.
     if (r.change?.kind === "unconvertible") {
       unconvertible ??= r.change.reason ?? "unconvertible";
-      failed.push(item[sub.key]);
+      // Stored: the write left this item as it was (no baseline: the operation's own pass).
+      failed.push({ value: item[sub.key], stored: !stored || stored.has(canonicalJson(item)) });
       out.push(item);
       continue;
     }

@@ -46,6 +46,8 @@ export interface EditionDrop {
 interface Target {
   collections: readonly string[];
   where?: readonly FieldCondition[] | undefined;
+  /** A repeater's sub-field the value sits in (its held ids are read per path). */
+  sub?: string | undefined;
 }
 
 /** Whether the edition takes `groupId` for a target, and why not. */
@@ -152,7 +154,7 @@ function carryRepeater(
       if (next[key] === undefined) continue;
       if (unconvertedText(m, sub.key, next[key], true) && carry.converts(next[key] as string))
         continue;
-      const target = { collections: sub.collections };
+      const target = { collections: sub.collections, sub: sub.key };
       if (!keep(next[key], { path: `${path}/${i}/${key}`, target, carry })) delete next[key];
     }
     if (Object.keys(next).length > 0) items.push(next);
@@ -202,27 +204,26 @@ async function textConverts(
 
 /**
  * Whether a stored value already holds a group for `def` (the freshness test only, not a count).
- * On a path converting from text, only an id with its row is held (RFC-0045 §7); a repeater's
- * other sub-fields read their stored values.
+ * On a path converting from text, only an id with its row is held (RFC-0045 §7). Every other
+ * path, a repeater's other sub-fields included, holds its own stored ids only.
  */
 function heldByRows(
   def: FieldDefinition,
   value: unknown,
   rows: FieldRows | undefined,
-): (group: string) => boolean {
-  const path = convertingPath(def);
-  const fromText = path !== undefined && def.migration?.fromType === "text";
-  if (!fromText) {
-    const ids = new Set(referenceUses(def, value, "").map((u) => u.groupId));
-    return (g) => ids.has(g);
+): (group: string, sub?: string) => boolean {
+  const fromText = convertingPath(def) !== undefined && def.migration?.fromType === "text";
+  const converting = def.migration?.sub;
+  // Per path: a sub-field's stored ids hold only for that sub-field.
+  const ids = new Map<string, Set<string>>();
+  for (const u of referenceUses(def, value, "")) {
+    const at = def.type === "repeater" ? (u.path.split("/")[2] ?? "") : "";
+    ids.set(at, (ids.get(at) ?? new Set()).add(u.groupId));
   }
-  const sub = def.migration?.sub;
-  const others = new Set(
-    referenceUses(def, value, "")
-      .filter((u) => sub === undefined || u.path.split("/")[2] !== sub)
-      .map((u) => u.groupId),
-  );
-  return (g) => (sub !== undefined && others.has(g)) || rows?.has(g) === true;
+  return (g, sub = "") =>
+    fromText && (converting === undefined || converting === sub)
+      ? rows?.has(g) === true
+      : ids.get(sub)?.has(g) === true;
 }
 
 /**
@@ -250,6 +251,7 @@ export async function editionReferences(
   const rows = await loadNodeRows(sql, {
     siteId: toSite.id,
     nodeId: input.stored ? entry.id : undefined,
+    collection: entry.collection,
     defs,
   });
   const before: Record<string, unknown> =
@@ -271,7 +273,7 @@ export async function editionReferences(
   for (const { def, key } of changed) {
     const held = Object.hasOwn(before, key) ? heldByRows(def, before[key], rows) : () => false;
     const carry: Carry = {
-      usable: (g, target) => usable(g, target, !held(g)),
+      usable: (g, target) => usable(g, target, !held(g, target.sub)),
       dropped,
       budget,
       converts,

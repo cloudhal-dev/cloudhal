@@ -16,6 +16,7 @@ import {
 import type { SqlStatement } from "@cloudhal/storage";
 import { ConflictError } from "../errors.ts";
 import type { ValueChange } from "../fields/migration.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import { sameJson } from "../fields/types.ts";
 import { nodeHash } from "../hash.ts";
 import { passResetStatement } from "../list-values/state-sql.ts";
@@ -88,6 +89,10 @@ export interface PassInput {
    * only newly named ids, `present` (a revert) a member for every one (`rewriteTargetGuard`).
    */
   readonly targets?: "fresh" | "present" | undefined;
+  /** RFC-0045 §7: a running text → reference path and its rows per node (phase B's guard). */
+  readonly converting?:
+    | { readonly path: string; readonly rowsOf: (nodeId: string) => FieldRows }
+    | undefined;
   /**
    * RFC-0042 §4: the collection and the field keys the operation rewrites. Each batch resets
    * (`passResetStatement`) the list values of collections listing one of them, or any other key a
@@ -168,7 +173,13 @@ async function statementsOf(
 ): Promise<SqlStatement[]> {
   // RFC-0045 §2.6: a rewrite that changes reference values writes them only under the target guard.
   const targets = p.fieldsChanged
-    ? rewriteTargetGuard(input.site, p.next, p.stored.entry, input.targets)
+    ? rewriteTargetGuard(input.site, p.next, p.stored.entry, {
+        mode: input.targets,
+        converting: input.converting && {
+          path: input.converting.path,
+          rows: input.converting.rowsOf(p.next.id),
+        },
+      })
     : undefined;
   const cas = await casUpdateStatement(
     "contentEntry",

@@ -17,7 +17,6 @@ import { GROUP_ID_PATTERN } from "../fields/props.ts";
 import { fieldDefinitions, isRecord } from "../fields/types.ts";
 import { chunks, REFS_STATEMENT_BYTES } from "../media/refs-rebuild.ts";
 import { convertingPath } from "./conversion-rows.ts";
-import { memberGroup } from "./members.ts";
 import { type EntryRefRow, entryRefRows, sharedOf, storedKey } from "./rows.ts";
 
 const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
@@ -25,16 +24,12 @@ const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
 /**
  * RFC-0045 §7: an entry's rows for a rebuild, read through a running text ↔ reference
  * conversion's earlier type, so they mean only what phase B or an accepted write left. Converting
- * from text, the path gets no row: phase B checks every value again. Converting from references,
- * a stored value that still is a group id of the site keeps its row (an id-shaped title naming no
- * group stays text). Without such a marker, `entryRefRows`.
+ * from text, a bare string gets no row, so phase B checks it again; a multiple's list keeps its
+ * rows (only phase B or a guarded write stores one). Converting from references, every stored
+ * group-id-shaped string keeps its row, whether or not its group still has a member, as the live
+ * writer keeps it; phase B then reports a deleted target. Without such a marker, `entryRefRows`.
  */
-export function rebuildRows(
-  site: Pick<Site, "collections">,
-  entry: ContentEntry,
-  /** The groups with a member in the site: an id-shaped title of no group stays text. */
-  groups: ReadonlySet<string>,
-): EntryRefRow[] {
+export function rebuildRows(site: Pick<Site, "collections">, entry: ContentEntry): EntryRefRow[] {
   const defs = fieldDefinitions(site, entry.collection);
   const rows = entryRefRows(defs, entry.fields);
   const values = isRecord(entry.fields) ? entry.fields : {};
@@ -42,13 +37,15 @@ export function rebuildRows(
   for (const def of defs) {
     const f = convertingPath(def);
     if (f === undefined) continue;
-    if (def.migration?.fromType === "text") {
-      out.splice(0, out.length, ...out.filter((row) => row.f !== f));
-      continue;
-    }
     const k = storedKey(def, values) ?? def.key;
     const sub = def.migration?.sub;
     const stored = values[k];
+    if (def.migration?.fromType === "text") {
+      // A bare string may be legacy text; a multiple's list came from phase B or a guarded write.
+      if (sub !== undefined || !Array.isArray(stored))
+        out.splice(0, out.length, ...out.filter((row) => row.f !== f));
+      continue;
+    }
     const found =
       sub === undefined
         ? Array.isArray(stored)
@@ -58,8 +55,7 @@ export function rebuildRows(
           ? stored.map((i) => (isRecord(i) ? i[sub] : undefined))
           : [];
     for (const t of new Set(found))
-      if (typeof t === "string" && GROUP_ID.test(t) && groups.has(t))
-        out.push({ t, f, k, shared: sharedOf(def) });
+      if (typeof t === "string" && GROUP_ID.test(t)) out.push({ t, f, k, shared: sharedOf(def) });
   }
   return out;
 }
@@ -83,9 +79,8 @@ export function entryRefItems(
   const entries = rows.flatMap((r) =>
     r.kind === "contentEntry" ? [{ id: r.id, entry: JSON.parse(r.body) as ContentEntry }] : [],
   );
-  const groups = new Set(entries.map(({ entry }) => memberGroup(entry)));
   for (const { id, entry } of entries) {
-    for (const row of rebuildRows(site, entry, groups))
+    for (const row of rebuildRows(site, entry))
       out.push(
         JSON.stringify({
           t: row.t,

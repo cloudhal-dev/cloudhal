@@ -94,7 +94,10 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
       on = store(),
     ) => runFieldOperation(on, site.id, op, { ...actor, ...extra });
 
-    async function world(events: FieldDefinition[]): Promise<Site> {
+    async function world(
+      events: FieldDefinition[],
+      extra: NonNullable<Site["collections"]> = {},
+    ): Promise<Site> {
       n++;
       const project = await store().createProject({
         name: "Ops",
@@ -111,7 +114,7 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         domains: [],
         pageIds: [],
         theme: { name: "blog" },
-        collections: { events: { fields: events as [FieldDefinition] }, places: {} },
+        collections: { events: { fields: events as [FieldDefinition] }, places: {}, ...extra },
       });
     }
     const entry = (site: Site, collection: string, over: Partial<ContentEntry> = {}) =>
@@ -1059,6 +1062,163 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         expect(done.done).toBe(true);
         expect((await fresh(e)).fields).toEqual({ venue: "Main Hall" });
         expect(await rows(e.id)).toEqual([]);
+      });
+    });
+
+    describe("round 5 edges", () => {
+      const toRef = (over: Partial<Extract<FieldOperation, { op: "change_field_type" }>> = {}) =>
+        ({
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+          ...over,
+        }) as FieldOperation;
+      const storage = () => ({ sql: ctx.sql(), blobs: ctx.blobs() });
+      const reimport = async (site: Site) =>
+        importSite(storage(), await exportSite(storage(), site.id), {
+          mode: "replace",
+          fieldTypes: ENABLED,
+        });
+
+      it("a rebuild keeps an accepted list's rows; only a bare string is checked again", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const a = await entry(site, "events", { fields: { venue: "Main Hall" } });
+        const b = await entry(site, "events", { fields: { venue: "Main Hall" } });
+        const part = await run(site, toRef({ multiple: true }), { budget: { entries: 1 } });
+        expect((await fresh(a)).fields).toEqual({ venue: [hall.id] });
+        await store().updateContentEntry({ ...(await fresh(hall)), status: "archived" });
+        await reimport(site);
+        expect(await rows(a.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([b.id]);
+        expect((await fresh(a)).fields).toEqual({ venue: [hall.id] });
+        expect(await rows(a.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+      });
+
+      it("a rebuild keeps rows for a deleted target converting to text; phase B reports it", async () => {
+        const site = await world([reference("venue")]);
+        const gone = await place(site, "Gone");
+        const e = await entry(site, "events", { fields: { venue: gone.id } });
+        const part = await run(
+          site,
+          { op: "change_field_type", collection: "events", key: "venue", type: "text" },
+          { budget: { entries: 0 } },
+        );
+        expect(await code(store().deleteContentEntry(await fresh(gone)))).toBe("ok");
+        await reimport(site);
+        expect(await rows(e.id)).toEqual([{ t: gone.id, f: "venue", k: "venue", s: 1 }]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        expect((await fresh(e)).fields).toEqual({ venue: gone.id });
+      });
+
+      it("a person writing their own group id during text → reference is refused", async () => {
+        const site = await world([text("venue")]);
+        const e = await entry(site, "events", { fields: { venue: "x" } });
+        await run(site, toRef({ collections: ["places", "events"], onInvalid: "clear" }), {
+          budget: { entries: 0 },
+        });
+        expect(
+          await code(store().updateContentEntry({ ...(await fresh(e)), fields: { venue: e.id } })),
+        ).toBe("invalid_fields");
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("an id a new item adds is guarded, even when an untouched failing item holds it", async () => {
+        const site = await world([SPEAKERS]);
+        const z = await place(site, "Z place");
+        const e = await entry(site, "events", { fields: { speakers: [{ name: z.id }] } });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "name",
+          type: "reference",
+          collections: ["places"],
+        };
+        await run(site, op, { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(z)), status: "archived" });
+        expect(
+          await code(
+            store().updateContentEntry({
+              ...(await fresh(e)),
+              fields: { speakers: [{ name: z.id }, { name: z.id, seats: "2" }] },
+            }),
+          ),
+        ).toBe("unknown_entry");
+        // the untouched failing item alone still writes, kept as it is
+        const edited = await store().updateContentEntry({ ...(await fresh(e)), title: "Edited" });
+        expect(edited.fields).toEqual({ speakers: [{ name: z.id }] });
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a move into a converting collection does not hold the old collection's rows", async () => {
+        const site = await world([text("venue")], { talks: { fields: [reference("venue")] } });
+        const gone = await place(site, "Gone");
+        const t = await entry(site, "talks", { fields: { venue: gone.id } });
+        expect(await rows(t.id)).toEqual([{ t: gone.id, f: "venue", k: "venue", s: 1 }]);
+        await run(site, toRef(), { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(gone)), status: "archived" });
+        expect(
+          await code(store().updateContentEntry({ ...(await fresh(t)), collection: "events" })),
+        ).toBe("unknown_entry");
+      });
+
+      it("phase B does not re-check a sub-value it accepted when another item converts later", async () => {
+        const site = await world([SPEAKERS]);
+        const hall = await place(site, "Main Hall");
+        const room = await place(site, "Room");
+        const e = await entry(site, "events", {
+          fields: { speakers: [{ name: "Main Hall" }, { name: room.id }] },
+        });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "name",
+          type: "reference",
+          collections: ["places"],
+        };
+        const part = await run(site, op, { budget: { entries: 0 } });
+        // the room is archived: a title edit converts item 1 alone and holds item 2
+        await store().updateContentEntry({ ...(await fresh(room)), status: "archived" });
+        const written = await store().updateContentEntry({ ...(await fresh(e)), title: "Edited" });
+        expect(written.fields).toEqual({ speakers: [{ name: hall.id }, { name: room.id }] });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "speakers.name", k: "speakers", s: 1 }]);
+        // item 2 becomes usable again, and item 1's target is archived meanwhile
+        await store().updateContentEntry({ ...(await fresh(room)), status: "published" });
+        await store().updateContentEntry({ ...(await fresh(hall)), status: "archived" });
+        const done = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(done).toMatchObject({ done: true, skipped: [] });
+        expect((await rows(e.id)).map((r) => r.t).sort()).toEqual([hall.id, room.id].sort());
+      });
+
+      it("a person's write over a failing text item keeps the repeater as stored", async () => {
+        const site = await world([SPEAKERS]);
+        await place(site, "Main Hall");
+        const room = await place(site, "Room");
+        const e = await entry(site, "events", {
+          fields: { speakers: [{ name: "Main Hall" }, { name: "Room" }] },
+        });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "name",
+          type: "reference",
+          collections: ["places"],
+        };
+        await run(site, op, { budget: { entries: 0 } });
+        await store().updateContentEntry({
+          ...(await fresh(room)),
+          title: "Hall B",
+          slug: "hall-b",
+        });
+        const written = await store().updateContentEntry({ ...(await fresh(e)), title: "Edited" });
+        expect(written.fields).toEqual({ speakers: [{ name: "Main Hall" }, { name: "Room" }] });
       });
     });
 

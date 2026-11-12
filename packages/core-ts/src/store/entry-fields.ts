@@ -24,8 +24,9 @@ import {
   normalizeThroughMarkers,
   refuseFieldIssues,
 } from "../fields/index.ts";
+import type { FailedValue } from "../fields/migration.ts";
 import type { FieldRows } from "../fields/text-reference.ts";
-import { sameJson } from "../fields/types.ts";
+import { isRecord, sameJson } from "../fields/types.ts";
 import { fieldAssetIssues, fieldAssetRefs } from "../media/field-refs.ts";
 import type { AssetRefUse } from "../media/refs.ts";
 import type { Cond } from "../node-sql.ts";
@@ -86,7 +87,7 @@ export function normalizeEntryFields(
      */
     write?: { stored: ContentEntry | undefined } | undefined;
     /** The definitions whose value does not convert (kept as stored; the writer leaves its rows). */
-    onUnconvertible?: ((def: FieldDefinition, failed: readonly unknown[]) => void) | undefined;
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly FailedValue[]) => void) | undefined;
   } = {},
 ): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
@@ -106,6 +107,35 @@ export function normalizeEntryFields(
     translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
   });
   return fields ? { ...draft, fields } : draft;
+}
+
+/** The strings of a value (a string, or a list's). */
+const idsOf = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [value]).filter((v): v is string => typeof v === "string");
+
+/** The ids the draft holds at a converting path: the field's value, or the sub-field's items'. */
+function idsAtPath(def: FieldDefinition, fields: ContentEntry["fields"]): string[] {
+  const value = (fields ?? {})[def.key];
+  const sub = def.migration?.sub;
+  if (sub === undefined) return idsOf(value);
+  return Array.isArray(value) ? value.flatMap((i) => (isRecord(i) ? idsOf(i[sub]) : [])) : [];
+}
+
+/**
+ * The held pairs, per occurrence: an id the draft also holds in an accepted or converted item (it
+ * occurs more often than in the failing stored ones) is not held, so it gets its guard and row.
+ */
+function heldRefs(
+  failures: readonly { def: FieldDefinition; f: string; ids: readonly string[] }[],
+  fields: ContentEntry["fields"],
+): HeldRef[] {
+  const out: HeldRef[] = [];
+  for (const { def, f, ids } of failures) {
+    const count = (list: readonly string[], id: string) => list.filter((x) => x === id).length;
+    const all = idsAtPath(def, fields);
+    for (const t of new Set(ids)) if (count(all, t) <= count(ids, t)) out.push({ f, t });
+  }
+  return out;
 }
 
 /**
@@ -129,22 +159,28 @@ export async function normalizeWrite(
   const defs = fieldDefinitions(site, write.draft.collection);
   const entries = await loadConversionEntries(ctx.graph, site, defs);
   const rows = entries
-    ? await loadNodeRows(ctx.sql, { siteId: site.id, nodeId: stored?.id, defs })
+    ? await loadNodeRows(ctx.sql, {
+        siteId: site.id,
+        nodeId: stored?.id,
+        collection: write.draft.collection,
+        defs,
+      })
     : undefined;
-  const held: HeldRef[] = [];
+  const failures: { def: FieldDefinition; f: string; ids: string[] }[] = [];
   const draft = normalizeEntryFields(site, write.draft, {
     entries,
     rows,
     write: { stored },
-    // Per value: only what did not convert keeps its rows as they are.
+    // Per value: only a stored value that did not convert keeps its rows as they are; one the
+    // person newly wrote is guarded like any choice.
     onUnconvertible: (def, failed) => {
       const f = convertingPath(def);
       if (f === undefined) return;
-      for (const value of failed)
-        for (const t of Array.isArray(value) ? value : [value])
-          if (typeof t === "string") held.push({ f, t });
+      const ids = failed.filter((x) => x.stored).flatMap((x) => idsOf(x.value));
+      failures.push({ def, f, ids });
     },
   });
+  const held = heldRefs(failures, draft.fields);
   const baseline = stored && normalizeEntryFields(site, stored, { entries, rows });
   const path = defs.map(convertingPath).find((p) => p !== undefined);
   return { draft, baseline, held, rows: rows && path !== undefined ? { path, rows } : undefined };

@@ -44,14 +44,20 @@ export async function loadFieldRows(
 /** One node's rows for the converting path of `defs` (a person's write), or undefined. */
 export async function loadNodeRows(
   sql: SqlDriver,
-  at: { siteId: string; nodeId: string | undefined; defs: readonly FieldDefinition[] },
+  at: {
+    siteId: string;
+    nodeId: string | undefined;
+    /** The draft's collection: rows the node held in another one are not held here. */
+    collection: string;
+    defs: readonly FieldDefinition[];
+  },
 ): Promise<FieldRows | undefined> {
   const path = at.defs.map(convertingPath).find((p) => p !== undefined);
   if (path === undefined) return undefined;
   if (at.nodeId === undefined) return NONE;
   const rows = await sql.all<{ t: string }>(
-    "SELECT target_id AS t FROM entry_refs WHERE site_id = ? AND source_id = ? AND field = ?",
-    [at.siteId, at.nodeId, path],
+    "SELECT target_id AS t FROM entry_refs WHERE site_id = ? AND source_id = ? AND source_collection = ? AND field = ?",
+    [at.siteId, at.nodeId, at.collection, path],
   );
   return rowsOf(rows.map((r) => r.t));
 }

@@ -8,7 +8,7 @@
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type Conversion, type ConvertContext, convertFieldValue } from "./conversions.ts";
-import { rewriteItems } from "./migration-sub.ts";
+import { rewriteItems, subAsField } from "./migration-sub.ts";
 import { type FieldRows, textReferenceOutcome } from "./text-reference.ts";
 import { isRecord, renamedFrom, type SiteFields, sameJson } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
@@ -88,7 +88,13 @@ export interface RewriteResult {
    * RFC-0045 §7: the values that did not convert, as stored (a field's value, or a repeater's
    * failing sub-values), so a person's write can keep their rows as they are.
    */
-  readonly failed?: readonly unknown[] | undefined;
+  readonly failed?: readonly FailedValue[] | undefined;
+}
+
+/** A value that did not convert, and whether it is the stored one (a person did not write it). */
+export interface FailedValue {
+  readonly value: unknown;
+  readonly stored: boolean;
 }
 
 const NOTHING: RewriteResult = { values: undefined, change: undefined };
@@ -143,7 +149,7 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   return {
     values: undefined,
     change: { kind: "unconvertible", before, after: undefined, reason: out.reason },
-    failed: [before],
+    failed: [{ value: before, stored: !written }],
   };
 }
 
@@ -167,9 +173,12 @@ function rewriteSub(input: RewriteInput, values: Readonly<Record<string, unknown
       after: undefined,
       reason: r.unconvertible,
     };
-    // A person's write keeps the items that converted; the operation's passes fail the entry.
+    // A person's write keeps the items that converted, when every failing one still fits the new
+    // sub-field (an id-shaped value: else the write would not check); the passes fail the entry.
+    const sub = def.migration?.sub === undefined ? undefined : subAsField(def, def.migration.sub);
+    const fit = (r.failed ?? []).every((f) => !sub || valueIssues(sub, f.value, "v").length === 0);
     const kept =
-      input.partial && r.next !== "unchanged"
+      input.partial && fit && r.next !== "unchanged"
         ? r.next === undefined
           ? without(values, def.key)
           : { ...values, [def.key]: r.next }
@@ -247,7 +256,7 @@ export function normalizeThroughMarkers(
     /** RFC-0045 §7: the node's rows for a running text ↔ reference conversion's path. */
     rows?: FieldRows | undefined;
     /** Called for a definition with values that do not convert (kept as stored), with them. */
-    onUnconvertible?: ((def: FieldDefinition, failed: readonly unknown[]) => void) | undefined;
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly FailedValue[]) => void) | undefined;
   },
 ): Record<string, unknown> | undefined {
   let current = values;

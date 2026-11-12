@@ -100,6 +100,8 @@ export interface EntryRefsPlan {
 interface Use extends ReferenceUse {
   fresh: boolean;
   def: FieldDefinition;
+  /** A stored value a running conversion did not accept: only the own-group check applies. */
+  held?: boolean;
 }
 
 /** The uses the target guard covers: changed keys, or every own value when the entry goes live. */
@@ -110,7 +112,8 @@ function guardedUses(
   at: { converting?: ConvertingRows | undefined; held?: readonly HeldRef[] | undefined } = {},
 ): Use[] {
   const { converting } = at;
-  // A value the conversion held is stored as it was: phase B reports it, no guard decides it.
+  // A value the conversion held is stored as it was: phase B reports it, no target guard decides
+  // it, but the own-group rule still applies (`useIssues`).
   const kept = new Set((at.held ?? []).map((h) => `${h.f} ${h.t}`));
   const values = draft.fields ?? {};
   const same = stored?.collection === draft.collection;
@@ -125,7 +128,10 @@ function guardedUses(
     for (const use of referenceUses(def, values[def.key], `fields/${def.key}`)) {
       // RFC-0045 §7: on a path converting from text, only an id with its row is already held.
       const path = def.type === "repeater" ? `${def.key}.${use.path.split("/")[3]}` : def.key;
-      if (kept.has(`${path} ${use.groupId}`)) continue;
+      if (kept.has(`${path} ${use.groupId}`)) {
+        out.push({ ...use, def, fresh: false, held: true });
+        continue;
+      }
       const held =
         converting?.path === path ? converting.rows.has(use.groupId) : had.has(use.groupId);
       out.push({ ...use, def, fresh: !held });
@@ -178,6 +184,8 @@ function useIssues(site: Site, draft: ContentEntry, uses: readonly Use[], member
       });
       continue;
     }
+    // A held value is stored as it was: phase B reports it; only the own-group rule applies.
+    if (use.held) continue;
     const issue = useIssue(site, use, members);
     if (issue) issues.push(issue);
   }
@@ -258,6 +266,7 @@ export function entryRefStatements(
 function pairsOf(uses: readonly Use[]): TargetPair[] {
   const pairs = new Map<string, TargetPair>();
   for (const u of uses) {
+    if (u.held) continue;
     const pair: TargetPair = { t: u.groupId, c: u.collections, f: u.fresh ? 1 : 0 };
     pairs.set(JSON.stringify(pair), pair);
   }
@@ -304,8 +313,14 @@ export function rewriteTargetGuard(
   site: Site,
   next: ContentEntry,
   stored: ContentEntry,
-  mode: "fresh" | "present" = "fresh",
+  options: {
+    mode?: "fresh" | "present" | undefined;
+    /** The node's rows on a running text → reference path: an id with its row is carried. */
+    converting?: ConvertingRows | undefined;
+  } = {},
 ): Cond | undefined {
+  const mode = options.mode ?? "fresh";
+  const { converting } = options;
   const values = next.fields ?? {};
   const before = stored.collection === next.collection ? (stored.fields ?? {}) : {};
   const pairs = new Map<string, TargetPair>();
@@ -320,6 +335,10 @@ export function rewriteTargetGuard(
     const carried = strings(carriedPart(def, was));
     for (const use of referenceUses(def, values[def.key], "")) {
       if (mode === "fresh" && carried.has(use.groupId)) continue;
+      // An accepted value already has its row for the path: carried, like `guardedUses` reads it.
+      const path = def.type === "repeater" ? `${def.key}.${use.path.split("/")[2]}` : def.key;
+      if (mode === "fresh" && converting?.path === path && converting.rows.has(use.groupId))
+        continue;
       const pair: TargetPair = { t: use.groupId, c: use.collections, f: mode === "fresh" ? 1 : 0 };
       pairs.set(JSON.stringify(pair), pair);
     }

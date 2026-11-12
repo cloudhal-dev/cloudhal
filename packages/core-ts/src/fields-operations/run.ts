@@ -14,10 +14,11 @@ import {
 import { InvariantError } from "../errors.ts";
 import { checkFieldDefinitions, refuseFieldIssues } from "../fields/index.ts";
 import { convertContext, rewriteFields, type ValueChange } from "../fields/migration.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import { fieldDefinitions } from "../fields/types.ts";
 import { referenceDefinitionOptions } from "../references/capability.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
-import { loadFieldRows } from "../references/conversion-rows.ts";
+import { convertingPath, loadFieldRows } from "../references/conversion-rows.ts";
 import { withinReferenceCap } from "./cap.ts";
 import {
   checkOperation,
@@ -75,15 +76,15 @@ async function decider(
     pristine: (id: string, hash: string) => boolean;
     /** A continuing call's `onInvalid` (RFC-0045 §7), else the request's. */
     onInvalid?: "clear" | undefined;
+    /** The pass's rows, when the caller read them for its guard too. */
+    rowsOf?: ((nodeId: string) => FieldRows) | undefined;
   },
 ): Promise<Decide> {
   const { op, pristine } = input;
   const entries = await loadConversionEntries(ctx.store, site, [def]);
-  const rowsOf = await loadFieldRows(ctx.store.sql, {
-    siteId: site.id,
-    collection: op.collection,
-    def,
-  });
+  const rowsOf =
+    input.rowsOf ??
+    (await loadFieldRows(ctx.store.sql, { siteId: site.id, collection: op.collection, def }));
   const convert = { ...convertContext(site), entries };
   const onInvalid = input.onInvalid ?? (op.op === "change_field_type" ? op.onInvalid : undefined);
   const defs = fieldDefinitions(site, op.collection);
@@ -287,6 +288,13 @@ async function proceed(
     site = await requireSite(ctx, siteId);
     const marked = markedField(site, op.collection, id);
     if (!marked) break;
+    // RFC-0045 §7: one read of the converting path's rows, for the decisions and the guard.
+    const path = convertingPath(marked.def);
+    const rowsOf = await loadFieldRows(ctx.store.sql, {
+      siteId,
+      collection: op.collection,
+      def: marked.def,
+    });
     const r = await rewritePass({
       ctx,
       site,
@@ -296,7 +304,9 @@ async function proceed(
         op,
         pristine: (eid, hash) => hashes.get(eid) === hash,
         onInvalid: options.onInvalid,
+        rowsOf,
       }),
+      converting: path !== undefined && rowsOf ? { path, rowsOf } : undefined,
       guard: markerGuard(siteId, op.collection, id),
       done: rewritten,
       lists: { collection: op.collection, keys: operationKeys(op) },

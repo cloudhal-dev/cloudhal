@@ -157,6 +157,19 @@ const isGroupId = (expr: string) =>
   `(${expr} GLOB 'entry_*' AND length(${expr}) BETWEEN 12 AND 38 AND substr(${expr}, 7) NOT GLOB '*[^A-Za-z0-9]*')`;
 
 /**
+ * RFC-0045 §7: text → multiple reference: a list is pending while any element is not a group id
+ * with its own `entry_refs` row for (node, field path, element), as `text-reference.ts` decides.
+ */
+export function listRowsPending(path: string, field: string): Cond {
+  return {
+    sql: `(json_type(body, ?) = 'array' AND EXISTS (SELECT 1 FROM json_each(body, ?) e
+            WHERE NOT (${isGroupId("e.value")} AND EXISTS (SELECT 1 FROM entry_refs r
+              WHERE r.source_id = nodes.id AND r.field = ? AND r.target_id = e.value))))`,
+    params: [path, path, field],
+  };
+}
+
+/**
  * RFC-0045 §7: phase C's pending test for text ↔ single reference follows the rows, not the shape
  * (both store one string; `text-reference.ts` decides values the same way):
  * - to a reference, a string is converted only when it is a group id with its `entry_refs` row
