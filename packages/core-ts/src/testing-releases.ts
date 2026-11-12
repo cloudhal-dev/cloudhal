@@ -532,6 +532,66 @@ export function releasesSuite(
       expect(tags).toContain(`cloudhal-node-${event.id}`);
     });
 
+    it("a run-time re-plan that fails still purges everything, never drops the purge", async () => {
+      const s = await story();
+      await scheduled([s.id]);
+      // after the release's batch, every snapshot read fails (a transient D1 error)
+      let committed = false;
+      const failing: SqlDriver = {
+        ...sql,
+        get: (q, p) => {
+          if (committed && /FROM snapshots/.test(q)) throw new Error("D1_ERROR: connection lost");
+          return sql.get(q, p);
+        },
+        all: (q, p) => sql.all(q, p),
+        run: (q, p) => sql.run(q, p),
+        exec: (q) => sql.exec(q),
+        close: () => sql.close(),
+        batch: async (statements) => {
+          const out = await sql.batch(statements);
+          if (statements.some((st) => /INSERT INTO snapshots/.test(st.sql))) committed = true;
+          return out;
+        },
+      };
+      const plans: CachePurgePlan[] = [];
+      const report = await tick(T, {
+        sql: failing,
+        purge: () => async (_siteId, plan) => {
+          plans.push(plan);
+          return "everything";
+        },
+      });
+      expect(report.ran).toBe(1);
+      expect(committed).toBe(true);
+      expect(plans).toHaveLength(1);
+      expect(plans[0]?.mode).toBe("everything");
+      const r = (await svc.list(site.id))[0] as Release;
+      expect(r.outcome).toMatchObject({ kind: "published", purge: "everything" });
+    });
+
+    it("back-to-back releases: each run writes its snapshot's bundle, so the next plan reads it", async () => {
+      const first = await story();
+      await scheduled([first.id]);
+      const plans: CachePurgePlan[] = [];
+      const purge = () => async (_siteId: string, plan: CachePurgePlan) => {
+        plans.push(plan);
+        return "tags" as const;
+      };
+      await tick(T, { purge });
+      const S1 = await live();
+      expect(S1.reason).toBe("scheduled");
+      expect(await store.readSnapshotBundle(S1)).toBeDefined();
+      const second = await story({ slug: "second-story", title: "Second story" });
+      await scheduled([second.id], { at: T + HOUR });
+      await tick(T + HOUR, { purge });
+      const S2 = await live();
+      expect(S2.id).not.toBe(S1.id);
+      expect(await store.readSnapshotBundle(S2)).toBeDefined();
+      expect(plans.map((p) => p.mode)).toEqual(["tags", "tags"]);
+      const tags = plans[1]?.mode === "tags" ? plans[1].tags : [];
+      expect(tags).toContain(`cloudhal-node-${second.id}`);
+    });
+
     it("sends the purge re-planned at run time and records a deferred purge", async () => {
       const s = await story();
       await scheduled([s.id]);

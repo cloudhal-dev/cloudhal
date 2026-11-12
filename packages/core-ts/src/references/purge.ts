@@ -19,15 +19,17 @@
  * and without it, since a page reads whichever its view shows), so a translation that only
  * inherits counts.
  *
- * Reads: one hash-keyed cache over both snapshots, the planner's own (`cached`). It loads one
- * bundle, `to`'s, else `from`'s (RFC-0010), streamed: each body is cut to what the closure needs
- * as its shard is parsed, and the byte and node budgets are checked before each parse. Only the
- * hashes still missing are read one by one, through the planner's counted reader. Shard reads count
- * against `maxReads` too.
+ * Reads, only when something seeds it: one hash-keyed cache over both snapshots. It loads one
+ * bundle, `to`'s, else `from`'s (RFC-0010; none for a snapshot known to have none, `unbundled`),
+ * streamed: each body is cut to what the closure needs as its shard is parsed, and the byte and
+ * node budgets are checked before each parse. Bodies the planner already holds are reused; the
+ * hashes still missing are read by the closure itself (`only`, six at a time, the same budgets),
+ * never into the planner's cache of full bodies. Shard and node reads count against `maxReads`.
  *
  * Purges everything (`string` result) when a budget is passed, and whenever a field-operation
  * marker is on either site node (renames and conversions in flight read through markers). Skipped
- * entirely for sites whose two snapshots define no reference (top-level or inside a repeater).
+ * entirely for sites whose two snapshots define no reference (top-level, inside a repeater, or
+ * still converting from one), and at a release's pin time (`references: false`).
  */
 import type {
   ContentEntry,
@@ -57,6 +59,13 @@ export interface ReferencePurgeLimits {
   readonly maxBodyBytes?: number | undefined;
   /** Entry bodies across both snapshots, and nodes of the bundle read (default 50,000). */
   readonly maxNodes?: number | undefined;
+  /** Snapshots known to have no bundle (a release run could not write one): no shard reads. */
+  readonly unbundled?: ReadonlySet<string> | undefined;
+  /**
+   * `false`: skip the closure (a release's pin-time plan, which is the batch's expected outcome
+   * only; the run-time re-plan covers referrers, or purges everything).
+   */
+  readonly references?: false | undefined;
 }
 
 export const DEFAULT_PURGE_MAX_BODY_BYTES = 32 * 1024 * 1024;
@@ -89,11 +98,17 @@ type Slim = Pick<ContentEntry, "id" | "collection" | "locale" | "status" | "fiel
 const defsOf = (site: Site): FieldDefinition[] =>
   Object.values(site.collections ?? {}).flatMap((c) => c?.fields ?? []);
 
-/** A `reference` field, or a repeater with a `reference` sub-field. */
+/**
+ * A `reference` field, a repeater with a `reference` sub-field, or a field (or `sub`) still
+ * converting *from* references: during `change_field_type` reference → text its values render
+ * the targets' titles through the conversion maps until phase B rewrites them.
+ */
 const namesEntries = (d: FieldDefinition): boolean =>
-  d.type === "reference" || (d.type === "repeater" && d.fields.some((s) => s.type === "reference"));
+  d.type === "reference" ||
+  (d.type === "repeater" && d.fields.some((s) => s.type === "reference")) ||
+  d.migration?.fromType === "reference";
 
-/** True when some collection of the site holds references (top-level or in a repeater). */
+/** True when some collection of the site holds or converts references (top-level or in items). */
 export function definesReferences(site: Pick<Site, "collections">): boolean {
   return defsOf(site as Site).some(namesEntries);
 }
@@ -172,26 +187,42 @@ async function slimBodies(
   input: ReferencePurgeInput,
   slim: (body: unknown) => Slim,
 ): Promise<Map<string, Slim>> {
-  const { from, to, reader, limits } = input;
+  const { from, to, limits } = input;
+  const read = input.reader.readSnapshotBundle?.bind(input.reader);
+  if (!read) throw new Error("the snapshot reader cannot stream bodies");
   const maxNodes = limits?.maxNodes ?? DEFAULT_PURGE_MAX_NODES;
+  // One byte total over the bundle and the node reads: nothing is parsed past it.
+  const budget = {
+    maxBytes: limits?.maxBodyBytes ?? DEFAULT_PURGE_MAX_BODY_BYTES,
+    maxNodes,
+    spent: { bytes: 0 },
+    keep: (body: unknown, ref: NodeRef) => (ref.kind === "contentEntry" ? slim(body) : undefined),
+  };
   const out = new Map<string, Slim>();
   const bundleOf = async (snapshot: Snapshot) => {
-    if (!reader.readSnapshotBundle) return undefined;
+    if (limits?.unbundled?.has(snapshot.id)) return undefined;
     input.spend(bundleShardCount(snapshot));
-    return reader.readSnapshotBundle(snapshot, {
-      maxBytes: limits?.maxBodyBytes ?? DEFAULT_PURGE_MAX_BODY_BYTES,
-      maxNodes,
-      keep: (body, ref) => (ref.kind === "contentEntry" ? slim(body) : undefined),
-    });
+    return read(snapshot, budget);
   };
   const bundle = (await bundleOf(to)) ?? (await bundleOf(from));
   for (const [hash, s] of bundle ?? []) out.set(hash, s as Slim);
+  // The rest: bodies the planner already holds, then the missing hashes, read by this closure
+  // alone (counted, budgeted, cut to `Slim`; never into the planner's cache of full bodies).
+  const missing = new Map<string, NodeRef>();
   for (const snapshot of [from, to])
     for (const ref of snapshot.nodes) {
-      if (ref.kind !== "contentEntry" || out.has(ref.hash)) continue;
-      if (out.size >= maxNodes) throw new BundleBudgetError(`more than ${maxNodes} entries`);
-      out.set(ref.hash, slim(input.cached(ref.hash) ?? (await input.read<ContentEntry>(ref))));
+      if (ref.kind !== "contentEntry" || out.has(ref.hash) || missing.has(ref.hash)) continue;
+      const held = input.cached(ref.hash);
+      if (held !== undefined) out.set(ref.hash, slim(held));
+      else missing.set(ref.hash, ref);
     }
+  if (out.size + missing.size > maxNodes)
+    throw new BundleBudgetError(`more than ${maxNodes} entries`);
+  if (missing.size > 0) {
+    input.spend(missing.size);
+    const got = await read(to, { ...budget, only: [...missing.values()] });
+    for (const [hash, s] of got ?? []) out.set(hash, s as Slim);
+  }
   return out;
 }
 
@@ -201,6 +232,7 @@ async function slimBodies(
  */
 export async function planReferencePurge(input: ReferencePurgeInput): Promise<string | undefined> {
   const { from, to, read, tags } = input;
+  if (input.limits?.references === false) return undefined;
   const siteOf = (s: Snapshot) => {
     const ref = s.nodes.find((n) => n.kind === "site" && n.id === s.siteId);
     return ref ? read<Site>(ref) : Promise.resolve(undefined);
@@ -209,6 +241,10 @@ export async function planReferencePurge(input: ReferencePurgeInput): Promise<st
   if (!a || !b) return "a snapshot has no site node";
   if (!definesReferences(a) && !definesReferences(b)) return undefined;
   if (hasMarker(a) || hasMarker(b)) return "a field operation is running in a published snapshot";
+  // Nothing changed that a card shows: no entry and no shown asset (a term-only, asset-only or
+  // site-only publish). The closure could add no tag, so it reads nothing.
+  if (input.entries.length === 0 && input.reached.size === 0) return undefined;
+  if (!input.reader.readSnapshotBundle) return "the snapshot reader cannot stream bodies";
   let bodies: Map<string, Slim>;
   try {
     bodies = await slimBodies(input, slimmer(keptKeys([a, b])));

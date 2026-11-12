@@ -71,7 +71,7 @@ import { type BuiltinInputs, graphBuiltinRunner } from "./automations.ts";
 import { type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
-import * as after from "./release-after.ts";
+import type * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
 import { releaseDepsOf } from "./release-deps.ts";
 import { releaseExecutor } from "./release-executor.ts";
@@ -191,7 +191,7 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       graph,
       schedules,
       purge,
-      recordPurge: (id, p) => after.recordPurgeOutcome(counted, id, p),
+      counted,
       onPublished: o.onReleasePublished,
       log: o.log,
     }),
@@ -509,17 +509,13 @@ export class ReleaseService {
     };
   }
 
-  /** Step 5: `planCachePurge(L → L ⊕ items)` over a virtual snapshot (bodies are in the blob store). */
+  /** Step 5: the expected purge `L → L ⊕ items`, over a virtual snapshot, closure aside (RFC-0045). */
   async #purgePlan(
     live: Snapshot | undefined,
     items: readonly ReleaseItem[],
   ): Promise<CachePurgePlan> {
     if (!live) return { mode: "everything", reason: "nothing is live yet" };
-    const target: Snapshot = {
-      ...live,
-      id: "snap_releaseplan",
-      nodes: composeRelease(live.nodes, items),
-    };
+    const target: Snapshot = { ...live, id: "snap_pin", nodes: composeRelease(live.nodes, items) };
     return planCachePurge(
       {
         getSnapshot: async (id) => (id === live.id ? live : id === target.id ? target : undefined),
@@ -527,6 +523,7 @@ export class ReleaseService {
       },
       live.id,
       target.id,
+      { references: false },
     );
   }
 

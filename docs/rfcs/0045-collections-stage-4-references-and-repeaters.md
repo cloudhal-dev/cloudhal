@@ -1211,9 +1211,20 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **`ReferencedEntry.path`** (§4): the member's graph path (`entryPath`, no locale prefix). Themes link with it, so the locale middleware localizes it once, like every other entry link. `url` stays the canonical URL, already localized, and absolute only on a locale's own domain.
 - **`referencedBy` follows each page** (§4): a translation resolves with its same-site original while the view shows that original, and without it otherwise, as its page reads it through the gated `entryById`. Ties on date order by id, so both sources agree on order and on what `limit` keeps.
 
-### Amended in 3b (2026-11-12)
+### Amended in 3b (2026-11-12, after the PR #212 review)
 
 - **Seeds purge their own groups' members** (§2 Purges, point 1). A translation inheriting a changed original's reference shows a new card, but it is neither a referrer of the seed nor changed itself.
-- **The marker rule follows the short-circuit.** A field-operation marker purges everything only on sites whose `from` or `to` site node defines a reference. Sites without references keep today's purge, as the short-circuit promises. A marker's own publish changes the site node, which already purges the site.
-- **The node budget** (`maxNodes`) counts the entry bodies the closure holds across both snapshots, and the node count of the one bundle it reads.
-- **The release re-plan** plans from the pointer the batch moved (`from`, the live snapshot it replaced) to the new snapshot. That is `baseSnapshotId` whenever something was live. A first publish purges everything, as before. `RELEASE_EXECUTOR_COST` rises from 16 to 18 (two `getSnapshot` reads); bundle shards and node bodies are blob reads, bounded by `maxReads`.
+- **No seeds, no reads.** A publish that changes no entry and no shown asset (term-only, asset-only, site-only) reads nothing for the closure, so the budgets cannot turn it into purge-everything.
+- **Which sites count.** A site counts as having references when its `from` or `to` site node defines a reference field, a repeater with a reference sub-field, or a field (or `sub`) still converting *from* references (`migration.fromType: "reference"`). During `change_field_type` reference → text, the converted values render their targets' titles through the conversion maps until phase B rewrites them. On such sites any field-operation marker purges everything; other sites keep today's purge.
+- **The closure's own reads.** Bodies the planner already holds are reused. The missing hashes are read by the closure itself (`readSnapshotBundle` with `only`):
+  - six at a time;
+  - counted against `maxReads`;
+  - added to the same byte total as the bundle before each parse;
+  - cut to what the closure needs, and never cached whole.
+- **The node budget** (`maxNodes`) counts the entry bodies the closure holds across both snapshots, plus the node count of the one bundle it reads.
+- **Release runs.**
+  - The purge is re-planned after the batch from the pointer it moved (`from`, the live snapshot it replaced). That is `baseSnapshotId` whenever something was live; a first publish purges everything.
+  - The re-plan runs over the tick's counting driver, never refused. If it throws, the run sends purge-everything, never the stored plan.
+  - First, the run writes its `scheduled` snapshot's bundle, best effort, for snapshots of at most 1,000 nodes. So back-to-back releases each read one bundle. A snapshot left without one is passed to the planner as `unbundled`, so no shard reads are spent on it.
+  - `RELEASE_EXECUTOR_COST` is 26: the batch, `refreshSearch`'s 7, the re-plan's and the bundle's reads, and the bookkeeping. The rare site-moved retry stays outside it, as before.
+- **The pin-time plan skips the closure** (`references: false`). It would read every body one by one, and for sites with references it is the batch's *expected* outcome only: the run-time re-plan, or purge-everything, covers referrers.

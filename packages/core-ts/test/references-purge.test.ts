@@ -12,6 +12,7 @@ import type {
   NodeRef,
   Site,
   Snapshot,
+  Term,
 } from "@cloudhal/core-contracts";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -21,7 +22,7 @@ import type { BundleReadOptions } from "../src/bundles.ts";
 import { type CachePurgeOptions, planCachePurge, type SnapshotReader } from "../src/cache-purge.ts";
 import { nodeCacheTag, siteCacheTag } from "../src/cache-tags.ts";
 import { continueFieldOperation, runFieldOperation } from "../src/fields-operations/index.ts";
-import { nodeHash } from "../src/hash.ts";
+import { canonicalJson, nodeHash } from "../src/hash.ts";
 import { PNG_1X1 } from "../src/media/fixtures.ts";
 import { seedStarterSite } from "../src/seed.ts";
 import { type PublishChange, SiteGraphStore } from "../src/store.ts";
@@ -343,5 +344,89 @@ describe("planCachePurge: the referrer closure (RFC-0045 §2)", () => {
     const done = await continueFieldOperation(store, site.id, part.operationId, { actor: human });
     expect(done.done).toBe(true);
     expect(all(await plan(await publish()))).toBe(true);
+  });
+
+  it("a publish that changes no entry and no shown asset reads nothing: a term's tags only", async () => {
+    await world();
+    const news = (await store.getTermBySlug(site.id, "category", "news")) as Term;
+    await store.updateTerm({ ...news, labels: { en: { name: "Latest news" } } });
+    const p = await plan(await publish());
+    expect(p.mode).toBe("tags");
+    expect(p.mode === "tags" ? p.tags : []).toContain(`cloudhal-term-${news.id}`);
+    expect(counts.bundles).toBe(0);
+  });
+
+  it("without bundles the closure's own reads keep to the byte budget", async () => {
+    const { hall } = await world();
+    await edit(hall, { title: "Great hall" });
+    const a = await snap("manual");
+    await edit(hall, { title: "Grand hall" });
+    const b = await snap("manual");
+    const p = await plan({ from: a.id, to: b.id }, { maxBodyBytes: 300 });
+    expect(p.mode === "everything" ? p.reason : "tags").toMatch(/too large/);
+    expect((await plan({ from: a.id, to: b.id })).mode).toBe("tags");
+  });
+
+  it("the closure's own reads count against maxReads (not just the planner's)", async () => {
+    const { hall, event } = await world();
+    for (let i = 0; i < 20; i++) await make("events", `filler-${i}`);
+    await edit(hall, { title: "Great hall" });
+    const a = await snap("manual");
+    await edit(hall, { title: "Grand hall" });
+    const b = await snap("manual");
+    const change = { from: a.id, to: b.id };
+    // the planner's own reads, the closure aside
+    await plan(change, { references: false });
+    const own = counts.nodes;
+    const tight = await plan(change, { maxReads: own + 5 });
+    expect(tight.mode === "everything" ? tight.reason : "tags").toMatch(/node reads/);
+    expect((await tagsOf(change, { maxReads: own + 100 })).has(node(event))).toBe(true);
+  });
+
+  it("spends no shard reads on a snapshot known to have no bundle", async () => {
+    const { hall } = await world();
+    await edit(hall, { title: "Main hall" });
+    const s = await snap("manual");
+    await tagsOf(await point(s.id), { unbundled: new Set([s.id]) });
+    expect(counts.bundles).toBe(1);
+  });
+
+  it("a conversion from references counts as references: its marker purges everything", async () => {
+    const { hall } = await world();
+    // `change_field_type` reference → text, phase A: the definition is text with the marker, and
+    // no reference field is left (written directly: the operation tools need rollout step 4)
+    const s = await fresh();
+    const events = s.collections?.events;
+    const fields = (events?.fields ?? []).flatMap((d): FieldDefinition[] =>
+      d.key === "venue"
+        ? [
+            {
+              key: "venue",
+              type: "text",
+              labels: L("Venue"),
+              localized: false,
+              migration: { id: "fop_01HZX8K3Q9CD", fromType: "reference" },
+            },
+          ]
+        : d.type === "reference"
+          ? []
+          : [d],
+    );
+    const next = {
+      ...s,
+      rev: s.rev + 1,
+      collections: { ...s.collections, events: { ...events, fields } },
+    } as unknown as Site;
+    await store.sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+      next.rev,
+      await nodeHash(next),
+      canonicalJson(next),
+      s.id,
+    ]);
+    await publish();
+    // a retitled target, both snapshots converting: its referrers' pages show its title
+    await edit(hall, { title: "Main hall" });
+    const p = await plan(await publish());
+    expect(p.mode === "everything" ? p.reason : "tags").toMatch(/field operation/);
   });
 });
