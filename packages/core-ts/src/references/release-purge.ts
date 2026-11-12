@@ -7,8 +7,9 @@
  *   that read happens except on a first publish: a snapshot's site node is captured before the
  *   publish flips the pointer, so the row differs from it at least in `publishedSnapshotId` and
  *   `rev`. The read is counted but never refused (one call per release, from the sizing's margin),
- *   so a site without references never depends on what other runs left; if it fails, the working
- *   row decides (no references: the stored plan; else everything). Only a node that defines
+ *   so a site without references never depends on what other runs left. If it fails, it is retried
+ *   once, then the run purges everything; never the working row (#213), since a draft that
+ *   dropped its reference fields would send the closure-less stored plan. Only a node that defines
  *   references, or still converts from them, re-plans; every other site sends the plan stored at
  *   pin time, as before 3b (nothing when it purges nothing).
  * - **Re-planned** `from → snapshotId` (`from`: the pointer the batch moved), like every other
@@ -32,7 +33,7 @@
  * release (the re-plan's 2 `getSnapshot`, bookkeeping 4, `recordPurge` 1); the built-in jobs' 40
  * blob reads. Per release, counted from the allowance itself: `refreshSearch`'s worst case
  * (`MAX_RELEASE_ITEMS` × 2 + the site + ~10 taxonomies ≈ 211), `labelOf` and the publish's own
- * blobs (2), the gate read (1); and the purge's sends (≤ 4).
+ * blobs (2), the gate read (1, 2 on a retry); and the purge's sends (≤ 4).
  * - **Free** (40 statements, 1 release per tick):
  *   1,000 − 2 × (40 + 7) − 2 × 40 − 2 × (211 + 2 + 4) = 392, so 350.
  * - **Paid** (900 statements; about 27 releases fit a tick's D1, at 33 statements each with claim
@@ -134,14 +135,13 @@ async function planFor(input: ReleasePurgeInput): Promise<CachePurgePlan> {
   // site without references never depends on what other runs left.
   let node: Site = site;
   const published = input.publishedSite;
-  if (published && !published.current)
-    try {
-      node = await planner.readSnapshotNode<Site>(published.ref);
-    } catch (e) {
-      // the working row decides: no references there, the stored plan; else everything
-      if (!definesReferences(site)) return input.stored;
-      return everything(`the published site node could not be read: ${message(e)}`);
-    }
+  if (published && !published.current) {
+    const read = await readTwice(() => planner.readSnapshotNode<Site>(published.ref));
+    // Never the working row (#213): a draft that dropped its reference fields would send the
+    // closure-less stored plan and leave referrer pages stale.
+    if (!read.ok) return everything(`the published site node could not be read: ${read.error}`);
+    node = read.value;
+  }
   if (!definesReferences(node)) return input.stored;
   if (!input.from) return { mode: "everything", reason: "nothing was live before the release" };
   try {
@@ -170,6 +170,21 @@ async function planFor(input: ReleasePurgeInput): Promise<CachePurgePlan> {
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/** The gate read, retried once: a transient blob error should not cost a whole-site purge. */
+async function readTwice<T>(
+  read: () => Promise<T>,
+): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await read() };
+  } catch {
+    try {
+      return { ok: true, value: await read() };
+    } catch (e) {
+      return { ok: false, error: message(e) };
+    }
+  }
+}
 
 /** Sends the run's purge (see the module comment); a throw only from the purger itself. */
 export async function sendReleasePurge(input: ReleasePurgeInput): Promise<ReleasePurge> {

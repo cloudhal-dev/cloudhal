@@ -1046,6 +1046,7 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - Shards are streamed, and the byte and node budgets are checked before each parse, so an out-of-memory isolate can never skip a purge silently.
    - The short-circuit for sites without reference definitions.
    - `RELEASE_EXECUTOR_COST` is updated for the re-plan.
+   - The release gate reads the published site node, retries once, then purges everything; it never falls back to the working row (#213).
 3. **Marker interplay** (phases 2 to 4).
    - `rename_field`'s `root_key` and `fromKey` lag in the fragment (over-blocks only) and in the rows `INSERT` (`fromKey` match).
    - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a).
@@ -1225,7 +1226,7 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **Release runs.**
   - **The gate is the published site node,** not the working row. A release never carries the site node, so its snapshot publishes the live one's; `publishRelease` returns that ref. Only a node that defines references, or still converts from them, re-plans. Every other site sends the plan stored at pin time, as before 3b (nothing when it purges nothing).
     - That gate costs one blob read per release run that has a purger, except on a first publish: a snapshot's site node is captured before the publish flips the pointer, so the working row equals it only on a site's first publish.
-    - The read is counted but never refused, so a site without references never depends on what other runs left. If it fails, the working row decides: no references, the stored plan; otherwise purge everything.
+    - The read is counted but never refused, so a site without references never depends on what other runs left. If it fails, it is retried once, then the run purges everything ([#213](https://github.com/cloudhal-dev/cloudhal/issues/213), fixed in step 4). The working row never decides: a draft that dropped its reference fields would send the closure-less stored plan and leave referrer pages stale.
   - **The re-plan** goes from the pointer the batch moved (`from`) to the new snapshot. That is `baseSnapshotId` whenever something was live; a first publish purges everything.
     - It runs over the tick's counting driver, never refused, and spends no shard reads on `to`.
     - If it throws, the run purges everything, never the stored plan.
