@@ -168,6 +168,27 @@ async function npmPublish(pkgs: readonly Pkg[], publishes: readonly NpmPublish[]
     );
 }
 
+/**
+ * GitHub's releases list shows a just-created draft only after a few seconds, and every later step
+ * finds the draft through that list (a draft whose tag is not pushed has no `releases/tags/` URL).
+ * Waits until `count()` sees it: 1, 2, 4, then 8 s per try, about a minute in all.
+ */
+export function waitForDraft(
+  tag: string,
+  count: () => number,
+  sleep: (ms: number) => void = sleepSync,
+  tries = 10,
+): void {
+  for (let i = 0; count() === 0; i++) {
+    if (i + 1 >= tries)
+      throw new Error(`the draft ${tag} did not appear in the releases list after ${tries} tries`);
+    sleep(1000 * 2 ** Math.min(i, 3));
+  }
+}
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function releasesOf(tag: string): ReleaseView[] {
   const pages = JSON.parse(
     sh("gh", ["api", "--paginate", "--slurp", `repos/${REPO}/releases?per_page=100`], true),
@@ -218,6 +239,7 @@ function githubPort(pkgs: readonly Pkg[], version: string, dryRun: boolean): Pub
         ...(o.prerelease ? ["--prerelease"] : []),
         ...(o.target ? ["--target", o.target] : ["--verify-tag"]),
       ]);
+      waitForDraft(tag, () => releasesOf(tag).length);
     },
     upload: (tag, assets) =>
       sh("gh", ["release", "upload", tag, ...assets.map((a) => a.file), "--clobber"]),
