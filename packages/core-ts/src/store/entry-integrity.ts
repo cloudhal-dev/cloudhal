@@ -28,6 +28,8 @@ export async function planEntryIntegrity(
     stored: ContentEntry | undefined;
     /** `stored` through the field-operation markers, as the draft was (RFC-0045 §7). */
     baseline?: ContentEntry | undefined;
+    /** RFC-0045 §7: field paths whose value did not convert; their rows stay as they are. */
+    held?: readonly string[] | undefined;
   },
 ): Promise<EntryIntegrityPlan> {
   const { draft, stored } = write;
@@ -41,6 +43,7 @@ export async function planEntryIntegrity(
     draft,
     stored,
     baseline: write.baseline ?? stored,
+    held: write.held,
   });
   const leave = stored ? await planLeave(ctx.sql, site, { stored, next: draft }) : undefined;
   return {

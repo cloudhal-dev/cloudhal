@@ -130,6 +130,7 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
     const place = (site: Site, title: string, over: Partial<ContentEntry> = {}) =>
       entry(site, "places", { title, slug: title.toLowerCase().replace(/ /g, "-"), ...over });
     const fresh = async (e: ContentEntry) => (await store().getContentEntry(e.id)) as ContentEntry;
+    const freshSite = async (site: Site) => (await store().getSite(site.id)) as Site;
     const def = async (site: Site, key: string) =>
       ((await store().getSite(site.id)) as Site).collections?.events?.fields?.find(
         (d) => d.key === key,
@@ -791,6 +792,151 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
           "bio",
         ]);
         expect((await fresh(e)).fields).toEqual({ speakers: [{ name: "Ada" }] });
+      });
+    });
+
+    describe("decided by the rows (round 3: other writes do not change what is converted)", () => {
+      const toRef = (over: Partial<Extract<FieldOperation, { op: "change_field_type" }>> = {}) =>
+        ({
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+          ...over,
+        }) as FieldOperation;
+      const title = async (e: ContentEntry, t = "Edited") =>
+        store().updateContentEntry({ ...(await fresh(e)), title: t });
+
+      it("multiple: a legacy id with a title edit before phase B is converted, with a row", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: hall.id } });
+        const part = await run(site, toRef({ multiple: true }), { budget: { entries: 0 } });
+        await title(e);
+        const done = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(done).toMatchObject({ done: true, unconvertible: [] });
+        expect((await fresh(e)).fields).toEqual({ venue: [hall.id] });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+      });
+
+      it("single: a translation's legacy id stays decided by rows when its source is forwarded", async () => {
+        const site = await world([text("venue", { localized: true }), text("note")]);
+        const hall = await place(site, "Main Hall");
+        const original = await entry(site, "events", { fields: { venue: hall.id, note: "a" } });
+        const member = (await store().translationGroup(site, original.id)).members.find(
+          (m) => m.id === original.id,
+        );
+        const tr = await entry(site, "events", {
+          locale: "tr",
+          slug: original.slug,
+          fields: { venue: hall.id },
+          translation: {
+            group: original.id,
+            method: "human",
+            source: {
+              id: original.id,
+              locale: "en",
+              rev: original.rev,
+              hash: member?.hash as string,
+            },
+          },
+        });
+        const part = await run(site, toRef(), { budget: { entries: 0 } });
+        // a non-localized change forwards the translation's source: its hash moves, its venue not
+        const before = (await fresh(tr)).translation?.source?.hash;
+        await store().updateContentEntry({
+          ...(await fresh(original)),
+          fields: { venue: hall.id, note: "b" },
+        });
+        expect((await fresh(tr)).translation?.source?.hash).not.toBe(before);
+        const done = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(done.done).toBe(true);
+        expect((await fresh(tr)).fields).toEqual({ venue: hall.id });
+        expect(await rows(tr.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 2 }]);
+      });
+
+      it("single: a legacy id whose group was archived, then a title edit: reported with no row, then cleared", async () => {
+        const site = await world([text("venue")]);
+        const gone = await place(site, "Gone");
+        const e = await entry(site, "events", { fields: { venue: gone.id } });
+        const part = await run(site, toRef(), { budget: { entries: 0 } });
+        await store().updateContentEntry({ ...(await fresh(gone)), status: "archived" });
+        const edited = await title(e);
+        expect(edited.fields).toEqual({ venue: gone.id });
+        expect(await rows(e.id)).toEqual([]);
+        const stuck = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(stuck.done).toBe(false);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        expect(await rows(e.id)).toEqual([]);
+        const done = await continueFieldOperation(store(), site.id, part.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({});
+      });
+
+      it("a legacy id of the entry's own group, then a title edit: it fails and gets no row", async () => {
+        const site = await world([text("venue")]);
+        const e = await entry(site, "events", { fields: {} });
+        await store().updateContentEntry({ ...(await fresh(e)), fields: { venue: e.id } });
+        const op = toRef({ collections: ["places", "events"], onInvalid: "clear" });
+        const part = await run(site, op, { budget: { entries: 0 } });
+        const edited = await title(e);
+        expect(edited.fields).toEqual({ venue: e.id });
+        expect(await rows(e.id)).toEqual([]);
+        const done = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({});
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("the revert of text → reference with an edited entry whose target is gone: reported, then cleared", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { fields: { venue: "Main Hall" } });
+        const done = await run(site, toRef());
+        await title(e, "Edited after");
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("ok");
+        const stuck = await revertFieldOperation(store(), site.id, done.operationId, actor);
+        expect(stuck.done).toBe(false);
+        expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([e.id]);
+        const back = await revertFieldOperation(store(), site.id, done.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(back.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({});
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a term merge touching an entry not converted yet: it is converted", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const [, tag] = await store().createDefaultTaxonomies(await freshSite(site));
+        const term = (slug: string) =>
+          store().createTerm({
+            siteId: site.id,
+            taxonomyId: (tag as { id: string }).id,
+            slug,
+            status: "active",
+            visibility: "public",
+            labels: { en: { name: slug } },
+          });
+        const [a, b] = [await term("old"), await term("new")];
+        const e = await entry(site, "events", {
+          fields: { venue: hall.id },
+          terms: { tag: { ids: [a.id] } },
+        } as never);
+        const part = await run(site, toRef(), { budget: { entries: 0 } });
+        const hash = (await fresh(e)).rev;
+        await store().mergeTerms([a], b);
+        expect((await fresh(e)).rev).not.toBe(hash);
+        const doneOp = await continueFieldOperation(store(), site.id, part.operationId, actor);
+        expect(doneOp.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ venue: hall.id });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
       });
     });
 

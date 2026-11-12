@@ -25,6 +25,7 @@ import {
   type SiteFields,
   sameJson,
 } from "../fields/types.ts";
+import { conversionCollections, conversionEntries, foldText } from "./conversion-maps.ts";
 import { entryRefRows, holdsReferences, storedKey } from "./rows.ts";
 import { readMembers, targetProblem } from "./targets.ts";
 import { referenceUses } from "./values.ts";
@@ -53,6 +54,11 @@ interface Carry {
   dropped: EditionDrop[];
   /** References still allowed in this entry (the per-entry cap). */
   budget: { left: number };
+  /**
+   * RFC-0045 §7: under a running text → reference conversion, text the edition site's maps
+   * convert to exactly one group (its own write converts it); any other text is dropped.
+   */
+  converts: (text: string) => boolean;
 }
 
 const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
@@ -91,7 +97,8 @@ function carryReference(
   const { path, carry } = at;
   // Text a running text → reference conversion has not converted yet: the edition's own write
   // converts it through its markers, so it is carried as it is.
-  if (unconvertedText(def.migration, def.key, value)) return value;
+  if (unconvertedText(def.migration, def.key, value) && at.carry.converts(value as string))
+    return value;
   const ids = Array.isArray(value) ? value : [value];
   const pathOf = (i: number) => (Array.isArray(value) ? `${path}/${i}` : path);
   const target = { collections: def.collections, where: def.where };
@@ -140,7 +147,9 @@ function carryRepeater(
         next[sub.key] === undefined && m?.sub === sub.key && m.fromKey !== undefined
           ? m.fromKey
           : sub.key;
-      if (next[key] === undefined || unconvertedText(m, sub.key, next[key], true)) continue;
+      if (next[key] === undefined) continue;
+      if (unconvertedText(m, sub.key, next[key], true) && carry.converts(next[key] as string))
+        continue;
       const target = { collections: sub.collections };
       if (!keep(next[key], { path: `${path}/${i}/${key}`, target, carry })) delete next[key];
     }
@@ -161,6 +170,30 @@ async function usableOn(
     const problem = targetProblem(site, { groupId, ...target, fresh }, members);
     return problem === undefined ? undefined : problem === "where" ? "where" : "missing";
   };
+}
+
+/**
+ * Whether text converts to exactly one group on the edition site, under `defs`' running text →
+ * reference conversion: the site's maps over its target collections (one read, only then).
+ */
+async function textConverts(
+  sql: SqlDriver,
+  toSite: SiteFields & { id: string },
+  defs: readonly FieldDefinition[],
+): Promise<(text: string) => boolean> {
+  const needs = conversionCollections(defs);
+  if (!needs) return () => false;
+  const rows = await sql.all<{ body: string }>(
+    `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
+      AND json_extract(body, '$.collection') IN (SELECT value FROM json_each(?))`,
+    [toSite.id, JSON.stringify([...needs])],
+  );
+  const maps = conversionEntries(
+    rows.map((r) => JSON.parse(r.body) as ContentEntry),
+    toSite.defaultLocale ?? "en",
+    needs,
+  );
+  return (text) => maps.byText.get(foldText(text))?.length === 1;
 }
 
 /** The group ids a stored value holds for `def`: the freshness test only (not a count). */
@@ -185,6 +218,7 @@ export async function editionReferences(
   const ids = [...new Set(entryRefRows(defs, entry.fields).map((r) => r.t))];
   if (ids.length === 0) return { fields: entry.fields, dropped: [] };
   const usable = await usableOn(sql, toSite, ids);
+  const converts = await textConverts(sql, toSite, defs);
   const before: Record<string, unknown> =
     input.stored?.collection === entry.collection ? { ...(input.stored.fields ?? {}) } : {};
   const budget = { left: FIELD_LIMITS.referencesPerEntry };
@@ -207,6 +241,7 @@ export async function editionReferences(
       usable: (g, target) => usable(g, target, !held.has(g)),
       dropped,
       budget,
+      converts,
     };
     const at = { path: `fields/${key}`, carry };
     const value =

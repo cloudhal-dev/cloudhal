@@ -311,39 +311,59 @@ describe("RFC-0045 §7 review round (PR #214)", () => {
     expect(convertFieldValue("text", ref(), "Gone", c).ok).toBe(false);
   });
 
-  it("one rule says whether a value is already in the new type (text-reference.ts)", () => {
+  it("one rule decides by the rows phase C reads (text-reference.ts)", () => {
+    const rows = (...targets: string[]) => ({
+      has: (t: string) => targets.includes(t),
+      any: targets.length > 0,
+    });
     const at = (over: Partial<Parameters<typeof textReferenceOutcome>[0]>) =>
       textReferenceOutcome({
         from: "text",
         def: ref(),
         value: HALL,
         convert: { entries },
-        pristine: false,
         written: false,
         ...over,
       })?.kind;
     const GONE = "entry_GONE000001";
-    // text → reference: a converted list, an id of any member (an archived one too), kept
-    expect(at({ def: ref(true), value: [HALL] })).toBe("keep");
-    expect(at({ value: HALL })).toBe("keep");
-    expect(at({ value: GONE })).toBe("keep");
-    expect(at({ value: "Main Hall" })).toBe("table");
-    expect(at({ value: "entry_NOBODY0001" })).toBe("table");
-    // pristine legacy ids: written again when usable, else unconvertible (own group too)
-    expect(at({ value: HALL, pristine: true })).toBe("check");
-    expect(at({ value: GONE, pristine: true })).toBe("fail");
-    expect(at({ value: HALL, pristine: true, convert: { entries, group: HALL } })).toBe("fail");
-    // a person's write under the new type: kept when it fits; no maps: kept as stored
-    expect(at({ value: "entry_NOBODY0001", written: true })).toBe("keep");
-    expect(at({ value: "Main Hall", written: true })).toBe("table");
+    // text → reference with rows: in the target shape and with its row, kept
+    expect(at({ value: HALL, rows: rows(HALL) })).toBe("keep");
+    expect(at({ def: ref(true), value: [HALL], rows: rows(HALL) })).toBe("keep");
+    expect(at({ value: GONE, rows: rows(GONE) })).toBe("keep");
+    // no row: legacy text that happens to be an id; checked when usable, else it fails
+    expect(at({ value: HALL, rows: rows() })).toBe("check");
+    expect(at({ def: ref(true), value: HALL, rows: rows(HALL) })).toBe("check");
+    expect(at({ value: GONE, rows: rows() })).toBe("fail");
+    expect(at({ value: "entry_NOBODY0001", rows: rows() })).toBe("fail");
+    // the own group fails first, rows or not, in every caller
+    expect(at({ value: HALL, rows: rows(HALL), convert: { entries, group: HALL } })).toBe("fail");
+    expect(at({ value: HALL, convert: { entries, group: HALL } })).toBe("fail");
+    // a person's write under the new type: kept when it fits and has the shape
+    expect(at({ value: "entry_NOBODY0001", rows: rows(), written: true })).toBe("keep");
+    expect(at({ def: ref(true), value: HALL, rows: rows(), written: true })).toBe("check");
+    // other text goes through the table; no maps: kept as stored
+    expect(at({ value: "Main Hall", rows: rows() })).toBe("table");
     expect(at({ value: "Main Hall", convert: {} })).toBe("keep");
-    // reference → text: a named group's title; any other string is text already, unless pristine
+    // display (no rows): an id naming a member group shows as a reference
+    expect(at({ value: GONE })).toBe("keep");
+    expect(at({ value: "entry_NOBODY0001" })).toBe("table");
+    // reference → text: a row left means still a reference; no row means text already
     const text = def({ type: "text" });
-    expect(at({ from: "reference", def: text, value: HALL })).toBe("table");
-    expect(at({ from: "reference", def: text, value: "entry_2025report" })).toBe("keep");
-    expect(at({ from: "reference", def: text, value: "entry_NOBODY0001", pristine: true })).toBe(
-      "fail",
+    expect(at({ from: "reference", def: text, value: HALL, rows: rows(HALL) })).toBe("table");
+    expect(
+      at({
+        from: "reference",
+        def: text,
+        value: "entry_NOBODY0001",
+        rows: rows("entry_NOBODY0001"),
+      }),
+    ).toBe("fail");
+    expect(at({ from: "reference", def: text, value: HALL, rows: rows() })).toBe("keep");
+    expect(at({ from: "reference", def: text, value: "entry_2025report", rows: rows() })).toBe(
+      "keep",
     );
+    expect(at({ from: "reference", def: text, value: "entry_2025report" })).toBe("keep");
+    expect(at({ from: "reference", def: text, value: HALL })).toBe("table");
     // other rows are not decided here
     expect(at({ from: "text", def: def({ type: "number" }) })).toBeUndefined();
   });

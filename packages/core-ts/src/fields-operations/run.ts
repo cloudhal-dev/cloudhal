@@ -17,6 +17,7 @@ import { convertContext, rewriteFields, type ValueChange } from "../fields/migra
 import { fieldDefinitions } from "../fields/types.ts";
 import { referenceDefinitionOptions } from "../references/capability.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
+import { loadFieldRows } from "../references/conversion-rows.ts";
 import { withinReferenceCap } from "./cap.ts";
 import {
   checkOperation,
@@ -62,7 +63,8 @@ const DRY_RUN_ID = "snap_fielddryrun";
 
 /**
  * How entries change under `def`'s marker; `pristine` per entry from the `before` snapshot. A
- * text ↔ reference conversion's maps are read once here, before the pass (RFC-0045 §7).
+ * text ↔ reference conversion's maps and its `entry_refs` rows are read once here, before the
+ * pass (RFC-0045 §7): its values are decided by the rows phase C reads.
  */
 async function decider(
   ctx: OperationContext,
@@ -77,6 +79,11 @@ async function decider(
 ): Promise<Decide> {
   const { op, pristine } = input;
   const entries = await loadConversionEntries(ctx.store, site, [def]);
+  const rowsOf = await loadFieldRows(ctx.store.sql, {
+    siteId: site.id,
+    collection: op.collection,
+    def,
+  });
   const convert = { ...convertContext(site), entries };
   const onInvalid = input.onInvalid ?? (op.op === "change_field_type" ? op.onInvalid : undefined);
   const defs = fieldDefinitions(site, op.collection);
@@ -88,6 +95,7 @@ async function decider(
       translation,
       pristine: pristine(row.entry.id, row.hash),
       onInvalid,
+      rows: rowsOf?.(row.entry.id),
     });
     if (!r.values) return r.change ? { fields: undefined, change: r.change } : undefined;
     return withinReferenceCap(defs, def, { values: r.values, change: r.change, onInvalid });

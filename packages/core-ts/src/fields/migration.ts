@@ -9,7 +9,7 @@
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type Conversion, type ConvertContext, convertFieldValue } from "./conversions.ts";
 import { rewriteItems } from "./migration-sub.ts";
-import { textReferenceOutcome } from "./text-reference.ts";
+import { type FieldRows, textReferenceOutcome } from "./text-reference.ts";
 import { isRecord, renamedFrom, type SiteFields, sameJson } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
@@ -60,6 +60,11 @@ export interface RewriteInput {
    * counts as written under the new type (`text-reference.ts`).
    */
   readonly baseline?: { readonly value: unknown } | undefined;
+  /**
+   * RFC-0045 §7: the node's `entry_refs` rows for the converting field path, which decide text ↔
+   * reference values for the writers (`text-reference.ts`); absent for readers.
+   */
+  readonly rows?: FieldRows | undefined;
 }
 
 /** How one entry's value changes under a marker. */
@@ -91,11 +96,18 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   const before = values[def.key];
   // RFC-0045 §7: for text ↔ reference, "fits" says nothing; one rule decides (`text-reference.ts`).
   const written = input.baseline !== undefined && !sameJson(before, input.baseline.value);
-  const decided = textReferenceOutcome({ from, def, value: before, convert, pristine, written });
+  const decided = textReferenceOutcome({
+    from,
+    def,
+    value: before,
+    convert,
+    rows: input.rows,
+    written,
+  });
   if (decided?.kind === "keep") return NOTHING;
   if (decided?.kind === "check") {
     // Kept, but written again (a list for a multiple reference) so the guard and rows run.
-    const value = "multiple" in def && def.multiple ? [before] : before;
+    const value = "multiple" in def && def.multiple && !Array.isArray(before) ? [before] : before;
     return {
       values: { ...values, [def.key]: value },
       change: { kind: "converted", before, after: value },
@@ -134,6 +146,7 @@ function rewriteSub(input: RewriteInput, values: Readonly<Record<string, unknown
     pristine: input.pristine,
     onInvalid: input.onInvalid,
     baseline: input.baseline,
+    rows: input.rows,
     rewrite: rewriteFields,
   });
   if (r.unconvertible !== undefined)
@@ -209,15 +222,20 @@ export function normalizeThroughMarkers(
     translation: boolean;
     /** The stored entry's `fields`, for a person's write (RFC-0045 §7: what the write changed). */
     stored?: Readonly<Record<string, unknown>> | undefined;
+    /** RFC-0045 §7: the node's rows for a running text ↔ reference conversion's path. */
+    rows?: FieldRows | undefined;
+    /** Called for a definition whose value does not convert (kept as stored). */
+    onUnconvertible?: ((def: FieldDefinition) => void) | undefined;
   },
 ): Record<string, unknown> | undefined {
   let current = values;
   let changed = false;
-  const { stored, ...rest } = context;
+  const { stored, onUnconvertible, ...rest } = context;
   for (const def of defs) {
     if (!def.migration) continue;
     const baseline = stored === undefined ? undefined : { value: storedValue(def, stored) };
     const r = rewriteFields({ def, values: current, ...rest, pristine: false, baseline });
+    if (r.change?.kind === "unconvertible") onUnconvertible?.(def);
     if (r.values) {
       current = r.values;
       changed = true;

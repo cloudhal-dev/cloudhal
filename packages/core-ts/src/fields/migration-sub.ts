@@ -9,6 +9,7 @@
 import type { FieldDefinition, FieldMigration } from "@cloudhal/core-contracts";
 import { canonicalJson } from "../hash.ts";
 import type { ConvertContext } from "./conversions.ts";
+import type { FieldRows } from "./text-reference.ts";
 import { isRecord, type RepeaterFieldDefinition } from "./types.ts";
 
 /** One item's rewrite: what `rewriteFields` answers for the sub-field read as a field. */
@@ -25,6 +26,7 @@ export type RewriteItem = (input: {
   pristine: boolean;
   onInvalid?: "clear" | undefined;
   baseline?: { readonly value: unknown } | undefined;
+  rows?: FieldRows | undefined;
 }) => ItemRewrite;
 
 /** A sub-field as a field definition: the repeater's `localized`, and `migration` when given. */
@@ -77,6 +79,8 @@ export function rewriteItems(
     onInvalid?: "clear" | undefined;
     /** A person's write: the repeater's stored value (an item found there unchanged is not written). */
     baseline?: { readonly value: unknown } | undefined;
+    /** The node's rows for `<field>.<sub>` (every item's sub-value shares the path). */
+    rows?: FieldRows | undefined;
     rewrite: RewriteItem;
   },
 ): ItemsResult {
@@ -107,6 +111,7 @@ export function rewriteItems(
       pristine: input.pristine,
       onInvalid: input.onInvalid,
       baseline,
+      rows: input.rows,
     });
     if (r.change?.kind === "unconvertible")
       return { next: "unchanged", unconvertible: r.change.reason ?? "unconvertible" };

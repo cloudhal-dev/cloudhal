@@ -13,13 +13,14 @@ import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } fro
 import { uniquenessKey } from "../nodes.ts";
 import { entryPath } from "../permalinks.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
+import { convertingPath, loadNodeRows } from "../references/conversion-rows.ts";
 import { planLeave } from "../references/leave.ts";
 import { dropEntryRefsStatement } from "../references/rebuild.ts";
 import { canonicalReferences } from "../references/writer.ts";
 import { canonicalTerms } from "../taxonomy.ts";
 import { entersCollection, planNewCollection } from "./collection-paths.ts";
 import type { StoreContext } from "./context.ts";
-import { normalizeEntryFields, planEntryFields } from "./entry-fields.ts";
+import { normalizeWrite, planEntryFields } from "./entry-fields.ts";
 import { planEntryIntegrity } from "./entry-integrity.ts";
 import { planSourceForward } from "./source-forward.ts";
 import { checkLocalizedNode } from "./translations.ts";
@@ -65,15 +66,10 @@ export class EntryEngine {
       });
       draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
     }
-    // RFC-0045 §7: a running text ↔ reference conversion's maps, read only while one runs. The
-    // stored entry goes through the same markers, so an edit that leaves a value alone keeps it.
-    const entries = await loadConversionEntries(
-      this.#ctx.graph,
-      site,
-      fieldDefinitions(site, draft.collection),
-    );
-    draft = normalizeEntryFields(site, draft, entries, stored);
-    const baseline = stored && normalizeEntryFields(site, stored, entries);
+    // RFC-0045 §7: through the field-operation markers, stored entry too (`normalizeWrite`).
+    const normalized = await normalizeWrite(this.#ctx, site, { draft, stored });
+    const { baseline, held } = normalized;
+    draft = normalized.draft;
     // RFC-0045 §1: a member's id is stored as its group's.
     draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored: baseline });
     assertValid("content-entry", canonicalTerms(draft));
@@ -81,7 +77,7 @@ export class EntryEngine {
     // RFC-0041 §3: typed field values, requiredToPublish and their asset references.
     const fields = await planEntryFields(this.#ctx, site, draft, stored);
     // RFC-0033 links; RFC-0045 §2 targets, anchors, `entry_refs`, a move or group change.
-    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored, baseline });
+    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored, baseline, held });
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {

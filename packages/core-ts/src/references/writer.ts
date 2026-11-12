@@ -174,12 +174,25 @@ function useIssues(site: Site, draft: ContentEntry, uses: readonly Use[], member
 }
 
 /** The rows statements for `draft` (an anchored `DELETE`, then the plain `INSERT … SELECT`). */
-export function entryRefStatements(site: Site, draft: ContentEntry, hash: string): SqlStatement[] {
-  const rows = entryRefRows(fieldDefinitions(site, draft.collection), draft.fields);
+export function entryRefStatements(
+  site: Site,
+  draft: ContentEntry,
+  hash: string,
+  /**
+   * RFC-0045 §7: field paths whose rows the write leaves as they are: a value a running text ↔
+   * reference conversion did not accept gets no row, and one still converting from references
+   * keeps its rows, until phase B reports or clears it.
+   */
+  held: readonly string[] = [],
+): SqlStatement[] {
+  const rows = entryRefRows(fieldDefinitions(site, draft.collection), draft.fields).filter(
+    (r) => !held.includes(r.f),
+  );
+  const keep = held.length > 0 ? " AND field NOT IN (SELECT value FROM json_each(?))" : "";
   const out: SqlStatement[] = [
     {
-      sql: `DELETE FROM entry_refs WHERE source_id = ? AND ${ANCHOR}`,
-      params: [draft.id, draft.id, hash],
+      sql: `DELETE FROM entry_refs WHERE source_id = ?${keep} AND ${ANCHOR}`,
+      params: [draft.id, ...(held.length > 0 ? [JSON.stringify(held)] : []), draft.id, hash],
     },
   ];
   if (rows.length === 0) return out;
@@ -311,6 +324,8 @@ export async function planEntryRefs(
      * so a value an operation reshapes or renames, and the writer left alone, is not re-checked.
      */
     baseline: ContentEntry | undefined;
+    /** Field paths whose value a running conversion did not accept: their rows stay as they are. */
+    held?: readonly string[] | undefined;
   },
 ): Promise<EntryRefsPlan> {
   const { draft, stored } = write;
@@ -328,7 +343,7 @@ export async function planEntryRefs(
   await check();
   return {
     guard: and(anchor, targetGuard(site.id, pairsOf(uses))),
-    statements: (hash) => entryRefStatements(site, draft, hash),
+    statements: (hash) => entryRefStatements(site, draft, hash, write.held),
     diagnose: check,
   };
 }

@@ -119,7 +119,6 @@ export function resolveFields(
           def,
           value,
           convert: context,
-          pristine: false,
           written: false,
         })
       : undefined;

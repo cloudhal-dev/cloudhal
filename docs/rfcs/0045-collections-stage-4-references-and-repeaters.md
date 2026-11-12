@@ -1302,9 +1302,7 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **One rule for "already in the new type"** (`fields/text-reference.ts`). Every caller uses it: the dry run, phase B, the revert's decider, a person's write (`normalizeThroughMarkers`), `resolveFields` with and without maps, and so the renderer sources.
   - **A person's write that changes the value** (it differs from the stored value) is kept when it fits, and the writer's guard checks it as newly chosen. `normalizeEntryFields` passes the stored entry, and items are compared one by one.
   - **No maps** (`checkRequiredToPublish`, prechecks): a value is kept as stored, never read as missing for want of maps.
-  - **Text → reference.** A list is converted. An id-shaped string naming a group with a member in the target collections, in any status, is converted, unless it is pristine. A pristine one is legacy text that happens to be an id. Phase B writes it again (`check`) so the fresh guard and `entryRefStatements` run, and it is unconvertible when its group has no usable member or is the entry's own. Anything else goes through `byText`. The table itself keeps no value as it is any more.
-  - **Reference → text.** A string naming a group in `titles` converts to its title. A pristine value naming no group is unconvertible, because its reference has no member left. Any other string is text already, an id-shaped title included.
-  - **Accepted gap:** an edit planned before phase A and batched after it, in a site with no reference fields (so no anchor on a title-only write), can leave legacy id-shaped text non-pristine. That value is then kept but never rewritten, so it has no row, stays pending and is not reported. Continuing with `clear` does not help either; the entry needs an edit.
+  - The pristine rule this round introduced, and the gap it left, are replaced by round 3's rule below.
 - **Phase C's pending check follows the rows, not the shape** (`textReferencePending`, on top-level values and `sub` items, correlated on the pending query's `nodes.id`, run on SQLite, D1 and DO).
   - To a reference: a value is pending when it is text that is not a group id, or a group id with no `entry_refs` row for (node, field path, value).
   - From a reference: a value is pending while any row is left for (node, field path).
@@ -1319,4 +1317,21 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **The renderer's maps read every entry**, archived ones too, as the store does. An archived target or an archived default-locale member lends its title to reference → text on both sources.
 - **The edition copy** carries text that a running text → reference conversion has not converted yet as it is, rather than dropping it as missing. The edition's own write converts it.
 - **Repeater → reference is always multiple**, as its row is reference (multiple) ↔ repeater. A `multiple: false` (the CLI's default) is ignored there, and `maxItems` is kept.
+
+#### Review round 3 (2026-11-12, PM verification of 23bffe00)
+
+- **The decision reads the facts phase C reads.** Round 2 decided legacy values by whole-entry pristineness (the node's hash against the `before` snapshot), while phase C reads rows. Many writes move a hash without touching the field: a title edit, a status change, source-forward, a term merge or retire, the tags migration. Each one left the two sides disagreeing. `pristine` is gone from these rows' decision (`fields/text-reference.ts`); the other conversion rows keep RFC-0041's rule.
+  - Each pass of the dry run, phase B and the revert loads the collection's `entry_refs` rows for the converting field path once, beside the maps (`references/conversion-rows.ts`, filtered by `site_id`, `source_collection` and `field`). A person's write reads its node's rows.
+  - **Text → reference**, for an id-shaped value (a string, or every element of a multiple's list):
+    - the entry's own group fails first, in every caller;
+    - in the target shape with a row for every id, it is kept;
+    - written under the new type by a person's write (it differs from the stored value) and fitting, it is kept, and the writer's guard checks it;
+    - otherwise it is legacy, and `check` writes it as a reference (a bare string wrapped for a multiple) under the fresh guard, with its rows, when every id names a usable group. Else it fails, is reported, and `clear` drops it;
+    - under a multiple definition a bare string is never kept;
+    - any other text goes through the table (`byText`).
+  - **Reference → text.** A row left for the node and path means the value is still a reference: a group in `titles` converts to its title, any other fails (reported; `clear` removes it and its rows). No row left means it is text already, an id-shaped title included.
+  - **A value the decision does not accept keeps its rows as they are** in a person's write (`held`): a rejected text → reference value gets no row, and a reference → text value that does not convert keeps its rows until phase B reports or clears it.
+  - **Readers** (`resolveFields`, the renderer) have no rows. They keep a display rule: an id-shaped value naming a member group shows as a reference, except the entry's own group; a group's title shows for reference → text, any other string as it is.
+  - Round 2's accepted gap is closed: legacy text is decided by its rows, whatever wrote the entry.
+- **The edition copy** carries text a running text → reference conversion has not converted only when the edition site's maps convert it to exactly one group, so the edition's own write converts it. Any other text is dropped and reported, as in round 1.
 

@@ -1,24 +1,26 @@
 /**
  * RFC-0045 §7: the one rule for "is this value already in the new type?" while `change_field_type`
  * runs text ↔ reference (single or multiple, top-level or in a `sub` item). A group id is valid
- * text and id-shaped text a valid single reference, so whether a value "fits" cannot say. Every
- * caller asks this module: the dry run, phase B, the revert, a person's write
- * (`normalizeThroughMarkers`), `resolveFields` with and without maps, and so the renderer.
+ * text and id-shaped text a valid single reference, so neither "fits" nor the entry's hash can
+ * say. The writers decide by the facts phase C reads, the node's `entry_refs` rows for the field
+ * path (`FieldRows`): the dry run, phase B and the revert load them once per pass, a person's write
+ * reads its node's. Readers without rows (`resolveFields`, the renderer) use a display rule.
  *
- * - **Written under the new type** (a person's write that changes the value): kept when it fits;
- *   the writer's own guard checks it as newly chosen.
- * - **No maps** (readers that do not convert: `checkRequiredToPublish`, prechecks): kept as stored.
- * - **Text → reference.** A list is a converted value. An id-shaped string naming a group with a
- *   member in the target collections, in any status, is a converted value too, except while it is
- *   pristine (unchanged since the operation began): legacy text that happens to be an id, which
- *   phase B writes again (`check`) so the fresh guard and the rows run, and which is unconvertible
- *   when its group has no usable member or is the entry's own. Anything else goes through the
- *   table (`byText`).
- * - **Reference → text.** A string naming a group in `titles` converts to its title. A pristine
- *   value naming no group is unconvertible (its reference has no member left). Any other string is
- *   text already, an id-shaped title included.
+ * - **Text → reference**, for an id-shaped value (a string, or every element of a multiple's
+ *   list). The entry's own group fails first, in every caller. In the target shape with a row for
+ *   every id: kept. Written under the new type by a person's write (it differs from the stored
+ *   value) and fitting: kept, and the writer's guard checks it. Otherwise it is legacy text that
+ *   happens to be an id: `check` writes it as a reference (a bare string wrapped for a multiple)
+ *   under the fresh guard, with its rows, when every id names a usable group; else it fails, is
+ *   reported, and `clear` drops it. Any other text goes through the table (`byText`). Display: an
+ *   id-shaped value naming a member group shows as a reference.
+ * - **Reference → text.** A row left for the node and path means the value is still a reference:
+ *   a group in `titles` converts to its title, any other fails (reported; `clear` removes it and
+ *   its rows). No row left: text already, an id-shaped title included. Display: a group in
+ *   `titles` shows its title, any other string as it is.
+ * - **No maps** (`checkRequiredToPublish`, prechecks): kept as stored.
  *
- * Phase C's pending check follows the rows the same way (`plan-sub.ts`). Pure.
+ * Other conversion rows keep RFC-0041's pristine rule. Pure.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import type { ConvertContext } from "./conversions.ts";
@@ -32,19 +34,30 @@ const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
 export type TextReferenceOutcome =
   /** Already in the new type: left as stored. */
   | { readonly kind: "keep" }
-  /** Pristine legacy id: kept, but written again so the target guard and the rows run. */
+  /** Legacy id-shaped text naming a usable group: written as a reference, guard and rows run. */
   | { readonly kind: "check" }
   /** Through the conversion table. */
   | { readonly kind: "table" }
   | { readonly kind: "fail"; readonly reason: string };
+
+/** The node's `entry_refs` rows for the converting field path (`venue`, `speakers.host`). */
+export interface FieldRows {
+  /** A row names this group. */
+  has(target: string): boolean;
+  /** Any row is left. */
+  readonly any: boolean;
+}
 
 export interface TextReferenceInput {
   readonly from: FieldType;
   readonly def: FieldDefinition;
   readonly value: unknown;
   readonly convert: Pick<ConvertContext, "entries" | "group">;
-  /** Unchanged since the operation began (phase B and the dry run know it). */
-  readonly pristine: boolean;
+  /**
+   * The rows phase C reads, for the writers that decide (the dry run, phase B, the revert, a
+   * person's write). Absent: a reader's display rule.
+   */
+  readonly rows?: FieldRows | undefined;
   /** A person's write changed the value (its stored value differs). */
   readonly written: boolean;
 }
@@ -53,27 +66,56 @@ export interface TextReferenceInput {
 export const isTextReference = (from: string | undefined, to: string): boolean =>
   (from === "text" && to === "reference") || (from === "reference" && to === "text");
 
-/** The decision for one value, or undefined when the row is not text ↔ reference. */
-export function textReferenceOutcome(input: TextReferenceInput): TextReferenceOutcome | undefined {
-  const { from, def, value, convert, pristine } = input;
-  if (!isTextReference(from, def.type)) return undefined;
-  if (input.written)
-    return valueIssues(def, value, "v").length === 0 ? { kind: "keep" } : { kind: "table" };
+const OWN: TextReferenceOutcome = {
+  kind: "fail",
+  reason: "an entry cannot reference its own translation group",
+};
+
+/** Text → reference over the ids of a value (a string, or a multiple's list). */
+function toReference(input: TextReferenceInput, ids: readonly string[]): TextReferenceOutcome {
+  const { def, convert, rows } = input;
+  if (ids.some((id) => id === convert.group)) return OWN;
   const maps = convert.entries;
-  if (!maps) return { kind: "keep" };
+  if (def.type !== "reference" || !maps) return { kind: "keep" };
+  // In the target shape and every id with its row: what phase B or an accepted write left.
+  const shaped = Array.isArray(input.value) === (def.multiple === true);
+  if (!rows)
+    return ids.every((id) => maps.titles.has(id)) && shaped ? { kind: "keep" } : { kind: "table" };
+  if (shaped && ids.every((id) => rows.has(id))) return { kind: "keep" };
+  if (input.written && shaped && valueIssues(def, input.value, "v").length === 0)
+    return { kind: "keep" };
+  const gone = ids.find((id) => !maps.usable.has(id));
+  if (gone === undefined) return { kind: "check" };
+  return { kind: "fail", reason: `${gone} names no usable entry of ${def.collections.join(", ")}` };
+}
+
+/**
+ * The decision for one value, or undefined when the row is not text ↔ reference. Phase C's
+ * pending check reads the same rows (`plan-sub.ts`), so the two cannot disagree.
+ */
+export function textReferenceOutcome(input: TextReferenceInput): TextReferenceOutcome | undefined {
+  const { from, def, value, convert, rows } = input;
+  if (!isTextReference(from, def.type)) return undefined;
+  const maps = convert.entries;
   if (def.type === "reference") {
-    if (Array.isArray(value)) return { kind: "keep" };
-    if (typeof value !== "string" || !GROUP_ID.test(value)) return { kind: "table" };
-    if (!pristine) return maps.titles.has(value) ? { kind: "keep" } : { kind: "table" };
-    if (value === convert.group)
-      return { kind: "fail", reason: "an entry cannot reference its own translation group" };
-    return maps.usable.has(value)
-      ? { kind: "check" }
-      : { kind: "fail", reason: `${value} names no usable entry of ${def.collections.join(", ")}` };
+    const ids = Array.isArray(value) ? value : [value];
+    const idShaped = ids.length > 0 && ids.every((v) => typeof v === "string" && GROUP_ID.test(v));
+    if (idShaped) return toReference(input, ids as string[]);
+    if (!maps) return { kind: "keep" };
+    if (input.written && valueIssues(def, value, "v").length === 0) return { kind: "keep" };
+    return { kind: "table" };
   }
-  if (Array.isArray(value)) return { kind: "table" };
-  if (typeof value !== "string" || maps.titles.has(value)) return { kind: "table" };
-  return pristine
-    ? { kind: "fail", reason: `${value} has no entry in this site` }
-    : { kind: "keep" };
+  // Reference → text: a row left means the value is still a reference.
+  if (!maps) return { kind: "keep" };
+  if (input.written && valueIssues(def, value, "v").length === 0) return { kind: "keep" };
+  if (!rows)
+    return typeof value === "string" && !maps.titles.has(value)
+      ? { kind: "keep" }
+      : { kind: "table" };
+  if (!rows.any) return { kind: "keep" };
+  const ids = Array.isArray(value) ? value : [value];
+  const gone = ids.find((id) => typeof id !== "string" || !maps.titles.has(id));
+  return gone === undefined
+    ? { kind: "table" }
+    : { kind: "fail", reason: `${String(gone)} has no entry in this site` };
 }

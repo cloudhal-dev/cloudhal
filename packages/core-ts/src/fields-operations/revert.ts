@@ -16,6 +16,7 @@ import { InvariantError } from "../errors.ts";
 import { convertContext, rewriteFields } from "../fields/migration.ts";
 import { fieldDefinitions, sameJson } from "../fields/types.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
+import { loadFieldRows } from "../references/conversion-rows.ts";
 import { hasReferenceFields } from "../references/issues.ts";
 import {
   changedReferenceIds,
@@ -288,6 +289,9 @@ export async function revertFieldOperation(
     const earlier = await restorable(ctx, rows, snaps);
     // RFC-0045 §7: the inverse conversion's maps, read once before the pass.
     const entries = marked ? await loadConversionEntries(ctx.store, site, [marked.def]) : undefined;
+    const rowsOf = marked
+      ? await loadFieldRows(ctx.store.sql, { siteId, collection: op.collection, def: marked.def })
+      : undefined;
     const convert = { ...convertContext(site), entries };
     const raw = (row: Row, translation: boolean): Decision | undefined => {
       const body = earlier.get(row.entry.id);
@@ -300,6 +304,7 @@ export async function revertFieldOperation(
         translation,
         pristine: false,
         onInvalid: options.onInvalid,
+        rows: rowsOf?.(row.entry.id),
       });
       if (!r.values) return r.change ? { change: r.change } : undefined;
       // RFC-0045 §1: converting back into references counts the cap too.

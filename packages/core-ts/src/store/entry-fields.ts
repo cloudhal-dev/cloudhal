@@ -24,11 +24,14 @@ import {
   normalizeThroughMarkers,
   refuseFieldIssues,
 } from "../fields/index.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import { sameJson } from "../fields/types.ts";
 import { fieldAssetIssues, fieldAssetRefs } from "../media/field-refs.ts";
 import type { AssetRefUse } from "../media/refs.ts";
 import type { Cond } from "../node-sql.ts";
+import { loadConversionEntries } from "../references/conversion-load.ts";
 import type { ConversionEntries } from "../references/conversion-maps.ts";
+import { convertingPath, loadNodeRows } from "../references/conversion-rows.ts";
 import type { StoreContext } from "./context.ts";
 
 /** What the field checks add to an entry write. */
@@ -72,20 +75,68 @@ async function originalOf(
 export function normalizeEntryFields(
   site: Site,
   draft: ContentEntry,
-  entries?: ConversionEntries,
-  /** The stored entry, for a person's write: a value the write changed counts as written. */
-  stored?: ContentEntry,
+  options: {
+    /** RFC-0045 §7: the text ↔ reference rows' maps, and the node's rows for the path. */
+    entries?: ConversionEntries | undefined;
+    rows?: FieldRows | undefined;
+    /**
+     * A person's write, with the stored entry (none: a new entry): a value the write changed is
+     * written under the new type. Absent: the stored entry itself, normalized as the baseline.
+     */
+    write?: { stored: ContentEntry | undefined } | undefined;
+    /** The definitions whose value does not convert (kept as stored; the writer leaves its rows). */
+    onUnconvertible?: ((def: FieldDefinition) => void) | undefined;
+  } = {},
 ): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
   if (!defs.some((d) => d.migration)) return draft;
   const t = draft.translation;
+  const stored = options.write?.stored;
   const fields = normalizeThroughMarkers(defs, draft.fields, {
     // RFC-0045 §7: the text ↔ reference rows' maps, and the group text → reference skips.
-    convert: { ...convertContext(site), entries, group: t?.group ?? draft.id },
-    stored: stored?.collection === draft.collection ? (stored.fields ?? {}) : undefined,
+    convert: { ...convertContext(site), entries: options.entries, group: t?.group ?? draft.id },
+    stored: options.write
+      ? stored?.collection === draft.collection
+        ? (stored.fields ?? {})
+        : {}
+      : undefined,
+    rows: options.rows,
+    onUnconvertible: options.onUnconvertible,
     translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
   });
   return fields ? { ...draft, fields } : draft;
+}
+
+/**
+ * RFC-0045 §7: a write's draft and its stored entry through the markers. A running text ↔
+ * reference conversion's maps, and the node's rows for its path, are read only while one runs:
+ * the values are decided by the rows phase C reads. The stored entry, normalized the same way, is
+ * the baseline of what the write changed; `held` lists the paths whose value did not convert,
+ * whose rows the write leaves as they are.
+ */
+export async function normalizeWrite(
+  ctx: StoreContext,
+  site: Site,
+  write: { draft: ContentEntry; stored: ContentEntry | undefined },
+): Promise<{ draft: ContentEntry; baseline: ContentEntry | undefined; held: string[] }> {
+  const { stored } = write;
+  const defs = fieldDefinitions(site, write.draft.collection);
+  const entries = await loadConversionEntries(ctx.graph, site, defs);
+  const rows = entries
+    ? await loadNodeRows(ctx.sql, { siteId: site.id, nodeId: stored?.id, defs })
+    : undefined;
+  const held: string[] = [];
+  const draft = normalizeEntryFields(site, write.draft, {
+    entries,
+    rows,
+    write: { stored },
+    onUnconvertible: (def) => {
+      const path = convertingPath(def);
+      if (path !== undefined) held.push(path);
+    },
+  });
+  const baseline = stored && normalizeEntryFields(site, stored, { entries, rows });
+  return { draft, baseline, held };
 }
 
 /** Checks the field part of an entry write and plans its asset references; throws on issues. */
