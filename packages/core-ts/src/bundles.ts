@@ -58,18 +58,41 @@ export async function writeSnapshotBundle(
 }
 
 /**
- * The snapshot's bodies by node hash, or `undefined` unless every shard is there and matches the
- * snapshot (version, snapshot id, the refs' hashes in order). Never throws for a bad bundle: the
- * caller falls back to `nodes/<hash>.json`.
+ * RFC-0045 §2 "Purges": a streaming read. Budgets are checked before each shard is parsed, so a
+ * bundle too large for the isolate fails loudly (`BundleBudgetError`) instead of running it out
+ * of memory; `keep` reduces each body as its shard is parsed (`undefined` drops it).
+ */
+export interface BundleReadOptions {
+  /** More shard bytes than this: `BundleBudgetError`, before the shard that would pass it. */
+  readonly maxBytes?: number | undefined;
+  /** A snapshot of more nodes than this: `BundleBudgetError`, before any shard is read. */
+  readonly maxNodes?: number | undefined;
+  /** What to keep of each body (default: the body). */
+  readonly keep?: ((body: unknown, ref: NodeRef) => unknown) | undefined;
+}
+
+/** A bundle read passed `BundleReadOptions.maxBytes` or `maxNodes`. */
+export class BundleBudgetError extends Error {}
+
+/**
+ * The snapshot's bodies by node hash (or what `options.keep` keeps of them), or `undefined` unless
+ * every shard is there and matches the snapshot (version, snapshot id, the refs' hashes in order).
+ * Never throws for a bad bundle, so the caller falls back to `nodes/<hash>.json`; only a passed
+ * budget throws (`BundleBudgetError`).
  */
 export async function readSnapshotBundle(
   blobs: BlobStore,
   snapshot: Snapshot,
+  options: BundleReadOptions = {},
 ): Promise<Map<string, unknown> | undefined> {
   const count = bundleShardCount(snapshot);
   if (count === 0) return undefined;
+  const { maxBytes, maxNodes, keep } = options;
+  if (maxNodes !== undefined && snapshot.nodes.length > maxNodes)
+    throw new BundleBudgetError(`${snapshot.nodes.length} nodes (more than ${maxNodes})`);
   const bodies = new Map<string, unknown>();
   let complete = true;
+  let bytesSeen = 0;
   const decoder = new TextDecoder();
   try {
     await eachLimited(
@@ -82,6 +105,9 @@ export async function readSnapshotBundle(
           complete = false;
           return;
         }
+        bytesSeen += bytes.byteLength;
+        if (maxBytes !== undefined && bytesSeen > maxBytes)
+          throw new BundleBudgetError(`more than ${maxBytes} bytes of bodies`);
         const parsed = JSON.parse(decoder.decode(bytes)) as {
           v?: unknown;
           snapshotId?: unknown;
@@ -105,10 +131,14 @@ export async function readSnapshotBundle(
           complete = false;
           return;
         }
-        for (const [i, r] of refs.entries()) bodies.set(r.hash, list[i]);
+        for (const [i, r] of refs.entries()) {
+          const kept = keep ? keep(list[i], r) : list[i];
+          if (kept !== undefined) bodies.set(r.hash, kept);
+        }
       },
     );
-  } catch {
+  } catch (e) {
+    if (e instanceof BundleBudgetError) throw e;
     return undefined; // unreadable or unparsable shard: the bundle is absent
   }
   return complete ? bodies : undefined;

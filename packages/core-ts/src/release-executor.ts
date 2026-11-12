@@ -1,12 +1,15 @@
 /**
  * The `ReleaseExecutor` seam of `runDue` (RFC-0008 §6.3, §8): `SiteGraphStore.publishRelease`,
- * then the stored purge plan, sent after the batch, then the release-published hook
+ * then the purge, re-planned after the batch from the pointer it moved (RFC-0045 §2,
+ * `references/release-purge.ts`; the stored plan only fills the batch's outcome), then the
+ * release-published hook
  * (`release-after.ts`; the Node server rebuilds its static site, #150). `runScheduledTick` and
  * "Publish now" (`ReleaseService.publishNow`) build one; both live in `releases.ts`.
  */
 import type { ReleaseExecution, ReleaseExecutor } from "@cloudhal/schedules";
 import type { SqlScheduleStore } from "@cloudhal/schedules/sql";
 import type { CachePurgePlan } from "./cache-purge.ts";
+import { purgeOutcome, releasePurgePlan } from "./references/release-purge.ts";
 import * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
 import type { ReleasePurger } from "./releases.ts";
@@ -14,11 +17,13 @@ import type { SiteGraphStore } from "./store.ts";
 
 /**
  * Statements one release execution takes, for `runDue`'s budget check: the stored purge plan (1),
- * the site, the live snapshot and the parent (3), the eight-statement batch, and the purge's own
- * bookkeeping after it (up to 4). A site that moved between the reads and the batch repeats the
- * reads and the batch once; that rare path may end the tick early (`more`), never mid-batch.
+ * the site, the live snapshot and the parent (3), the eight-statement batch, the run-time re-plan's
+ * two `getSnapshot` reads (RFC-0045 §2; its bundle shards and node bodies are blob reads, bounded
+ * by the planner's `maxReads`), and the purge's own bookkeeping after it (up to 4). A site that
+ * moved between the reads and the batch repeats the reads and the batch once; that rare path may
+ * end the tick early (`more`), never mid-batch.
  */
-export const RELEASE_EXECUTOR_COST = 16;
+export const RELEASE_EXECUTOR_COST = 18;
 
 export interface ReleaseExecutorOptions {
   readonly graph: SiteGraphStore;
@@ -48,13 +53,7 @@ export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
       const plan: CachePurgePlan = after.isPurgePlan(stored)
         ? stored
         : { mode: "everything", reason: "no purge plan was stored with the release" };
-      const expected: ReleasePurge = !o.purge
-        ? "none"
-        : plan.mode === "everything"
-          ? "everything"
-          : plan.tags.length > 0
-            ? "tags"
-            : "none";
+      const expected = purgeOutcome(plan, o.purge !== undefined);
       const r = await o.graph.publishRelease({
         release: input.release,
         items: input.items,
@@ -70,9 +69,11 @@ export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
       switch (r.kind) {
         case "published": {
           let purge: ReleasePurge = expected;
-          if (r.committed && o.purge && expected !== "none") {
+          if (r.committed && o.purge) {
             try {
-              purge = await o.purge(input.release.siteId, plan);
+              const now = await releasePurgePlan(o.graph, r);
+              purge = purgeOutcome(now, true);
+              if (purge !== "none") purge = await o.purge(input.release.siteId, now);
             } catch (e) {
               purge = "failed";
               log(

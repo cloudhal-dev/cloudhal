@@ -28,8 +28,12 @@ export interface AssetPurgeInput {
   readonly why: string[];
 }
 
-/** Adds the asset rule's tags and log lines to `input.tags` and `input.why`. */
-export async function planAssetPurge(input: AssetPurgeInput): Promise<void> {
+/**
+ * Adds the asset rule's tags and log lines to `input.tags` and `input.why`; returns the entries it
+ * reached (RFC-0045: their referrers' cards show the changed cover).
+ */
+export async function planAssetPurge(input: AssetPurgeInput): Promise<Set<string>> {
+  const reached = new Set<string>();
   const { tags, why, read } = input;
   const shown = new Set<string>();
   for (const c of input.changed) {
@@ -45,7 +49,7 @@ export async function planAssetPurge(input: AssetPurgeInput): Promise<void> {
     else why.push(`asset ${id} changed`);
     shown.add(id);
   }
-  if (shown.size === 0) return;
+  if (shown.size === 0) return reached;
   const refsOf = await referencesIn(input.to, read);
   for (const ref of input.to.nodes) {
     if (ref.kind !== "contentEntry" && ref.kind !== "page" && ref.kind !== "term") continue;
@@ -54,7 +58,9 @@ export async function planAssetPurge(input: AssetPurgeInput): Promise<void> {
     if (ref.kind === "term")
       for (const id of input.withAncestors(ref.id)) tags.add(termCacheTag(id));
     else tags.add(nodeCacheTag(ref.id));
+    if (ref.kind === "contentEntry") reached.add(ref.id);
   }
+  return reached;
 }
 
 /** A node's asset references in `snapshot`: its own, and an entry's typed fields' by its defs. */

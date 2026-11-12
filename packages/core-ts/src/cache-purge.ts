@@ -24,6 +24,11 @@
  *   nothing (404s are never cached, and whatever starts showing it changed itself). Media never
  *   carry the site tag, so the site-wide purges above leave them.
  *
+ * - RFC-0045 **references**: the referrers of every changed entry's group, two hops deep, and the
+ *   targets a changed entry names ("used by"), found from the two snapshots' own bodies, never
+ *   the working copy (`references/purge.ts`; one bundle, then only the missing hashes, within
+ *   byte and node budgets). Any field-operation marker on either site node purges everything.
+ *
  * Falls back to purging everything when there is no previous snapshot, a snapshot or node cannot
  * be read, reading the diff would take more than `maxReads` node reads, or the result has more
  * than `maxTags` tags.
@@ -39,13 +44,18 @@ import type {
 import { planAssetPurge } from "./cache-purge-assets.ts";
 import { listCacheTag, nodeCacheTag, siteCacheTag, termCacheTag } from "./cache-tags.ts";
 import { canonicalJson } from "./hash.ts";
+import {
+  planReferencePurge,
+  type ReferencePurgeLimits,
+  type ReferencePurgeReader,
+} from "./references/purge.ts";
 
-export interface SnapshotReader {
+export interface SnapshotReader extends ReferencePurgeReader {
   getSnapshot(id: string): Promise<Snapshot | undefined>;
   readSnapshotNode(ref: NodeRef): Promise<unknown>;
 }
 
-export interface CachePurgeOptions {
+export interface CachePurgeOptions extends ReferencePurgeLimits {
   /** More tags than this purge everything instead (default 300: three requests of 100). */
   readonly maxTags?: number;
   /** More node reads than this purge everything instead (default 2000). */
@@ -97,6 +107,69 @@ function filedUnder(e: ContentEntry | undefined): string[] {
   return Object.values(e.terms).flatMap((a) => a?.ids ?? []);
 }
 
+type Change = { before?: NodeRef; after?: NodeRef };
+
+/** The planner's one hash-keyed body cache; reads past `maxReads` (bundle shards too) throw. */
+function countedReader(reader: SnapshotReader, maxReads: number) {
+  let reads = 0;
+  const bodies = new Map<string, unknown>();
+  const spend = (n: number) => {
+    reads += n;
+    if (reads > maxReads) throw new TooManyReads();
+  };
+  const read = async <T>(ref: NodeRef): Promise<T> => {
+    const hit = bodies.get(ref.hash);
+    if (hit !== undefined) return hit as T;
+    spend(1);
+    const body = (await reader.readSnapshotNode(ref)) as T;
+    bodies.set(ref.hash, body);
+    return body;
+  };
+  return { read, spend, cached: (hash: string) => bodies.get(hash) };
+}
+
+/** Both snapshots' vocabularies, and a term with its ancestors in either (archives follow parents). */
+async function ancestry(
+  before: Map<string, NodeRef>,
+  after: Map<string, NodeRef>,
+  read: <T>(ref: NodeRef) => Promise<T>,
+) {
+  const termsOf = async (refs: Map<string, NodeRef>) => {
+    const out = new Map<string, Term>();
+    for (const ref of refs.values())
+      if (ref.kind === "term") out.set(ref.id, await read<Term>(ref));
+    return out;
+  };
+  const oldTerms = await termsOf(before);
+  const newTerms = await termsOf(after);
+  const withAncestors = (id: string): string[] => {
+    const out = new Set<string>();
+    for (const terms of [oldTerms, newTerms]) {
+      let cursor: string | undefined = id;
+      while (cursor && !out.has(cursor)) {
+        out.add(cursor);
+        cursor = terms.get(cursor)?.parentId;
+      }
+    }
+    return [...out];
+  };
+  return { oldTerms, newTerms, withAncestors };
+}
+
+/** The nodes of both snapshots by id, and every node that differs between them. */
+function diffNodes(from: Snapshot, to: Snapshot) {
+  const before = new Map(from.nodes.map((n) => [n.id, n]));
+  const after = new Map(to.nodes.map((n) => [n.id, n]));
+  const changed: Change[] = [];
+  for (const [id, ref] of after) {
+    const prev = before.get(id);
+    if (!prev || prev.hash !== ref.hash)
+      changed.push({ ...(prev ? { before: prev } : {}), after: ref });
+  }
+  for (const [id, ref] of before) if (!after.has(id)) changed.push({ before: ref });
+  return { before, after, changed };
+}
+
 export async function planCachePurge(
   reader: SnapshotReader,
   fromId: string | undefined,
@@ -113,16 +186,7 @@ export async function planCachePurge(
   if (!to) return { mode: "everything", reason: `snapshot ${toId} not found` };
   if (from.siteId !== to.siteId) return { mode: "everything", reason: "different sites" };
 
-  let reads = 0;
-  const bodies = new Map<string, unknown>();
-  const read = async <T>(ref: NodeRef): Promise<T> => {
-    const hit = bodies.get(ref.hash);
-    if (hit !== undefined) return hit as T;
-    if (++reads > maxReads) throw new TooManyReads();
-    const body = (await reader.readSnapshotNode(ref)) as T;
-    bodies.set(ref.hash, body);
-    return body;
-  };
+  const { read, spend, cached } = countedReader(reader, maxReads);
 
   try {
     return await plan();
@@ -138,15 +202,7 @@ export async function planCachePurge(
   async function plan(): Promise<CachePurgePlan> {
     const site = siteCacheTag(to?.siteId as string);
     const wholeSite = (why: string): CachePurgePlan => ({ mode: "tags", tags: [site], why: [why] });
-    const before = new Map((from as Snapshot).nodes.map((n) => [n.id, n]));
-    const after = new Map((to as Snapshot).nodes.map((n) => [n.id, n]));
-    const changed: Array<{ before?: NodeRef; after?: NodeRef }> = [];
-    for (const [id, ref] of after) {
-      const prev = before.get(id);
-      if (!prev || prev.hash !== ref.hash)
-        changed.push({ ...(prev ? { before: prev } : {}), after: ref });
-    }
-    for (const [id, ref] of before) if (!after.has(id)) changed.push({ before: ref });
+    const { before, after, changed } = diffNodes(from as Snapshot, to as Snapshot);
     if (changed.length === 0) return { mode: "tags", tags: [], why: [] };
 
     // Structure first: no node body needs reading to know these purge the site.
@@ -170,34 +226,22 @@ export async function planCachePurge(
         return wholeSite("the site settings or navigation changed");
     }
 
-    // The vocabulary of both snapshots, for ancestors (archives and breadcrumbs follow parents).
-    const termsOf = async (refs: Map<string, NodeRef>) => {
-      const out = new Map<string, Term>();
-      for (const ref of refs.values())
-        if (ref.kind === "term") out.set(ref.id, await read<Term>(ref));
-      return out;
-    };
     const entryChanges = changed.filter((c) => (c.after ?? c.before)?.kind === "contentEntry");
     const termChanges = changed.filter((c) => (c.after ?? c.before)?.kind === "term");
-    const oldTerms = await termsOf(before);
-    const newTerms = await termsOf(after);
-    const withAncestors = (id: string): string[] => {
-      const out = new Set<string>();
-      for (const terms of [oldTerms, newTerms]) {
-        let cursor: string | undefined = id;
-        while (cursor && !out.has(cursor)) {
-          out.add(cursor);
-          cursor = terms.get(cursor)?.parentId;
-        }
-      }
-      return [...out];
-    };
+    const { oldTerms, newTerms, withAncestors } = await ancestry(before, after, read);
 
     const tags = new Set<string>();
     const why: string[] = [];
 
     // Media (§7.4): an asset that left the live snapshot or changed (`cache-purge-assets.ts`).
-    await planAssetPurge({ changed, to: to as Snapshot, read, withAncestors, tags, why });
+    const reached = await planAssetPurge({
+      changed,
+      to: to as Snapshot,
+      read,
+      withAncestors,
+      tags,
+      why,
+    });
 
     for (const c of termChanges) {
       const a = c.before ? await read<Term>(c.before) : undefined;
@@ -230,6 +274,12 @@ export async function planCachePurge(
       if (flip) return wholeSite(flip);
     }
 
+    // RFC-0045: the referrer closure, from the two snapshots' bodies (`references/purge.ts`).
+    const all = await planReferencePurge({
+      ...{ reader, read, cached, spend, limits: options, entries, reached, tags, why },
+      ...{ from: from as Snapshot, to: to as Snapshot },
+    });
+    if (all) return { mode: "everything", reason: all };
     if (tags.size > maxTags)
       return { mode: "everything", reason: `${tags.size} tags (more than ${maxTags})` };
     return { mode: "tags", tags: [...tags], why };

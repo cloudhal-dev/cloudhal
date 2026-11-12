@@ -1210,3 +1210,10 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 
 - **`ReferencedEntry.path`** (§4): the member's graph path (`entryPath`, no locale prefix). Themes link with it, so the locale middleware localizes it once, like every other entry link. `url` stays the canonical URL, already localized, and absolute only on a locale's own domain.
 - **`referencedBy` follows each page** (§4): a translation resolves with its same-site original while the view shows that original, and without it otherwise, as its page reads it through the gated `entryById`. Ties on date order by id, so both sources agree on order and on what `limit` keeps.
+
+### Amended in 3b (2026-11-12)
+
+- **Seeds purge their own groups' members** (§2 Purges, point 1). A translation inheriting a changed original's reference shows a new card, but it is neither a referrer of the seed nor changed itself.
+- **The marker rule follows the short-circuit.** A field-operation marker purges everything only on sites whose `from` or `to` site node defines a reference. Sites without references keep today's purge, as the short-circuit promises. A marker's own publish changes the site node, which already purges the site.
+- **The node budget** (`maxNodes`) counts the entry bodies the closure holds across both snapshots, and the node count of the one bundle it reads.
+- **The release re-plan** plans from the pointer the batch moved (`from`, the live snapshot it replaced) to the new snapshot. That is `baseSnapshotId` whenever something was live. A first publish purges everything, as before. `RELEASE_EXECUTOR_COST` rises from 16 to 18 (two `getSnapshot` reads); bundle shards and node bodies are blob reads, bounded by `maxReads`.

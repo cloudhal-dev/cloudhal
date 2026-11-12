@@ -4,7 +4,14 @@
  * purge plan, and the tick that runs them (`runScheduledTick`) — on SQLite and Miniflare D1.
  * Test names cite the invariants of RFC-0008 §17 they prove.
  */
-import type { Actor, ContentEntry, Release, Site, Snapshot } from "@cloudhal/core-contracts";
+import type {
+  Actor,
+  ContentEntry,
+  FieldDefinition,
+  Release,
+  Site,
+  Snapshot,
+} from "@cloudhal/core-contracts";
 import { isValid } from "@cloudhal/core-contracts";
 import { TICK_BUDGETS } from "@cloudhal/schedules";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
@@ -48,7 +55,9 @@ export function releasesSuite(
       await dropAllTables(sql);
       now = T0;
       logs.length = 0;
-      store = new SiteGraphStore({ sql, blobs, now: () => new Date(now) });
+      // RFC-0045: references are enabled here (refused in production) for the purge re-plan case
+      const fieldTypes = { supported: () => true };
+      store = new SiteGraphStore({ sql, blobs, now: () => new Date(now), fieldTypes });
       await store.init();
       site = await seedStarterSite(store, { name: "Releases", slug: "releases" });
       news = (await store.getTermBySlug(site.id, "category", "news"))?.id as string;
@@ -485,7 +494,45 @@ export function releasesSuite(
       expect((await get(release.id)).state).toBe("published");
     });
 
-    it("sends the purge plan stored at pin time and records a deferred purge", async () => {
+    it("re-plans the purge at run time: a referrer published after the pin is purged (RFC-0045)", async () => {
+      const s = await fresh();
+      const venue: FieldDefinition = {
+        key: "venue",
+        type: "reference",
+        labels: { en: { label: "Venue" } },
+        localized: false,
+        collections: ["places"],
+      };
+      site = await store.updateSite({
+        ...s,
+        collections: { ...s.collections, places: {}, events: { fields: [venue] } },
+      });
+      const hall = await story({ collection: "places", slug: "hall", title: "Hall" });
+      await publishSite();
+      // the release retitles the hall; at pin time nothing names it
+      await store.updateContentEntry({ ...hall, title: "Main hall" });
+      await scheduled([hall.id]);
+      // a referrer goes live after the pin, by an ordinary publish
+      const event = await story({
+        collection: "events",
+        slug: "launch",
+        fields: { venue: hall.id },
+      });
+      await publishSite();
+      const plans: CachePurgePlan[] = [];
+      const report = await tick(T, {
+        purge: () => async (_siteId, plan) => {
+          plans.push(plan);
+          return "tags";
+        },
+      });
+      expect(report.ran).toBe(1);
+      const tags = plans[0]?.mode === "tags" ? plans[0].tags : [];
+      expect(tags).toContain(`cloudhal-node-${hall.id}`);
+      expect(tags).toContain(`cloudhal-node-${event.id}`);
+    });
+
+    it("sends the purge re-planned at run time and records a deferred purge", async () => {
       const s = await story();
       await scheduled([s.id]);
       const plans: CachePurgePlan[] = [];

@@ -36,7 +36,7 @@ import {
 } from "./assets.ts";
 import { checkAvailability, type GateSupport, sameAvailability } from "./availability.ts";
 import { type BlockRegistry, createBlockRegistry, type PropsSchema } from "./blocks.ts";
-import { readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
+import { type BundleReadOptions, readSnapshotBundle, writeSnapshotBundle } from "./bundles.ts";
 import { type CachePurgeOptions, type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import type { CollectionInfo } from "./collections.ts";
 import { addedCorrections, type CorrectionInput } from "./corrections.ts";
@@ -945,9 +945,9 @@ export class SiteGraphStore {
     return this.#snapshots.create(siteId, input);
   }
 
-  /** The bodies of `snapshot` by node hash from its bundle, or undefined (RFC-0010). */
-  readSnapshotBundle(snapshot: Snapshot): Promise<Map<string, unknown> | undefined> {
-    return readSnapshotBundle(this.#blobs, snapshot);
+  /** Bodies by node hash from `snapshot`'s bundle, or undefined (RFC-0010; budgets: RFC-0045). */
+  readSnapshotBundle(snapshot: Snapshot, options?: BundleReadOptions) {
+    return readSnapshotBundle(this.#blobs, snapshot, options);
   }
 
   /**
