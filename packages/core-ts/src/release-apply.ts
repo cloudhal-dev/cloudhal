@@ -123,13 +123,13 @@ function approverOf(release: Release): Actor | undefined {
   return a.kind === "person" ? { kind: "human", ...a.by } : a.by;
 }
 
-/** The snapshot's label: the release title, else "Scheduled: <the first page or entry's title>". */
 /** The site node a snapshot's `nodes` publish, and whether it is the working row (`hash`). */
 function publishedSite(nodes: readonly NodeRef[], hash: string) {
   const ref = nodes.find((n) => n.kind === "site");
   return ref ? { ref, current: ref.hash === hash } : undefined;
 }
 
+/** The snapshot's label: the release title, else "Scheduled: <the first page or entry's title>". */
 async function labelOf(
   ctx: ReleaseApplyContext,
   release: Release,

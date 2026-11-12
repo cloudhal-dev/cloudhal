@@ -746,7 +746,8 @@ export function releasesSuite(
       const plans: CachePurgePlan[] = [];
       await tick(T + 2 * HOUR, { purge: capture(plans), releaseBlobs });
       expect(plans.map((p) => p.mode)).toEqual(["everything"]);
-      expect(releaseBlobs.left).toBe(0);
+      // the run's own calls (search, label, the gate) are counted, never refused: below 0
+      expect(releaseBlobs.left).toBeLessThan(0);
     });
 
     it("sends the purge re-planned at run time and records a deferred purge", async () => {

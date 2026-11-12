@@ -24,6 +24,7 @@ import { nodeCacheTag, siteCacheTag } from "../src/cache-tags.ts";
 import { continueFieldOperation, runFieldOperation } from "../src/fields-operations/index.ts";
 import { canonicalJson, nodeHash } from "../src/hash.ts";
 import { PNG_1X1 } from "../src/media/fixtures.ts";
+import { sendReleasePurge } from "../src/references/release-purge.ts";
 import { seedStarterSite } from "../src/seed.ts";
 import { type PublishChange, SiteGraphStore } from "../src/store.ts";
 
@@ -452,5 +453,83 @@ describe("planCachePurge: the referrer closure (RFC-0045 §2)", () => {
     await edit(hall, { title: "Main hall" });
     const p = await plan(await publish());
     expect(p.mode === "everything" ? p.reason : "tags").toMatch(/field operation/);
+  });
+
+  describe("a release run's purge (sendReleasePurge)", () => {
+    const stored = { mode: "tags", tags: ["cloudhal-node-entry_STORED0001"], why: [] } as const;
+    const siteRefOf = (s: Snapshot) => s.nodes.find((n) => n.kind === "site") as NodeRef;
+    const run = async (o: {
+      graph?: SiteGraphStore;
+      siteId?: string;
+      left: number;
+      from: string;
+      to: string;
+    }) => {
+      const graph = o.graph ?? store;
+      const sent: unknown[] = [];
+      const allowance = { left: o.left };
+      const toSnap = (await graph.getSnapshot(o.to)) as Snapshot;
+      const outcome = await sendReleasePurge({
+        graph,
+        purge: async (_siteId, plan) => {
+          sent.push(plan);
+          return plan.mode === "everything" ? "everything" : "tags";
+        },
+        stored,
+        site: (await graph.getSite(o.siteId ?? site.id)) as Site,
+        publishedSite: { ref: siteRefOf(toSnap), current: false },
+        from: o.from,
+        snapshotId: o.to,
+        allowance,
+        log: () => {},
+      });
+      return { sent, allowance, outcome };
+    };
+
+    it("a site without references sends the stored plan with the allowance spent, or the gate read failing", async () => {
+      const plain = await seedStarterSite(store, { name: "Plain", slug: "plain-release" });
+      const a = await store.createSnapshot(plain.id, { actor: human, reason: "publish" });
+      await store.publish(plain, a.id);
+      const b = await store.createSnapshot(plain.id, { actor: human, reason: "manual" });
+      const spent = await run({ siteId: plain.id, left: 0, from: a.id, to: b.id });
+      expect(spent.sent).toEqual([stored]);
+      const failing = new SiteGraphStore({
+        sql: store.sql,
+        blobs: new Proxy(store.blobs, {
+          get(target, prop, receiver) {
+            const v = Reflect.get(target, prop, receiver);
+            if (prop === "get") return async () => Promise.reject(new Error("R2 went away"));
+            return typeof v === "function" ? v.bind(target) : v;
+          },
+        }),
+      });
+      const broken = await run({
+        graph: failing,
+        siteId: plain.id,
+        left: 100,
+        from: a.id,
+        to: b.id,
+      });
+      expect(broken.sent).toEqual([stored]);
+    });
+
+    it("a re-plan with more terms than reads left purges everything before reading anything", async () => {
+      const { hall, event } = await world();
+      const from = (await fresh()).publishedSnapshotId as string;
+      await edit(hall, { title: "Main hall" });
+      const to = await snap("manual");
+      const s = (await store.getSnapshot(to.id)) as Snapshot;
+      const terms = new Set(s.nodes.filter((n) => n.kind === "term").map((n) => n.hash)).size;
+      expect(terms).toBeGreaterThan(1);
+      // the gate read is one call; then fewer reads are left than there are terms
+      const { sent, allowance } = await run({ left: terms, from, to: to.id });
+      expect(sent).toHaveLength(1);
+      expect((sent[0] as { reason?: string }).reason).toMatch(/terms/);
+      expect(allowance.left).toBe(terms - 1);
+      // enough left: tags
+      const ok = await run({ left: 2000, from, to: to.id });
+      expect(ok.sent[0]).toMatchObject({ mode: "tags" });
+      expect((ok.sent[0] as { tags: string[] }).tags).toContain(node(event));
+    });
   });
 });

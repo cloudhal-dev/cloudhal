@@ -1224,16 +1224,22 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **The node budget** (`maxNodes`) counts the entry bodies the closure holds across both snapshots, plus the node count of the one bundle it reads.
 - **Release runs.**
   - **The gate is the published site node,** not the working row. A release never carries the site node, so its snapshot publishes the live one's; `publishRelease` returns that ref. Only a node that defines references, or still converts from them, re-plans. Every other site sends the plan stored at pin time, as before 3b (nothing when it purges nothing).
-    - That gate costs one blob read per release run that has a purger: a snapshot's site node is captured before the publish flips the pointer, so the working row never equals it.
+    - That gate costs one blob read per release run that has a purger, except on a first publish: a snapshot's site node is captured before the publish flips the pointer, so the working row equals it only on a site's first publish.
+    - The read is counted but never refused, so a site without references never depends on what other runs left. If it fails, the working row decides: no references, the stored plan; otherwise purge everything.
   - **The re-plan** goes from the pointer the batch moved (`from`) to the new snapshot. That is `baseSnapshotId` whenever something was live; a first publish purges everything.
     - It runs over the tick's counting driver, never refused, and spends no shard reads on `to`.
     - If it throws, the run purges everything, never the stored plan.
   - **No bundle write at run time.** The site Worker writes the new snapshot's bundle on its first read. Back-to-back releases of one site with no visitor between them therefore re-plan node by node, within the allowance, or purge everything: an over-purge, never a stale page.
   - **Subrequests.** R2 and D1 calls are capped per invocation: 1,000 on Workers Free, by default 10,000 on Paid.
-    - Release purges charge their *actual* blob calls to one allowance per invocation, shared by both ticks of the cron's invocation. Each re-plan gets `maxReads = min(2,000, left)`.
+    - Release runs charge their *actual* blob calls to one allowance per invocation, shared by both ticks of the cron's invocation. That includes `refreshSearch`, `labelOf` and a first publish's own blobs, counted but never refused. Each re-plan gets `maxReads = min(2,000, left)`.
+    - A re-plan whose two snapshots hold more distinct terms than reads left purges everything before reading anything.
+    - "Publish now" sizes its allowance from the deployment's tick budget (`CLOUDHAL_TICK_BUDGET`).
     - Free: 1,000 − 2 × (40 + 7) D1 − 2 × 40 built-in blobs − 2 × (211 `refreshSearch` + 2 + 4 purge sends) = 392, so 350.
-    - Paid: sized for ticks of up to 10 releases of 100 items, 3,000. Fifty such releases pass the default cap with `refreshSearch` alone, re-plan or not; that is RFC-0008's budget, unchanged here.
-    - On Free, a reference site with more terms than the allowance leaves purges everything on every release, because the planner reads every term. That is accepted: rare, an over-purge, and no cache priming is built for it.
+    - Paid: about 27 releases fit a tick's 900 statements (33 each with claim and finish). The allowance is sized for ticks of up to 10 releases of 100 items, 3,000. Twenty-seven such releases pass the default cap with `refreshSearch` alone, re-plan or not; that is RFC-0008's budget, unchanged here.
+    - **Accepted over-purges, not fixed:**
+      - On Free, a reference site with more terms than the allowance leaves purges everything on every release, because the planner reads every term. No cache priming is built for it.
+      - On Free, a reference-site release that changes an existing asset reads every entry, page and term one by one in the asset rule, so above about 350 nodes it purges everything.
+      - The AI Search mirror's R2 calls (RFC-0029) are not counted.
   - **`RELEASE_EXECUTOR_COST` is 26 statements:**
     - the stored plan (1), the reads (3), the batch (8) and `refreshSearch` (7);
     - then the re-plan's two `getSnapshot` reads, the bookkeeping (4) and `recordPurge` (1).

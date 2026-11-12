@@ -71,11 +71,16 @@ import { type BuiltinInputs, graphBuiltinRunner } from "./automations.ts";
 import { type CachePurgePlan, planCachePurge } from "./cache-purge.ts";
 import { NotFoundError } from "./errors.ts";
 import type { NodeHold } from "./holds.ts";
-import { releaseBlobAllowance } from "./references/release-purge.ts";
+import { chargedBlobs, releaseBlobAllowance } from "./references/release-purge.ts";
 import type * as after from "./release-after.ts";
 import type { ReleasePurge } from "./release-apply.ts";
 import { releaseDepsOf } from "./release-deps.ts";
 import { releaseExecutor } from "./release-executor.ts";
+import type {
+  CreateReleaseRequest,
+  PinRequest,
+  ReleaseServiceOptions,
+} from "./release-service-options.ts";
 import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
 export { type ReleasePublishedHook, recordPurgeOutcome } from "./release-after.ts";
@@ -181,7 +186,10 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
   const meter = new TickMeter(o.budget ?? TICK_BUDGETS.free, o.clock);
   const metered = meter.wrap(o.sql);
   const counted = meter.wrapCounting(o.sql);
-  const graph = new SiteGraphStore({ ...o.graph, sql: metered, blobs: o.blobs });
+  // RFC-0045: the release runs' blob calls (`refreshSearch`, `labelOf`, the re-plan) are counted
+  const releaseBlobs = o.releaseBlobs ?? { left: releaseBlobAllowance(meter.budget) };
+  const blobs = chargedBlobs(o.blobs, releaseBlobs);
+  const graph = new SiteGraphStore({ ...o.graph, sql: metered, blobs });
   const schedules = new SqlScheduleStore(metered);
   const purge = o.purge?.({ counted });
   return runDue(o.now, {
@@ -194,7 +202,7 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       schedules,
       purge,
       counted,
-      releaseBlobs: o.releaseBlobs ?? { left: releaseBlobAllowance(meter.budget) },
+      releaseBlobs,
       onPublished: o.onReleasePublished,
       log: o.log,
     }),
@@ -268,38 +276,7 @@ export async function schedulerHealthReport(
 
 // ───────────────────────────── the service ─────────────────────────────
 
-export interface ReleaseServiceOptions {
-  readonly graph: SiteGraphStore;
-  /** The database of `graph` (default `graph.sql`). */
-  readonly sql?: SqlDriver | undefined;
-  /** The clock for lead times and "Publish now" (default `Date.now`). */
-  readonly now?: (() => Date) | undefined;
-  /** The ticker, poked when a release's time is set or moved (default: cron, no pokes). */
-  readonly scheduler?: SchedulerRuntime | undefined;
-  /** "Publish now" purges like a tick does (absent: nothing cached). */
-  readonly purge?: ReleasePurger | undefined;
-  /** New bodies one call may write (§6.1 step 4; Workers Free: 20). `Infinity` on Node. */
-  readonly maxNewBodies?: number | undefined;
-  /** After "Publish now" commits a release, as a tick's `onReleasePublished` (the Node server rebuilds, #150). */
-  readonly onReleasePublished?: after.ReleasePublishedHook | undefined;
-  readonly log?: ((line: string) => void) | undefined;
-}
-
-export interface PinRequest {
-  /** Nodes whose current working-copy version goes live. */
-  readonly set?: readonly string[] | undefined;
-  /** Entries, pages and redirects taken out of the live site. */
-  readonly remove?: readonly string[] | undefined;
-}
-
-export interface CreateReleaseRequest extends PinRequest {
-  readonly siteId: string;
-  readonly createdBy: Actor;
-  readonly title?: string | undefined;
-  /** An instant, a wall-clock time (in `timeZone`, else the site's zone), or `on-approval`. */
-  readonly when?: WhenInput | undefined;
-  readonly metadata?: Record<string, string> | undefined;
-}
+export type { CreateReleaseRequest, PinRequest, ReleaseServiceOptions };
 
 export interface PinnedRelease {
   readonly release: Release;
@@ -331,6 +308,7 @@ export class ReleaseService {
   readonly #maxNewBodies: number;
   readonly #onReleasePublished: after.ReleasePublishedHook | undefined;
   readonly #log: (line: string) => void;
+  readonly #tickBudget: ReleaseServiceOptions["tickBudget"];
 
   constructor(o: ReleaseServiceOptions) {
     this.graph = o.graph;
@@ -342,6 +320,7 @@ export class ReleaseService {
     this.#maxNewBodies = o.maxNewBodies ?? MAX_NEW_BODIES_PER_REQUEST;
     this.#onReleasePublished = o.onReleasePublished;
     this.#log = o.log ?? (() => {});
+    this.#tickBudget = o.tickBudget;
   }
 
   async #site(siteId: string) {
@@ -830,6 +809,7 @@ export class ReleaseService {
           graph: this.graph,
           schedules: this.schedules,
           purge: this.#purge,
+          releaseBlobs: { left: releaseBlobAllowance(this.#tickBudget) },
           onPublished: this.#onReleasePublished,
           log: this.#log,
         }),

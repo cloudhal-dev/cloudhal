@@ -68,7 +68,7 @@ export interface ReleaseExecutorOptions {
 export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
   const log = o.log ?? (() => {});
   const counted = o.counted;
-  // RFC-0045: the blob calls every release run of this tick may make together.
+  // RFC-0045: the blob calls every release run of this invocation may make together.
   const allowance = o.releaseBlobs ?? { left: releaseBlobAllowance() };
   const recordPurge =
     o.recordPurge ??

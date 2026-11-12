@@ -73,7 +73,7 @@ import {
   type BackstopState,
   cronTick,
   followUpDelay,
-  releasePurger,
+  publishNowPurge,
   requestBackstop,
   runAdminTick,
   type SchedulerEnv,
@@ -538,7 +538,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         // RFC-0008 §12–§13: the schedule routes and tools; "Publish now" purges like a tick.
         schedules: {
           store: new SqlScheduleStore(sql),
-          purge: releasePurger(env, sql, { log }),
+          ...publishNowPurge(env, sql, log),
           automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
         },
         scheduler: {

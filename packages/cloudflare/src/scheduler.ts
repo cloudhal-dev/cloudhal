@@ -390,6 +390,11 @@ export interface AdminTickOptions {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** "Publish now"'s purge, and the deployment's tick budget that sizes its blob calls (RFC-0045). */
+export function publishNowPurge(env: SchedulerEnv, sql: SqlDriver, log: (line: string) => void) {
+  return { purge: releasePurger(env, sql, { log }), tickBudget: tickBudget(env) };
+}
+
 const invocationBlobs = new WeakMap<object, { left: number }>();
 
 /**
