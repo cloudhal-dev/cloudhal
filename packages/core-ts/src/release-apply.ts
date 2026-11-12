@@ -72,6 +72,11 @@ export type PublishReleaseResult =
       readonly baseSnapshotId: string;
       /** The pointer moved from (absent on a site never published before). */
       readonly from?: string;
+      /**
+       * RFC-0045: the site node the new snapshot publishes (a release never carries the site
+       * node: the live one's), and whether the working site row read before the batch was it.
+       */
+      readonly publishedSite?: { readonly ref: NodeRef; readonly current: boolean } | undefined;
       /** False when a recovered run found its snapshot already written (nothing new committed). */
       readonly committed: boolean;
     }
@@ -119,6 +124,12 @@ function approverOf(release: Release): Actor | undefined {
 }
 
 /** The snapshot's label: the release title, else "Scheduled: <the first page or entry's title>". */
+/** The site node a snapshot's `nodes` publish, and whether it is the working row (`hash`). */
+function publishedSite(nodes: readonly NodeRef[], hash: string) {
+  const ref = nodes.find((n) => n.kind === "site");
+  return ref ? { ref, current: ref.hash === hash } : undefined;
+}
+
 async function labelOf(
   ctx: ReleaseApplyContext,
   release: Release,
@@ -194,7 +205,6 @@ export async function publishRelease(
         message: `the live snapshot ${site.publishedSnapshotId} cannot be read`,
       };
     const parent = (await ctx.latestSnapshot(siteId)) ?? live;
-
     // Conflicts, composition and dependencies (§6.3 steps 3–5), pure.
     const plan = planRelease(live?.nodes ?? [], items);
     if (plan.kind === "conflict") return plan;
@@ -350,6 +360,7 @@ export async function publishRelease(
         snapshotId,
         baseSnapshotId: base,
         ...(live ? { from: live.id } : {}),
+        publishedSite: publishedSite(nodes, row.hash),
         committed: true,
       };
     lastError = `the site ${siteId} or the run's lease changed while the release was applied`;

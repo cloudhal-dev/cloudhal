@@ -25,17 +25,16 @@ import type { SiteGraphStore } from "./store.ts";
  * driver: the stored purge plan (1), the site, the live snapshot and the parent (3), the batch
  * (up to 8, with asset blobs to root), and the search index brought to the new snapshot (7: its
  * reads and one guarded batch, RFC-0019 §3). On its counting driver, never refused: for sites
- * with references, the run-time re-plan's two `getSnapshot` reads (RFC-0045 §2; the bundle
- * write reuses them); the purge's bookkeeping (up to 4); and `recordPurge`, correcting the
- * outcome after a deferred or differing purge (1): 1 + 3 + 8 + 7 + 2 + 4 + 1 = 26. A site that moved between the reads and the
- * batch repeats the reads and the batch once (11 more); that rare path may end the tick early
+ * with references, the run-time re-plan's two `getSnapshot` reads (RFC-0045 §2); the purge's
+ * bookkeeping (up to 4); and `recordPurge`, correcting the outcome after a deferred or differing
+ * purge (1). 1 + 3 + 8 + 7 + 2 + 4 + 1 = 26. A site that moved between the reads and the batch
+ * repeats the reads and the batch once (11 more); that rare path may end the tick early
  * (`more`), never mid-batch, and the purge after it runs on the counting driver regardless.
  *
- * Blob calls (R2 subrequests) are bounded apart: a tick's release runs share
- * `releaseBlobAllowance` (400 on Workers Free, under its 1,000 subrequests with the tick's 40 D1
- * statements; 4,000 on Paid, under its default 10,000 with 900). A re-plan reads at most
- * `RELEASE_REPLAN_MAX_READS` (250) blobs, a bundle write at most 108; past the allowance the run
- * purges everything (`references/release-purge.ts`).
+ * Blob calls (R2 subrequests) are bounded apart, per invocation: every release run of every tick
+ * in it charges its re-plan's actual blob calls to one allowance (350 on Workers Free, 3,000 on
+ * Paid; the arithmetic is in `references/release-purge.ts`), and past it the run purges
+ * everything.
  */
 export const RELEASE_EXECUTOR_COST = 26;
 
@@ -55,8 +54,11 @@ export interface ReleaseExecutorOptions {
    * `recordPurge` is absent, the outcome's correction is written over it.
    */
   readonly counted?: SqlDriver | undefined;
-  /** Blob calls this executor's runs may make together (`releaseBlobAllowance`; default Free's). */
-  readonly blobReads?: number | undefined;
+  /**
+   * Blob calls left for this invocation's release runs, shared by its ticks and charged by actual
+   * calls (default: Free's `releaseBlobAllowance`).
+   */
+  readonly releaseBlobs?: { left: number } | undefined;
   /** After a committed release's purge (`release-after.ts`; the Node server rebuilds, #150). */
   readonly onPublished?: after.ReleasePublishedHook | undefined;
   readonly log?: ((line: string) => void) | undefined;
@@ -67,7 +69,7 @@ export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
   const log = o.log ?? (() => {});
   const counted = o.counted;
   // RFC-0045: the blob calls every release run of this tick may make together.
-  const allowance = { left: o.blobReads ?? releaseBlobAllowance() };
+  const allowance = o.releaseBlobs ?? { left: releaseBlobAllowance() };
   const recordPurge =
     o.recordPurge ??
     (counted
@@ -100,7 +102,8 @@ export function releaseExecutor(o: ReleaseExecutorOptions): ReleaseExecutor {
             try {
               purge = await sendReleasePurge({
                 ...{ graph: o.graph, counted, purge: o.purge, stored: plan, allowance, log },
-                ...{ site: r.site, from: r.from, snapshotId: r.snapshotId },
+                ...{ site: r.site, publishedSite: r.publishedSite },
+                ...{ from: r.from, snapshotId: r.snapshotId },
               });
             } catch (e) {
               purge = "failed";

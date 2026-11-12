@@ -1,46 +1,56 @@
 /**
  * RFC-0045 §2 "Purges", point 4: what a release run purges, decided after its batch committed.
  *
- * - **Sites without references: exactly as before 3b.** The plan stored at pin time is sent (nothing
- *   when it purges nothing), with no read at all: the test is the site row `publishRelease`
- *   returns, which is the site node the release publishes. (A site whose last reference field was
- *   removed since `from` gets the stored plan, as every site did before 3b.)
- * - **Sites with references (or converting from them): re-planned** `from → snapshotId` (`from`:
- *   the pointer the batch moved), like every other publish path. The pin-time plan skips the
- *   referrer closure and is the batch's *expected* outcome only. The re-plan reads over the tick's
- *   counting driver (never refused) and, for blobs, within the run's share of the tick's blob
- *   allowance; past it, or if it throws, the run purges everything, never the stored plan.
- * - **Then the scheduled snapshot's bundle** (RFC-0010), best effort and bounded, so the *next*
- *   release run (whose `from` this snapshot is) reads one bundle: only for reference sites, only
- *   when `from` has a bundle, from `from`'s bodies plus at most `RELEASE_BUNDLE_MAX_FETCH` changed
- *   nodes, for snapshots of at most `RELEASE_BUNDLE_MAX_NODES` nodes. This run's re-plan reads
- *   `from`'s bundle and the items, and spends no shard reads on `to` (`unbundled`).
+ * - **The gate is the published site node.** A release never carries the site node, so the new
+ *   snapshot publishes the live one's. When the working site row the batch read is that node, it
+ *   is tested as is; otherwise the published body is read once (one blob call, charged). In
+ *   practice that read always happens: a snapshot's site node is captured before the publish
+ *   flips the pointer, so the row differs from it at least in `publishedSnapshotId` and `rev`.
+ *   Only a node that defines references, or still converts from them, re-plans; every other site
+ *   sends the plan stored at pin time, as before 3b (nothing when it purges nothing).
+ * - **Re-planned** `from → snapshotId` (`from`: the pointer the batch moved), like every other
+ *   publish path. The pin-time plan skips the referrer closure and is the batch's *expected*
+ *   outcome only. The re-plan's statements run on the tick's counting driver (never refused); if
+ *   it throws, the run purges everything, never the stored plan.
+ * - **Blob calls are charged as they happen** against the invocation's allowance (`allowance`,
+ *   shared by every tick of one invocation), and each re-plan gets `maxReads = min(2,000, left)`.
+ *   Past it, the planner purges everything: an over-purge, never a stale page. The scheduled
+ *   snapshot gets no bundle here (the site Worker writes one on its first read): back-to-back
+ *   releases of one site with no visitor between them re-plan node by node, within the same
+ *   allowance.
  *
- * **Subrequests.** R2 and D1 calls are capped per invocation: 1,000 on Workers Free, 10,000 by
- * default on Paid (RFC-0010, ADR-0024). A tick spends at most its `maxQueries` D1 statements (40
- * Free, 900 Paid) and the release runs' blob allowance (`releaseBlobAllowance`: 400 Free, 4,000
- * Paid, shared by every run of the tick), plus the purge's own calls: well under either cap.
+ * **Sizing the allowance.** R2 and D1 calls are capped per invocation: 1,000 on Workers Free, by
+ * default 10,000 on Paid (RFC-0010, ADR-0024). An invocation runs up to two ticks (the cron's
+ * follow-up). Per tick: D1, at most `maxQueries` refused statements plus 7 counted ones per
+ * release (the re-plan's 2 `getSnapshot`, bookkeeping 4, `recordPurge` 1); the built-in jobs' 40
+ * blob reads. Per release: `refreshSearch`'s worst case (`MAX_RELEASE_ITEMS` × 2 + the site +
+ * ~10 taxonomies ≈ 211), `labelOf` and the publish's own blobs (2), the purge's sends (≤ 4).
+ * - **Free** (40 statements, 1 release per tick):
+ *   1,000 − 2 × (40 + 7) − 2 × 40 − 2 × (211 + 2 + 4) = 392, so 350.
+ * - **Paid** (900 statements, up to 50 releases per tick): 50 releases of 100 items pass the
+ *   default 10,000 with `refreshSearch` alone, re-plan or not (RFC-0008's budgets, unchanged
+ *   here). Sized for ticks of up to 10 such releases:
+ *   10,000 − 2 × (900 + 10 × 7) − 2 × 40 − 2 × 10 × 217 = 3,640, so 3,000.
+ *
+ * A reference site with more terms than the allowance leaves (the planner reads every term of
+ * both snapshots) purges everything on every release: rare, and an over-purge.
  */
-import type { NodeRef, Site, Snapshot } from "@cloudhal/core-contracts";
-import type { SqlDriver } from "@cloudhal/storage";
-import { type CachePurgePlan, planCachePurge, type SnapshotReader } from "../cache-purge.ts";
+import type { NodeRef, Site } from "@cloudhal/core-contracts";
+import type { BlobStore, SqlDriver } from "@cloudhal/storage";
+import { type CachePurgePlan, DEFAULT_PURGE_MAX_READS } from "../cache-purge.ts";
 import type { ReleasePurge } from "../release-apply.ts";
 import type { ReleasePurger } from "../releases.ts";
 import { SiteGraphStore } from "../store.ts";
 import { definesReferences } from "./purge.ts";
 
-/** Above this many nodes a release run leaves its snapshot's bundle to the site Worker. */
-export const RELEASE_BUNDLE_MAX_NODES = 1000;
-/** Changed nodes a bundle write may fetch one by one (the rest come from `from`'s bundle). */
-export const RELEASE_BUNDLE_MAX_FETCH = 100;
-/** The most blob reads one re-plan may make (node bodies and bundle shards). */
-export const RELEASE_REPLAN_MAX_READS = 250;
-/** What a bundle write may cost in blob calls: `from`'s shards, the fetches, `to`'s shards. */
-const BUNDLE_WRITE_COST = 2 * Math.ceil(RELEASE_BUNDLE_MAX_NODES / 256) + RELEASE_BUNDLE_MAX_FETCH;
+/** Blob calls one invocation's release runs may make (see the module comment). */
+export const RELEASE_BLOB_ALLOWANCE = { free: 350, paid: 3000 } as const;
 
-/** The blob calls one tick's release runs may make together (see the module comment). */
+/** The allowance for a tick budget: Paid's when it allows more than Free's 40 statements. */
 export function releaseBlobAllowance(budget?: { readonly maxQueries: number }): number {
-  return budget && budget.maxQueries > 40 ? 4000 : 400;
+  return budget && budget.maxQueries > 40
+    ? RELEASE_BLOB_ALLOWANCE.paid
+    : RELEASE_BLOB_ALLOWANCE.free;
 }
 
 /** What a plan does to the outcome's `purge` (`none` where nothing is cached or nothing changed). */
@@ -51,108 +61,71 @@ export function purgeOutcome(plan: CachePurgePlan, purging: boolean): ReleasePur
 }
 
 export interface ReleasePurgeInput {
-  /** The executor's graph (its blob store is the planner's). */
+  /** The executor's graph (its blob store and driver are the planner's). */
   readonly graph: SiteGraphStore;
   /** The tick's counting driver; absent ("Publish now"): the graph's own. */
   readonly counted?: SqlDriver | undefined;
   readonly purge: ReleasePurger;
   /** The plan stored at pin time. */
   readonly stored: CachePurgePlan;
-  /** The site row the batch wrote (`to`'s site node). */
+  /** The site row the batch wrote. */
   readonly site: Site;
+  /** The site node the new snapshot publishes, and whether the working row was it. */
+  readonly publishedSite?: { readonly ref: NodeRef; readonly current: boolean } | undefined;
   /** The pointer the batch moved (absent: nothing was live, so everything). */
   readonly from?: string | undefined;
   readonly snapshotId: string;
-  /** Blob calls left for this tick's release runs; spent here. */
+  /** Blob calls left for this invocation's release runs; charged by actual calls. */
   readonly allowance: { left: number };
   readonly log: (line: string) => void;
 }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Sends the run's purge (see the module comment); a throw only from the purger itself. */
-export async function sendReleasePurge(input: ReleasePurgeInput): Promise<ReleasePurge> {
-  const { site, allowance, log } = input;
-  const planner = input.counted
-    ? new SiteGraphStore({ sql: input.counted, blobs: input.graph.blobs })
-    : input.graph;
-  const send = (plan: CachePurgePlan) =>
-    purgeOutcome(plan, true) === "none"
-      ? Promise.resolve("none" as const)
-      : input.purge(site.id, plan);
-  if (!definesReferences(site)) return send(input.stored);
-  let from: Snapshot | undefined;
-  let to: Snapshot | undefined;
-  try {
-    [from, to] = await Promise.all([
-      input.from ? planner.getSnapshot(input.from) : undefined,
-      planner.getSnapshot(input.snapshotId),
-    ]);
-  } catch (e) {
-    log(`schedules: the release's snapshots could not be read: ${message(e)}`);
-    return send({ mode: "everything", reason: `snapshots unreadable: ${message(e)}` });
-  }
-  const pair: Pair = { from, to, allowance, log };
-  const plan = await replan(planner, pair);
-  const sent = await send(plan);
-  if (from && to && pair.fromBundle !== "missing")
-    await writeBundle(planner, { ...pair, from, to });
-  return sent;
-}
-
-interface Pair {
-  readonly from: Snapshot | undefined;
-  readonly to: Snapshot | undefined;
-  readonly allowance: { left: number };
-  readonly log: (line: string) => void;
-  /** What the re-plan found of `from`'s bundle (unset: it did not look). */
-  fromBundle?: "present" | "missing";
-}
-
-/** The run-time plan within the run's blob share; purge-everything when it cannot be made. */
-async function replan(planner: SiteGraphStore, p: Pair): Promise<CachePurgePlan> {
-  const { from, to } = p;
-  if (!from || !to) return { mode: "everything", reason: "nothing was live before the release" };
-  const maxReads = Math.min(RELEASE_REPLAN_MAX_READS, p.allowance.left);
-  p.allowance.left -= maxReads;
-  if (maxReads < 10) return { mode: "everything", reason: "the tick's blob allowance is spent" };
-  const reader: SnapshotReader = {
-    getSnapshot: async (id) => (id === from.id ? from : id === to.id ? to : undefined),
-    readSnapshotNode: (ref: NodeRef) => planner.readSnapshotNode(ref),
-    readSnapshotBundle: async (s, o) => {
-      const got = await planner.readSnapshotBundle(s, o);
-      if (s.id === from.id && !o?.only) p.fromBundle = got ? "present" : "missing";
-      return got;
+/** A blob store that charges every call to `allowance`. */
+function charged(blobs: BlobStore, allowance: { left: number }): BlobStore {
+  return new Proxy(blobs, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== "function") return v;
+      return (...args: unknown[]) => {
+        allowance.left--;
+        return v.apply(target, args);
+      };
     },
-  };
+  });
+}
+
+/** The plan to send: the stored one, a re-plan, or purge-everything; never throws. */
+async function planFor(input: ReleasePurgeInput): Promise<CachePurgePlan> {
+  const { site, allowance } = input;
+  const planner = new SiteGraphStore({
+    sql: input.counted ?? input.graph.sql,
+    blobs: charged(input.graph.blobs, allowance),
+  });
   try {
-    // `to` has no bundle yet: it is written after the purge, for the next run.
-    return await planCachePurge(reader, from.id, to.id, { maxReads, unbundled: new Set([to.id]) });
+    const published = input.publishedSite;
+    const read = published && !published.current;
+    if (read && allowance.left < 1)
+      return { mode: "everything", reason: "the blob allowance is spent" };
+    const node = read ? await planner.readSnapshotNode<Site>(published.ref) : site;
+    if (!definesReferences(node)) return input.stored;
+    if (!input.from) return { mode: "everything", reason: "nothing was live before the release" };
+    const maxReads = Math.min(DEFAULT_PURGE_MAX_READS, allowance.left);
+    if (maxReads < 1) return { mode: "everything", reason: "the blob allowance is spent" };
+    // `to` has no bundle: no shard reads are spent on it.
+    const unbundled = new Set([input.snapshotId]);
+    return await planner.planCachePurge(
+      { from: input.from, to: input.snapshotId },
+      { maxReads, unbundled },
+    );
   } catch (e) {
-    const reason = `the run-time purge plan failed: ${message(e)}`;
-    p.log(`schedules: ${reason}`);
+    const reason = `the run-time purge plan failed: ${e instanceof Error ? e.message : String(e)}`;
+    input.log(`schedules: ${reason}`);
     return { mode: "everything", reason };
   }
 }
 
-/** `to`'s bundle from `from`'s bodies plus the few changed nodes; skipped when it would cost more. */
-async function writeBundle(planner: SiteGraphStore, p: Pair & { from: Snapshot; to: Snapshot }) {
-  const { from, to } = p;
-  if (to.nodes.length > RELEASE_BUNDLE_MAX_NODES || from.nodes.length > RELEASE_BUNDLE_MAX_NODES)
-    return;
-  if (p.allowance.left < BUNDLE_WRITE_COST) return;
-  p.allowance.left -= BUNDLE_WRITE_COST;
-  try {
-    const bodies = await planner.readSnapshotBundle(from, { maxNodes: RELEASE_BUNDLE_MAX_NODES });
-    if (!bodies) return;
-    const known = new Map<string, string>();
-    for (const ref of to.nodes) {
-      const body = bodies.get(ref.hash);
-      if (body !== undefined) known.set(ref.hash, JSON.stringify(body));
-    }
-    if (to.nodes.length - known.size > RELEASE_BUNDLE_MAX_FETCH) return;
-    await planner.writeSnapshotBundle(to, known);
-  } catch (e) {
-    p.log(`schedules: no bundle for ${to.id}: ${message(e)}`);
-  }
+/** Sends the run's purge (see the module comment); a throw only from the purger itself. */
+export async function sendReleasePurge(input: ReleasePurgeInput): Promise<ReleasePurge> {
+  const plan = await planFor(input);
+  return purgeOutcome(plan, true) === "none" ? "none" : input.purge(input.site.id, plan);
 }

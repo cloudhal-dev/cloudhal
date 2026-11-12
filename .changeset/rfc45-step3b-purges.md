@@ -1,8 +1,9 @@
 ---
 "@cloudhal/core-ts": patch
+"@cloudhal/cloudflare": patch
 ---
 
-RFC-0045 rollout step 3b: publishes purge the pages that show references. Nothing changes for sites without reference definitions. Their publish purge plans are the same, with no bundle read. Their release runs send the plan stored at pin time, as before, with no extra read, re-plan or bundle write.
+RFC-0045 rollout step 3b: publishes purge the pages that show references. Nothing changes for sites without reference definitions. Their publish purge plans are the same, with no bundle read. Their release runs send the plan stored at pin time, as before, with no re-plan; the only addition is one read of the published site node, to tell them apart.
 
 - **The referrer closure** (`references/purge.ts`, called by `planCachePurge`).
   - The seeds are the groups of every changed, added or removed entry, and of every entry whose shown asset changed.
@@ -23,7 +24,8 @@ RFC-0045 rollout step 3b: publishes purge the pages that show references. Nothin
   So does any field-operation marker on either snapshot's site node, for sites that hold references or convert from them.
 - **`readSnapshotBundle`** (`SnapshotReader.readSnapshotBundle`, `SiteGraphStore.readSnapshotBundle`, `readSnapshotBundle` in bundles) takes optional `maxBytes`, `maxNodes`, `keep`, `only` (bodies node by node) and `spent` (a shared byte total). A passed budget throws `BundleBudgetError` before the shard is parsed. No new cache tags.
 - **Release runs on sites with references re-plan their purge at run time** (`references/release-purge.ts`), from the pointer they moved to the snapshot they made, instead of sending the plan stored at pin time.
-  - The re-plan runs over the tick's counting driver, within the tick's blob allowance (400 on Workers Free, 4,000 on Paid; at most 250 reads per re-plan). If it fails, the run purges everything.
-  - After the purge, the run writes its snapshot's bundle, best effort, when `from` has one: from `from`'s bodies plus at most 100 changed nodes, for snapshots of at most 1,000 nodes.
+  - The test is the published site node, which `publishRelease` now returns (`publishedSite`). That costs one blob read per run with a purger.
+  - The re-plan runs over the tick's counting driver. Its actual blob calls are charged to one allowance per invocation, shared by the cron's ticks (`ScheduledTickOptions.releaseBlobs`): 350 on Workers Free, 3,000 on Paid. Past the allowance, or if the re-plan fails, the run purges everything.
   - The pin-time plan skips the closure (`CachePurgeOptions.references: false`): for these sites it is the expected outcome only.
   - `RELEASE_EXECUTOR_COST` is 26 (it counts `refreshSearch` and `recordPurge` now).
+- **`@cloudhal/cloudflare`:** the cron handler passes one `releaseBlobs` allowance to both ticks of its invocation (`cronTick`); the alarm and the request backstop run one tick each, with the default allowance.

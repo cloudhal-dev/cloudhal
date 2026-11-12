@@ -162,6 +162,7 @@ export interface ScheduledTickOptions {
   readonly checkApproval?:
     | ((release: Release, now: Date) => ApprovalVerdict | Promise<ApprovalVerdict>)
     | undefined;
+  readonly releaseBlobs?: { left: number } | undefined; // RFC-0045: one per invocation (R2 calls)
   /** Sends a published release's purge plan; it gets the counting driver for its bookkeeping. */
   readonly purge?: ((ctx: { counted: SqlDriver }) => ReleasePurger) | undefined;
   /** `CLOUDHAL_AUTOMATIONS=off` → false. */
@@ -193,7 +194,7 @@ export async function runScheduledTick(o: ScheduledTickOptions): Promise<TickRep
       schedules,
       purge,
       counted,
-      blobReads: releaseBlobAllowance(meter.budget),
+      releaseBlobs: o.releaseBlobs ?? { left: releaseBlobAllowance(meter.budget) },
       onPublished: o.onReleasePublished,
       log: o.log,
     }),

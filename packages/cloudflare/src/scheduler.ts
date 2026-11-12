@@ -30,6 +30,7 @@ import { SqlCommentStore } from "@cloudhal/comments/sql";
 import {
   type AiSearchEnv,
   type CachePurgePlan,
+  releaseBlobAllowance,
   SiteGraphStore,
   searchProviderFromEnv,
   siteCacheTag,
@@ -380,9 +381,29 @@ export interface AdminTickOptions {
   readonly commentsOn: boolean;
   /** Keeps a deferred purge's flush alive after the tick (the handler's `waitUntil`). */
   readonly waitUntil?: ((p: Promise<unknown>) => void) | undefined;
+  /**
+   * RFC-0045: the R2 calls release purges may still make in this invocation, shared by every tick
+   * it runs (the cron's follow-up); absent: one allowance per tick.
+   */
+  readonly releaseBlobs?: { left: number } | undefined;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const invocationBlobs = new WeakMap<object, { left: number }>();
+
+/**
+ * A cron tick's trigger and clock, with RFC-0045's R2 allowance for release purges: one per
+ * invocation (`controller`), so the cron's follow-up tick shares it (the cap is per invocation).
+ */
+export function cronTick(controller: object, env: SchedulerEnv, now: Date) {
+  let releaseBlobs = invocationBlobs.get(controller);
+  if (!releaseBlobs) {
+    releaseBlobs = { left: releaseBlobAllowance(tickBudget(env)) };
+    invocationBlobs.set(controller, releaseBlobs);
+  }
+  return { trigger: "cron" as const, now, releaseBlobs };
+}
 
 /** One tick of the admin Worker (cron, alarm, request backstop or the operator's run-due). */
 export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<TickReport> {
@@ -425,6 +446,7 @@ export function runAdminTick(env: SchedulerEnv, o: AdminTickOptions): Promise<Ti
         log: o.log,
       }),
     purge: ({ counted }) => releasePurger(env, counted, { log: o.log, wake: flush }),
+    ...(o.releaseBlobs ? { releaseBlobs: o.releaseBlobs } : {}),
     automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
     // RFC-0008 §11.1: the built-in jobs read analytics' 404 rows and the site's own feed.
     builtinInputs: ({ counted }) => adminBuiltinInputs(env, o.analytics(counted, o.now)),

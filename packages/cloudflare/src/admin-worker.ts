@@ -71,6 +71,7 @@ import { adminMail, type MailEnv } from "./mail.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
   type BackstopState,
+  cronTick,
   followUpDelay,
   releasePurger,
   requestBackstop,
@@ -571,8 +572,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       await ensureMigrated(sql);
       const tick = (now: Date) =>
         runAdminTick(env, {
-          trigger: "cron",
-          now,
+          ...cronTick(controller, env, now),
           log,
           analytics: (s, at) => adminAnalytics(env, s, { now: () => at, log }),
           commentsOn: commentsOn(env),

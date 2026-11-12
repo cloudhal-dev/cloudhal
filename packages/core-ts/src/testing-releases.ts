@@ -17,9 +17,9 @@ import { TICK_BUDGETS } from "@cloudhal/schedules";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
 import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { bundleShardCount } from "./bundles.ts";
 import type { CachePurgePlan } from "./cache-purge.ts";
 import { ScheduledLockedError } from "./errors.ts";
+import { canonicalJson, nodeHash } from "./hash.ts";
 import { type PersonApproval, ReleaseService, runScheduledTick } from "./releases.ts";
 import { seedStarterSite } from "./seed.ts";
 import { SiteGraphStore } from "./store.ts";
@@ -559,7 +559,7 @@ export function releasesSuite(
       expect(tags).toContain(`cloudhal-node-${late.id}`);
     });
 
-    it("a site without references sends the pin-time plan and reads no more blobs than before", async () => {
+    it("a site without references sends the pin-time plan, reading only the published site node", async () => {
       // the same release twice: without a purger (Node: the executor sends nothing), then with
       const first = await story();
       await scheduled([first.id]);
@@ -573,7 +573,8 @@ export function releasesSuite(
       expect((await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) })).ran).toBe(1);
       expect(plans).toEqual([stored]);
       expect(c.gets.filter((k) => k.startsWith("bundles/"))).toEqual([]);
-      expect(c.gets).toHaveLength(quiet.gets.length);
+      // one read more than a run that purges nothing: the published site node, for the gate
+      expect(c.gets).toHaveLength(quiet.gets.length + 1);
     });
 
     it("a run-time re-plan that fails still purges everything, never drops the purge", async () => {
@@ -610,70 +611,142 @@ export function releasesSuite(
       expect(r.outcome).toMatchObject({ kind: "published", purge: "everything" });
     });
 
-    it("back-to-back releases on a reference site: one bundle each, never to's shards", async () => {
+    const retitle = async (id: string, title: string) =>
+      store.updateContentEntry({ ...((await store.getContentEntry(id)) as ContentEntry), title });
+    const tagsOf = (p: CachePurgePlan | undefined) => (p?.mode === "tags" ? p.tags : []);
+    /** Writes the working site row directly (a definition change the store would refuse). */
+    async function rawSite(change: (s: Site) => Site) {
+      const s = await fresh();
+      const next = { ...change(s), rev: s.rev + 1 };
+      await sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+        next.rev,
+        await nodeHash(next),
+        canonicalJson(next),
+        s.id,
+      ]);
+    }
+
+    it("back-to-back releases on a reference site: a purge each, within the allowance", async () => {
       const { hall, event } = await venueSite();
-      const edit = async (title: string) =>
-        store.updateContentEntry({
-          ...((await store.getContentEntry(hall.id)) as ContentEntry),
-          title,
-        });
-      const shardsOf = (gets: string[], id: string) => gets.filter((k) => k.includes(`/${id}/`));
-      // 1: `from` (a publish) has a bundle; `to` gets one after the purge
-      const L = await live();
-      await edit("Main hall");
-      await scheduled([hall.id]);
-      const c1 = counting();
+      const releaseBlobs = { left: 350 };
       const plans: CachePurgePlan[] = [];
-      await tick(T, { blobs: c1.blobs, purge: capture(plans) });
-      const S1 = await live();
-      expect(S1.reason).toBe("scheduled");
-      expect(shardsOf(c1.gets, S1.id)).toEqual([]);
-      expect(shardsOf(c1.gets, L.id).length).toBeGreaterThan(0);
-      expect(await store.readSnapshotBundle(S1)).toBeDefined();
-      // 2: `from` is the first release's scheduled snapshot, bundled by its run
-      await edit("Great hall");
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      await tick(T, { purge: capture(plans), releaseBlobs });
+      // the second run's `from` is the first's scheduled snapshot: no bundle, nobody read it
+      await retitle(hall.id, "Great hall");
       await scheduled([hall.id], { at: T + HOUR });
-      const c2 = counting();
-      await tick(T + HOUR, { blobs: c2.blobs, purge: capture(plans) });
-      const S2 = await live();
-      expect(shardsOf(c2.gets, S2.id)).toEqual([]);
-      // `from`'s shards: once for the re-plan, once to build `to`'s bundle (the rest of `to`
-      // comes from them; only changed nodes are fetched one by one)
-      expect(shardsOf(c2.gets, S1.id)).toHaveLength(2 * bundleShardCount(S1));
-      for (const p of plans.slice(0, 2)) {
-        expect(p.mode).toBe("tags");
-        expect(p.mode === "tags" ? p.tags : []).toContain(`cloudhal-node-${event.id}`);
+      await tick(T + HOUR, { purge: capture(plans), releaseBlobs });
+      expect(plans).toHaveLength(2);
+      for (const p of plans) {
+        expect(["tags", "everything"]).toContain(p.mode);
+        if (p.mode === "tags") expect(p.tags).toContain(`cloudhal-node-${event.id}`);
       }
+      expect(releaseBlobs.left).toBeGreaterThanOrEqual(0);
+      expect(releaseBlobs.left).toBeLessThan(350);
     });
 
-    it("back-to-back releases where from has no bundle: from's shards tried once, to's never", async () => {
+    it("gates on the published site node: a draft that drops the last reference field still re-plans", async () => {
       const { hall, event } = await venueSite();
-      const edit = async (title: string) =>
-        store.updateContentEntry({
-          ...((await store.getContentEntry(hall.id)) as ContentEntry),
-          title,
-        });
-      // a first release run with nothing to purge (Node): its snapshot gets no bundle
-      await edit("Main hall");
+      // the working copy drops `events.venue`, unpublished
+      await rawSite((s) => ({
+        ...s,
+        collections: { ...s.collections, events: {} },
+      }));
+      await retitle(hall.id, "Main hall");
       await scheduled([hall.id]);
-      await tick(T);
-      const S1 = await live();
-      expect(await store.readSnapshotBundle(S1)).toBeUndefined();
-      await edit("Great hall");
-      await scheduled([hall.id], { at: T + HOUR });
+      const plans: CachePurgePlan[] = [];
+      await tick(T, { purge: capture(plans) });
+      expect(tagsOf(plans[0])).toContain(`cloudhal-node-${event.id}`);
+    });
+
+    it("gates on the published site node: a draft that adds a first reference field sends the stored plan", async () => {
+      const first = await story();
+      await scheduled([first.id]);
+      const quiet = counting();
+      await tick(T, { blobs: quiet.blobs });
+      // the working copy gains a reference field, unpublished
+      const s = await fresh();
+      const venue: FieldDefinition = {
+        key: "venue",
+        type: "reference",
+        labels: { en: { label: "Venue" } },
+        localized: false,
+        collections: ["posts"],
+      };
+      site = await store.updateSite({
+        ...s,
+        collections: { ...s.collections, events: { fields: [venue] } },
+      });
+      const second = await story({ slug: "second-story", title: "Second story" });
+      const { release } = await scheduled([second.id], { at: T + HOUR });
+      const stored = await svc.schedules.releasePurgePlan(release.id);
       const c = counting();
       const plans: CachePurgePlan[] = [];
       await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) });
-      const S2 = await live();
-      expect(c.gets.filter((k) => k.includes(`/${S2.id}/`))).toEqual([]);
-      expect(c.gets.filter((k) => k.includes(`/${S1.id}/`))).toHaveLength(1);
-      const p = plans[0];
-      expect(
-        p?.mode === "everything" ||
-          (p?.mode === "tags" && p.tags.includes(`cloudhal-node-${event.id}`)),
-      ).toBe(true);
-      // nor does it write `to`'s bundle without `from`'s
-      expect(await store.readSnapshotBundle(S2)).toBeUndefined();
+      expect(plans).toEqual([stored]);
+      // one read more than a run that purges nothing: the published site node, for the gate
+      expect(c.gets).toHaveLength(quiet.gets.length + 1);
+    });
+
+    it("Paid: a tick of 13 reference-site releases purges each by its tags", async () => {
+      const { hall, event } = await venueSite();
+      const ids: string[] = [hall.id];
+      for (let i = 0; i < 12; i++)
+        ids.push(
+          (await story({ collection: "places", slug: `place-${i}`, title: `Place ${i}` })).id,
+        );
+      await publishSite();
+      for (const [i, id] of ids.entries()) {
+        await retitle(id, `Retitled ${i}`);
+        await scheduled([id]);
+      }
+      const plans: CachePurgePlan[] = [];
+      const report = await tick(T, { purge: capture(plans), budget: TICK_BUDGETS.paid });
+      expect(report.ran).toBe(13);
+      expect(plans.map((p) => p.mode)).toEqual(Array(13).fill("tags"));
+      expect(plans.some((p) => tagsOf(p).includes(`cloudhal-node-${event.id}`))).toBe(true);
+    });
+
+    it("Paid: a reference site with more than 250 terms gets tags for a one-entry release", async () => {
+      const { hall, event } = await venueSite();
+      for (let i = 0; i < 260; i++)
+        await store.createTerm({
+          siteId: site.id,
+          taxonomyId: category,
+          slug: `topic-${i}`,
+          status: "active",
+          visibility: "public",
+          labels: { en: { name: `Topic ${i}` } },
+        });
+      await publishSite();
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      const plans: CachePurgePlan[] = [];
+      await tick(T, { purge: capture(plans), budget: TICK_BUDGETS.paid });
+      expect(tagsOf(plans[0])).toContain(`cloudhal-node-${event.id}`);
+    });
+
+    it("two ticks of one invocation share the allowance, charged by actual calls", async () => {
+      const { hall } = await venueSite();
+      const releaseBlobs = { left: 1000 };
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      await tick(T, { purge: capture([]), releaseBlobs });
+      const afterFirst = releaseBlobs.left;
+      expect(afterFirst).toBeLessThan(1000);
+      await retitle(hall.id, "Great hall");
+      await scheduled([hall.id], { at: T + HOUR });
+      await tick(T + HOUR, { purge: capture([]), releaseBlobs });
+      expect(releaseBlobs.left).toBeLessThan(afterFirst);
+      // spent: the next run purges everything without reading
+      releaseBlobs.left = 0;
+      await retitle(hall.id, "Grand hall");
+      await scheduled([hall.id], { at: T + 2 * HOUR });
+      const plans: CachePurgePlan[] = [];
+      await tick(T + 2 * HOUR, { purge: capture(plans), releaseBlobs });
+      expect(plans.map((p) => p.mode)).toEqual(["everything"]);
+      expect(releaseBlobs.left).toBe(0);
     });
 
     it("sends the purge re-planned at run time and records a deferred purge", async () => {
