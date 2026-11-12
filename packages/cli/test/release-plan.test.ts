@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  isSecurityRelease,
   type Pkg,
   readPackages,
   releaseNotes,
@@ -75,5 +76,31 @@ describe("release plan", () => {
     expect(releaseNotes(["## 0.3.6\n\n- Updated dependencies [x]"], "0.3.6")).toContain(
       "- Dependency updates only.",
     );
+  });
+
+  it("a changeset that starts with **Security release.** marks only its own version", () => {
+    const cli = [
+      "# @cloudhal/cli",
+      "",
+      "## 0.8.1",
+      "",
+      "### Patch Changes",
+      "",
+      "- 1a2b3c4: **Security release.** The setup token is required on the Node path too.",
+      "- Updated dependencies [1a2b3c4]",
+      "",
+      "## 0.8.0",
+      "",
+      "- 5d6e7f8: A feature.",
+      "",
+    ].join("\n");
+    const api = "# @cloudhal/api\n\n## 0.8.1\n\n- Updated dependencies [1a2b3c4]\n";
+    expect(isSecurityRelease([api, cli], "0.8.1")).toBe(true);
+    expect(isSecurityRelease([api, cli], "0.8.0")).toBe(false);
+    // Prose that mentions security, or the marker inside an entry, is not the flag.
+    const prose =
+      "# x\n\n## 0.8.2\n\n- abcdef1: **Security (self-hosting).** Fixed.\n- See **Security release.** notes.\n";
+    expect(isSecurityRelease([prose], "0.8.2")).toBe(false);
+    expect(isSecurityRelease([], "0.8.1")).toBe(false);
   });
 });

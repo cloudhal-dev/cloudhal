@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release-statement.schema.json",
+  "title": "ReleaseStatement",
+  "description": "cloudhal.release-statement@1 (RFC-0046): the small canonical document a Cloudhal release signs, published as the release asset release-statement.json next to release-statement.sig (a raw 64-byte Ed25519 signature over the exact bytes, at most 4096 of them). It names the version, channel, commit and key id and pins the SHA-256 and size of manifest.json and of the tarball, so a remote deployer verifies one small file and then checks every other asset by digest. Canonical bytes: keys sorted recursively, 2-space indent, a trailing newline; a consumer verifies the bytes it downloaded and never re-serialises them. Portable on purpose: it references common only for SchemaVersion and Timestamp.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "version",
+    "channel",
+    "securityRelease",
+    "commit",
+    "createdAt",
+    "signing",
+    "manifest",
+    "tarball"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/SchemaVersion"
+    },
+    "format": {
+      "type": "string",
+      "enum": ["cloudhal.release-statement@1"]
+    },
+    "version": {
+      "$ref": "#/$defs/CloudhalVersion"
+    },
+    "channel": {
+      "type": "string",
+      "enum": ["stable", "next"]
+    },
+    "securityRelease": {
+      "type": "boolean"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "createdAt": {
+      "$ref": "common.schema.json#/$defs/Timestamp"
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keyId", "algorithm", "signature"],
+      "properties": {
+        "keyId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": ["Ed25519"]
+        },
+        "signature": {
+          "type": "string",
+          "enum": ["release-statement.sig"]
+        }
+      }
+    },
+    "manifest": {
+      "$ref": "#/$defs/StatementAsset"
+    },
+    "tarball": {
+      "$ref": "#/$defs/StatementAsset"
+    }
+  },
+  "$defs": {
+    "CloudhalVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "Sha256Hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "StatementAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sha256", "bytes"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256Hex"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 104857600
+        }
+      }
+    }
+  }
+}

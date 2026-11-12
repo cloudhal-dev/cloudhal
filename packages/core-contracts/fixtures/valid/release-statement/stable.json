@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "format": "cloudhal.release-statement@1",
+  "version": "0.8.0",
+  "channel": "stable",
+  "securityRelease": false,
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "createdAt": "2026-11-12T08:00:00Z",
+  "signing": {
+    "keyId": "cloudhal-release-2026a",
+    "algorithm": "Ed25519",
+    "signature": "release-statement.sig"
+  },
+  "manifest": {
+    "name": "manifest.json",
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "bytes": 48213
+  },
+  "tarball": {
+    "name": "cloudhal-release-0.8.0.tar.gz",
+    "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "bytes": 7340032
+  }
+}

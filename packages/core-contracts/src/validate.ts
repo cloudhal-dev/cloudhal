@@ -14,6 +14,8 @@ import type {
   Project,
   Redirect,
   Release,
+  ReleaseManifest,
+  ReleaseStatement,
   ScheduleRun,
   Section,
   Site,
@@ -46,6 +48,8 @@ export interface ContractTypes {
   automation: Automation;
   "schedule-run": ScheduleRun;
   glossary: Glossary;
+  "release-manifest": ReleaseManifest;
+  "release-statement": ReleaseStatement;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -69,6 +73,8 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   automation: v.validateAutomation,
   "schedule-run": v.validateScheduleRun,
   glossary: v.validateGlossary,
+  "release-manifest": v.validateReleaseManifest,
+  "release-statement": v.validateReleaseStatement,
 };
 
 export class ContractValidationError extends Error {

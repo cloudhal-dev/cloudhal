@@ -157,3 +157,11 @@ fn automation() {
 fn schedule_run() {
     check::<cloudhal_schema::ScheduleRun>("schedule-run");
 }
+#[test]
+fn release_manifest() {
+    check::<cloudhal_schema::ReleaseManifest>("release-manifest");
+}
+#[test]
+fn release_statement() {
+    check::<cloudhal_schema::ReleaseStatement>("release-statement");
+}

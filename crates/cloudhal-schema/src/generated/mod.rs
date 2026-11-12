@@ -13,6 +13,8 @@ pub mod page;
 pub mod project;
 pub mod redirect;
 pub mod release;
+pub mod release_manifest;
+pub mod release_statement;
 pub mod schedule_run;
 pub mod section;
 pub mod site;

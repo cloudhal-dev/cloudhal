@@ -18,6 +18,8 @@ pub use generated::page::Page;
 pub use generated::project::Project;
 pub use generated::redirect::Redirect;
 pub use generated::release::Release;
+pub use generated::release_manifest::ReleaseManifest;
+pub use generated::release_statement::ReleaseStatement;
 pub use generated::schedule_run::ScheduleRun;
 pub use generated::section::Section;
 pub use generated::site::Site;
