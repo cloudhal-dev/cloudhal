@@ -9,6 +9,7 @@ import {
   resolveFields,
   rewriteFields,
 } from "../src/fields/index.ts";
+import { textReferenceOutcome } from "../src/fields/text-reference.ts";
 
 const L = { en: { label: "x" } };
 const def = (over: Record<string, unknown>) =>
@@ -310,16 +311,44 @@ describe("RFC-0045 §7 review round (PR #214)", () => {
     expect(convertFieldValue("text", ref(), "Gone", c).ok).toBe(false);
   });
 
-  it("a value already in the new type converts to itself; a repeater's repeated ids collapse", () => {
-    // a usable target id written under the reference definition stays, never the entry's own group
-    expect(convertFieldValue("text", ref(), HALL, ctx)).toEqual({ ok: true, value: HALL });
-    expect(convertFieldValue("text", ref(), HALL, { ...ctx, group: HALL }).ok).toBe(false);
-    expect(convertFieldValue("text", ref(), "entry_Zz9xQ1AB", ctx).ok).toBe(false);
-    // plain text written under the text definition stays
-    expect(convertFieldValue("reference", def({ type: "text" }), "Main Hall", ctx)).toEqual({
-      ok: true,
-      value: "Main Hall",
-    });
+  it("one rule says whether a value is already in the new type (text-reference.ts)", () => {
+    const at = (over: Partial<Parameters<typeof textReferenceOutcome>[0]>) =>
+      textReferenceOutcome({
+        from: "text",
+        def: ref(),
+        value: HALL,
+        convert: { entries },
+        pristine: false,
+        written: false,
+        ...over,
+      })?.kind;
+    const GONE = "entry_GONE000001";
+    // text → reference: a converted list, an id of any member (an archived one too), kept
+    expect(at({ def: ref(true), value: [HALL] })).toBe("keep");
+    expect(at({ value: HALL })).toBe("keep");
+    expect(at({ value: GONE })).toBe("keep");
+    expect(at({ value: "Main Hall" })).toBe("table");
+    expect(at({ value: "entry_NOBODY0001" })).toBe("table");
+    // pristine legacy ids: written again when usable, else unconvertible (own group too)
+    expect(at({ value: HALL, pristine: true })).toBe("check");
+    expect(at({ value: GONE, pristine: true })).toBe("fail");
+    expect(at({ value: HALL, pristine: true, convert: { entries, group: HALL } })).toBe("fail");
+    // a person's write under the new type: kept when it fits; no maps: kept as stored
+    expect(at({ value: "entry_NOBODY0001", written: true })).toBe("keep");
+    expect(at({ value: "Main Hall", written: true })).toBe("table");
+    expect(at({ value: "Main Hall", convert: {} })).toBe("keep");
+    // reference → text: a named group's title; any other string is text already, unless pristine
+    const text = def({ type: "text" });
+    expect(at({ from: "reference", def: text, value: HALL })).toBe("table");
+    expect(at({ from: "reference", def: text, value: "entry_2025report" })).toBe("keep");
+    expect(at({ from: "reference", def: text, value: "entry_NOBODY0001", pristine: true })).toBe(
+      "fail",
+    );
+    // other rows are not decided here
+    expect(at({ from: "text", def: def({ type: "number" }) })).toBeUndefined();
+  });
+
+  it("repeater → multiple reference: repeated ids collapse, first seen first", () => {
     expect(
       convertFieldValue(
         "repeater",

@@ -72,7 +72,7 @@ export class EntryEngine {
       site,
       fieldDefinitions(site, draft.collection),
     );
-    draft = normalizeEntryFields(site, draft, entries);
+    draft = normalizeEntryFields(site, draft, entries, stored);
     const baseline = stored && normalizeEntryFields(site, stored, entries);
     // RFC-0045 §1: a member's id is stored as its group's.
     draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored: baseline });

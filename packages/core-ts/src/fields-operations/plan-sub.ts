@@ -136,12 +136,20 @@ export function subPending(
   if (!sub) return undefined;
   const types = jsonTypes({ ...sub, localized: def.localized } as unknown as FieldDefinition);
   const at = `$.${m.sub}`;
-  const id = idPending(sub.type, m.fromType, "i.value", at);
-  return holds(
-    m.sub,
-    ` AND (json_type(i.value, ?) NOT IN (${types.map(() => "?").join(", ")})${id ? ` OR ${id.sql}` : ""})`,
-    [at, ...types, ...(id?.params ?? [])],
-  );
+  const field = `${def.key}.${m.sub}`;
+  const rows = textReferencePending(sub.type, m.fromType, { doc: "i.value", path: at, field });
+  // To a reference, per item; from one, the rows say what is left, whatever the items look like.
+  const perItem = m.fromType === "text" ? rows : undefined;
+  const mismatch: Cond = {
+    sql: `EXISTS (SELECT 1 FROM json_each(body, ?) i WHERE json_type(i.value, ?) IS NOT NULL
+            AND (json_type(i.value, ?) NOT IN (${types.map(() => "?").join(", ")})${perItem ? ` OR ${perItem.sql}` : ""}))`,
+    params: [items, at, at, ...types, ...(perItem?.params ?? [])],
+  };
+  const left = perItem ? undefined : rows;
+  return {
+    sql: `${base.sql} AND (${mismatch.sql}${left ? ` OR ${left.sql}` : ""})`,
+    params: [...base.params, ...mismatch.params, ...(left?.params ?? [])],
+  };
 }
 
 /** `expr` is a translation group id (`GROUP_ID_PATTERN`: `entry_` and 6 to 32 letters or digits). */
@@ -149,21 +157,31 @@ const isGroupId = (expr: string) =>
   `(${expr} GLOB 'entry_*' AND length(${expr}) BETWEEN 12 AND 38 AND substr(${expr}, 7) NOT GLOB '*[^A-Za-z0-9]*')`;
 
 /**
- * RFC-0045 §7: text ↔ single reference store one string on both sides, so the JSON type cannot
- * tell what is left: to a reference, a string that is no group id is pending; from one, a string
- * that still is one. `doc` is the JSON the value sits in at `path`.
+ * RFC-0045 §7: phase C's pending test for text ↔ single reference follows the rows, not the shape
+ * (both store one string; `text-reference.ts` decides values the same way):
+ * - to a reference, a string is converted only when it is a group id with its `entry_refs` row
+ *   for (node, field path, value): what phase B or a person's write left;
+ * - from a reference, a value is converted once no row is left for (node, field path).
+ *
+ * `doc` is the JSON the value sits in at `path`; `field` is the rows' field path. The node is the
+ * pending query's `nodes` row.
  */
-export function idPending(
+export function textReferencePending(
   type: string,
   from: string | undefined,
-  doc: string,
-  path: string,
+  at: { doc: string; path: string; field: string },
 ): Cond | undefined {
-  const toRef = type === "reference" && from === "text";
-  if (!toRef && !(type === "text" && from === "reference")) return undefined;
+  const { doc, path, field } = at;
+  if (type === "text" && from === "reference")
+    return {
+      sql: "EXISTS (SELECT 1 FROM entry_refs r WHERE r.source_id = nodes.id AND r.field = ?)",
+      params: [field],
+    };
+  if (type !== "reference" || from !== "text") return undefined;
   const value = `json_extract(${doc}, ?)`;
   return {
-    sql: `(json_type(${doc}, ?) = 'text' AND ${toRef ? "NOT " : ""}${isGroupId(value)})`,
-    params: [path, path, path, path],
+    sql: `(json_type(${doc}, ?) = 'text' AND (NOT ${isGroupId(value)} OR NOT EXISTS (
+            SELECT 1 FROM entry_refs r WHERE r.source_id = nodes.id AND r.field = ? AND r.target_id = ${value})))`,
+    params: [path, path, path, path, field, path],
   };
 }

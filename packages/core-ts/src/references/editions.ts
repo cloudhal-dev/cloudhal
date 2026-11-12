@@ -17,6 +17,7 @@
  */
 import type { ContentEntry, FieldCondition, FieldDefinition } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
+import { GROUP_ID_PATTERN } from "../fields/props.ts";
 import {
   FIELD_LIMITS,
   fieldDefinitions,
@@ -54,6 +55,19 @@ interface Carry {
   budget: { left: number };
 }
 
+const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
+
+/** A string that is no group id under a running text → reference marker (top-level or `sub`). */
+function unconvertedText(
+  m: FieldDefinition["migration"],
+  key: string,
+  value: unknown,
+  sub = false,
+): boolean {
+  const converting = m?.fromType === "text" && (sub ? m.sub === key : m.sub === undefined);
+  return converting && typeof value === "string" && !GROUP_ID.test(value);
+}
+
 /** One reference id: kept, or dropped with its reason. */
 function keep(id: unknown, at: { path: string; target: Target; carry: Carry }): id is string {
   const { path, target, carry } = at;
@@ -75,6 +89,9 @@ function carryReference(
   at: { path: string; carry: Carry },
 ): unknown {
   const { path, carry } = at;
+  // Text a running text → reference conversion has not converted yet: the edition's own write
+  // converts it through its markers, so it is carried as it is.
+  if (unconvertedText(def.migration, def.key, value)) return value;
   const ids = Array.isArray(value) ? value : [value];
   const pathOf = (i: number) => (Array.isArray(value) ? `${path}/${i}` : path);
   const target = { collections: def.collections, where: def.where };
@@ -123,7 +140,7 @@ function carryRepeater(
         next[sub.key] === undefined && m?.sub === sub.key && m.fromKey !== undefined
           ? m.fromKey
           : sub.key;
-      if (next[key] === undefined) continue;
+      if (next[key] === undefined || unconvertedText(m, sub.key, next[key], true)) continue;
       const target = { collections: sub.collections };
       if (!keep(next[key], { path: `${path}/${i}/${key}`, target, carry })) delete next[key];
     }

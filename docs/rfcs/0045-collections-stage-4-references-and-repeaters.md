@@ -1295,3 +1295,28 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **`multiple`** is ignored where it does not apply, as before step 4. The CLI sends `multiple: false` for a reference target without `--multiple`, so multiple → single can be asked for.
 - **Malformed `subFields`** (entries that are not objects) are a 400 in the admin API and a CLI error, never a 500.
 
+#### Review round 2 (2026-11-12, PM verification of c8c00f9e)
+
+Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table re-decided values that were already converted. This round replaces that with one rule.
+
+- **One rule for "already in the new type"** (`fields/text-reference.ts`). Every caller uses it: the dry run, phase B, the revert's decider, a person's write (`normalizeThroughMarkers`), `resolveFields` with and without maps, and so the renderer sources.
+  - **A person's write that changes the value** (it differs from the stored value) is kept when it fits, and the writer's guard checks it as newly chosen. `normalizeEntryFields` passes the stored entry, and items are compared one by one.
+  - **No maps** (`checkRequiredToPublish`, prechecks): a value is kept as stored, never read as missing for want of maps.
+  - **Text → reference.** A list is converted. An id-shaped string naming a group with a member in the target collections, in any status, is converted, unless it is pristine. A pristine one is legacy text that happens to be an id. Phase B writes it again (`check`) so the fresh guard and `entryRefStatements` run, and it is unconvertible when its group has no usable member or is the entry's own. Anything else goes through `byText`. The table itself keeps no value as it is any more.
+  - **Reference → text.** A string naming a group in `titles` converts to its title. A pristine value naming no group is unconvertible, because its reference has no member left. Any other string is text already, an id-shaped title included.
+  - **Accepted gap:** an edit planned before phase A and batched after it, in a site with no reference fields (so no anchor on a title-only write), can leave legacy id-shaped text non-pristine. That value is then kept but never rewritten, so it has no row, stays pending and is not reported. Continuing with `clear` does not help either; the entry needs an edit.
+- **Phase C's pending check follows the rows, not the shape** (`textReferencePending`, on top-level values and `sub` items, correlated on the pending query's `nodes.id`, run on SQLite, D1 and DO).
+  - To a reference: a value is pending when it is text that is not a group id, or a group id with no `entry_refs` row for (node, field path, value).
+  - From a reference: a value is pending while any row is left for (node, field path).
+  - A multiple reference keeps its shape test: arrays are converted, strings are pending.
+- **The cap** (`fields-operations/cap.ts`) is applied by the dry run, phase B and the revert's decider. Under `clear`, a `sub` conversion over the cap loses only the converted sub-values (an emptied item goes, an emptied list is no value), never the repeater.
+- **A sub-field operation's revert** starts from the repeater as it is now and puts back only the named sub-field (`revert-sub.ts`):
+  - a removed sub-field goes back in at its old index;
+  - a renamed or retyped one is replaced by its earlier definition under the inverse marker;
+  - a different sub-field of the same key is refused (`field_key_in_use`).
+
+  A removal counts as reverted only when the repeater holds the earlier sub-field unchanged (`sameJson`). Sub-fields added since stay.
+- **The renderer's maps read every entry**, archived ones too, as the store does. An archived target or an archived default-locale member lends its title to reference → text on both sources.
+- **The edition copy** carries text that a running text → reference conversion has not converted yet as it is, rather than dropping it as missing. The edition's own write converts it.
+- **Repeater → reference is always multiple**, as its row is reference (multiple) ↔ repeater. A `multiple: false` (the CLI's default) is ignored there, and `maxItems` is kept.
+

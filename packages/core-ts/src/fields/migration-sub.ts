@@ -7,6 +7,7 @@
  * value. Pure and Worker-safe.
  */
 import type { FieldDefinition, FieldMigration } from "@cloudhal/core-contracts";
+import { canonicalJson } from "../hash.ts";
 import type { ConvertContext } from "./conversions.ts";
 import { isRecord, type RepeaterFieldDefinition } from "./types.ts";
 
@@ -23,6 +24,7 @@ export type RewriteItem = (input: {
   translation: boolean;
   pristine: boolean;
   onInvalid?: "clear" | undefined;
+  baseline?: { readonly value: unknown } | undefined;
 }) => ItemRewrite;
 
 /** A sub-field as a field definition: the repeater's `localized`, and `migration` when given. */
@@ -48,6 +50,11 @@ export function subMarker(def: FieldDefinition): FieldMigration | undefined {
   return rest;
 }
 
+/** The stored items, as canonical JSON. */
+function storedItems(value: unknown): Set<string> {
+  return new Set(Array.isArray(value) ? value.filter(isRecord).map((i) => canonicalJson(i)) : []);
+}
+
 export interface ItemsResult {
   /** The new list (`undefined`: no value), or `unchanged`. */
   readonly next: unknown[] | undefined | "unchanged";
@@ -68,6 +75,8 @@ export function rewriteItems(
     convert: ConvertContext;
     pristine: boolean;
     onInvalid?: "clear" | undefined;
+    /** A person's write: the repeater's stored value (an item found there unchanged is not written). */
+    baseline?: { readonly value: unknown } | undefined;
     rewrite: RewriteItem;
   },
 ): ItemsResult {
@@ -80,11 +89,16 @@ export function rewriteItems(
   let changed = false;
   let cleared: string | undefined;
   const out: unknown[] = [];
+  const stored = input.baseline === undefined ? undefined : storedItems(input.baseline.value);
   for (const item of value) {
     if (!isRecord(item)) {
       out.push(item);
       continue;
     }
+    // An item the write left as stored keeps its sub-value's baseline; any other is written.
+    const baseline = stored && {
+      value: stored.has(canonicalJson(item)) ? item[sub.key] : undefined,
+    };
     const r = input.rewrite({
       def: sub,
       values: item,
@@ -92,6 +106,7 @@ export function rewriteItems(
       translation: false,
       pristine: input.pristine,
       onInvalid: input.onInvalid,
+      baseline,
     });
     if (r.change?.kind === "unconvertible")
       return { next: "unchanged", unconvertible: r.change.reason ?? "unconvertible" };

@@ -24,8 +24,10 @@ import {
 } from "../references/revert-drops.ts";
 import { readMembers, targetProblem } from "../references/targets.ts";
 import { renameSettingsReferences } from "../store/collection-settings.ts";
+import { withinReferenceCap } from "./cap.ts";
 import { markedField, markerGuard, pendingCondition, phaseCSite, withFields } from "./plan.ts";
 import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
+import { restoredSubDefinition, subRestored } from "./revert-sub.ts";
 import {
   type Decide,
   type Decision,
@@ -90,7 +92,12 @@ function restoredSite(site: Site, op: FieldOperation, beforeSite: Site, id: stri
   const defs = [...(site.collections?.[op.collection]?.fields ?? [])];
   const at = defs.findIndex((d) => d.key === finalKey(op));
   const marker = inverseMarker(id, op, defs[at]);
-  const def = (marker ? { ...earlier, migration: marker } : earlier) as FieldDefinition;
+  const now = defs[at];
+  // RFC-0045 `sub`: only the named sub-field goes back; the repeater keeps what was added since.
+  const def =
+    op.sub !== undefined && now
+      ? restoredSubDefinition(now, earlier, { ...op, sub: op.sub }, marker)
+      : ((marker ? { ...earlier, migration: marker } : earlier) as FieldDefinition);
   if (at >= 0) defs[at] = def;
   else defs.splice(Math.min(index, defs.length), 0, def);
   const restored = withFields(site, op.collection, defs);
@@ -246,12 +253,15 @@ export async function revertFieldOperation(
   const beforeSite = await beforeSiteOf(ctx, before);
   let site = await requireSite(ctx, siteId);
   const removal = op.op === "remove_field";
-  // A sub-field removal is undone once the repeater has the sub-field again (RFC-0045 `sub`).
+  // A sub-field removal is undone once the repeater holds the earlier sub-field (RFC-0045 `sub`).
+  const earlierDef = beforeSite.collections?.[op.collection]?.fields?.find(
+    (d) => d.key === operationKey(op),
+  );
   const restoredDef = (site.collections?.[op.collection]?.fields ?? []).some((d) =>
     !removal
       ? d.migration?.id === operationId
       : d.key === op.key &&
-        (op.sub === undefined || (d.type === "repeater" && d.fields.some((f) => f.key === op.sub))),
+        (op.sub === undefined || (!!earlierDef && subRestored(d, earlierDef, op.sub))),
   );
   if (!restoredDef) {
     const running = (site.collections?.[op.collection]?.fields ?? []).find((d) => d.migration);
@@ -291,8 +301,13 @@ export async function revertFieldOperation(
         pristine: false,
         onInvalid: options.onInvalid,
       });
-      if (r.values) return { fields: r.values, change: r.change };
-      return r.change ? { change: r.change } : undefined;
+      if (!r.values) return r.change ? { change: r.change } : undefined;
+      // RFC-0045 §1: converting back into references counts the cap too.
+      return withinReferenceCap(fieldDefinitions(site, op.collection), marked.def, {
+        values: r.values,
+        change: r.change,
+        onInvalid: options.onInvalid,
+      });
     };
     const { decide, drops } = await droppingMissing(ctx, site, { rows, decide: raw });
     const r = await rewritePass({

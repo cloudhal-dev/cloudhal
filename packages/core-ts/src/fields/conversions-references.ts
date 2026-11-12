@@ -11,9 +11,8 @@
  * | reference ↔ repeater | one item per id into the repeater's one `reference` sub-field, and back | items with other shapes |
  *
  * The text ↔ reference rows read the prefetched maps (`ConvertContext.entries`), so the table stays
- * pure and synchronous. Both store one string, so every value goes through them (`retype` takes no
- * "fits" shortcut there), and they keep a value already in the new type: a usable target's id that
- * is not the entry's own group, or text that is no group id. Repeater → reference drops repeated ids. Readers know only the new definition and the marker, so the repeater rows
+ * pure and synchronous. Whether a value is already in the new type is decided before them, by one
+ * rule every caller shares (`text-reference.ts`). Repeater → reference drops repeated ids. Readers know only the new definition and the marker, so the repeater rows
  * read an item's shape from the value: one own key per item. The operation refuses, before phase
  * A, a repeater source that has more than one sub-field (`checkOperation`), so a reader never sees
  * an item that phase B would treat differently. A rich-text sub-field's items join as their
@@ -22,7 +21,6 @@
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { foldText } from "../references/conversion-maps.ts";
 import type { Conversion, ConvertContext } from "./conversions.ts";
-import { GROUP_ID_PATTERN } from "./props.ts";
 import { isRecord } from "./types.ts";
 
 type Step = (value: unknown, to: FieldDefinition, ctx: ConvertContext) => Conversion;
@@ -30,7 +28,6 @@ type Step = (value: unknown, to: FieldDefinition, ctx: ConvertContext) => Conver
 const fail = (reason: string): Conversion => ({ ok: false, reason });
 const ok = (value: unknown): Conversion => ({ ok: true, value });
 const quote = (text: string) => `"${text.slice(0, 40)}"`;
-const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
 
 /** A reference value as a list of ids (a single id is a list of one), or undefined. */
 function idsOf(value: unknown): string[] | undefined {
@@ -74,8 +71,6 @@ function textToReference(value: string, to: FieldDefinition, ctx: ConvertContext
   const text = foldText(value);
   if (text === "") return ok(undefined);
   if (!ctx.entries) return fail("the entries to match could not be read");
-  // A value already in the new type (written under it): a usable target that is not the entry's.
-  if (ctx.entries.usable.has(value) && value !== ctx.group) return asReference([value], to);
   const groups = (ctx.entries.byText.get(text) ?? []).filter((g) => g !== ctx.group);
   if (groups.length === 0)
     return fail(`no entry of ${to.collections.join(", ")} has the title or slug ${quote(value)}`);
@@ -115,8 +110,6 @@ export const STAGE4_FROM: { readonly reference: Step; readonly repeater: Step } 
     }
     if (to.type !== "text") return fail(`references do not convert to ${to.type}`);
     if (ids.length === 0) return ok(undefined);
-    // A value already in the new type (written under it): text that is no group id stays.
-    if (typeof value === "string" && !GROUP_ID.test(value)) return ok(value);
     if (!ctx.entries) return fail("the entries' titles could not be read");
     const titles: string[] = [];
     for (const id of ids) {

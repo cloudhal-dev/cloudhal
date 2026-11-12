@@ -621,6 +621,179 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
       });
     });
 
+    describe("already converted (round 2: one rule, rows decide what is pending)", () => {
+      const toRef = (over: Partial<Extract<FieldOperation, { op: "change_field_type" }>> = {}) =>
+        ({
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+          ...over,
+        }) as FieldOperation;
+
+      it("text → multiple reference over several calls with budget 1, with and without clear", async () => {
+        for (const onInvalid of [undefined, "clear" as const]) {
+          const site = await world([text("venue")]);
+          const hall = await place(site, "Main Hall");
+          const made: ContentEntry[] = [];
+          for (let i = 0; i < 3; i++)
+            made.push(await entry(site, "events", { fields: { venue: "Main Hall" } }));
+          let r = await run(site, toRef({ multiple: true }), { budget: { entries: 1 } });
+          for (let i = 0; i < 5 && !r.done; i++) {
+            expect(r.unconvertible).toEqual([]);
+            r = await continueFieldOperation(store(), site.id, r.operationId, {
+              ...actor,
+              budget: { entries: 1 },
+              onInvalid,
+            });
+          }
+          expect(r.done).toBe(true);
+          for (const m of made) {
+            expect((await fresh(m)).fields).toEqual({ venue: [hall.id] });
+            expect(await rows(m.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+          }
+        }
+      });
+
+      it("convert, archive the target, continue with clear: the reference and its row stay", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const a = await entry(site, "events", { fields: { venue: "Main Hall" } });
+        const b = await entry(site, "events", { fields: { venue: "Main Hall" } });
+        const part = await run(site, toRef(), { budget: { entries: 1 } });
+        expect((await fresh(a)).fields).toEqual({ venue: hall.id });
+        await store().updateContentEntry({ ...(await fresh(hall)), status: "archived" });
+        const done = await continueFieldOperation(store(), site.id, part.operationId, {
+          ...actor,
+          onInvalid: "clear",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(a)).fields).toEqual({ venue: hall.id });
+        expect(await rows(a.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+        // the one still unconverted matches no usable entry now: cleared
+        expect((await fresh(b)).fields).toEqual({});
+      });
+
+      it("a pristine legacy id is checked, gets its row and locks; the revert gives the text back", async () => {
+        const site = await world([text("venue")]);
+        const hall = await place(site, "Main Hall");
+        const e = await entry(site, "events", { status: "published", fields: { venue: hall.id } });
+        const done = await run(site, toRef());
+        expect(done).toMatchObject({ done: true, rewritten: 1 });
+        expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
+        expect(await code(store().deleteContentEntry(await fresh(hall)))).toBe("entry_referenced");
+        const back = await revertFieldOperation(store(), site.id, done.operationId, actor);
+        expect(back.done).toBe(true);
+        expect((await def(site, "venue"))?.type).toBe("text");
+        expect((await fresh(e)).fields).toEqual({ venue: hall.id });
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("reference → text where the title is id-shaped finishes", async () => {
+        const site = await world([reference("venue")]);
+        const odd = await place(site, "entry_2025report", { slug: "report-2025" });
+        const e = await entry(site, "events", { fields: { venue: odd.id } });
+        const done = await run(site, {
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "text",
+        });
+        expect(done.done).toBe(true);
+        expect((await fresh(e)).fields).toEqual({ venue: "entry_2025report" });
+        expect(await rows(e.id)).toEqual([]);
+      });
+
+      it("a requiredToPublish field mid-operation: editing a published entry succeeds", async () => {
+        const site = await world([text("venue", { requiredToPublish: true })]);
+        const hall = await place(site, "Main Hall");
+        const a = await entry(site, "events", {
+          status: "published",
+          fields: { venue: "Main Hall" },
+        });
+        await entry(site, "events", { status: "published", fields: { venue: "Main Hall" } });
+        const part = await run(site, toRef(), { budget: { entries: 1 } });
+        expect(part.done).toBe(false);
+        const edited = await store().updateContentEntry({ ...(await fresh(a)), title: "Edited" });
+        expect(edited.fields).toEqual({ venue: hall.id });
+        expect((await continueFieldOperation(store(), site.id, part.operationId, actor)).done).toBe(
+          true,
+        );
+      });
+
+      it("a sub over-cap clear drops only the converted sub-values; the other sub-fields stay", async () => {
+        const site = await world([
+          reference("hosts", { multiple: true, maxItems: 50 }),
+          reference("lead"),
+          { ...SPEAKERS, maxItems: 50 } as FieldDefinition,
+        ]);
+        const places: ContentEntry[] = [];
+        for (let i = 0; i < 50; i++)
+          places.push(await place(site, i === 0 ? "Main Hall" : `Place ${i}`));
+        const hall = places[0] as ContentEntry;
+        const items = Array.from({ length: 50 }, (_, i) => ({ name: "Main Hall", seats: `s${i}` }));
+        const e = await entry(site, "events", {
+          fields: { hosts: places.map((p) => p.id), lead: hall.id, speakers: items },
+        });
+        const op: FieldOperation = {
+          op: "change_field_type",
+          collection: "events",
+          key: "speakers",
+          sub: "name",
+          type: "reference",
+          collections: ["places"],
+        };
+        const dry = await run(site, op, { dryRun: true });
+        expect(dry.report.unconvertible).toBe(1);
+        const done = await run(site, { ...op, onInvalid: "clear" });
+        expect(done.done).toBe(true);
+        const after = (await fresh(e)).fields;
+        expect(after?.hosts).toHaveLength(50);
+        expect(after?.speakers).toEqual(items.map(({ seats }) => ({ seats })));
+      });
+
+      it("a sub revert keeps a sub-field added later", async () => {
+        const site = await world([SPEAKERS]);
+        const e = await entry(site, "events", { fields: { speakers: [{ name: "Ada" }] } });
+        const done = await run(site, {
+          op: "rename_field",
+          collection: "events",
+          from: "speakers",
+          sub: "name",
+          to: "fullName",
+        });
+        const now = (await store().getSite(site.id)) as Site;
+        const speakers = now.collections?.events?.fields?.find((d) => d.key === "speakers");
+        const bio = { key: "bio", type: "text", labels: L("Bio") } as const;
+        await store().updateSite({
+          ...now,
+          collections: {
+            ...now.collections,
+            events: {
+              fields: [
+                {
+                  ...speakers,
+                  fields: [...(speakers?.type === "repeater" ? speakers.fields : []), bio],
+                },
+              ],
+            },
+          },
+        } as unknown as Site);
+        const back = await revertFieldOperation(store(), site.id, done.operationId, actor);
+        expect(back.done).toBe(true);
+        const restored = await def(site, "speakers");
+        expect(restored?.type === "repeater" && restored.fields.map((f) => f.key)).toEqual([
+          "person",
+          "name",
+          "seats",
+          "photo",
+          "bio",
+        ]);
+        expect((await fresh(e)).fields).toEqual({ speakers: [{ name: "Ada" }] });
+      });
+    });
+
     describe("revert, after edits", () => {
       it("text → reference: an entry edited after the operation converts back to its title", async () => {
         const site = await world([text("venue")]);

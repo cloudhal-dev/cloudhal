@@ -15,8 +15,9 @@
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { type ConvertContext, convertFieldValue } from "./conversions.ts";
-import { convertContext, convertsEveryValue, isBeingRemoved, rewriteFields } from "./migration.ts";
+import { convertContext, isBeingRemoved, rewriteFields } from "./migration.ts";
 import { rewriteItems } from "./migration-sub.ts";
+import { textReferenceOutcome } from "./text-reference.ts";
 import {
   type FieldIssue,
   fieldDefinitions,
@@ -109,15 +110,29 @@ export function resolveFields(
       out[def.key] = { def, value: undefined, fromOriginal: false };
       continue;
     }
+    // A sub-field marker converted the items already (`throughSub`).
+    const converting = def.migration?.sub === undefined ? def.migration?.fromType : undefined;
+    // RFC-0045 §7: text ↔ reference values are decided by the one shared rule.
+    const decided = converting
+      ? textReferenceOutcome({
+          from: converting,
+          def,
+          value,
+          convert: context,
+          pristine: false,
+          written: false,
+        })
+      : undefined;
     const issues = valueIssues(def, value, `fields/${def.key}`);
     const first = issues[0];
-    if (!first && !convertsEveryValue(def)) {
+    if (decided?.kind === "keep" || decided?.kind === "check" || (!decided && !first)) {
       out[def.key] = { def, value, fromOriginal };
       continue;
     }
-    // A sub-field marker converted the items already (`throughSub`).
-    const converting = def.migration?.sub === undefined ? def.migration?.fromType : undefined;
-    const converted = converting ? convertFieldValue(converting, def, value, context) : undefined;
+    const converted =
+      converting && decided?.kind !== "fail"
+        ? convertFieldValue(converting, def, value, context)
+        : undefined;
     if (converted?.ok) {
       out[def.key] = {
         def,

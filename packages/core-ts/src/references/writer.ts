@@ -274,7 +274,10 @@ export function rewriteTargetGuard(
     if (!holdsReferences(def) || !Object.hasOwn(values, def.key)) continue;
     const key = storedKey(def, before);
     const was = key === undefined ? undefined : before[key];
-    if (sameJson(values[def.key], was)) continue;
+    // A value converting from text is newly chosen even when phase B writes it unchanged (a
+    // pristine legacy id, `text-reference.ts`): its ids are checked anyway.
+    const fromText = mode === "fresh" && def.migration?.fromType === "text";
+    if (!fromText && sameJson(values[def.key], was)) continue;
     const carried = strings(carriedPart(def, was));
     for (const use of referenceUses(def, values[def.key], "")) {
       if (mode === "fresh" && carried.has(use.groupId)) continue;

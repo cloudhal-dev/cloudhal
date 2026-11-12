@@ -73,6 +73,8 @@ export function normalizeEntryFields(
   site: Site,
   draft: ContentEntry,
   entries?: ConversionEntries,
+  /** The stored entry, for a person's write: a value the write changed counts as written. */
+  stored?: ContentEntry,
 ): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
   if (!defs.some((d) => d.migration)) return draft;
@@ -80,6 +82,7 @@ export function normalizeEntryFields(
   const fields = normalizeThroughMarkers(defs, draft.fields, {
     // RFC-0045 §7: the text ↔ reference rows' maps, and the group text → reference skips.
     convert: { ...convertContext(site), entries, group: t?.group ?? draft.id },
+    stored: stored?.collection === draft.collection ? (stored.fields ?? {}) : undefined,
     translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
   });
   return fields ? { ...draft, fields } : draft;

@@ -5,6 +5,7 @@
  * active); gate instants; depth, cycles and the per-request budget.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
+import { canonicalJson, nodeHash } from "@cloudhal/core-ts";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { entryFields, type FieldsSource, type RenderedFields } from "../src/fields.ts";
 import { linkLocalizer, localizeLinks } from "../src/locales.ts";
@@ -371,4 +372,49 @@ describe("reference links go through the locale middleware once (RFC-0045 §4)",
       for (const h of [...hrefs(trOut), ...hrefs(enOut)])
         expect(h, h).not.toMatch(/^\/(en|tr)\/(en|tr)\//);
     });
+});
+
+describe("reference → text titles on both sources (RFC-0045 §7, PR #214 round 2)", () => {
+  it("an archived target and an archived default-locale member lend their titles, as in the store", async () => {
+    const w = await refsWorld();
+    const { e, store } = w;
+    // the hall's English member is archived; its Turkish member stays
+    await store.updateContentEntry({
+      ...((await store.getContentEntry(e.hall?.id as string)) as ContentEntry),
+      status: "archived",
+    });
+    // `change_field_type` reference → text, phase A: venue is text with the marker
+    const site = (await store.getSite(w.site.id)) as Site;
+    const events = site.collections?.events;
+    const fields = (events?.fields ?? []).map((d) =>
+      d.key === "venue"
+        ? {
+            key: "venue",
+            type: "text",
+            labels: d.labels,
+            localized: false,
+            migration: { id: "fop_01HZX8K3Q9CD", fromType: "reference" },
+          }
+        : d,
+    );
+    const next = {
+      ...site,
+      rev: site.rev + 1,
+      collections: { ...site.collections, events: { ...events, fields } },
+    } as unknown as Site;
+    await store.sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+      next.rev,
+      await nodeHash(next),
+      canonicalJson(next),
+      site.id,
+    ]);
+    const snap = await snapshotOf(w, next);
+    const live = new LiveSource(store, site.id, { includeDrafts: false, now: () => T });
+    for (const source of [snap, live]) {
+      const night = await source.entryFields(e.night as ContentEntry);
+      expect(night.venue?.text).toBe("Title vault");
+      const launch = await source.entryFields(e.launch as ContentEntry);
+      expect(launch.venue?.text).toBe("Title hall");
+    }
+  });
 });

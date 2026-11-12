@@ -51,8 +51,10 @@ function ownProperties(def: FieldDefinition, op: Retype): Record<string, unknown
     if (!collections?.length) invalid("collections", "a reference needs its target collections");
     out.collections = [...new Set(collections)];
     // From a repeater it stays a list; a reference keeps its own unless the request says.
+    // From a repeater it is always a list (the row is reference (multiple) ↔ repeater), so a
+    // `multiple: false` (the CLI's default) is ignored there, and `maxItems` kept.
     const multiple =
-      op.multiple ?? (def.type === "reference" ? def.multiple : def.type === "repeater");
+      def.type === "repeater" || (op.multiple ?? (def.type === "reference" && def.multiple));
     if (multiple) out.multiple = true;
     const maxItems = op.maxItems ?? ("maxItems" in def ? def.maxItems : undefined);
     if (multiple && maxItems !== undefined) out.maxItems = maxItems;

@@ -17,7 +17,7 @@ import { convertContext, rewriteFields, type ValueChange } from "../fields/migra
 import { fieldDefinitions } from "../fields/types.ts";
 import { referenceDefinitionOptions } from "../references/capability.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
-import { referenceCountIssues } from "../references/values.ts";
+import { withinReferenceCap } from "./cap.ts";
 import {
   checkOperation,
   currentDefinition,
@@ -32,7 +32,7 @@ import {
 } from "./plan.ts";
 import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
 import { buildReport } from "./report.ts";
-import { type Decide, type Decision, loadEntries, rewritePass } from "./rewrite.ts";
+import { type Decide, loadEntries, rewritePass } from "./rewrite.ts";
 import {
   labelOf,
   nothingPending,
@@ -91,32 +91,6 @@ async function decider(
     });
     if (!r.values) return r.change ? { fields: undefined, change: r.change } : undefined;
     return withinReferenceCap(defs, def, { values: r.values, change: r.change, onInvalid });
-  };
-}
-
-/**
- * RFC-0045 §1: a conversion into references keeps the entry within 100 reference values; over
- * the cap the value is unconvertible, or cleared under `onInvalid: "clear"`.
- */
-function withinReferenceCap(
-  defs: readonly FieldDefinition[],
-  def: FieldDefinition,
-  r: {
-    values: Record<string, unknown>;
-    change: ValueChange | undefined;
-    onInvalid?: "clear" | undefined;
-  },
-): Decision {
-  const over =
-    def.migration?.fromType !== undefined ? referenceCountIssues(defs, r.values)[0] : undefined;
-  if (!over) return { fields: r.values, change: r.change };
-  const before = r.change?.before;
-  if (r.onInvalid !== "clear")
-    return { change: { kind: "unconvertible", before, after: undefined, reason: over.message } };
-  const { [def.key]: _over, ...rest } = r.values;
-  return {
-    fields: rest,
-    change: { kind: "cleared", before, after: undefined, reason: over.message },
   };
 }
 

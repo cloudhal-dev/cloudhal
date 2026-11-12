@@ -11,11 +11,11 @@ import type { Cond } from "../node-sql.ts";
 import { renameSettingsReferences } from "../store/collection-settings.ts";
 import {
   checkSub,
-  idPending,
   subApplied,
   subMarkerOf,
   subPending,
   subTarget,
+  textReferencePending,
   withoutSub,
 } from "./plan-sub.ts";
 import { checkRetype, retyped } from "./retype.ts";
@@ -217,7 +217,9 @@ export function pendingCondition(
     // RFC-0045 §7: a list of ids and a list of items are both arrays; their first element differs.
     const item = listItemType(def, m.fromType);
     const multiple = "multiple" in def && def.multiple === true;
-    const id = multiple ? undefined : idPending(def.type, m.fromType, "body", path);
+    const id = multiple
+      ? undefined
+      : textReferencePending(def.type, m.fromType, { doc: "body", path, field: def.key });
     return {
       sql: `${base.sql} AND json_type(body, ?) IS NOT NULL AND (json_type(body, ?) NOT IN (${types.map(() => "?").join(", ")})${item ? " OR json_type(body, ?) = ?" : ""}${id ? ` OR ${id.sql}` : ""})`,
       params: [
