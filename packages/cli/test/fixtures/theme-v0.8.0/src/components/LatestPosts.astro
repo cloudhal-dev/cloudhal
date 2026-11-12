@@ -1,0 +1,30 @@
+---
+/**
+ * The theme's content list section (`components.contentList` in theme.ts): the section's entries
+ * sorted and trimmed as it asks, drawn as cards.
+ */
+import type { MediaContext } from "@cloudhal/astro-renderer/media";
+import type { ContentEntry, ContentListSection } from "@cloudhal/core-contracts";
+import EntryList from "./EntryList.astro";
+
+interface Props {
+  section: ContentListSection;
+  entries: ContentEntry[];
+  media?: MediaContext;
+}
+const { section, entries, media } = Astro.props;
+const at = (e: ContentEntry) => e.publishedAt ?? e.createdAt;
+const sorted = [...entries]
+  .sort((a, b) =>
+    section.sort === "title"
+      ? a.title.localeCompare(b.title)
+      : section.sort === "oldest"
+        ? at(a).localeCompare(at(b))
+        : at(b).localeCompare(at(a)),
+  )
+  .slice(0, section.limit);
+const locale = media?.locale ?? sorted[0]?.locale ?? "en";
+---
+<section class="ch-contentlist" data-section-id={section.id} data-kind="contentList" data-collection={section.collection}>
+  <EntryList entries={sorted} locale={locale} media={media} />
+</section>

@@ -1,0 +1,426 @@
+---
+import { CHROME_SCRIPT } from "@cloudhal/astro-renderer/chrome";
+import { SeoHead } from "@cloudhal/astro-renderer/components";
+import type { ActiveNavItem } from "@cloudhal/astro-renderer/navigation";
+import { PREFS_SCRIPT } from "@cloudhal/astro-renderer/prefs";
+import { SEARCH_SCRIPT } from "@cloudhal/astro-renderer/search-client";
+import type { HeadMeta } from "@cloudhal/astro-renderer/seo";
+import { themeVariables } from "@cloudhal/astro-renderer/theme-settings";
+import type { Site } from "@cloudhal/core-contracts";
+import { copyrightText, type ResolvedChrome, resolveChrome } from "@cloudhal/core-ts/chrome";
+import { renderIcon } from "@cloudhal/core-ts/icons";
+import MenuPanel from "../components/MenuPanel.astro";
+import NavLink from "../components/NavLink.astro";
+import NavMenu from "../components/NavMenu.astro";
+import SearchDialog from "../components/SearchDialog.astro";
+import { PAIRING_PRELOADS } from "../fonts.ts";
+import { iconSet } from "../icons.ts";
+import { themeSettings } from "../settings.ts";
+import type { ThemeStrings } from "../theme.ts";
+import "../styles/global.css";
+
+interface Props {
+  site: Site;
+  meta: HeadMeta;
+  /** The `primary` menu, or the derived header when the site has none (RFC-0003 §7.3). */
+  nav: ActiveNavItem[];
+  /** The `footer` menu; undefined keeps the default footer links. */
+  footer?: ActiveNavItem[] | undefined;
+  /** A preview of an embargoed or expired page or entry says so above it (RFC-0008 §7.3). */
+  notice?: { state: string; at: string; text: string } | undefined;
+  /** RFC-0019 §3: the header's search form, where the deployment answers searches. */
+  search?:
+    | {
+        label: string;
+        placeholder: string;
+        button: string;
+        query?: string;
+        /** RFC-0029 §6: the search modal's words; the header field opens it. */
+        modal?: ThemeStrings["searchModal"];
+      }
+    | undefined;
+  /** RFC-0024 §1: the page's own motion level, over the site's. */
+  motion?: string | undefined;
+  /** RFC-0025: the page's header and footer (`resolveChrome`), and the menus they name by key. */
+  chrome?: ResolvedChrome | undefined;
+  menus?: Record<string, ActiveNavItem[] | undefined> | undefined;
+  /** The chrome's own words, in the page's language. */
+  words?:
+    | {
+        skip: string;
+        main: string;
+        secondary: string;
+        menu: string;
+        closeMenu: string;
+        footer: string;
+        legal: string;
+        social: string;
+        credit: string;
+      }
+    | undefined;
+  /** RFC-0025 25d: the bars' and toasts' words, in the page's language. */
+  barWords?: Record<(typeof BAR_WORDS)[number], string> | undefined;
+  /**
+   * RFC-0033 §4: the reader's notice on a machine translation or a page shown in its original
+   * language, with a link to the original.
+   */
+  translation?:
+    | { text: string; original?: { href: string; text: string; lang: string } }
+    | undefined;
+  /** RFC-0033 §4: the language switcher: each language's name in itself and its URL here. */
+  languages?:
+    | {
+        label: string;
+        items: Array<{ locale: string; name: string; href: string; current: boolean }>;
+      }
+    | undefined;
+}
+const BAR_WORDS = [
+  "announcement",
+  "dismiss",
+  "privacy",
+  "consentNotice",
+  "consentChoices",
+  "consentOk",
+  "consentAll",
+  "consentEssential",
+  "privacyPolicy",
+  "copied",
+  "linkCopied",
+] as const;
+const {
+  site,
+  meta,
+  nav,
+  footer,
+  notice,
+  search,
+  motion,
+  menus = {},
+  words,
+  barWords,
+  translation,
+  languages,
+} = Astro.props;
+const chrome = Astro.props.chrome ?? resolveChrome(site);
+const h = chrome.header;
+const f = chrome.footer;
+const w = words ?? {
+  skip: "Skip to content",
+  main: "Main",
+  secondary: "Secondary",
+  menu: "Menu",
+  closeMenu: "Close menu",
+  footer: "Footer",
+  legal: "Legal",
+  social: "Social links",
+  credit: "Built with Cloudhal",
+};
+// The header's menu: the primary menu (or the derived header without one), else the one it names.
+const headerNav = h.nav === "primary" ? nav : (menus[h.nav] ?? []);
+const utilityNav = h.utility ? (menus[h.utility] ?? []) : [];
+const legalNav = f.legal ? (f.legal === "footer" ? footer : menus[f.legal]) : undefined;
+const brand = site.brand;
+const SOCIAL: Record<string, string> = {
+  x: "X",
+  bluesky: "Bluesky",
+  mastodon: "Mastodon",
+  github: "GitHub",
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  facebook: "Facebook",
+  youtube: "YouTube",
+  tiktok: "TikTok",
+  threads: "Threads",
+  rss: "RSS",
+  email: "Email",
+};
+const social = f.social ? (brand?.social ?? []) : [];
+const safe = (href: string) => (/^(https?:|mailto:|\/(?!\/)|#)/i.test(href) ? href : "#");
+// The actions this page can show (search only where the deployment answers searches).
+const actions = h.actions.filter((a) =>
+  a.kind === "button"
+    ? a.label && a.href
+    : a.kind === "locale"
+      ? languages
+      : a.kind === "search" && search,
+);
+// Without a header switcher, a multilingual site lists its languages in the footer (RFC-0033).
+const footerLanguages =
+  languages && !actions.some((a) => a.kind === "locale") ? languages : undefined;
+// The bar collapses into the phone menu below `collapseAt` (always for the minimal layout).
+const collapse = h.layout === "minimal" ? "always" : h.collapseAt;
+const dialog =
+  h.mobileStyle === "drawer-start" ||
+  h.mobileStyle === "drawer-end" ||
+  h.mobileStyle === "fullscreen";
+const searchAction = actions.some((a) => a.kind === "search") ? search : undefined;
+// The chrome module, only where the header needs it (RFC-0025 §2): without it everything works.
+// RFC-0025 25d: the bars, and the words they and the toasts speak.
+const bw = barWords ?? {
+  announcement: "Announcement",
+  dismiss: "Dismiss",
+  privacy: "Privacy",
+  consentNotice: "This site keeps only what it needs to work: no tracking cookies.",
+  consentChoices: "Some parts of this site can load content from other services (videos, maps).",
+  consentOk: "OK",
+  consentAll: "Allow all",
+  consentEssential: "Only essential",
+  privacyPolicy: "Privacy policy",
+  copied: "Copied",
+  linkCopied: "Link copied",
+};
+const announce = chrome.announcement;
+const consent = chrome.consent.mode !== "none" ? chrome.consent : undefined;
+// Read before the body paints, so a closed bar is never drawn (the edge cache ignores cookies).
+const needsPrefs = Boolean(announce?.dismissible || consent);
+const needsScript =
+  needsPrefs ||
+  (!h.hidden &&
+    (h.behavior !== "static" ||
+      h.shrink ||
+      h.transparent ||
+      dialog ||
+      headerNav.some((i) => i.children.length > 0)));
+const copyright = f.copyright
+  ? copyrightText(f.copyright, site.name, new Date().getFullYear())
+  : undefined;
+// RFC-0026: icons in the site's weight (26c), the theme's own drawings over the set's (26d).
+const iconWeight = String(site.theme.config?.iconWeight ?? "regular");
+const icon = (name: string, o: { label?: string; className?: string } = {}) =>
+  renderIcon(name, { ...o, weight: iconWeight, set: iconSet });
+// The site's design settings (RFC-0017 §1): typed values only, defaults where unset.
+const look = themeVariables(site, themeSettings);
+// A page's own motion level wins over the site's (RFC-0024 §1).
+if (
+  motion &&
+  ["none", "subtle", "standard", "expressive"].includes(motion) &&
+  look.attributes["data-ch-motion"]
+)
+  look.attributes["data-ch-motion"] = motion;
+const fonts = PAIRING_PRELOADS[look.attributes["data-ch-type-pairing"] ?? ""] ?? [];
+const header = { on: "text-zinc-900", off: "hover:text-zinc-900" };
+const below = { on: "text-zinc-700", off: "hover:text-zinc-700" };
+---
+<!doctype html>
+<html lang={meta.lang} dir={meta.dir ?? "ltr"} {...look.attributes} data-ch-announcement={announce?.dismissible ? announce.id : undefined}>
+  <head>
+    {/* is:inline keeps it a classic script where it is: it must run before the body paints. */}
+    {needsPrefs && <script is:inline src={PREFS_SCRIPT.path}></script>}
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <SeoHead meta={meta} />
+    {/* public/: static assets, answered before the Site Worker runs (no render, no analytics event) */}
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="generator" content="Cloudhal" />
+    {fonts.map((href) => <link rel="preload" href={href} as="font" type="font/woff2" crossorigin />)}
+    {look.style && <style set:html={look.style} />}
+  </head>
+  <body class="ch-body min-h-screen antialiased">
+    <a class="ch-skip" href="#main">{w.skip}</a>
+    {announce && (
+      <div class="ch-announcement" data-tone={announce.tone} role="region" aria-label={bw.announcement}>
+        <p class="ch-announcement__text">
+          {announce.text}
+          {announce.link && <a href={safe(announce.link.href)}>{announce.link.label}</a>}
+        </p>
+        {announce.dismissible && (
+          <button type="button" class="ch-announcement__close" data-ch-dismiss={announce.id} aria-label={bw.dismiss} hidden>
+            <Fragment set:html={icon("close")} />
+          </button>
+        )}
+      </div>
+    )}
+    {!h.hidden && (
+      <header
+        class="ch-header"
+        data-layout={h.layout}
+        data-behavior={h.behavior}
+        data-width={h.width}
+        data-surface={h.surface}
+        data-collapse={collapse}
+        data-shrink={h.shrink ? "" : undefined}
+        data-transparent={h.transparent ? "" : undefined}
+        data-over={h.transparent ? h.over : undefined}
+      >
+        <div class="ch-header__inner">
+          <a href="/" class="ch-header__brand">
+            {brand?.logo ? (
+              <Fragment>
+                <img class="ch-logo" data-size={brand.logoHeight ?? "m"} data-variant={brand.logoDark ? "light" : undefined} src={brand.logo.src} alt={brand.logo.alt || site.name} />
+                {brand.logoDark && <img class="ch-logo" data-size={brand.logoHeight ?? "m"} data-variant="dark" src={brand.logoDark.src} alt={brand.logoDark.alt || site.name} />}
+              </Fragment>
+            ) : (
+              site.name
+            )}
+          </a>
+          {utilityNav.length > 0 && (
+            <nav class="ch-header__utility" aria-label={w.secondary}>
+              {utilityNav.map((item) => <NavLink item={item} {...header} />)}
+            </nav>
+          )}
+          {headerNav.length > 0 && (
+            <nav class="ch-header__nav" aria-label={w.main}>
+              {headerNav.map((item, i) => item.children.length > 0 ? <NavMenu item={item} {...header} popover={`ch-sub-${i}`} iconWeight={iconWeight} /> : <NavLink item={item} {...header} />)}
+            </nav>
+          )}
+          {actions.length > 0 && (
+            <div class="ch-header__actions">
+              {actions.map((a) =>
+                a.kind === "button" && a.label && a.href ? (
+                  <a class={`ch-button ch-button--${a.variant ?? "primary"}`} href={safe(a.href)}>{a.label}</a>
+                ) : a.kind === "locale" && languages ? (
+                  <details class="ch-languages">
+                    <summary>{languages.label}</summary>
+                    <ul>
+                      {languages.items.map((l) => <li><a href={l.href} lang={l.locale} hreflang={l.locale} aria-current={l.current ? "true" : undefined}>{l.name}</a></li>)}
+                    </ul>
+                  </details>
+                ) : a.kind === "search" && search ? (
+                  <form class="ch-header-search" method="get" action="/search" role="search" data-ch-search-open={search.modal ? "" : undefined}>
+                    <label for="ch-header-q" class="sr-only">{search.label}</label>
+                    <input id="ch-header-q" type="search" name="q" value={search.query ?? ""} maxlength="200" placeholder={search.placeholder} />
+                    <button type="submit" class="sr-only">{search.button}</button>
+                  </form>
+                ) : null,
+              )}
+            </div>
+          )}
+          {(headerNav.length > 0 || utilityNav.length > 0 || searchAction) && (
+            <div class="ch-menu-slot">
+              {dialog ? (
+                <a class="ch-menu__open" href="/menu" data-ch-dialog="ch-menu">
+                  <Fragment set:html={icon("menu")} />
+                  {w.menu}
+                </a>
+              ) : (
+                <details class="ch-menu">
+                  <summary class="ch-menu__open">
+                    <Fragment set:html={icon("menu")} />
+                    {w.menu}
+                  </summary>
+                  <MenuPanel iconWeight={iconWeight} nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="drop" />
+                </details>
+              )}
+            </div>
+          )}
+        </div>
+      </header>
+    )}
+    {!h.hidden && dialog && (
+      <dialog id="ch-menu" class="ch-menu__dialog" data-style={h.mobileStyle} aria-label={w.menu}>
+        <div class="ch-menu__bar">
+          <span class="ch-header__brand">{site.name}</span>
+          <form method="dialog"><button class="ch-menu__close" type="submit">{w.closeMenu}</button></form>
+        </div>
+        <MenuPanel iconWeight={iconWeight} nav={headerNav} utility={utilityNav} search={searchAction} words={w} idSuffix="dialog" />
+      </dialog>
+    )}
+    <main id="main" tabindex="-1" class="mx-auto max-w-3xl px-4 pb-16">
+      {notice && (
+        <p
+          class="ch-gate-notice mb-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          role="status"
+          data-gate={notice.state}
+          data-gate-at={notice.at}
+        >{notice.text}</p>
+      )}
+      {translation && (
+        <p class="ch-translation-notice mb-6 rounded-md border border-sky-300 bg-sky-50 px-4 py-3 text-sm text-sky-900" role="note">
+          {translation.text}
+          {translation.original && <> <a href={translation.original.href} lang={translation.original.lang} hreflang={translation.original.lang}>{translation.original.text}</a></>}
+        </p>
+      )}
+      <slot />
+    </main>
+    {!f.hidden && (
+      <footer class="ch-footer" data-layout={f.layout} data-surface={f.surface}>
+        <div class="ch-footer__inner">
+          {f.region && (
+            <div class="ch-footer__region">
+              <slot name="footer-region" />
+            </div>
+          )}
+          {f.cta && (
+            <div class="ch-footer__cta">
+              <p class="ch-footer__cta-heading">{f.cta.heading}</p>
+              <a class="ch-button ch-button--primary" href={safe(f.cta.href)}>{f.cta.label}</a>
+            </div>
+          )}
+          {(f.columns.length > 0 || (f.layout !== "minimal" && f.layout !== "simple" && (f.tagline || social.length > 0))) && (
+            <div class="ch-footer__top">
+              <div class="ch-footer__about">
+                <a href="/" class="ch-footer__brand">{brand?.logo ? <img class="ch-logo" data-size="s" src={brand.logo.src} alt={brand.logo.alt || site.name} /> : site.name}</a>
+                {f.tagline && <p class="ch-footer__tagline">{f.tagline}</p>}
+                {social.length > 0 && (
+                  <ul class="ch-footer__social" aria-label={w.social}>
+                    {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={icon(l.network)} /></a></li>)}
+                  </ul>
+                )}
+              </div>
+              {f.columns.map((c) => (menus[c.menu] ?? []).length > 0 && (
+                <nav class="ch-footer__col" aria-label={c.heading}>
+                  <p class="ch-footer__heading">{c.heading}</p>
+                  <ul>
+                    {(menus[c.menu] ?? []).flatMap((item) => [item, ...item.children]).map((item) => <li><NavLink item={item} {...below} /></li>)}
+                  </ul>
+                </nav>
+              ))}
+            </div>
+          )}
+          {footerLanguages && (
+            <nav class="ch-footer__languages" aria-label={footerLanguages.label}>
+              <ul>
+                {footerLanguages.items.map((l) => <li><a href={l.href} lang={l.locale} hreflang={l.locale} aria-current={l.current ? "true" : undefined}>{l.name}</a></li>)}
+              </ul>
+            </nav>
+          )}
+          <div class="ch-footer__legal">
+            {copyright && <span>{copyright}</span>}
+            {f.layout === "simple" && f.tagline && <span>{f.tagline}</span>}
+            {f.layout === "simple" && social.length > 0 && (
+              <ul class="ch-footer__social" aria-label={w.social}>
+                {social.map((l) => <li><a href={safe(l.href)} rel="me noopener" aria-label={SOCIAL[l.network] ?? l.network} class="ch-social-link"><Fragment set:html={icon(l.network)} /></a></li>)}
+              </ul>
+            )}
+            {f.credit && <span>{w.credit}</span>}
+            {legalNav ? (
+              legalNav.length > 0 && (
+                <nav class="flex flex-wrap gap-4" aria-label={f.legal === "footer" ? w.footer : w.legal}>
+                  {legalNav.map((item) => item.children.length > 0 ? <NavMenu item={item} {...below} iconWeight={iconWeight} /> : <NavLink item={item} {...below} />)}
+                </nav>
+              )
+            ) : (
+              f.fallbackRss && <a href="/rss.xml" class="hover:text-zinc-700">RSS</a>
+            )}
+          </div>
+        </div>
+      </footer>
+    )}
+    {consent && (
+      <div class="ch-consent" data-ch-bar data-ch-consent-bar data-mode={consent.mode} role="region" aria-label={bw.privacy}>
+        <p class="ch-consent__text">
+          {consent.mode === "choices" ? bw.consentChoices : bw.consentNotice}
+          {consent.policy && <a href={safe(consent.policy)}>{bw.privacyPolicy}</a>}
+        </p>
+        <div class="ch-consent__actions">
+          {consent.mode === "choices" ? (
+            <Fragment>
+              <button type="button" class="ch-button ch-button--secondary" data-ch-consent-choice="essential" hidden>{bw.consentEssential}</button>
+              <button type="button" class="ch-button ch-button--primary" data-ch-consent-choice="all" hidden>{bw.consentAll}</button>
+            </Fragment>
+          ) : (
+            <button type="button" class="ch-button ch-button--primary" data-ch-consent-choice="ok" hidden>{bw.consentOk}</button>
+          )}
+        </div>
+      </div>
+    )}
+    {/* RFC-0025 25d: toasts land here (a live region already in the page, so they are announced). */}
+    <div class="ch-toasts" data-ch-toasts role="status" aria-live="polite" data-copied={bw.copied} data-link-copied={bw.linkCopied}></div>
+    {needsScript && <script type="module" src={CHROME_SCRIPT.path}></script>}
+    {/* RFC-0029 §6: the search modal, where the deployment answers searches. */}
+    {search?.modal && <SearchDialog label={search.label} placeholder={search.placeholder} words={search.modal} />}
+    {search?.modal && <script type="module" src={SEARCH_SCRIPT.path}></script>}
+  </body>
+</html>

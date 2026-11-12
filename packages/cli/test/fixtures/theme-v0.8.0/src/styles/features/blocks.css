@@ -1,0 +1,93 @@
+/* Shown in previews only, where an invalid ```surface would draw nothing. */
+.ch-surface-problem {
+  @apply rounded-lg px-4 py-3 text-sm;
+  border: 1px solid var(--ch-color-accent);
+}
+.ch-surface-problem ul {
+  @apply mt-2 list-disc ps-5;
+}
+.ch-richtext table:not([class]) tbody tr:hover {
+  background: var(--ch-color-surface-muted);
+}
+.ch-image {
+  @apply py-6;
+}
+/* Block types (RFC-0015): callout, button, video link and questions. */
+.ch-block {
+  @apply py-4;
+}
+.ch-callout {
+  @apply space-y-2 rounded border-l-4 border-sky-500 bg-sky-50 px-4 py-3;
+}
+.ch-callout--success {
+  @apply border-emerald-500 bg-emerald-50;
+}
+.ch-callout--warning {
+  @apply border-amber-500 bg-amber-50;
+}
+.ch-callout--danger {
+  @apply border-red-500 bg-red-50;
+}
+.ch-button {
+  /* w-fit: a button in a Stack (a flex column) keeps its own width (RFC-0022 22e). */
+  @apply inline-block w-fit rounded px-4 py-2 font-medium;
+}
+.ch-button--primary {
+  @apply text-(--ch-color-on-brand);
+  background: var(--ch-color-brand);
+}
+.ch-button--secondary {
+  @apply border border-zinc-300 text-zinc-900;
+}
+.ch-embed__link {
+  @apply flex items-center gap-3 rounded border border-zinc-200 px-4 py-3 no-underline;
+}
+.ch-embed__play {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-(--ch-color-surface-inverse) text-(--ch-color-text-inverse);
+}
+.ch-embed__title {
+  @apply font-medium text-zinc-900;
+}
+.ch-embed__host {
+  @apply ml-auto text-sm text-zinc-500;
+}
+.ch-embed__frame {
+  @apply aspect-video w-full rounded border-0;
+}
+.ch-faq__item {
+  @apply border-b border-zinc-200 py-3;
+}
+.ch-faq__item summary {
+  @apply cursor-pointer font-medium;
+}
+.ch-faq__answer {
+  @apply mt-2 space-y-2 text-zinc-700;
+}
+/* This theme's own block type (src/blocks.ts). */
+.testimonial blockquote {
+  @apply border-l-4 border-zinc-300 pl-4 text-lg italic text-zinc-800;
+}
+.testimonial figcaption {
+  @apply mt-2 flex gap-2 text-sm;
+}
+.testimonial__author {
+  @apply font-medium text-zinc-900;
+}
+.testimonial__role {
+  @apply text-zinc-500;
+}
+.ch-image figcaption {
+  @apply mt-2 text-sm text-zinc-500;
+}
+.ch-contentlist {
+  @apply py-6;
+}
+.ch-contentlist ul {
+  @apply space-y-4;
+}
+.ch-contentlist a {
+  @apply text-lg font-medium underline-offset-4 hover:underline;
+}
+.ch-contentlist p {
+  @apply text-sm text-zinc-600;
+}

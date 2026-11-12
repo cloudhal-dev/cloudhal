@@ -9,9 +9,14 @@ import type {
   Term,
 } from "@cloudhal/core-contracts";
 import type { RedirectMatch, SearchResults, SiteGraphStore } from "@cloudhal/core-ts";
-import { searchDocuments, searchRows } from "@cloudhal/core-ts";
+import {
+  getGroupMembers,
+  referrerCandidates,
+  searchDocuments,
+  searchRows,
+} from "@cloudhal/core-ts";
 import { isAvailable, nextInstant } from "@cloudhal/core-ts/availability";
-import { derivedGates, hasExpiryRules } from "@cloudhal/core-ts/fields";
+import { type ConversionEntries, derivedGates, hasExpiryRules } from "@cloudhal/core-ts/fields";
 import { matches } from "@cloudhal/core-ts/filter";
 import {
   evaluateEntryQuery,
@@ -22,8 +27,14 @@ import {
 import { type EntrySplit, gateIndex, splitEntries } from "./entry-views.ts";
 import { type EntryFieldsOptions, entryFields, type RenderedFields } from "./fields.ts";
 import { type Navigation, type NavigationOptions, navigationFor } from "./navigation.ts";
+import { conversionMaps, conversionMapsOf, conversionNeeds } from "./reference-conversions.ts";
+
+import { membersIn, type ReferencedByQuery, referrerRecords, referrersIn } from "./references.ts";
 import type { GraphSource, SourceSearchOptions } from "./source.ts";
 import { byNewest, byPosition, compile, shown, termFilter, visible } from "./source-helpers.ts";
+
+/** How long a live source reuses the conversion maps it built (one page render, not a session). */
+const CONVERSION_MAPS_TTL_MS = 2_000;
 
 /**
  * Reads the current nodes on every call. Drafts are included so authors can preview them in dev,
@@ -36,6 +47,11 @@ export class LiveSource implements GraphSource {
   readonly #siteId: string;
   readonly #includeDrafts: boolean;
   readonly #now: () => number;
+  /** RFC-0045 §7: conversion maps by collection, with when they were built. */
+  readonly #conversions = new Map<
+    string,
+    { at: number; maps: Promise<ConversionEntries | undefined> }
+  >();
 
   constructor(
     store: SiteGraphStore,
@@ -204,6 +220,72 @@ export class LiveSource implements GraphSource {
 
   entryFields(entry: ContentEntry, options?: EntryFieldsOptions): Promise<RenderedFields> {
     return entryFields(this, entry, options);
+  }
+
+  /** RFC-0045 §4: one store read (`getGroupMembers`), then this view's gates. */
+  async groupMembers(groupIds: readonly string[]): Promise<Map<string, ContentEntry[]>> {
+    const read = await getGroupMembers(this.#store.sql, this.#siteId, groupIds);
+    // A translation's original is its group's root, so the rows read are the originals' pool too.
+    const members = [...read.values()].flat();
+    const split = await this.#split(members, members);
+    return membersIn(read, groupIds, { listed: split.listed, reachable: split.reachable });
+  }
+
+  /**
+   * RFC-0045 §4: the `entry_refs` rows naming the group, expanded by the `shared` rule, each
+   * candidate then resolved like the snapshot's index (its original from the same pool), so both
+   * sources answer alike on the same graph.
+   */
+  async referencedBy(groupId: string, q: ReferencedByQuery = {}): Promise<ContentEntry[]> {
+    const [site, read] = await Promise.all([
+      this.site(),
+      referrerCandidates(this.#store.sql, this.#siteId, groupId),
+    ]);
+    const pool = visible([...read.byId.values()], this.#includeDrafts);
+    const ids = new Map(pool.map((e) => [e.id, e]));
+    const originalOf = (e: ContentEntry) => {
+      const g = e.translation?.group;
+      return g && g !== e.id ? ids.get(g) : undefined;
+    };
+    const shownHere = read.candidates.filter((e) => ids.has(e.id));
+    const maps = await conversionMapsOf(
+      site,
+      shownHere.map((e) => e.collection),
+      (c) => this.conversionEntries(c),
+    );
+    const records =
+      referrerRecords(site, shownHere, { originalOf, maps, only: groupId }).get(groupId) ?? [];
+    // The candidates' originals were read with them: the pool for derived gates as well.
+    const split = await this.#split(pool, pool);
+    return referrersIn(records, q, { listed: split.listed, reachable: split.reachable });
+  }
+
+  /**
+   * RFC-0045 §7: built from the working copy, only while the collection runs a conversion, from
+   * the collections it reads. Kept for `CONVERSION_MAPS_TTL_MS` per collection: one page's calls
+   * (every `entryFields`, depth-2 members, `referencedBy`) share one build, while `cloudhal dev`,
+   * whose one source serves every request, still sees edits.
+   */
+  async conversionEntries(collection: string): Promise<ConversionEntries | undefined> {
+    const site = await this.site();
+    const needs = conversionNeeds(site, collection);
+    if (!needs) return undefined;
+    const at = Date.now();
+    const hit = this.#conversions.get(collection);
+    if (hit && at - hit.at < CONVERSION_MAPS_TTL_MS) return hit.maps;
+    const maps = conversionMaps(site, collection, async () => {
+      const read = needs.has("*")
+        ? await this.#store.listContentEntries(this.#siteId)
+        : (
+            await Promise.all(
+              [...needs].map((c) => this.#store.listContentEntries(this.#siteId, c)),
+            )
+          ).flat();
+      return visible(read, true);
+    });
+    this.#conversions.set(collection, { at, maps });
+    maps.catch(() => this.#conversions.delete(collection));
+    return maps;
   }
 
   taxonomies(): Promise<Taxonomy[]> {

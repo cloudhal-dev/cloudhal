@@ -75,13 +75,26 @@ export const IMAGE_FITS: readonly ImageFit[] = [
   "natural",
 ];
 
-/** A page's placeholder allowance (RFC-0028 §4), shared by every image the page draws. */
+/**
+ * A page's allowances, shared by everything one request draws: placeholder bytes (RFC-0028 §4),
+ * spent by every image, and RFC-0045 §4's resolved reference targets, spent by every
+ * `entryFields` call (absent: a full allowance on first use).
+ */
 export interface PlaceholderBudget {
   left: number;
+  /** RFC-0045 §4: reference targets left to resolve; past it they resolve to nothing. */
+  references?: number;
+  /** Set once the reference allowance ran out and was logged (one warning per request). */
+  referencesWarned?: boolean;
 }
 /** About 24 KB of LQIPs per page; beyond it images get their colour only. */
 export const PLACEHOLDER_BUDGET = 24 * 1024;
-export const placeholderBudget = (): PlaceholderBudget => ({ left: PLACEHOLDER_BUDGET });
+/** RFC-0045 §4: at most 200 resolved reference targets per request. */
+export const REFERENCE_BUDGET = 200;
+export const placeholderBudget = (): PlaceholderBudget => ({
+  left: PLACEHOLDER_BUDGET,
+  references: REFERENCE_BUDGET,
+});
 
 /**
  * The placeholder painted behind an image while it loads (RFC-0028 §2): the dominant colour, and

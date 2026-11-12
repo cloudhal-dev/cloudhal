@@ -60,6 +60,7 @@ import {
 } from "@cloudhal/astro-renderer/runtime";
 import { SqlCommentStore } from "@cloudhal/comments/sql";
 import { GATES_FEATURE_VERSION } from "@cloudhal/core-ts/availability";
+import { FIELDS_FEATURE_VERSION } from "@cloudhal/core-ts/fields";
 import { D1Driver } from "@cloudhal/storage/d1";
 import {
   ANALYTICS_BEACON_PATH,
@@ -277,7 +278,8 @@ function fromAdmin(request: Request, env: Env): boolean {
 
 /**
  * What this site Worker enforces (RFC-0008 §7.6–§7.7): the admin Worker asks before it lets anyone
- * write time gates. Authenticated like the purge (it is not a public endpoint), never cached.
+ * write time gates, and (RFC-0045 §1, `fields: 2`) reference and repeater fields, which this
+ * renderer resolves. Authenticated like the purge (it is not a public endpoint), never cached.
  */
 function features(request: Request, env: Env): Response {
   const headers = { "cache-control": "no-store", "cloudflare-cdn-cache-control": "no-store" };
@@ -288,7 +290,10 @@ function features(request: Request, env: Env): Response {
     });
   if (!fromAdmin(request, env))
     return Response.json({ error: "unauthorized" }, { status: 401, headers });
-  return Response.json({ gates: GATES_FEATURE_VERSION }, { headers });
+  return Response.json(
+    { gates: GATES_FEATURE_VERSION, fields: FIELDS_FEATURE_VERSION },
+    { headers },
+  );
 }
 
 /**

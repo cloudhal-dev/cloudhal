@@ -1,10 +1,12 @@
 /**
  * The route sweep's renderer (RFC-0008 §7.2): what the blog starter's routes put on the wire for
- * one source, path by path. Shared by the time-gate sweep (`gates-sweep.test.ts`) and the derived
- * gate sweep (`derived-gates-sweep.test.ts`, RFC-0042 §3).
+ * one source, path by path. Shared by the time-gate sweep (`gates-sweep.test.ts`), the derived
+ * gate sweep (`derived-gates-sweep.test.ts`, RFC-0042 §3) and the reference sweep
+ * (`references-sweep.test.ts`, RFC-0045 §8): entry routes draw their fields with reference cards
+ * at depth 2 and their "used by" list.
  */
 import type { Section } from "@cloudhal/core-contracts";
-import type { SiteGraphStore } from "@cloudhal/core-ts";
+import { entryPath, type SiteGraphStore } from "@cloudhal/core-ts";
 import { archiveSummaries } from "../src/archive.ts";
 import { collectionFeedXml } from "../src/collection-feed-route.ts";
 import { collectionForFeedPath } from "../src/collection-feeds.ts";
@@ -86,6 +88,13 @@ export async function sweep(
         renderEntryArticle(route.entry, locale, media),
         JSON.stringify(terms),
         JSON.stringify(relatedEntries(route.entry, all, index, 3).map((e) => [e.id, e.title])),
+        // RFC-0045: the entry's fields with reference cards at depth 2, and its "used by" list
+        JSON.stringify((await source.entryFields?.(route.entry, { media, depth: 2 })) ?? {}),
+        JSON.stringify(
+          (
+            (await source.referencedBy?.(route.entry.translation?.group ?? route.entry.id)) ?? []
+          ).map((e) => [e.id, e.title, entryPath(site, e)]),
+        ),
       );
     } else if (route.kind === "archive") {
       out.push(

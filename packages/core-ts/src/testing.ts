@@ -18,6 +18,7 @@ import { listingsSuite } from "./testing-listings.ts";
 import { menuSuite } from "./testing-menu.ts";
 import { permalinksSuite } from "./testing-permalinks.ts";
 import { referenceGateSuite } from "./testing-reference-gate.ts";
+import { referenceReadsSuite } from "./testing-reference-reads.ts";
 import { referencesSuite } from "./testing-references.ts";
 import { racingDriver, type SuiteContext, taxonomySuite } from "./testing-taxonomy.ts";
 
@@ -279,6 +280,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
     fieldOperationsSuite(suite);
     referenceGateSuite(suite);
     referencesSuite(suite);
+    referenceReadsSuite(suite);
     listingsSuite(suite);
     entryQuerySuite(suite);
   });

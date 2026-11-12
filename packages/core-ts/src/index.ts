@@ -79,6 +79,11 @@ export {
   redirectLocale,
   splitTarget,
 } from "./redirects.ts";
+export {
+  getGroupMembers,
+  type ReferrerCandidates,
+  referrerCandidates,
+} from "./references/reads.ts";
 export type {
   PublishReleaseInput,
   PublishReleaseResult,
