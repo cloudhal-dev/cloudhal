@@ -37,10 +37,16 @@ export interface ReferenceSnapshot {
   entries: readonly ContentEntry[];
 }
 
-/** True when some collection of the site has a reference or repeater field. */
+/**
+ * True when some collection of the site has a reference or repeater field, or a field still
+ * converting from references (RFC-0045 §7: until phase B rewrites them, its entries keep rows,
+ * which every write and guard must still see).
+ */
 export function hasReferenceFields(site: Pick<Site, "collections">): boolean {
   return Object.values(site.collections ?? {}).some((c) =>
-    (c?.fields ?? []).some((d) => isReferenceFieldType(d.type)),
+    (c?.fields ?? []).some(
+      (d) => isReferenceFieldType(d.type) || d.migration?.fromType === "reference",
+    ),
   );
 }
 

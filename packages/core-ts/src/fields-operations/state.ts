@@ -16,6 +16,7 @@ import { settleListValues } from "../list-values/backfill.ts";
 import { planListState } from "../list-values/site-plan.ts";
 import { type Cond, casUpdateStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { referenceDefinitionOptions } from "../references/capability.ts";
+import { sharedUpdates } from "../references/localize.ts";
 import type { PageRewrite } from "./references.ts";
 import {
   FIELD_MIGRATION,
@@ -101,11 +102,13 @@ export async function writeSite(
       ),
     );
     const rewrites = (await pages?.(site)) ?? [];
+    const hash = await nodeHash(next);
     // RFC-0042 §4: a marker on a listed field changes its fingerprint (phases A and C both).
-    const lists = (await planListState(site, next)).statements(
-      await nodeHash(next),
-      next.updatedAt,
-    );
+    // RFC-0045 §7: a field's new `localized` reaches its `entry_refs` rows in the same batch.
+    const lists = [
+      ...(await planListState(site, next)).statements(hash, next.updatedAt),
+      ...sharedUpdates(site, next, hash),
+    ];
     if (rewrites.length > 0) {
       if (await writeWithPages(ctx, { site, next, guard, rewrites, lists })) return "written";
     } else {

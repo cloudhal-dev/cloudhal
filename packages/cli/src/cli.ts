@@ -75,6 +75,10 @@ export const OPTIONS = {
   options: { type: "string" },
   multiple: { type: "boolean" },
   clear: { type: "boolean" },
+  collections: { type: "string" },
+  "max-items": { type: "string" },
+  "sub-fields": { type: "string" },
+  sub: { type: "string" },
 } as const;
 
 /**

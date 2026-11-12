@@ -9,7 +9,7 @@
  */
 import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
 import { type NodeVersion, referencedNodeIds } from "@cloudhal/schedules/engine";
-import { fieldDefinitions, isRecord } from "./fields/types.ts";
+import { fieldDefinitions, isRecord, renamedFrom } from "./fields/types.ts";
 
 /** One value with its reference ids removed (a repeater keeps its other sub-values). */
 function withoutReferences(def: FieldDefinition, value: unknown): unknown {
@@ -31,7 +31,7 @@ export function stripReferences(site: Pick<Site, "collections">, body: unknown):
   if (!defs.some((d) => d.type === "reference" || d.type === "repeater")) return body;
   const fields: Record<string, unknown> = { ...body.fields };
   for (const def of defs)
-    for (const key of [def.key, def.migration?.fromKey])
+    for (const key of [def.key, renamedFrom(def)])
       if (key !== undefined && Object.hasOwn(fields, key))
         fields[key] = withoutReferences(def, fields[key]);
   return { ...body, fields };

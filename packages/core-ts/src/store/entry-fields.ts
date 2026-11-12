@@ -28,6 +28,7 @@ import { sameJson } from "../fields/types.ts";
 import { fieldAssetIssues, fieldAssetRefs } from "../media/field-refs.ts";
 import type { AssetRefUse } from "../media/refs.ts";
 import type { Cond } from "../node-sql.ts";
+import type { ConversionEntries } from "../references/conversion-maps.ts";
 import type { StoreContext } from "./context.ts";
 
 /** What the field checks add to an entry write. */
@@ -68,12 +69,17 @@ async function originalOf(
  * a value still in the old type converts, a removed field or a translation's copy of a field that
  * stops being localized goes), so a person's edit and the operation converge.
  */
-export function normalizeEntryFields(site: Site, draft: ContentEntry): ContentEntry {
+export function normalizeEntryFields(
+  site: Site,
+  draft: ContentEntry,
+  entries?: ConversionEntries,
+): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
   if (!defs.some((d) => d.migration)) return draft;
   const t = draft.translation;
   const fields = normalizeThroughMarkers(defs, draft.fields, {
-    convert: convertContext(site),
+    // RFC-0045 §7: the text ↔ reference rows' maps, and the group text → reference skips.
+    convert: { ...convertContext(site), entries, group: t?.group ?? draft.id },
     translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
   });
   return fields ? { ...draft, fields } : draft;

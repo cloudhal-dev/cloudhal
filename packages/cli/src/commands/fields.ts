@@ -8,7 +8,7 @@
  */
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import type { FieldOption } from "@cloudhal/core-contracts";
+import type { FieldOption, SubFieldDefinition } from "@cloudhal/core-contracts";
 import {
   continueFieldOperation,
   type FieldOperation,
@@ -17,7 +17,7 @@ import {
   revertFieldOperation,
   runFieldOperation,
 } from "@cloudhal/core-ts";
-import { type EnabledFieldType, FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
+import { ALL_FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
 import { openLocalStore } from "@cloudhal/core-ts/local";
 import { humanizeSlug } from "@cloudhal/core-ts/names";
 import type { CliCommand } from "../cli/types.ts";
@@ -28,7 +28,41 @@ import { brief, deployment } from "./sync.ts";
 const CLI_ACTOR = { kind: "human", id: "user_localcli0001", name: "cloudhal CLI" } as const;
 
 export const FIELDS_USAGE =
-  "usage: cloudhal fields rename <collection> <from> <to> | retype <collection> <key> <type> [--options a,b] [--multiple] [--clear] | localize <collection> <key> on|off | remove <collection> <key> | continue|revert <collection> <id>  [--dry-run] [--remote]";
+  "usage: cloudhal fields rename <collection> <from> <to> | retype <collection> <key> <type> [--options a,b] [--multiple] [--collections a,b] [--max-items n] [--sub-fields file.json] [--clear] | localize <collection> <key> on|off | remove <collection> <key> | continue|revert <collection> <id>  [--sub <sub-field>] [--dry-run] [--remote]";
+
+/** What `parseFieldsArgs` takes besides the positionals (`subFields` already read from its file). */
+export interface FieldsFlags {
+  dryRun?: boolean;
+  options?: string;
+  multiple?: boolean;
+  clear?: boolean;
+  /** RFC-0045 §7: a reference's target collections, `a,b`. */
+  collections?: string;
+  maxItems?: string;
+  subFields?: SubFieldDefinition[];
+  /** A repeater's sub-field: the operation renames, converts or removes it in every item. */
+  sub?: string;
+}
+
+/** `--max-items 20` as a positive integer. */
+function maxItemsOf(v: string): number {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1) throw new Error("--max-items is a whole number from 1");
+  return n;
+}
+
+/** The type change's RFC-0045 inputs, each only when given. */
+function stage4Inputs(flags: FieldsFlags) {
+  const list = flags.collections
+    ?.split(",")
+    .map((c) => c.trim())
+    .filter(Boolean);
+  return {
+    ...(list?.length ? { collections: list } : {}),
+    ...(flags.maxItems !== undefined ? { maxItems: maxItemsOf(flags.maxItems) } : {}),
+    ...(flags.subFields ? { subFields: flags.subFields } : {}),
+  };
+}
 
 export interface FieldsCliOptions {
   readonly projectDir: string;
@@ -60,7 +94,7 @@ function optionsOf(list: string, locale: string): FieldOption[] {
 /** The positionals and flags as a request (throws the usage when they do not fit). */
 export function parseFieldsArgs(
   rest: readonly string[],
-  flags: { dryRun?: boolean; options?: string; multiple?: boolean; clear?: boolean },
+  flags: FieldsFlags,
   locale = "en",
 ): Request {
   const [action, collection, a, b] = rest;
@@ -69,36 +103,51 @@ export function parseFieldsArgs(
   };
   const dryRun = flags.dryRun === true;
   const c = collection as string;
+  const sub = flags.sub ? { sub: flags.sub } : {};
   switch (action) {
     case "rename":
       need(a, b);
       return {
         kind: "run",
         dryRun,
-        op: { op: "rename_field", collection: c, from: a as string, to: b as string },
+        op: { op: "rename_field", collection: c, from: a as string, to: b as string, ...sub },
       };
     case "remove":
       need(a);
-      return { kind: "run", dryRun, op: { op: "remove_field", collection: c, key: a as string } };
+      return {
+        kind: "run",
+        dryRun,
+        op: { op: "remove_field", collection: c, key: a as string, ...sub },
+      };
     case "localize":
       need(a);
       if (b !== "on" && b !== "off") throw new Error(FIELDS_USAGE);
       return {
         kind: "run",
         dryRun,
-        op: { op: "set_field_localized", collection: c, key: a as string, localized: b === "on" },
+        op: {
+          op: "set_field_localized",
+          collection: c,
+          key: a as string,
+          localized: b === "on",
+          ...sub,
+        },
       };
     case "retype": {
       need(a, b);
-      if (!FIELD_TYPES.includes(b as EnabledFieldType))
-        throw new Error(`the type is one of ${FIELD_TYPES.join(", ")}`);
+      // The store refuses reference and repeater targets until RFC-0045 rollout step 7.
+      if (!ALL_FIELD_TYPES.includes(b as FieldType))
+        throw new Error(`the type is one of ${ALL_FIELD_TYPES.join(", ")}`);
       const op: FieldOperation = {
         op: "change_field_type",
         collection: c,
         key: a as string,
         type: b as FieldType,
+        ...sub,
         ...(flags.options ? { options: optionsOf(flags.options, locale) } : {}),
-        ...(b === "select" ? { multiple: flags.multiple === true } : {}),
+        ...(b === "select" && !flags.sub ? { multiple: flags.multiple === true } : {}),
+        ...(b === "reference" && flags.multiple !== undefined ? { multiple: flags.multiple } : {}),
+        ...stage4Inputs(flags),
         ...(flags.clear ? { onInvalid: "clear" as const } : {}),
       };
       return { kind: "run", dryRun, op };
@@ -229,6 +278,9 @@ export function describeFields(r: FieldsCliResult): string[] {
     return [
       `${x.done ? "reverted" : "reverting"} ${x.operationId}: ${x.restored} entries restored`,
       ...(x.edited.length ? [`converted back (edited since): ${x.edited.join(", ")}`] : []),
+      ...(x.dropped ?? []).map(
+        (d) => `dropped ${d.entryId} ${d.field} → ${d.targetId} (no entry of that group is left)`,
+      ),
       ...(x.done ? [`snapshot ${x.snapshotId}`] : ["not finished: run the revert again"]),
     ];
   }
@@ -261,6 +313,14 @@ export function describeFields(r: FieldsCliResult): string[] {
   return lines;
 }
 
+/** `--sub-fields <file.json>`: a JSON list of sub-field definitions (checked by the store). */
+async function readSubFields(projectDir: string, file: string): Promise<SubFieldDefinition[]> {
+  const text = await readFile(path.resolve(projectDir, file), "utf8");
+  const list = JSON.parse(text) as unknown;
+  if (!Array.isArray(list)) throw new Error(`${file} holds a JSON list of sub-field definitions`);
+  return list as SubFieldDefinition[];
+}
+
 /** `cloudhal fields …`. */
 export const fieldsCommand: CliCommand = async (rest, values, { projectDir }) => {
   const locale = values.options ? await localDefaultLocale(projectDir) : "en";
@@ -271,6 +331,12 @@ export const fieldsCommand: CliCommand = async (rest, values, { projectDir }) =>
       ...(values.options ? { options: values.options } : {}),
       ...(values.multiple ? { multiple: true } : {}),
       ...(values.clear ? { clear: true } : {}),
+      ...(values.collections ? { collections: values.collections } : {}),
+      ...(values["max-items"] ? { maxItems: values["max-items"] } : {}),
+      ...(values["sub-fields"]
+        ? { subFields: await readSubFields(projectDir, values["sub-fields"]) }
+        : {}),
+      ...(values.sub ? { sub: values.sub } : {}),
     },
     locale,
   );

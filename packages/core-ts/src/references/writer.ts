@@ -11,8 +11,9 @@
  *   with reference fields, and on writes that change `fields` or `collection` elsewhere.
  * - **The rows**, anchored on the entry's new hash: an anchored `DELETE`, then one plain
  *   `INSERT … SELECT` that reads `shared` from the site row as it is when the batch runs, by key
- *   or `migration.fromKey` (the exact key wins; an aggregate, not a correlated `ORDER BY`, which
- *   workerd's SQLite does not resolve). A key with no reference or repeater definition (absent, or
+ *   or a top-level rename's `migration.fromKey` (a sub-field rename's names a sub-key, RFC-0045
+ *   §7 `sub`; the exact key wins; an aggregate, not a correlated `ORDER BY`, which workerd's
+ *   SQLite does not resolve). A key with no reference or repeater definition (absent, or
  *   retyped by a concurrent import) yields `NULL` and fails the batch (`isSharedNullViolation` →
  *   `ConflictError`); it is never `OR IGNORE`.
  */
@@ -23,7 +24,7 @@ import { type FieldIssue, fieldDefinitions, isRecord, sameJson } from "../fields
 import { and, type Cond } from "../node-sql.ts";
 import { hasReferenceFields } from "./issues.ts";
 import { memberGroup } from "./members.ts";
-import { definitionsPath, entryRefRows, holdsReferences } from "./rows.ts";
+import { definitionsPath, entryRefRows, holdsReferences, storedKey } from "./rows.ts";
 import { definitionsAnchor, type TargetPair, targetGuard } from "./sql.ts";
 import { type MemberRow, readMembers, targetProblem } from "./targets.ts";
 import { type ReferenceUse, referenceUses } from "./values.ts";
@@ -189,12 +190,14 @@ export function entryRefStatements(site: Site, draft: ContentEntry, hash: string
              max(CASE WHEN json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
                  THEN CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END END),
              max(CASE WHEN json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k')
+                   AND json_extract(d.value, '$.migration.sub') IS NULL
                  THEN CASE json_extract(d.value, '$.localized') WHEN 1 THEN 2 ELSE 1 END END))
            FROM nodes s, json_each(json_extract(s.body, ?)) d
           WHERE s.id = ? AND s.kind = 'site'
             AND json_extract(d.value, '$.type') IN ('reference', 'repeater')
             AND (json_extract(d.value, '$.key') = json_extract(p.value, '$.k')
-                 OR json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k'))),
+                 OR (json_extract(d.value, '$.migration.fromKey') = json_extract(p.value, '$.k')
+                     AND json_extract(d.value, '$.migration.sub') IS NULL))),
         ?
       FROM json_each(?) p WHERE ${ANCHOR}`,
     params: [
@@ -222,19 +225,48 @@ function pairsOf(uses: readonly Use[]): TargetPair[] {
   return [...pairs.values()];
 }
 
+/** Every string a stored value holds, at any depth (the ids a rewrite carries over). */
+function strings(value: unknown, out = new Set<string>()): Set<string> {
+  if (typeof value === "string") out.add(value);
+  else if (Array.isArray(value)) for (const v of value) strings(v, out);
+  else if (isRecord(value)) for (const v of Object.values(value)) strings(v, out);
+  return out;
+}
+
 /**
- * §2.6: the target guard of a field-operation rewrite, over the reference values it changes
- * (undefined when none change). A miss skips the entry for the next pass, like a concurrent edit.
- * The rewrite's own statements are guarded on the site still carrying the operation's marker, so
- * the definitions the pairs come from cannot change under it.
+ * §2.6 and §7: the target guard of a field-operation rewrite, over the reference values it
+ * changes (undefined when none change). A miss skips the entry for the next pass, like a
+ * concurrent edit. The rewrite's own statements are guarded on the site still carrying the
+ * operation's marker, so the definitions the pairs come from cannot change under it.
+ *
+ * - `fresh` (phase B): only ids the stored value does not already hold, newly chosen, so a
+ *   conversion never writes a deleted or archived target. Ids it carries over (a reshape, a
+ *   rename) stay as stored, as rows are kept for a missing target.
+ * - `present` (a revert, which first drops restored ids with no member): every changed id needs
+ *   a member in an allowed collection, whatever its status.
  */
 export function rewriteTargetGuard(
   site: Site,
   next: ContentEntry,
   stored: ContentEntry,
+  mode: "fresh" | "present" = "fresh",
 ): Cond | undefined {
-  const defs = fieldDefinitions(site, next.collection);
-  return targetGuard(site.id, pairsOf(guardedUses(defs, next, stored)));
+  const values = next.fields ?? {};
+  const before = stored.collection === next.collection ? (stored.fields ?? {}) : {};
+  const pairs = new Map<string, TargetPair>();
+  for (const def of fieldDefinitions(site, next.collection)) {
+    if (!holdsReferences(def) || !Object.hasOwn(values, def.key)) continue;
+    const key = storedKey(def, before);
+    const was = key === undefined ? undefined : before[key];
+    if (sameJson(values[def.key], was)) continue;
+    const carried = strings(was);
+    for (const use of referenceUses(def, values[def.key], "")) {
+      if (mode === "fresh" && carried.has(use.groupId)) continue;
+      const pair: TargetPair = { t: use.groupId, c: use.collections, f: mode === "fresh" ? 1 : 0 };
+      pairs.set(JSON.stringify(pair), pair);
+    }
+  }
+  return targetGuard(site.id, [...pairs.values()]);
 }
 
 /** True when the write changes the entry's values or collection (the definitions anchor applies). */
@@ -252,9 +284,17 @@ const changesFields = (draft: ContentEntry, stored: ContentEntry | undefined) =>
 export async function planEntryRefs(
   sql: SqlDriver,
   site: Site,
-  draft: ContentEntry,
-  stored: ContentEntry | undefined,
+  write: {
+    draft: ContentEntry;
+    stored: ContentEntry | undefined;
+    /**
+     * `stored` through the field-operation markers (RFC-0045 §7): which values the write changes,
+     * so a value an operation reshapes or renames, and the writer left alone, is not re-checked.
+     */
+    baseline: ContentEntry | undefined;
+  },
 ): Promise<EntryRefsPlan> {
+  const { draft, stored } = write;
   const references = hasReferenceFields(site);
   const anchor =
     references || changesFields(draft, stored)
@@ -262,7 +302,7 @@ export async function planEntryRefs(
       : undefined;
   if (!references) return { guard: anchor, statements: () => [], diagnose: async () => {} };
   const defs = fieldDefinitions(site, draft.collection);
-  const uses = guardedUses(defs, draft, stored);
+  const uses = guardedUses(defs, draft, write.baseline);
   const groups = [...new Set(uses.map((u) => u.groupId))];
   const check = async () =>
     refuseFieldIssues(useIssues(site, draft, uses, await readMembers(sql, site.id, groups)));

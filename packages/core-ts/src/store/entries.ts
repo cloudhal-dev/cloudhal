@@ -3,6 +3,7 @@ import { assertValid, type ContentEntry } from "@cloudhal/core-contracts";
 import { indexMarkdown, withoutIndex } from "../body-index.ts";
 import { prepareCorrections } from "../corrections.ts";
 import { ConflictError, NotFoundError } from "../errors.ts";
+import { fieldDefinitions } from "../fields/types.ts";
 import { nodeHash } from "../hash.ts";
 import { assertUnlocked } from "../holds.ts";
 import { ID_PREFIX } from "../ids.ts";
@@ -11,6 +12,7 @@ import { fillMissingSrc } from "../media/refs.ts";
 import { and, casUpdateStatement, insertNodeStatement, OpBatch, runOpBatch } from "../node-sql.ts";
 import { uniquenessKey } from "../nodes.ts";
 import { entryPath } from "../permalinks.ts";
+import { loadConversionEntries } from "../references/conversion-load.ts";
 import { planLeave } from "../references/leave.ts";
 import { dropEntryRefsStatement } from "../references/rebuild.ts";
 import { canonicalReferences } from "../references/writer.ts";
@@ -63,15 +65,23 @@ export class EntryEngine {
       });
       draft = corrections ? { ...rest, corrections } : (rest as ContentEntry);
     }
-    draft = normalizeEntryFields(site, draft);
+    // RFC-0045 §7: a running text ↔ reference conversion's maps, read only while one runs. The
+    // stored entry goes through the same markers, so an edit that leaves a value alone keeps it.
+    const entries = await loadConversionEntries(
+      this.#ctx.graph,
+      site,
+      fieldDefinitions(site, draft.collection),
+    );
+    draft = normalizeEntryFields(site, draft, entries);
+    const baseline = stored && normalizeEntryFields(site, stored, entries);
     // RFC-0045 §1: a member's id is stored as its group's.
-    draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored });
+    draft = await canonicalReferences(this.#ctx.sql, site, { draft, stored: baseline });
     assertValid("content-entry", canonicalTerms(draft));
     checkLocalizedNode("contentEntry", site, draft);
     // RFC-0041 §3: typed field values, requiredToPublish and their asset references.
     const fields = await planEntryFields(this.#ctx, site, draft, stored);
     // RFC-0033 links; RFC-0045 §2 targets, anchors, `entry_refs`, a move or group change.
-    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored });
+    const integrity = await planEntryIntegrity(this.#ctx, site, { draft, stored, baseline });
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {

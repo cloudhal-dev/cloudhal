@@ -16,10 +16,13 @@
  * | datetime → date | the day in the value's own zone |
  * | select ↔ select | single ↔ multiple (one value ↔ a list of one; an empty list is no value) |
  *
+ * RFC-0045 §7 adds the reference and repeater rows (`conversions-references.ts`).
+ *
  * Every result must also fit the new definition (`valueIssues`); anything else is unconvertible.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import type { ConversionEntries } from "../references/conversion-maps.ts";
+import { STAGE4_FROM, textToStage4 } from "./conversions-references.ts";
 import { escapeAtLineStarts, unlink } from "./markdown-scan.ts";
 import type { FieldType } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
@@ -35,6 +38,8 @@ export interface ConvertContext {
    * a conversion runs (`conversion-maps.ts`).
    */
   readonly entries?: ConversionEntries | undefined;
+  /** RFC-0045 §7: the converted entry's own translation group, which text → reference skips. */
+  readonly group?: string | undefined;
 }
 
 /** `value: undefined` means "no value" (the key is removed). */
@@ -42,14 +47,19 @@ export type Conversion = { ok: true; value: unknown } | { ok: false; reason: str
 
 /** The table, from → the types it converts to (besides itself). */
 export const FIELD_CONVERSIONS: Readonly<Partial<Record<FieldType, readonly FieldType[]>>> = {
-  text: ["richText", "number", "select", "url"],
+  text: ["richText", "number", "select", "url", "reference", "repeater"],
   richText: ["text"],
   number: ["text"],
   select: ["text", "select"],
   url: ["text"],
   date: ["datetime"],
   datetime: ["date"],
+  reference: ["text", "reference", "repeater"],
+  repeater: ["text", "reference"],
 };
+
+/** Types whose same-type change converts values (single ↔ multiple). */
+const RESHAPED: ReadonlySet<FieldType> = new Set(["select", "reference"]);
 
 /** True when the table converts `from` values to `to` (a type always converts to itself). */
 export function canConvert(from: FieldType, to: FieldType): boolean {
@@ -192,7 +202,7 @@ const FROM: Partial<Record<FieldType, Step>> = {
         return fail(`"${value.slice(0, 40)}" is not a number`);
       return ok(Number(value));
     }
-    return fail(`text does not convert to ${to.type}`);
+    return textToStage4(value, to, ctx);
   },
   richText(value, to) {
     if (!isString(value) || to.type !== "text") return fail(`rich text converts to text only`);
@@ -223,6 +233,7 @@ const FROM: Partial<Record<FieldType, Step>> = {
       return fail("a date and time converts to a date");
     return ok(dayIn(v.at, v.timeZone));
   },
+  ...STAGE4_FROM,
 };
 
 /**
@@ -236,7 +247,7 @@ export function convertFieldValue(
   ctx: ConvertContext,
 ): Conversion {
   let out: Conversion;
-  if (from === to.type && to.type !== "select") out = ok(value);
+  if (from === to.type && !RESHAPED.has(to.type)) out = ok(value);
   else if (!canConvert(from, to.type)) return fail(`${from} values do not convert to ${to.type}`);
   else {
     const step = FROM[from];

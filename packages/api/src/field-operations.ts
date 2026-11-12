@@ -15,7 +15,7 @@
  * definition codes (`unknown_field`, `field_key_duplicate`, `field_key_reserved`, …).
  */
 import { holds } from "@cloudhal/agent-runtime";
-import type { Actor, FieldOption } from "@cloudhal/core-contracts";
+import type { Actor, FieldOption, SubFieldDefinition } from "@cloudhal/core-contracts";
 import {
   continueFieldOperation,
   FIELD_OPERATIONS,
@@ -25,7 +25,7 @@ import {
   runFieldOperation,
   type SiteGraphStore,
 } from "@cloudhal/core-ts";
-import { type EnabledFieldType, FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
+import { ALL_FIELD_TYPES, type FieldType } from "@cloudhal/core-ts/fields";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "./context.ts";
@@ -41,20 +41,51 @@ const str = (b: Body, name: string): string => {
   return v;
 };
 
-/** The request body as an operation on `collection`; 400 for a malformed one. */
+/** RFC-0045 §7: a repeater's sub-field, when the body names one. */
+function subOf(b: Body): { sub?: string } {
+  if (b.sub === undefined) return {};
+  if (typeof b.sub !== "string" || !b.sub) throw badRequest("sub must be a sub-field key");
+  return { sub: b.sub };
+}
+
+/** RFC-0045 §7: a type change's inputs for references and repeaters, each only when given. */
+function stage4Of(b: Body) {
+  const strings = (v: unknown) => Array.isArray(v) && v.every((x) => typeof x === "string");
+  if (b.collections !== undefined && !strings(b.collections))
+    throw badRequest("collections must be a list of collection keys");
+  if (b.maxItems !== undefined && !Number.isInteger(b.maxItems))
+    throw badRequest("maxItems must be a whole number");
+  if (b.subFields !== undefined && !Array.isArray(b.subFields))
+    throw badRequest("subFields must be a list of sub-field definitions");
+  if (b.itemLabel !== undefined && typeof b.itemLabel !== "string")
+    throw badRequest("itemLabel must be a sub-field key");
+  return {
+    ...(b.collections !== undefined ? { collections: b.collections as string[] } : {}),
+    ...(b.maxItems !== undefined ? { maxItems: b.maxItems as number } : {}),
+    ...(b.subFields !== undefined ? { subFields: b.subFields as SubFieldDefinition[] } : {}),
+    ...(b.itemLabel !== undefined ? { itemLabel: b.itemLabel as string } : {}),
+  };
+}
+
+/**
+ * The request body as an operation on `collection`; 400 for a malformed one. Reference and
+ * repeater targets parse; the store refuses them (`fields_unsupported`) until RFC-0045 step 7.
+ */
 export function operationOf(collection: string, b: Body): FieldOperation {
   const op = b.op;
   if (typeof op !== "string" || !FIELD_OPERATIONS.includes(op as FieldOperation["op"]))
     throw badRequest(`op must be one of ${FIELD_OPERATIONS.join(", ")}`);
-  if (op === "rename_field") return { op, collection, from: str(b, "from"), to: str(b, "to") };
-  if (op === "remove_field") return { op, collection, key: str(b, "key") };
+  const sub = subOf(b);
+  if (op === "rename_field")
+    return { op, collection, from: str(b, "from"), to: str(b, "to"), ...sub };
+  if (op === "remove_field") return { op, collection, key: str(b, "key"), ...sub };
   if (op === "set_field_localized") {
     if (typeof b.localized !== "boolean") throw badRequest("localized must be a boolean");
-    return { op, collection, key: str(b, "key"), localized: b.localized };
+    return { op, collection, key: str(b, "key"), localized: b.localized, ...sub };
   }
   const type = str(b, "type");
-  if (!FIELD_TYPES.includes(type as EnabledFieldType))
-    throw badRequest(`type must be one of ${FIELD_TYPES.join(", ")}`);
+  if (!ALL_FIELD_TYPES.includes(type as FieldType))
+    throw badRequest(`type must be one of ${ALL_FIELD_TYPES.join(", ")}`);
   if (b.onInvalid !== undefined && b.onInvalid !== "clear")
     throw badRequest('onInvalid is "clear" or absent');
   if (b.multiple !== undefined && typeof b.multiple !== "boolean")
@@ -66,6 +97,8 @@ export function operationOf(collection: string, b: Body): FieldOperation {
     collection,
     key: str(b, "key"),
     type: type as FieldType,
+    ...sub,
+    ...stage4Of(b),
     ...(b.options ? { options: b.options as FieldOption[] } : {}),
     ...(b.multiple !== undefined ? { multiple: b.multiple as boolean } : {}),
     ...(b.onInvalid === "clear" ? { onInvalid: "clear" as const } : {}),

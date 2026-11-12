@@ -1049,7 +1049,7 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - The release gate reads the published site node, retries once, then purges everything; it never falls back to the working row (#213).
 3. **Marker interplay** (phases 2 to 4).
    - `rename_field`'s `root_key` and `fromKey` lag in the fragment (over-blocks only) and in the rows `INSERT` (`fromKey` match).
-   - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a).
+   - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a). Step 4 chose "only after phase B" (Amended in 4).
    - Text → reference conversion: readers convert on the fly, `field_operation_running` refuses target deletes, moves and group changes, and any marker on `from` or `to` purges everything.
    - `set_field_localized`'s phase-A `UPDATE` of `shared`.
    - `entryRefsRebuild` reading through `fromKey`.
@@ -1247,3 +1247,27 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 
     The rare site-moved retry stays outside it, as before.
 - **The pin-time plan skips the closure** (`references: false`). It would read every body one by one, and for sites with references it is the batch's *expected* outcome only: the run-time re-plan, or purge-everything, covers referrers.
+
+### Amended in 4 (2026-11-12, rollout step 4)
+
+- **`sub`** (§7). The marker sits on the repeater: `{ id, sub, fromKey | fromType }`, or `{ id, sub }` while a sub-field is removed. Phase A keeps a removed sub-field's definition and phase C drops it, as for a whole field. Every item goes through the sub-field's own per-value rule (`fields/migration-sub.ts`), so readers, writers and phase B agree.
+  - A sub-field rename's `fromKey` names a sub-key. Top-level readers ignore it (`renamedFrom`), and the rows `INSERT`'s `fromKey` match requires `migration.sub IS NULL`.
+  - `referenceUses`, `definitionOfPath` and `fieldAssetRefs` read an item's old sub-key while the rename runs.
+  - `set_field_localized` refuses `sub`, because sub-fields share their repeater's `localized`. Removing a repeater's only sub-field is refused: remove the repeater instead.
+- **`change_field_type`'s request checks** (`fields-operations/retype.ts`):
+  - an input the target type does not take is refused, and with `sub` only `collections` (to a reference) and `options` apply;
+  - a reference changes to a reference only to switch `multiple`;
+  - a conversion that carries ids over (reference ↔ reference, reference ↔ repeater) may only widen the target collections, so phase B never writes a carried id where the field no longer allows it;
+  - a repeater converts to text or to a reference only when it has exactly one sub-field, of type text or rich text, or reference. Readers know only the new definition and the marker, so they read each item's one value from its shape.
+  - Repeater → text sets `multiline: true`. A rich-text sub-field's items join as their Markdown source, as stored, because the marker does not record the sub-field's old type.
+  - The dry run checks the site the operation leaves against the contract and `checkFieldDefinitions`, with the store's capability. Until step 7, that is where reference and repeater targets are refused (`fields_unsupported`); `field_operation_unsupported` is no longer raised.
+- **Text → reference never picks the entry's own group** (`ConvertContext.group`), the same rule a person's write follows.
+- **Phase B's target guard covers only the ids a rewrite newly names** (`rewriteTargetGuard`, mode `fresh`), meaning ids that appear nowhere in the stored value. Ids a reshape or a rename carries over are not checked. A value naming a deleted target therefore finishes its conversion as stored, with its row, as rows are kept for a missing target. Guarding carried ids would skip such an entry on every pass, and phase C would never run.
+- **Writers during an operation** (`EntryEngine.write`) load the conversion maps before `normalizeEntryFields`, only while a text ↔ reference conversion runs. They then compare the draft with the stored entry normalized through the same markers, for the target guard and for canonical ids. A person's edit that leaves a reshaped or renamed value alone is therefore not re-checked. Text → reference values converted on a person's write are not guarded as newly chosen: deletes in the target collections are refused meanwhile (`field_operation_running`), and only archiving can race them.
+- **`hasReferenceFields` includes a field still converting from references.** Until phase B rewrites them, its entries keep rows, which every write, rewrite and guard must still see.
+- **`shared` follows `localized` in every operation site write** (`references/localize.ts`, phase A and the revert's first step), as a diff of the two site bodies anchored on the new site hash. In a site with reference fields, every entry write carries the definitions anchor. A holder write planned before phase A therefore fails its batch, and its retry reads the new definitions: R16 resolves by retry.
+- **Revert `dropped`.** Each revert pass reads the members of the ids its decisions name, once. It drops each id with no member in a collection its field allows, whatever the member's status, and guards the rest with a member requirement (mode `present`). A target deleted between the read and the batch skips the entry, and the next pass drops it.
+- **Watch item 3, live `referencedBy`:** it reads candidates from `entry_refs`, so during a text → reference conversion it lists a converting referrer only after phase B rewrites that entry. That is the documented behaviour, and nothing reads candidates by collection while a marker runs. The live-versus-snapshot comparison runs with no marker active, so the difference is never compared.
+- **The CLI and the admin API** take `collections`, `maxItems`, `subFields` and `sub`, and the API also takes `itemLabel`. MCP's operation tools keep their step-1 inputs until step 5.
+- **[#213](https://github.com/cloudhal-dev/cloudhal/issues/213)** (from 3b): the release gate's read of the published site node is retried once, then the run purges everything.
+

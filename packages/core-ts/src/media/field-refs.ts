@@ -8,7 +8,7 @@
  */
 import type { Asset, FieldDefinition } from "@cloudhal/core-contracts";
 import { ASSET_ID_PATTERN } from "../fields/props.ts";
-import { type FieldIssue, isRecord } from "../fields/types.ts";
+import { type FieldIssue, isRecord, renamedFrom } from "../fields/types.ts";
 import { type AssetRefUse, markdownAssetIds } from "./refs.ts";
 
 const ASSET_ID = new RegExp(ASSET_ID_PATTERN);
@@ -54,10 +54,17 @@ export function fieldAssetRefs(
     const value = Object.hasOwn(values, def.key) ? values[def.key] : undefined;
     for (const id of valueAssets(def, value)) add(id, `fields.${def.key}`, `fields/${def.key}`);
     if (def.type !== "repeater" || !Array.isArray(value)) continue;
+    // RFC-0045 §7: a running sub-field rename's items still hold the old key.
+    const m = def.migration;
+    const held = (item: Record<string, unknown>, key: string) => {
+      if (Object.hasOwn(item, key)) return item[key];
+      const was = m?.sub === key ? m.fromKey : undefined;
+      return was !== undefined && Object.hasOwn(item, was) ? item[was] : undefined;
+    };
     value.forEach((item, i) => {
       if (!isRecord(item)) return;
       for (const sub of def.fields)
-        for (const id of valueAssets(sub, Object.hasOwn(item, sub.key) ? item[sub.key] : undefined))
+        for (const id of valueAssets(sub, held(item, sub.key)))
           add(id, `fields.${def.key}.${sub.key}`, `fields/${def.key}/${i}/${sub.key}`);
     });
   }
@@ -76,10 +83,10 @@ export function migratedFieldValues(
   defs: readonly FieldDefinition[],
   values: Readonly<Record<string, unknown>> | undefined,
 ): Readonly<Record<string, unknown>> | undefined {
-  if (!values || !defs.some((d) => d.migration?.fromKey)) return values;
+  if (!values || !defs.some((d) => renamedFrom(d))) return values;
   const out: Record<string, unknown> = { ...values };
   for (const def of defs) {
-    const from = def.migration?.fromKey;
+    const from = renamedFrom(def);
     if (from && !Object.hasOwn(values, def.key) && Object.hasOwn(values, from))
       out[def.key] = values[from];
   }

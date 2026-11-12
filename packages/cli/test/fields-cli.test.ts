@@ -95,6 +95,54 @@ describe("cloudhal fields (RFC-0041 §6)", () => {
     expect(() => parseFieldsArgs(["nope"], {})).toThrow(/usage: cloudhal fields/);
   });
 
+  it("parses RFC-0045's inputs: --collections, --max-items, --sub-fields and --sub", () => {
+    expect(
+      parseFieldsArgs(["retype", "events", "venue", "reference"], {
+        collections: "places, halls",
+        maxItems: "5",
+        multiple: true,
+      }),
+    ).toMatchObject({
+      op: { type: "reference", collections: ["places", "halls"], maxItems: 5, multiple: true },
+    });
+    const subFields = [{ key: "line", type: "text" as const, labels: { en: { label: "Line" } } }];
+    expect(
+      parseFieldsArgs(["retype", "events", "steps", "repeater"], { subFields }).kind === "run" &&
+        parseFieldsArgs(["retype", "events", "steps", "repeater"], { subFields }),
+    ).toMatchObject({ op: { type: "repeater", subFields } });
+    expect(
+      parseFieldsArgs(["rename", "events", "speakers", "fullName"], { sub: "name" }),
+    ).toMatchObject({ op: { op: "rename_field", from: "speakers", sub: "name", to: "fullName" } });
+    expect(parseFieldsArgs(["remove", "events", "speakers"], { sub: "seats" })).toMatchObject({
+      op: { op: "remove_field", key: "speakers", sub: "seats" },
+    });
+    expect(() =>
+      parseFieldsArgs(["retype", "events", "venue", "reference"], { maxItems: "0" }),
+    ).toThrow(/max-items/);
+  });
+
+  it("reads --sub-fields from a file; the local store still refuses the types (step 7)", async () => {
+    await writeFile(
+      path.join(projectDir, "subs.json"),
+      JSON.stringify([{ key: "line", type: "text", labels: { en: { label: "Line" } } }]),
+    );
+    const cwd = vi.spyOn(process, "cwd").mockReturnValue(projectDir);
+    await expect(
+      main([
+        "fields",
+        "retype",
+        "events",
+        "venue",
+        "repeater",
+        "--sub-fields",
+        "subs.json",
+        "--dry-run",
+      ]),
+    ).rejects.toThrow(/not enabled on this server/);
+    cwd.mockRestore();
+    expect(await fields()).toEqual({ venue: "Hall" });
+  });
+
   it("--dry-run reports, greps the theme and writes nothing; a run and its revert", async () => {
     expect(await themeReferences(projectDir, "venue")).toEqual([
       path.join("src", "layouts", "Event.astro"),

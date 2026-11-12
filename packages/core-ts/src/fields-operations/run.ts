@@ -5,9 +5,17 @@
  * over what is still pending) and the `after` snapshot. Only the draft graph changes: the published
  * snapshot keeps the old definitions with the old values until the next publish.
  */
-import type { FieldDefinition, Site, Snapshot } from "@cloudhal/core-contracts";
+import {
+  assertValid,
+  type FieldDefinition,
+  type Site,
+  type Snapshot,
+} from "@cloudhal/core-contracts";
 import { InvariantError } from "../errors.ts";
+import { checkFieldDefinitions, refuseFieldIssues } from "../fields/index.ts";
 import { convertContext, rewriteFields } from "../fields/migration.ts";
+import { referenceDefinitionOptions } from "../references/capability.ts";
+import { loadConversionEntries } from "../references/conversion-load.ts";
 import {
   checkOperation,
   currentDefinition,
@@ -50,20 +58,25 @@ import {
 const PASSES = 3;
 const DRY_RUN_ID = "snap_fielddryrun";
 
-/** How entries change under `def`'s marker; `pristine` per entry from the `before` snapshot. */
-function decider(
+/**
+ * How entries change under `def`'s marker; `pristine` per entry from the `before` snapshot. A
+ * text ↔ reference conversion's maps are read once here, before the pass (RFC-0045 §7).
+ */
+async function decider(
+  ctx: OperationContext,
   site: Site,
   def: FieldDefinition,
-  op: FieldOperation,
-  pristine: (id: string, hash: string) => boolean,
-): Decide {
-  const convert = convertContext(site);
+  input: { op: FieldOperation; pristine: (id: string, hash: string) => boolean },
+): Promise<Decide> {
+  const { op, pristine } = input;
+  const entries = await loadConversionEntries(ctx.store, site, [def]);
+  const convert = { ...convertContext(site), entries };
   const onInvalid = op.op === "change_field_type" ? op.onInvalid : undefined;
   return (row, translation) => {
     const r = rewriteFields({
       def,
       values: row.entry.fields,
-      convert,
+      convert: { ...convert, group: row.entry.translation?.group ?? row.entry.id },
       translation,
       pristine: pristine(row.entry.id, row.hash),
       onInvalid,
@@ -79,15 +92,31 @@ async function dryRun(
   op: FieldOperation,
 ): Promise<FieldOperationReport> {
   const { def } = currentDefinition(site, op);
-  const marked = markedField(phaseASite(site, op, DRY_RUN_ID), op.collection, DRY_RUN_ID);
+  const phaseA = phaseASite(site, op, DRY_RUN_ID);
+  const marked = markedField(phaseA, op.collection, DRY_RUN_ID);
   const rows = await loadEntries(ctx, site.id, op.collection);
   return buildReport({
     op,
     before: def,
     after: targetDefinition(def, op),
     rows,
-    decide: decider(site, marked?.def as FieldDefinition, op, () => true),
+    decide: await decider(ctx, phaseA, marked?.def as FieldDefinition, {
+      op,
+      pristine: () => true,
+    }),
   });
+}
+
+/**
+ * RFC-0045 §7: the definitions the operation ends with pass the contract and
+ * `checkFieldDefinitions` (with the store's capability: the types stay refused until rollout step
+ * 7), so the dry run refuses what phase A or C could not write.
+ */
+async function checkEndState(ctx: OperationContext, site: Site, op: FieldOperation) {
+  const end = phaseCSite(phaseASite(site, op, DRY_RUN_ID), op.collection, DRY_RUN_ID) ?? site;
+  assertValid("site", end);
+  const options = await referenceDefinitionOptions(ctx.store, end, true);
+  refuseFieldIssues(checkFieldDefinitions(end, undefined, options));
 }
 
 function result(
@@ -129,6 +158,7 @@ export async function runFieldOperation(
   // RFC-0042 §4: what list fields, expiry, structured data and sections make of the change.
   await checkSectionReferences(ctx, site, op);
   checkSettingsReferences(site, op);
+  await checkEndState(ctx, site, op);
   const report = await dryRun(ctx, site, op);
   if (options.dryRun)
     return {
@@ -190,7 +220,10 @@ async function remaining(
     after: targetDefinition(def, op),
     rows: marked ? await loadEntries(ctx, site.id, op.collection) : [],
     decide: marked
-      ? decider(site, marked.def, op, (id, hash) => hashes.get(id) === hash)
+      ? await decider(ctx, site, marked.def, {
+          op,
+          pristine: (id, hash) => hashes.get(id) === hash,
+        })
       : () => undefined,
   });
 }
@@ -219,7 +252,7 @@ async function proceed(
       const running = runningMarker(site.collections?.[op.collection]?.fields ?? []);
       if (running) refuseRunning(op.collection, running.id);
       const sections =
-        op.op === "rename_field"
+        op.op === "rename_field" && op.sub === undefined
           ? (s: Site) =>
               renamedPages(ctx, s, { collection: op.collection, from: op.from, to: op.to })
           : undefined;
@@ -239,7 +272,10 @@ async function proceed(
       site,
       rows: await loadEntries(ctx, siteId, op.collection),
       defs: marked.defs,
-      decide: decider(site, marked.def, op, (eid, hash) => hashes.get(eid) === hash),
+      decide: await decider(ctx, site, marked.def, {
+        op,
+        pristine: (eid, hash) => hashes.get(eid) === hash,
+      }),
       guard: markerGuard(siteId, op.collection, id),
       done: rewritten,
       lists: { collection: op.collection, keys: operationKeys(op) },

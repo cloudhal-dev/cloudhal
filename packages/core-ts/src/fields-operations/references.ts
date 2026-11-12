@@ -34,7 +34,8 @@ function inUse(message: string, details: Record<string, unknown>): never {
 
 /** Settings that name the field: a removal refuses, a type change re-runs the settings checks. */
 export function checkSettingsReferences(site: Site, op: FieldOperation): void {
-  if (op.op === "remove_field") {
+  // Settings name fields, never a repeater's sub-fields (RFC-0045 `sub`).
+  if (op.op === "remove_field" && op.sub === undefined) {
     const paths = settingsUses(site, op.collection, op.key);
     if (paths.length === 0) return;
     inUse(`${op.collection}.${op.key} is named by ${paths.join(", ")}; remove it there first`, {
@@ -77,7 +78,7 @@ export async function checkSectionReferences(
   site: Site,
   op: FieldOperation,
 ): Promise<void> {
-  if (op.op === "set_field_localized") return;
+  if (op.op === "set_field_localized" || op.sub !== undefined) return;
   const key = operationKey(op);
   const pages = await pagesUsing(ctx.store.sql, sectionUse(site.id, op.collection, key));
   if (pages.length === 0) return;

@@ -23,7 +23,12 @@ export interface EntryIntegrityPlan {
 export async function planEntryIntegrity(
   ctx: StoreContext,
   site: Site,
-  write: { draft: ContentEntry; stored: ContentEntry | undefined },
+  write: {
+    draft: ContentEntry;
+    stored: ContentEntry | undefined;
+    /** `stored` through the field-operation markers, as the draft was (RFC-0045 §7). */
+    baseline?: ContentEntry | undefined;
+  },
 ): Promise<EntryIntegrityPlan> {
   const { draft, stored } = write;
   const linked = await checkTranslationLinks(ctx, {
@@ -32,7 +37,11 @@ export async function planEntryIntegrity(
     node: draft,
     stored,
   });
-  const references = await planEntryRefs(ctx.sql, site, draft, stored);
+  const references = await planEntryRefs(ctx.sql, site, {
+    draft,
+    stored,
+    baseline: write.baseline ?? stored,
+  });
   const leave = stored ? await planLeave(ctx.sql, site, { stored, next: draft }) : undefined;
   return {
     guard: and(references.guard, linked, leave?.guard),

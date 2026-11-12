@@ -1,0 +1,15 @@
+---
+"@cloudhal/core-ts": patch
+"@cloudhal/api": patch
+"@cloudhal/cli": patch
+---
+
+RFC-0045 rollout step 4: the four field operations work on reference and repeater fields. The types themselves stay refused on every production write path until step 7 (`fields_unsupported`, now from the dry run's check of the definitions the operation ends with); the shared suites enable them with `SiteGraphStoreOptions.fieldTypes`. Nothing changes for operations on the nine existing types.
+
+- **`sub`** on all four operations (`FieldOperation.sub`, `FieldMigration.sub`): with it, `rename_field`, `change_field_type` and `remove_field` rename, convert or remove one sub-field of a repeater in every item. An item left empty is dropped, and a list left empty is no value. `set_field_localized` refuses `sub` (sub-fields share their repeater's `localized`). Readers, writers and the rows read items through the marker; a top-level reader ignores a sub-field rename's `fromKey` (`renamedFrom`).
+- **New `change_field_type` inputs:** `collections`, `maxItems`, `subFields` and `itemLabel`, each refused where the target type does not take it. A reference changes to a reference only to switch `multiple`. A conversion that carries ids over may only widen the target collections. A repeater converts to text or to a reference only with exactly one matching sub-field.
+- **New conversion rows** (`fields/conversions-references.ts`): reference single ↔ multiple, text ↔ reference (through the prefetched `ConvertContext.entries` maps, never the entry's own group), multiline text → repeater, repeater → text, and multiple reference ↔ repeater. The maps are read once per operation pass, and by `EntryEngine.write` while such a conversion runs.
+- **Phase B's target guard** covers only the ids a rewrite newly names; ids a reshape or a rename carries over stay as stored, rows kept. **`set_field_localized`** updates the rows' `shared` in the batch of its site write (phase A, and the revert's).
+- **Revert** drops restored references whose group has no member left in the site, and reports them in `FieldRevertResult.dropped`.
+- **Releases (#213):** when the read of the published site node fails, the run retries it once, then purges everything; it no longer falls back to the working site row.
+- **CLI:** `cloudhal fields retype` takes `--collections a,b`, `--max-items n` and `--sub-fields <file.json>`, and every action takes `--sub <sub-field>`. The admin API's operation route parses the same inputs. MCP's operation tools take them with rollout step 5.

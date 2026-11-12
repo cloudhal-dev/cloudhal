@@ -14,11 +14,26 @@
 import type { ContentEntry, FieldDefinition, FieldMigration, Site } from "@cloudhal/core-contracts";
 import { InvariantError } from "../errors.ts";
 import { convertContext, rewriteFields } from "../fields/migration.ts";
-import { sameJson } from "../fields/types.ts";
+import { fieldDefinitions, sameJson } from "../fields/types.ts";
+import { loadConversionEntries } from "../references/conversion-load.ts";
+import { hasReferenceFields } from "../references/issues.ts";
+import {
+  changedReferenceIds,
+  type DroppedReference,
+  dropMissingReferences,
+} from "../references/revert-drops.ts";
+import { readMembers, targetProblem } from "../references/targets.ts";
 import { renameSettingsReferences } from "../store/collection-settings.ts";
 import { markedField, markerGuard, pendingCondition, phaseCSite, withFields } from "./plan.ts";
 import { checkSectionReferences, checkSettingsReferences, renamedPages } from "./references.ts";
-import { type Decision, loadEntries, type Row, rewritePass } from "./rewrite.ts";
+import {
+  type Decide,
+  type Decision,
+  isSameSiteTranslation,
+  loadEntries,
+  type Row,
+  rewritePass,
+} from "./rewrite.ts";
 import { beforeSiteOf } from "./run.ts";
 import {
   labelOf,
@@ -48,6 +63,13 @@ function inverseMarker(
   op: FieldOperation,
   now: FieldDefinition | undefined,
 ): FieldMigration | undefined {
+  // RFC-0045 `sub`: the marker reads the sub-field's end state as the earlier one's source.
+  if (op.sub !== undefined) {
+    if (op.op === "rename_field") return { id, sub: op.sub, fromKey: op.to };
+    if (op.op !== "change_field_type" || now?.type !== "repeater") return undefined;
+    const sub = now.fields.find((f) => f.key === op.sub);
+    return sub ? { id, sub: op.sub, fromType: sub.type } : undefined;
+  }
   switch (op.op) {
     case "rename_field":
       return { id, fromKey: op.to };
@@ -73,13 +95,15 @@ function restoredSite(site: Site, op: FieldOperation, beforeSite: Site, id: stri
   else defs.splice(Math.min(index, defs.length), 0, def);
   const restored = withFields(site, op.collection, defs);
   // RFC-0042 §4: a rename's references in the stage 3 settings follow the key back.
-  return op.op === "rename_field"
+  return op.op === "rename_field" && op.sub === undefined
     ? renameSettingsReferences(restored, op.collection, op.to, op.from)
     : restored;
 }
 
 /** The operation that undoes `op` as far as references are concerned (RFC-0042 §4). */
 function inverseOf(op: FieldOperation, beforeSite: Site): FieldOperation | undefined {
+  // Settings and sections never name a repeater's sub-fields.
+  if (op.sub !== undefined) return undefined;
   if (op.op === "rename_field") return { ...op, from: op.to, to: op.from };
   if (op.op !== "change_field_type") return undefined;
   const was = beforeSite.collections?.[op.collection]?.fields?.find((d) => d.key === op.key);
@@ -90,6 +114,12 @@ function inverseOf(op: FieldOperation, beforeSite: Site): FieldOperation | undef
     key: op.key,
     type: was.type,
     ...(was.type === "select" ? { options: was.options, multiple: was.multiple === true } : {}),
+    ...(was.type === "reference"
+      ? { collections: was.collections, multiple: was.multiple === true, maxItems: was.maxItems }
+      : {}),
+    ...(was.type === "repeater"
+      ? { subFields: was.fields, maxItems: was.maxItems, itemLabel: was.itemLabel }
+      : {}),
   };
 }
 
@@ -154,6 +184,44 @@ async function restorable(
   return out;
 }
 
+/**
+ * RFC-0045 §7: the pass's decisions with restored references whose group has no member left in
+ * the site (in an allowed collection, any status) dropped; one read of their members per pass.
+ * The pass then guards the rest (`targets: "present"`), so a target deleted meanwhile skips the
+ * entry, and the next pass drops it.
+ */
+async function droppingMissing(
+  ctx: OperationContext,
+  site: Site,
+  input: { rows: readonly Row[]; decide: Decide },
+): Promise<{ decide: Decide; drops: Map<string, DroppedReference[]> }> {
+  const drops = new Map<string, DroppedReference[]>();
+  if (!hasReferenceFields(site)) return { decide: input.decide, drops };
+  const defsOf = (row: Row) => fieldDefinitions(site, (row.entry as ContentEntry).collection);
+  const valuesOf = (d: Decision) => d.replace?.fields ?? d.fields ?? {};
+  const ids = new Set<string>();
+  for (const row of input.rows) {
+    const d = input.decide(row, isSameSiteTranslation(row.entry));
+    if (d)
+      for (const id of changedReferenceIds(defsOf(row), valuesOf(d), row.entry.fields ?? {}))
+        ids.add(id);
+  }
+  const members = await readMembers(ctx.store.sql, site.id, [...ids]);
+  const keep = (groupId: string, collections: readonly string[]) =>
+    targetProblem(site, { groupId, collections, fresh: false }, members) === undefined;
+  const decide: Decide = (row, translation) => {
+    const d = input.decide(row, translation);
+    if (!d) return d;
+    const r = dropMissingReferences(defsOf(row), valuesOf(d), row.entry.fields ?? {}, keep);
+    if (r.dropped.length === 0) return d;
+    drops.set(row.entry.id, r.dropped);
+    return d.replace
+      ? { ...d, replace: { ...d.replace, fields: r.fields } }
+      : { ...d, fields: r.fields };
+  };
+  return { decide, drops };
+}
+
 export async function revertFieldOperation(
   store: OperationContext["store"],
   siteId: string,
@@ -190,26 +258,36 @@ export async function revertFieldOperation(
     before: new Map(before.nodes.map((n) => [n.id, n.hash])),
     after: new Map(after.nodes.map((n) => [n.id, n.hash])),
   };
-  const out: FieldRevertResult = { operationId, done: false, restored: 0, edited: [], skipped: [] };
+  const out: FieldRevertResult = {
+    operationId,
+    done: false,
+    restored: 0,
+    edited: [],
+    dropped: [],
+    skipped: [],
+  };
   for (let pass = 0; pass < 3; pass++) {
     site = await requireSite(ctx, siteId);
     const marked = markedField(site, op.collection, operationId);
     const rows = await loadEntries(ctx, siteId, op.collection);
     const earlier = await restorable(ctx, rows, snaps);
-    const convert = convertContext(site);
-    const decide = (row: Row, translation: boolean): Decision | undefined => {
+    // RFC-0045 §7: the inverse conversion's maps, read once before the pass.
+    const entries = marked ? await loadConversionEntries(ctx.store, site, [marked.def]) : undefined;
+    const convert = { ...convertContext(site), entries };
+    const raw = (row: Row, translation: boolean): Decision | undefined => {
       const body = earlier.get(row.entry.id);
       if (body) return { replace: body };
       if (!marked) return undefined;
       const r = rewriteFields({
         def: marked.def,
         values: row.entry.fields,
-        convert,
+        convert: { ...convert, group: row.entry.translation?.group ?? row.entry.id },
         translation,
         pristine: false,
       });
       return r.values ? { fields: r.values, change: r.change } : undefined;
     };
+    const { decide, drops } = await droppingMissing(ctx, site, { rows, decide: raw });
     const r = await rewritePass({
       ctx,
       site,
@@ -220,10 +298,13 @@ export async function revertFieldOperation(
       freshAlso: (sourceId) => (earlier.has(sourceId) ? snaps.before.get(sourceId) : undefined),
       done: out.restored + out.edited.length,
       lists: { collection: op.collection, keys: operationKeys(op) },
+      targets: "present",
     });
-    for (const w of r.written)
+    for (const w of r.written) {
       if (w.decision?.replace) out.restored++;
       else if (w.decision?.fields) out.edited.push(w.id);
+      for (const d of drops.get(w.id) ?? []) out.dropped.push({ entryId: w.id, ...d });
+    }
     out.skipped = r.skipped;
     if (r.exhausted) return out;
     if (r.skipped.length === 0) break;

@@ -84,6 +84,11 @@ export interface PassInput {
   /** Entries this call already rewrote (the budget counts across passes). */
   readonly done: number;
   /**
+   * RFC-0045 §7: what the target guard requires of changed reference values: `fresh` (phase B)
+   * only newly named ids, `present` (a revert) a member for every one (`rewriteTargetGuard`).
+   */
+  readonly targets?: "fresh" | "present" | undefined;
+  /**
    * RFC-0042 §4: the collection and the field keys the operation rewrites. Each batch resets
    * (`passResetStatement`) the list values of collections listing one of them, or any other key a
    * body of the batch changes (a revert's restored body can carry an edit made while the
@@ -161,7 +166,7 @@ async function statementsOf(
 ): Promise<SqlStatement[]> {
   // RFC-0045 §2.6: a rewrite that changes reference values writes them only under the target guard.
   const targets = p.fieldsChanged
-    ? rewriteTargetGuard(input.site, p.next, p.stored.entry)
+    ? rewriteTargetGuard(input.site, p.next, p.stored.entry, input.targets)
     : undefined;
   const cas = await casUpdateStatement(
     "contentEntry",

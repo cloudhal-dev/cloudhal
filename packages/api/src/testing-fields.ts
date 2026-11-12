@@ -183,14 +183,37 @@ export function describeFieldsApi(label: string, factory: ApiStoreFactory): void
           expect(refused.body.error).toBe("fields_unsupported");
         }
       expect((await site()).collections?.events).toBeUndefined();
-      // and no field operation turns a field into one (the API takes the nine types only)
+      // and no field operation turns a field into one: the route parses RFC-0045's inputs, and
+      // the store's dry run refuses the end state (rollout step 4)
       expect((await put(EVENTS)).status).toBe(200);
       const ops = `/api/sites/${siteId}/collections/events/fields/operations`;
-      const retype = await call(ops, {
+      for (const dryRun of [true, false]) {
+        const retype = await call(ops, {
+          method: "POST",
+          body: JSON.stringify({
+            op: "change_field_type",
+            key: "venue",
+            type: "reference",
+            collections: ["events"],
+            dryRun,
+          }),
+        });
+        expect(retype.status).toBe(409);
+        expect(retype.body.error).toBe("fields_unsupported");
+      }
+      const malformed = await call(ops, {
         method: "POST",
-        body: JSON.stringify({ op: "change_field_type", key: "venue", type: "reference" }),
+        body: JSON.stringify({
+          op: "change_field_type",
+          key: "venue",
+          type: "reference",
+          maxItems: "x",
+        }),
       });
-      expect(retype.status).toBe(400);
+      expect(malformed.status).toBe(400);
+      expect((await site()).collections?.events?.fields?.find((d) => d.key === "venue")?.type).toBe(
+        "text",
+      );
     });
 
     it("field operations: dry run, run, status, continue and revert (RFC-0041 §6)", async () => {

@@ -8,6 +8,7 @@
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type ConvertContext, convertFieldValue } from "./conversions.ts";
+import { rewriteItems } from "./migration-sub.ts";
 import { isRecord, type SiteFields, sameJson } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
@@ -23,8 +24,12 @@ export function migrationKind(def: FieldDefinition): FieldMigrationKind | undefi
   return "remove";
 }
 
-/** True while an operation removes the field: readers treat it as gone. */
-export const isBeingRemoved = (def: FieldDefinition): boolean => migrationKind(def) === "remove";
+/**
+ * True while an operation removes the field: readers treat it as gone. A sub-field removal
+ * (RFC-0045 `sub`) removes only that sub-value from items; the field stays.
+ */
+export const isBeingRemoved = (def: FieldDefinition): boolean =>
+  migrationKind(def) === "remove" && def.migration?.sub === undefined;
 
 /** The conversion context of a site (`UTC` and `en` when it names none). */
 export function convertContext(site: SiteFields) {
@@ -98,10 +103,41 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   };
 }
 
+/** RFC-0045 §7 `sub`: the repeater's items rewritten, each through the sub-field's own rule. */
+function rewriteSub(input: RewriteInput, values: Readonly<Record<string, unknown>>): RewriteResult {
+  const { def } = input;
+  if (def.type !== "repeater" || !Object.hasOwn(values, def.key)) return NOTHING;
+  const before = values[def.key];
+  const r = rewriteItems(def, before, {
+    convert: input.convert,
+    pristine: input.pristine,
+    onInvalid: input.onInvalid,
+    rewrite: rewriteFields,
+  });
+  if (r.unconvertible !== undefined)
+    return {
+      values: undefined,
+      change: { kind: "unconvertible", before, after: undefined, reason: r.unconvertible },
+    };
+  if (r.next === "unchanged") return NOTHING;
+  const next = r.next === undefined ? without(values, def.key) : { ...values, [def.key]: r.next };
+  const kind = r.cleared !== undefined ? "cleared" : SUB_KIND[migrationKind(def) ?? "remove"];
+  const reason = r.cleared === undefined ? {} : { reason: r.cleared };
+  return { values: next, change: { kind, before, after: r.next, ...reason } };
+}
+
+const SUB_KIND = {
+  rename: "moved",
+  retype: "converted",
+  localize: "converted",
+  remove: "removed",
+} as const satisfies Record<FieldMigrationKind, ValueChange["kind"]>;
+
 /** What an entry's `fields` become under `input.def`'s marker. */
 export function rewriteFields(input: RewriteInput): RewriteResult {
   const { def } = input;
   const values = isRecord(input.values) ? input.values : {};
+  if (def.migration?.sub !== undefined) return rewriteSub(input, values);
   switch (migrationKind(def)) {
     case "rename": {
       const from = def.migration?.fromKey as string;

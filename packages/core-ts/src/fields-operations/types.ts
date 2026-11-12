@@ -2,7 +2,12 @@
  * RFC-0041 §6: the four field operations, their reports and results. Shared by the runner, the
  * API routes and the CLI.
  */
-import type { Actor, FieldDefinition, FieldOption } from "@cloudhal/core-contracts";
+import type {
+  Actor,
+  FieldDefinition,
+  FieldOption,
+  SubFieldDefinition,
+} from "@cloudhal/core-contracts";
 import type { FieldType } from "../fields/types.ts";
 import type { SiteGraphStore } from "../store.ts";
 
@@ -32,22 +37,41 @@ export const FIELD_OPERATIONS: readonly FieldOperationName[] = [
   "remove_field",
 ];
 
-/** One operation as requested: what an agent tool, the API and the CLI send. */
+/**
+ * One operation as requested: what an agent tool, the API and the CLI send. RFC-0045 §7: `sub`
+ * names a repeater's sub-field (`from`/`key` is then the repeater), which the operation renames,
+ * converts or removes in every item.
+ */
 export type FieldOperation =
-  | { op: "rename_field"; collection: string; from: string; to: string }
+  | { op: "rename_field"; collection: string; from: string; to: string; sub?: string | undefined }
   | {
       op: "change_field_type";
       collection: string;
       key: string;
       type: FieldType;
+      sub?: string | undefined;
       /** The options of a new select (default: the field's own when it already is one). */
       options?: FieldOption[] | undefined;
       multiple?: boolean | undefined;
+      /** RFC-0045: a reference's target collections (required to a reference). */
+      collections?: string[] | undefined;
+      /** RFC-0045: a multiple reference's or a repeater's item cap. */
+      maxItems?: number | undefined;
+      /** RFC-0045: a repeater's sub-fields (required to a repeater) and the one naming items. */
+      subFields?: SubFieldDefinition[] | undefined;
+      itemLabel?: string | undefined;
       /** Drop values the table cannot convert; without it such values refuse the operation. */
       onInvalid?: "clear" | undefined;
     }
-  | { op: "set_field_localized"; collection: string; key: string; localized: boolean }
-  | { op: "remove_field"; collection: string; key: string };
+  | {
+      op: "set_field_localized";
+      collection: string;
+      key: string;
+      localized: boolean;
+      /** Refused: sub-fields share their repeater's `localized`. */
+      sub?: string | undefined;
+    }
+  | { op: "remove_field"; collection: string; key: string; sub?: string | undefined };
 
 /** Counts of what happens to values (per locale too). */
 export interface FieldValueCounts {
@@ -130,6 +154,11 @@ export interface FieldRevertResult {
   restored: number;
   /** Entries edited since the operation: converted back through the marker instead. */
   edited: string[];
+  /**
+   * RFC-0045 §7: restored references whose group has no member left in the site (in a collection
+   * the field allows), dropped from the restored value.
+   */
+  dropped: { entryId: string; field: string; targetId: string }[];
   skipped: { entryId: string; reason: string }[];
   snapshotId?: string;
 }
@@ -167,14 +196,22 @@ export function operationContext(
   };
 }
 
-/** The field key the operation names (a rename's current key). */
+/** The field key the operation names (a rename's current key; with `sub`, the repeater). */
 export const operationKey = (op: FieldOperation): string =>
   op.op === "rename_field" ? op.from : op.key;
 
-/** The field key once the operation is done. */
-export const finalKey = (op: FieldOperation): string => (op.op === "rename_field" ? op.to : op.key);
+/** The field key once the operation is done (a sub-field rename keeps the repeater's). */
+export const finalKey = (op: FieldOperation): string =>
+  op.op === "rename_field" && op.sub === undefined ? op.to : operationKey(op);
 
 /** Every field key the operation rewrites in entries (a rename's both). */
 export const operationKeys = (op: FieldOperation): string[] => [
   ...new Set([operationKey(op), finalKey(op)]),
 ];
+
+/** The sub-field the operation names (RFC-0045 `sub`), if any. */
+export const operationSub = (op: FieldOperation): string | undefined => op.sub;
+
+/** `speakers.name` for a sub-field operation, else the field key. */
+export const operationPath = (op: FieldOperation): string =>
+  op.sub === undefined ? operationKey(op) : `${operationKey(op)}.${op.sub}`;

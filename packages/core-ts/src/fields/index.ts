@@ -160,6 +160,7 @@ export {
   type ReferenceFieldDefinition,
   type ReferenceFieldType,
   type RepeaterFieldDefinition,
+  renamedFrom,
   type SiteFields,
   type SubFieldType,
 } from "./types.ts";
