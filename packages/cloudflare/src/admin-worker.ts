@@ -71,8 +71,9 @@ import { adminMail, type MailEnv } from "./mail.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
   type BackstopState,
+  cronTick,
   followUpDelay,
-  releasePurger,
+  publishNowPurge,
   requestBackstop,
   runAdminTick,
   type SchedulerEnv,
@@ -537,7 +538,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         // RFC-0008 §12–§13: the schedule routes and tools; "Publish now" purges like a tick.
         schedules: {
           store: new SqlScheduleStore(sql),
-          purge: releasePurger(env, sql, { log }),
+          ...publishNowPurge(env, sql, log),
           automationsEnabled: env.CLOUDHAL_AUTOMATIONS !== "off",
         },
         scheduler: {
@@ -571,8 +572,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
       await ensureMigrated(sql);
       const tick = (now: Date) =>
         runAdminTick(env, {
-          trigger: "cron",
-          now,
+          ...cronTick(controller, env, now),
           log,
           analytics: (s, at) => adminAnalytics(env, s, { now: () => at, log }),
           commentsOn: commentsOn(env),

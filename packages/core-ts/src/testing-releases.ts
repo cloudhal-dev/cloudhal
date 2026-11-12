@@ -4,7 +4,14 @@
  * purge plan, and the tick that runs them (`runScheduledTick`) — on SQLite and Miniflare D1.
  * Test names cite the invariants of RFC-0008 §17 they prove.
  */
-import type { Actor, ContentEntry, Release, Site, Snapshot } from "@cloudhal/core-contracts";
+import type {
+  Actor,
+  ContentEntry,
+  FieldDefinition,
+  Release,
+  Site,
+  Snapshot,
+} from "@cloudhal/core-contracts";
 import { isValid } from "@cloudhal/core-contracts";
 import { TICK_BUDGETS } from "@cloudhal/schedules";
 import type { BlobStore, SqlDriver } from "@cloudhal/storage";
@@ -12,6 +19,7 @@ import { dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { CachePurgePlan } from "./cache-purge.ts";
 import { ScheduledLockedError } from "./errors.ts";
+import { canonicalJson, nodeHash } from "./hash.ts";
 import { type PersonApproval, ReleaseService, runScheduledTick } from "./releases.ts";
 import { seedStarterSite } from "./seed.ts";
 import { SiteGraphStore } from "./store.ts";
@@ -48,7 +56,9 @@ export function releasesSuite(
       await dropAllTables(sql);
       now = T0;
       logs.length = 0;
-      store = new SiteGraphStore({ sql, blobs, now: () => new Date(now) });
+      // RFC-0045: references are enabled here (refused in production) for the purge re-plan case
+      const fieldTypes = { supported: () => true };
+      store = new SiteGraphStore({ sql, blobs, now: () => new Date(now), fieldTypes });
       await store.init();
       site = await seedStarterSite(store, { name: "Releases", slug: "releases" });
       news = (await store.getTermBySlug(site.id, "category", "news"))?.id as string;
@@ -485,7 +495,262 @@ export function releasesSuite(
       expect((await get(release.id)).state).toBe("published");
     });
 
-    it("sends the purge plan stored at pin time and records a deferred purge", async () => {
+    /** RFC-0045: a `venue` reference from events to places (enabled on this suite's store). */
+    async function venueSite() {
+      const s = await fresh();
+      const venue: FieldDefinition = {
+        key: "venue",
+        type: "reference",
+        labels: { en: { label: "Venue" } },
+        localized: false,
+        collections: ["places"],
+      };
+      site = await store.updateSite({
+        ...s,
+        collections: { ...s.collections, places: {}, events: { fields: [venue] } },
+      });
+      const hall = await story({ collection: "places", slug: "hall", title: "Hall" });
+      const event = await story({
+        collection: "events",
+        slug: "launch",
+        fields: { venue: hall.id },
+      });
+      await publishSite();
+      return { hall, event };
+    }
+    /** A blob store that counts gets by key. */
+    const counting = () => {
+      const gets: string[] = [];
+      const wrapped: BlobStore = new Proxy(blobs, {
+        get(target, prop, receiver) {
+          if (prop === "get")
+            return (key: string) => {
+              gets.push(key);
+              return target.get(key);
+            };
+          const v = Reflect.get(target, prop, receiver);
+          return typeof v === "function" ? v.bind(target) : v;
+        },
+      });
+      return { gets, blobs: wrapped };
+    };
+    const capture =
+      (plans: CachePurgePlan[], answer: "tags" | "everything" = "tags") =>
+      () =>
+      async (_siteId: string, plan: CachePurgePlan) => {
+        plans.push(plan);
+        return answer;
+      };
+
+    it("re-plans the purge at run time: a referrer published after the pin is purged (RFC-0045)", async () => {
+      const { hall } = await venueSite();
+      // the release retitles the hall; a referrer goes live after the pin, by an ordinary publish
+      await store.updateContentEntry({
+        ...((await store.getContentEntry(hall.id)) as ContentEntry),
+        title: "Main hall",
+      });
+      await scheduled([hall.id]);
+      const late = await story({ collection: "events", slug: "late", fields: { venue: hall.id } });
+      await publishSite();
+      const plans: CachePurgePlan[] = [];
+      expect((await tick(T, { purge: capture(plans) })).ran).toBe(1);
+      const tags = plans[0]?.mode === "tags" ? plans[0].tags : [];
+      expect(tags).toContain(`cloudhal-node-${hall.id}`);
+      expect(tags).toContain(`cloudhal-node-${late.id}`);
+    });
+
+    it("a site without references sends the pin-time plan, reading only the published site node", async () => {
+      // the same release twice: without a purger (Node: the executor sends nothing), then with
+      const first = await story();
+      await scheduled([first.id]);
+      const quiet = counting();
+      expect((await tick(T, { blobs: quiet.blobs })).ran).toBe(1);
+      const second = await story({ slug: "second-story", title: "Second story" });
+      const { release } = await scheduled([second.id], { at: T + HOUR });
+      const stored = await svc.schedules.releasePurgePlan(release.id);
+      const c = counting();
+      const plans: CachePurgePlan[] = [];
+      expect((await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) })).ran).toBe(1);
+      expect(plans).toEqual([stored]);
+      expect(c.gets.filter((k) => k.startsWith("bundles/"))).toEqual([]);
+      // one read more than a run that purges nothing: the published site node, for the gate
+      expect(c.gets).toHaveLength(quiet.gets.length + 1);
+    });
+
+    it("a run-time re-plan that fails still purges everything, never drops the purge", async () => {
+      const { hall } = await venueSite();
+      await store.updateContentEntry({
+        ...((await store.getContentEntry(hall.id)) as ContentEntry),
+        title: "Main hall",
+      });
+      await scheduled([hall.id]);
+      // after the release's batch, every snapshot read fails (a transient D1 error)
+      let committed = false;
+      const failing: SqlDriver = {
+        ...sql,
+        get: (q, p) => {
+          if (committed && /FROM snapshots/.test(q)) throw new Error("D1_ERROR: connection lost");
+          return sql.get(q, p);
+        },
+        all: (q, p) => sql.all(q, p),
+        run: (q, p) => sql.run(q, p),
+        exec: (q) => sql.exec(q),
+        close: () => sql.close(),
+        batch: async (statements) => {
+          const out = await sql.batch(statements);
+          if (statements.some((st) => /INSERT INTO snapshots/.test(st.sql))) committed = true;
+          return out;
+        },
+      };
+      const plans: CachePurgePlan[] = [];
+      const report = await tick(T, { sql: failing, purge: capture(plans, "everything") });
+      expect(report.ran).toBe(1);
+      expect(committed).toBe(true);
+      expect(plans.map((p) => p.mode)).toEqual(["everything"]);
+      const r = (await svc.list(site.id))[0] as Release;
+      expect(r.outcome).toMatchObject({ kind: "published", purge: "everything" });
+    });
+
+    const retitle = async (id: string, title: string) =>
+      store.updateContentEntry({ ...((await store.getContentEntry(id)) as ContentEntry), title });
+    const tagsOf = (p: CachePurgePlan | undefined) => (p?.mode === "tags" ? p.tags : []);
+    /** Writes the working site row directly (a definition change the store would refuse). */
+    async function rawSite(change: (s: Site) => Site) {
+      const s = await fresh();
+      const next = { ...change(s), rev: s.rev + 1 };
+      await sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+        next.rev,
+        await nodeHash(next),
+        canonicalJson(next),
+        s.id,
+      ]);
+    }
+
+    it("back-to-back releases on a reference site: a purge each, within the allowance", async () => {
+      const { hall, event } = await venueSite();
+      const releaseBlobs = { left: 350 };
+      const plans: CachePurgePlan[] = [];
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      await tick(T, { purge: capture(plans), releaseBlobs });
+      // the second run's `from` is the first's scheduled snapshot: no bundle, nobody read it
+      await retitle(hall.id, "Great hall");
+      await scheduled([hall.id], { at: T + HOUR });
+      await tick(T + HOUR, { purge: capture(plans), releaseBlobs });
+      expect(plans).toHaveLength(2);
+      for (const p of plans) {
+        expect(["tags", "everything"]).toContain(p.mode);
+        if (p.mode === "tags") expect(p.tags).toContain(`cloudhal-node-${event.id}`);
+      }
+      expect(releaseBlobs.left).toBeGreaterThanOrEqual(0);
+      expect(releaseBlobs.left).toBeLessThan(350);
+    });
+
+    it("gates on the published site node: a draft that drops the last reference field still re-plans", async () => {
+      const { hall, event } = await venueSite();
+      // the working copy drops `events.venue`, unpublished
+      await rawSite((s) => ({
+        ...s,
+        collections: { ...s.collections, events: {} },
+      }));
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      const plans: CachePurgePlan[] = [];
+      await tick(T, { purge: capture(plans) });
+      expect(tagsOf(plans[0])).toContain(`cloudhal-node-${event.id}`);
+    });
+
+    it("gates on the published site node: a draft that adds a first reference field sends the stored plan", async () => {
+      const first = await story();
+      await scheduled([first.id]);
+      const quiet = counting();
+      await tick(T, { blobs: quiet.blobs });
+      // the working copy gains a reference field, unpublished
+      const s = await fresh();
+      const venue: FieldDefinition = {
+        key: "venue",
+        type: "reference",
+        labels: { en: { label: "Venue" } },
+        localized: false,
+        collections: ["posts"],
+      };
+      site = await store.updateSite({
+        ...s,
+        collections: { ...s.collections, events: { fields: [venue] } },
+      });
+      const second = await story({ slug: "second-story", title: "Second story" });
+      const { release } = await scheduled([second.id], { at: T + HOUR });
+      const stored = await svc.schedules.releasePurgePlan(release.id);
+      const c = counting();
+      const plans: CachePurgePlan[] = [];
+      await tick(T + HOUR, { blobs: c.blobs, purge: capture(plans) });
+      expect(plans).toEqual([stored]);
+      // one read more than a run that purges nothing: the published site node, for the gate
+      expect(c.gets).toHaveLength(quiet.gets.length + 1);
+    });
+
+    it("Paid: a tick of 13 reference-site releases purges each by its tags", async () => {
+      const { hall, event } = await venueSite();
+      const ids: string[] = [hall.id];
+      for (let i = 0; i < 12; i++)
+        ids.push(
+          (await story({ collection: "places", slug: `place-${i}`, title: `Place ${i}` })).id,
+        );
+      await publishSite();
+      for (const [i, id] of ids.entries()) {
+        await retitle(id, `Retitled ${i}`);
+        await scheduled([id]);
+      }
+      const plans: CachePurgePlan[] = [];
+      const report = await tick(T, { purge: capture(plans), budget: TICK_BUDGETS.paid });
+      expect(report.ran).toBe(13);
+      expect(plans.map((p) => p.mode)).toEqual(Array(13).fill("tags"));
+      expect(plans.some((p) => tagsOf(p).includes(`cloudhal-node-${event.id}`))).toBe(true);
+    });
+
+    it("Paid: a reference site with more than 250 terms gets tags for a one-entry release", async () => {
+      const { hall, event } = await venueSite();
+      for (let i = 0; i < 260; i++)
+        await store.createTerm({
+          siteId: site.id,
+          taxonomyId: category,
+          slug: `topic-${i}`,
+          status: "active",
+          visibility: "public",
+          labels: { en: { name: `Topic ${i}` } },
+        });
+      await publishSite();
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      const plans: CachePurgePlan[] = [];
+      await tick(T, { purge: capture(plans), budget: TICK_BUDGETS.paid });
+      expect(tagsOf(plans[0])).toContain(`cloudhal-node-${event.id}`);
+    });
+
+    it("two ticks of one invocation share the allowance, charged by actual calls", async () => {
+      const { hall } = await venueSite();
+      const releaseBlobs = { left: 1000 };
+      await retitle(hall.id, "Main hall");
+      await scheduled([hall.id]);
+      await tick(T, { purge: capture([]), releaseBlobs });
+      const afterFirst = releaseBlobs.left;
+      expect(afterFirst).toBeLessThan(1000);
+      await retitle(hall.id, "Great hall");
+      await scheduled([hall.id], { at: T + HOUR });
+      await tick(T + HOUR, { purge: capture([]), releaseBlobs });
+      expect(releaseBlobs.left).toBeLessThan(afterFirst);
+      // spent: the next run purges everything without reading
+      releaseBlobs.left = 0;
+      await retitle(hall.id, "Grand hall");
+      await scheduled([hall.id], { at: T + 2 * HOUR });
+      const plans: CachePurgePlan[] = [];
+      await tick(T + 2 * HOUR, { purge: capture(plans), releaseBlobs });
+      expect(plans.map((p) => p.mode)).toEqual(["everything"]);
+      // the run's own calls (search, label, the gate) are counted, never refused: below 0
+      expect(releaseBlobs.left).toBeLessThan(0);
+    });
+
+    it("sends the purge re-planned at run time and records a deferred purge", async () => {
       const s = await story();
       await scheduled([s.id]);
       const plans: CachePurgePlan[] = [];

@@ -84,6 +84,10 @@ export {
   type ReferrerCandidates,
   referrerCandidates,
 } from "./references/reads.ts";
+export {
+  RELEASE_BLOB_ALLOWANCE,
+  releaseBlobAllowance,
+} from "./references/release-purge.ts";
 export type {
   PublishReleaseInput,
   PublishReleaseResult,

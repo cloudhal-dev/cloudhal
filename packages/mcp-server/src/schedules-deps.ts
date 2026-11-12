@@ -31,6 +31,8 @@ export interface SchedulesDeps {
   readonly maxNewBodies?: number | undefined;
   /** After "Publish now" commits a release (the Node server rebuilds its static site, #150). */
   readonly onReleasePublished?: ReleasePublishedHook | undefined;
+  /** RFC-0045: the deployment's tick budget, which sizes "Publish now"'s purge (default: Free's). */
+  readonly tickBudget?: { readonly maxQueries: number } | undefined;
 }
 
 /** True when the deployment serves schedules. */
@@ -50,6 +52,7 @@ export function releaseService(
     ...(deps.purge ? { purge: deps.purge } : {}),
     ...(deps.maxNewBodies !== undefined ? { maxNewBodies: deps.maxNewBodies } : {}),
     ...(deps.onReleasePublished ? { onReleasePublished: deps.onReleasePublished } : {}),
+    ...(deps.tickBudget ? { tickBudget: deps.tickBudget } : {}),
   });
 }
 

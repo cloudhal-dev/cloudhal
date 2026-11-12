@@ -15,6 +15,7 @@ import { createMiniflareD1, dropAllTables } from "@cloudhal/storage/testing";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   adminBuiltinInputs,
+  cronTick,
   followUpDelay,
   nextAlarm,
   releasePurger,
@@ -39,6 +40,19 @@ describe("the ticker's mode and budget", () => {
     );
     expect(tickBudget(env()).maxQueries).toBe(40);
     expect(tickBudget(env({ CLOUDHAL_TICK_BUDGET: "paid" })).maxQueries).toBe(900);
+  });
+
+  it("RFC-0045: the cron's ticks of one invocation share one R2 allowance for release purges", () => {
+    const one = {};
+    const a = cronTick(one, env(), new Date(0));
+    const b = cronTick(one, env(), new Date(60_000));
+    expect(a.trigger).toBe("cron");
+    expect(a.releaseBlobs).toBe(b.releaseBlobs);
+    expect(a.releaseBlobs.left).toBe(350);
+    expect(cronTick({}, env(), new Date(0)).releaseBlobs).not.toBe(a.releaseBlobs);
+    expect(cronTick({}, env({ CLOUDHAL_TICK_BUDGET: "paid" }), new Date(0)).releaseBlobs.left).toBe(
+      3000,
+    );
   });
 
   it("cron ignores pokes; alarm pokes the clock", async () => {
