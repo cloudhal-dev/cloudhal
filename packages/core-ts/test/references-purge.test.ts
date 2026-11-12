@@ -486,31 +486,95 @@ describe("planCachePurge: the referrer closure (RFC-0045 §2)", () => {
       return { sent, allowance, outcome };
     };
 
-    it("a site without references sends the stored plan with the allowance spent, or the gate read failing", async () => {
+    it("a site without references sends the stored plan with the allowance spent", async () => {
       const plain = await seedStarterSite(store, { name: "Plain", slug: "plain-release" });
       const a = await store.createSnapshot(plain.id, { actor: human, reason: "publish" });
       await store.publish(plain, a.id);
       const b = await store.createSnapshot(plain.id, { actor: human, reason: "manual" });
       const spent = await run({ siteId: plain.id, left: 0, from: a.id, to: b.id });
       expect(spent.sent).toEqual([stored]);
-      const failing = new SiteGraphStore({
+    });
+
+    // #213: the working row never decides. A draft that dropped its reference fields would send
+    // the closure-less stored plan while the live node still shows cards.
+    const failingGets = (fails: number) => {
+      let calls = 0;
+      const graph = new SiteGraphStore({
         sql: store.sql,
         blobs: new Proxy(store.blobs, {
           get(target, prop, receiver) {
             const v = Reflect.get(target, prop, receiver);
-            if (prop === "get") return async () => Promise.reject(new Error("R2 went away"));
+            if (prop === "get")
+              return async (...args: unknown[]) => {
+                calls++;
+                if (calls <= fails) throw new Error("R2 went away");
+                return (v as (...a: unknown[]) => unknown).apply(target, args);
+              };
             return typeof v === "function" ? v.bind(target) : v;
           },
         }),
       });
-      const broken = await run({
-        graph: failing,
+      return { graph, calls: () => calls };
+    };
+
+    it("a gate read that fails twice purges everything, even where the working row has no references", async () => {
+      const { hall } = await world();
+      const from = (await fresh()).publishedSnapshotId as string;
+      await edit(hall, { title: "Main hall" });
+      const to = await snap("manual");
+      // the working copy drops every reference definition (as a finished remove_field would)
+      const s = await fresh();
+      const events = s.collections?.events;
+      const next = {
+        ...s,
+        rev: s.rev + 1,
+        collections: {
+          ...s.collections,
+          events: {
+            ...events,
+            fields: (events?.fields ?? []).filter((d) => d.type !== "reference"),
+          },
+        },
+      } as unknown as Site;
+      await store.sql.run("UPDATE nodes SET rev = ?, hash = ?, body = ? WHERE id = ?", [
+        next.rev,
+        await nodeHash(next),
+        canonicalJson(next),
+        s.id,
+      ]);
+      const broken = failingGets(2);
+      const out = await run({ graph: broken.graph, left: 100, from, to: to.id });
+      expect(broken.calls()).toBe(2);
+      expect(out.sent).toHaveLength(1);
+      expect(out.sent[0]).toMatchObject({ mode: "everything" });
+      expect((out.sent[0] as { reason: string }).reason).toMatch(/published site node/);
+    });
+
+    it("a gate read that fails once is retried, and a site without references sends the stored plan", async () => {
+      const plain = await seedStarterSite(store, { name: "Plain", slug: "plain-retry" });
+      const a = await store.createSnapshot(plain.id, { actor: human, reason: "publish" });
+      await store.publish(plain, a.id);
+      const b = await store.createSnapshot(plain.id, { actor: human, reason: "manual" });
+      const flaky = failingGets(1);
+      const out = await run({
+        graph: flaky.graph,
         siteId: plain.id,
         left: 100,
         from: a.id,
         to: b.id,
       });
-      expect(broken.sent).toEqual([stored]);
+      expect(flaky.calls()).toBe(2);
+      expect(out.sent).toEqual([stored]);
+      // and failing for good: everything, not the stored plan
+      const down = failingGets(99);
+      const gone = await run({
+        graph: down.graph,
+        siteId: plain.id,
+        left: 100,
+        from: a.id,
+        to: b.id,
+      });
+      expect(gone.sent).toEqual([expect.objectContaining({ mode: "everything" })]);
     });
 
     it("a re-plan with more terms than reads left purges everything before reading anything", async () => {

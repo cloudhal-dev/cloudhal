@@ -15,12 +15,15 @@
  */
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { type ConvertContext, convertFieldValue } from "./conversions.ts";
-import { convertContext, isBeingRemoved } from "./migration.ts";
+import { convertContext, isBeingRemoved, rewriteFields } from "./migration.ts";
+import { rewriteItems } from "./migration-sub.ts";
+import { textReferenceOutcome } from "./text-reference.ts";
 import {
   type FieldIssue,
   fieldDefinitions,
   isKnownFieldType,
   isRecord,
+  renamedFrom,
   type SiteFields,
 } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
@@ -60,7 +63,7 @@ function readsOriginal(entry: FieldsEntry, original: FieldsOriginal | undefined)
 function read(values: unknown, def: FieldDefinition): unknown {
   if (!isRecord(values)) return undefined;
   if (Object.hasOwn(values, def.key)) return values[def.key];
-  const from = def.migration?.fromKey;
+  const from = renamedFrom(def);
   return from && Object.hasOwn(values, from) ? values[from] : undefined;
 }
 
@@ -92,23 +95,43 @@ export function resolveFields(
   convert?: Pick<ConvertContext, "entries">,
 ): ResolvedFields {
   const out: ResolvedFields = {};
+  // RFC-0045 §7: text → reference never picks the entry's own group.
+  const context = {
+    ...convertContext(site),
+    group: entry.translation?.group ?? entry.id,
+    ...convert,
+  };
   for (const def of fieldDefinitions(site, entry.collection)) {
     if (isBeingRemoved(def) || !isKnownFieldType(def.type)) continue;
-    const { value, fromOriginal } = pick(def, entry, original);
+    const picked = pick(def, entry, original);
+    const { fromOriginal } = picked;
+    const value = throughSub(def, picked.value, context);
     if (value === undefined) {
       out[def.key] = { def, value: undefined, fromOriginal: false };
       continue;
     }
+    // A sub-field marker converted the items already (`throughSub`).
+    const converting = def.migration?.sub === undefined ? def.migration?.fromType : undefined;
+    // RFC-0045 §7: text ↔ reference values are decided by the one shared rule.
+    const decided = converting
+      ? textReferenceOutcome({
+          from: converting,
+          def,
+          value,
+          convert: context,
+          written: false,
+        })
+      : undefined;
     const issues = valueIssues(def, value, `fields/${def.key}`);
     const first = issues[0];
-    if (!first) {
+    if (decided?.kind === "keep" || decided?.kind === "check" || (!decided && !first)) {
       out[def.key] = { def, value, fromOriginal };
       continue;
     }
-    const converting = def.migration?.fromType;
-    const converted = converting
-      ? convertFieldValue(converting, def, value, { ...convertContext(site), ...convert })
-      : undefined;
+    const converted =
+      converting && decided?.kind !== "fail"
+        ? convertFieldValue(converting, def, value, context)
+        : undefined;
     if (converted?.ok) {
       out[def.key] = {
         def,
@@ -122,15 +145,31 @@ export function resolveFields(
       value: undefined,
       fromOriginal,
       issue: {
-        path: first.path,
+        path: first?.path ?? `fields/${def.key}`,
         code: "field_value_unreadable",
         message: converting
           ? `a ${converting} value that does not convert to ${def.type}`
-          : first.message,
+          : (first?.message ?? "unreadable"),
       },
     };
   }
   return out;
+}
+
+/**
+ * RFC-0045 §7 `sub`: a repeater's items read through its sub-field marker. A sub-value the table
+ * cannot convert reads as none (an item left empty is dropped), as a top-level value does.
+ */
+function throughSub(def: FieldDefinition, value: unknown, convert: ConvertContext): unknown {
+  if (def.type !== "repeater" || def.migration?.sub === undefined || value === undefined)
+    return value;
+  const r = rewriteItems(def, value, {
+    convert,
+    pristine: false,
+    onInvalid: "clear",
+    rewrite: rewriteFields,
+  });
+  return r.next === "unchanged" ? value : r.next;
 }
 
 /** "Has a value" for `requiredToPublish`: not absent, not an empty string, not an empty list. */

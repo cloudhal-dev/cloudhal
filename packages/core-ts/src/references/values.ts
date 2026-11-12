@@ -30,11 +30,15 @@ export function referenceUses(def: FieldDefinition, value: unknown, path: string
   }
   if (def.type !== "repeater" || !Array.isArray(value)) return [];
   const subs = def.fields.filter((s) => s.type === "reference");
+  // RFC-0045 §7: a running sub-field rename's items still hold the old key.
+  const m = def.migration;
+  const old = (key: string) => (m?.sub === key ? m.fromKey : undefined);
   const out: ReferenceUse[] = [];
   value.forEach((item, i) => {
     if (!isRecord(item)) return;
     for (const sub of subs) {
-      const v = ownValue(item, sub.key);
+      const was = old(sub.key);
+      const v = ownValue(item, sub.key) ?? (was === undefined ? undefined : ownValue(item, was));
       if (typeof v === "string" && sub.type === "reference")
         out.push({ path: `${path}/${i}/${sub.key}`, groupId: v, collections: sub.collections });
     }

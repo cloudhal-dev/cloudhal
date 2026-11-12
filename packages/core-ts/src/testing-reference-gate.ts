@@ -126,19 +126,24 @@ export function referenceGateSuite(ctx: SuiteContext): void {
       expect((await store().getSite(site.id))?.collections).toEqual(site.collections);
     });
 
-    it("refuses a field operation that turns a field into one (step 4 adds them)", async () => {
+    it("refuses a field operation that turns a field into one, dry run included", async () => {
       const site = await setup();
-      for (const type of ["reference", "repeater"] as const)
-        expect(
-          await code(
-            runFieldOperation(
-              store(),
-              site.id,
-              { op: "change_field_type", collection: "events", key: "room", type },
-              { actor: person },
+      const into = [
+        { type: "reference", collections: ["events"] },
+        { type: "repeater", subFields: [{ key: "line", type: "text", labels: L("Line") }] },
+      ] as const;
+      for (const target of into)
+        for (const dryRun of [true, false])
+          expect(
+            await code(
+              runFieldOperation(
+                store(),
+                site.id,
+                { op: "change_field_type", collection: "events", key: "room", ...target } as never,
+                { actor: person, dryRun },
+              ),
             ),
-          ),
-        ).toBe("field_operation_unsupported");
+          ).toBe("fields_unsupported");
       expect((await store().getSite(site.id))?.collections).toEqual(site.collections);
     });
 

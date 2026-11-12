@@ -281,7 +281,9 @@ export class LiveSource implements GraphSource {
               [...needs].map((c) => this.#store.listContentEntries(this.#siteId, c)),
             )
           ).flat();
-      return visible(read, true);
+      // Every entry, archived ones too: an archived target still lends its title (reference →
+      // text), and `conversionEntries` keeps archived ones out of what text matches.
+      return read;
     });
     this.#conversions.set(collection, { at, maps });
     maps.catch(() => this.#conversions.delete(collection));

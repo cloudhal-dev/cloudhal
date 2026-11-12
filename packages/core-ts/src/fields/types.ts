@@ -172,6 +172,13 @@ export function fieldDefinitions(site: SiteFields, collection: string): readonly
   return site.collections?.[collection]?.fields ?? [];
 }
 
+/**
+ * The top-level key a running `rename_field` still reads values from. A sub-field rename (RFC-0045
+ * `migration.sub`) keeps the repeater's key, so its `fromKey` names a sub-field: none here.
+ */
+export const renamedFrom = (def: Pick<FieldDefinition, "migration">): string | undefined =>
+  def.migration?.sub === undefined ? def.migration?.fromKey : undefined;
+
 export const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 

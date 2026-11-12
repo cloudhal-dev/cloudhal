@@ -16,6 +16,7 @@ import {
 import type { SqlStatement } from "@cloudhal/storage";
 import { ConflictError } from "../errors.ts";
 import type { ValueChange } from "../fields/migration.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import { sameJson } from "../fields/types.ts";
 import { nodeHash } from "../hash.ts";
 import { passResetStatement } from "../list-values/state-sql.ts";
@@ -84,6 +85,15 @@ export interface PassInput {
   /** Entries this call already rewrote (the budget counts across passes). */
   readonly done: number;
   /**
+   * RFC-0045 §7: what the target guard requires of changed reference values: `fresh` (phase B)
+   * only newly named ids, `present` (a revert) a member for every one (`rewriteTargetGuard`).
+   */
+  readonly targets?: "fresh" | "present" | undefined;
+  /** RFC-0045 §7: a running text → reference path and its rows per node (phase B's guard). */
+  readonly converting?:
+    | { readonly path: string; readonly rowsOf: (nodeId: string) => FieldRows }
+    | undefined;
+  /**
    * RFC-0042 §4: the collection and the field keys the operation rewrites. Each batch resets
    * (`passResetStatement`) the list values of collections listing one of them, or any other key a
    * body of the batch changes (a revert's restored body can carry an edit made while the
@@ -99,6 +109,8 @@ export interface PassResult {
   written: { id: string; decision: Decision | undefined }[];
   /** The budget ran out before every planned entry was written. */
   exhausted: boolean;
+  /** RFC-0045 §7: entries left as they are because a value does not convert, with the reason. */
+  unconvertible: { entryId: string; reason: string }[];
 }
 
 /** Sources before the translations made from them (chains are short; capped at 8). */
@@ -161,7 +173,13 @@ async function statementsOf(
 ): Promise<SqlStatement[]> {
   // RFC-0045 §2.6: a rewrite that changes reference values writes them only under the target guard.
   const targets = p.fieldsChanged
-    ? rewriteTargetGuard(input.site, p.next, p.stored.entry)
+    ? rewriteTargetGuard(input.site, p.next, p.stored.entry, {
+        mode: input.targets,
+        converting: input.converting && {
+          path: input.converting.path,
+          rows: input.converting.rowsOf(p.next.id),
+        },
+      })
     : undefined;
   const cas = await casUpdateStatement(
     "contentEntry",
@@ -193,7 +211,17 @@ function resetKeys(keys: readonly string[], planned: readonly Planned[]): string
 export async function rewritePass(input: PassInput): Promise<PassResult> {
   const { ctx } = input;
   const { planned, decisions } = await planPass(input, ctx.stamp());
-  const out: PassResult = { rewritten: 0, skipped: [], written: [], exhausted: false };
+  const out: PassResult = {
+    rewritten: 0,
+    skipped: [],
+    written: [],
+    exhausted: false,
+    unconvertible: [...decisions].flatMap(([entryId, d]) =>
+      d?.change?.kind === "unconvertible" && !d.fields && !d.replace
+        ? [{ entryId, reason: d.change.reason ?? "does not convert" }]
+        : [],
+    ),
+  };
   // RFC-0045 §2.1: rows and target pairs come from the pass's definitions, so anchor them.
   let anchor: Cond | undefined;
   if (hasReferenceFields(input.site))

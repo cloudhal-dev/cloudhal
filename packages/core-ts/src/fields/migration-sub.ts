@@ -1,0 +1,139 @@
+/**
+ * RFC-0045 §7 `sub`: a field operation on one sub-field of a repeater. The marker sits on the
+ * repeater (`migration: { id, sub, fromKey | fromType }`; `sub` alone: the sub-field is being
+ * removed), and every item goes through the same per-value rule a top-level field does: the
+ * sub-field is read as a field (`subAsField`) carrying the marker without `sub`, and RFC-0041 §6's
+ * `rewriteFields` runs on the item. An item left empty is dropped, and a list left empty is no
+ * value. Pure and Worker-safe.
+ */
+import type { FieldDefinition, FieldMigration } from "@cloudhal/core-contracts";
+import { canonicalJson } from "../hash.ts";
+import type { ConvertContext } from "./conversions.ts";
+import type { FieldRows } from "./text-reference.ts";
+import { isRecord, type RepeaterFieldDefinition } from "./types.ts";
+
+/** One item's rewrite: what `rewriteFields` answers for the sub-field read as a field. */
+export interface ItemRewrite {
+  readonly values: Record<string, unknown> | undefined;
+  readonly change: { readonly kind: string; readonly reason?: string | undefined } | undefined;
+}
+
+export type RewriteItem = (input: {
+  def: FieldDefinition;
+  values: Readonly<Record<string, unknown>>;
+  convert: ConvertContext;
+  translation: boolean;
+  pristine: boolean;
+  onInvalid?: "clear" | undefined;
+  baseline?: { readonly value: unknown } | undefined;
+  rows?: FieldRows | undefined;
+}) => ItemRewrite;
+
+/** A sub-field as a field definition: the repeater's `localized`, and `migration` when given. */
+export function subAsField(
+  repeater: RepeaterFieldDefinition,
+  key: string,
+  migration?: FieldMigration,
+): FieldDefinition | undefined {
+  const sub = repeater.fields.find((s) => s.key === key);
+  if (!sub) return undefined;
+  return {
+    ...sub,
+    localized: repeater.localized,
+    ...(migration ? { migration } : {}),
+  } as unknown as FieldDefinition;
+}
+
+/** The sub-field marker as a top-level one (`sub` dropped), or undefined without `sub`. */
+export function subMarker(def: FieldDefinition): FieldMigration | undefined {
+  const m = def.migration;
+  if (m?.sub === undefined) return undefined;
+  const { sub: _sub, ...rest } = m;
+  return rest;
+}
+
+/** The stored items, as canonical JSON. */
+function storedItems(value: unknown): Set<string> {
+  return new Set(Array.isArray(value) ? value.filter(isRecord).map((i) => canonicalJson(i)) : []);
+}
+
+export interface ItemsResult {
+  /** The new list (`undefined`: no value), or `unchanged`. */
+  readonly next: unknown[] | undefined | "unchanged";
+  /** The first unconvertible item's reason (with `onInvalid` not `clear`). */
+  readonly unconvertible?: string | undefined;
+  /** Every unconvertible sub-value, as stored (its item is kept as it is in `next`). */
+  readonly failed?: readonly { readonly value: unknown; readonly stored: boolean }[] | undefined;
+  /** Some sub-value was dropped by `onInvalid: "clear"`. */
+  readonly cleared?: string | undefined;
+}
+
+/**
+ * The repeater's items under its `sub` marker. `rewrite` is RFC-0041's `rewriteFields`, passed
+ * in so this module and `migration.ts` do not import each other.
+ */
+export function rewriteItems(
+  def: RepeaterFieldDefinition,
+  value: unknown,
+  input: {
+    convert: ConvertContext;
+    pristine: boolean;
+    onInvalid?: "clear" | undefined;
+    /** A person's write: the repeater's stored value (an item found there unchanged is not written). */
+    baseline?: { readonly value: unknown } | undefined;
+    /** The node's rows for `<field>.<sub>` (every item's sub-value shares the path). */
+    rows?: FieldRows | undefined;
+    rewrite: RewriteItem;
+  },
+): ItemsResult {
+  const m = def.migration;
+  const marker = subMarker(def);
+  if (m?.sub === undefined || !marker || !Array.isArray(value)) return { next: "unchanged" };
+  // A removal's sub-field is still defined (phase C drops it); a rename's carries the new key.
+  const sub = subAsField(def, m.sub, marker);
+  if (!sub) return { next: "unchanged" };
+  let changed = false;
+  let cleared: string | undefined;
+  let unconvertible: string | undefined;
+  const failed: { value: unknown; stored: boolean }[] = [];
+  const out: unknown[] = [];
+  const stored = input.baseline === undefined ? undefined : storedItems(input.baseline.value);
+  for (const item of value) {
+    if (!isRecord(item)) {
+      out.push(item);
+      continue;
+    }
+    // An item the write left as stored keeps its sub-value's baseline; any other is written.
+    const baseline = stored && {
+      value: stored.has(canonicalJson(item)) ? item[sub.key] : undefined,
+    };
+    const r = input.rewrite({
+      def: sub,
+      values: item,
+      convert: input.convert,
+      translation: false,
+      pristine: input.pristine,
+      onInvalid: input.onInvalid,
+      baseline,
+      rows: input.rows,
+    });
+    // Item by item: a failing sub-value stays as stored, the others convert.
+    if (r.change?.kind === "unconvertible") {
+      unconvertible ??= r.change.reason ?? "unconvertible";
+      // Stored: the write left this item as it was (no baseline: the operation's own pass).
+      failed.push({ value: item[sub.key], stored: !stored || stored.has(canonicalJson(item)) });
+      out.push(item);
+      continue;
+    }
+    if (r.change?.kind === "cleared") cleared ??= r.change.reason;
+    if (!r.values) {
+      out.push(item);
+      continue;
+    }
+    changed = true;
+    if (Object.keys(r.values).length > 0) out.push(r.values);
+  }
+  const failures = unconvertible === undefined ? {} : { unconvertible, failed };
+  if (!changed) return { next: "unchanged", ...failures };
+  return { next: out.length > 0 ? out : undefined, cleared, ...failures };
+}

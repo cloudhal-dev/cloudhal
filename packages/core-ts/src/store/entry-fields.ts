@@ -24,10 +24,16 @@ import {
   normalizeThroughMarkers,
   refuseFieldIssues,
 } from "../fields/index.ts";
-import { sameJson } from "../fields/types.ts";
+import type { FailedValue } from "../fields/migration.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
+import { isRecord, sameJson } from "../fields/types.ts";
 import { fieldAssetIssues, fieldAssetRefs } from "../media/field-refs.ts";
 import type { AssetRefUse } from "../media/refs.ts";
 import type { Cond } from "../node-sql.ts";
+import { loadConversionEntries } from "../references/conversion-load.ts";
+import type { ConversionEntries } from "../references/conversion-maps.ts";
+import { convertingPath, loadNodeRows } from "../references/conversion-rows.ts";
+import type { HeldRef } from "../references/writer.ts";
 import type { StoreContext } from "./context.ts";
 
 /** What the field checks add to an entry write. */
@@ -68,15 +74,121 @@ async function originalOf(
  * a value still in the old type converts, a removed field or a translation's copy of a field that
  * stops being localized goes), so a person's edit and the operation converge.
  */
-export function normalizeEntryFields(site: Site, draft: ContentEntry): ContentEntry {
+export function normalizeEntryFields(
+  site: Site,
+  draft: ContentEntry,
+  options: {
+    /** RFC-0045 §7: the text ↔ reference rows' maps, and the node's rows for the path. */
+    entries?: ConversionEntries | undefined;
+    rows?: FieldRows | undefined;
+    /**
+     * A person's write, with the stored entry (none: a new entry): a value the write changed is
+     * written under the new type. Absent: the stored entry itself, normalized as the baseline.
+     */
+    write?: { stored: ContentEntry | undefined } | undefined;
+    /** The definitions whose value does not convert (kept as stored; the writer leaves its rows). */
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly FailedValue[]) => void) | undefined;
+  } = {},
+): ContentEntry {
   const defs = fieldDefinitions(site, draft.collection);
   if (!defs.some((d) => d.migration)) return draft;
   const t = draft.translation;
+  const stored = options.write?.stored;
   const fields = normalizeThroughMarkers(defs, draft.fields, {
-    convert: convertContext(site),
+    // RFC-0045 §7: the text ↔ reference rows' maps, and the group text → reference skips.
+    convert: { ...convertContext(site), entries: options.entries, group: t?.group ?? draft.id },
+    stored: options.write
+      ? stored?.collection === draft.collection
+        ? (stored.fields ?? {})
+        : {}
+      : undefined,
+    rows: options.rows,
+    onUnconvertible: options.onUnconvertible,
     translation: !!t && t.group !== draft.id && t.source?.siteId === undefined,
   });
   return fields ? { ...draft, fields } : draft;
+}
+
+/** The strings of a value (a string, or a list's). */
+const idsOf = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [value]).filter((v): v is string => typeof v === "string");
+
+/** The ids the draft holds at a converting path: the field's value, or the sub-field's items'. */
+function idsAtPath(def: FieldDefinition, fields: ContentEntry["fields"]): string[] {
+  const value = (fields ?? {})[def.key];
+  const sub = def.migration?.sub;
+  if (sub === undefined) return idsOf(value);
+  return Array.isArray(value) ? value.flatMap((i) => (isRecord(i) ? idsOf(i[sub]) : [])) : [];
+}
+
+/**
+ * The held pairs. Converting to references, per occurrence: an id the draft also holds in an
+ * accepted or converted item (it occurs more often than in the failing stored ones) is not held,
+ * so it gets its guard and row. Converting from references, every stored failing id is held.
+ */
+function heldRefs(
+  failures: readonly { def: FieldDefinition; f: string; ids: readonly string[] }[],
+  fields: ContentEntry["fields"],
+): HeldRef[] {
+  const out: HeldRef[] = [];
+  for (const { def, f, ids } of failures) {
+    const count = (list: readonly string[], id: string) => list.filter((x) => x === id).length;
+    const all = idsAtPath(def, fields);
+    // Only converting to references does another occurrence get its own guard and row; from
+    // references, every stored failing id keeps its rows until phase B reports it.
+    const toReference = def.migration?.fromType === "text";
+    for (const t of new Set(ids))
+      if (!toReference || count(all, t) <= count(ids, t)) out.push({ f, t });
+  }
+  return out;
+}
+
+/**
+ * RFC-0045 §7: a write's draft and its stored entry through the markers. A running text ↔
+ * reference conversion's maps, and the node's rows for its path, are read only while one runs:
+ * the values are decided by the rows phase C reads. The stored entry, normalized the same way, is
+ * the baseline of what the write changed; `held` lists the paths whose value did not convert,
+ * whose rows the write leaves as they are.
+ */
+export async function normalizeWrite(
+  ctx: StoreContext,
+  site: Site,
+  write: { draft: ContentEntry; stored: ContentEntry | undefined },
+): Promise<{
+  draft: ContentEntry;
+  baseline: ContentEntry | undefined;
+  held: HeldRef[];
+  rows: { path: string; rows: FieldRows } | undefined;
+}> {
+  const { stored } = write;
+  const defs = fieldDefinitions(site, write.draft.collection);
+  const entries = await loadConversionEntries(ctx.graph, site, defs);
+  const rows = entries
+    ? await loadNodeRows(ctx.sql, {
+        siteId: site.id,
+        nodeId: stored?.id,
+        collection: write.draft.collection,
+        defs,
+      })
+    : undefined;
+  const failures: { def: FieldDefinition; f: string; ids: string[] }[] = [];
+  const draft = normalizeEntryFields(site, write.draft, {
+    entries,
+    rows,
+    write: { stored },
+    // Per value: only a stored value that did not convert keeps its rows as they are; one the
+    // person newly wrote is guarded like any choice.
+    onUnconvertible: (def, failed) => {
+      const f = convertingPath(def);
+      if (f === undefined) return;
+      const ids = failed.filter((x) => x.stored).flatMap((x) => idsOf(x.value));
+      failures.push({ def, f, ids });
+    },
+  });
+  const held = heldRefs(failures, draft.fields);
+  const baseline = stored && normalizeEntryFields(site, stored, { entries, rows });
+  const path = defs.map(convertingPath).find((p) => p !== undefined);
+  return { draft, baseline, held, rows: rows && path !== undefined ? { path, rows } : undefined };
 }
 
 /** Checks the field part of an entry write and plans its asset references; throws on issues. */

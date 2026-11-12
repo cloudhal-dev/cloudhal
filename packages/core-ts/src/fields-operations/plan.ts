@@ -6,22 +6,26 @@
  */
 import type { FieldDefinition, FieldMigration, Site } from "@cloudhal/core-contracts";
 import { InvariantError } from "../errors.ts";
-import { isReferenceFieldType, RESERVED_FIELD_KEYS } from "../fields/types.ts";
+import { RESERVED_FIELD_KEYS } from "../fields/types.ts";
 import type { Cond } from "../node-sql.ts";
 import { renameSettingsReferences } from "../store/collection-settings.ts";
+import {
+  checkSub,
+  listRowsPending,
+  subApplied,
+  subMarkerOf,
+  subPending,
+  subTarget,
+  textReferencePending,
+  withoutSub,
+} from "./plan-sub.ts";
+import { checkRetype, retyped } from "./retype.ts";
 import { FIELD_OPERATIONS, type FieldOperation, finalKey, operationKey } from "./types.ts";
 
 const KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
 const COLLECTION = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-function refuse(
-  code:
-    | "unknown_field"
-    | "field_key_duplicate"
-    | "field_key_reserved"
-    | "field_operation_unsupported",
-  msg: string,
-) {
+function refuse(code: "unknown_field" | "field_key_duplicate" | "field_key_reserved", msg: string) {
   return new InvariantError(code, msg, { issues: [] });
 }
 
@@ -55,33 +59,9 @@ export function runningMarker(defs: readonly FieldDefinition[]): FieldMigration 
   return defs.find((d) => d.migration)?.migration;
 }
 
-const COMMON = ["key", "type", "labels", "localized", "requiredToPublish"] as const;
-
-/** The definition `change_field_type` ends with: the shared properties plus the new type's. */
-function retyped(def: FieldDefinition, op: Extract<FieldOperation, { op: "change_field_type" }>) {
-  const base: Record<string, unknown> = {};
-  const was = def as unknown as Record<string, unknown>;
-  for (const k of COMMON) if (was[k] !== undefined) base[k] = was[k];
-  base.type = op.type;
-  if (op.type === "boolean") delete base.requiredToPublish;
-  const searchable = "searchable" in def ? def.searchable : undefined;
-  if ((op.type === "text" || op.type === "richText") && searchable !== undefined)
-    base.searchable = searchable;
-  if (op.type === "select") {
-    const options = op.options ?? (def.type === "select" ? def.options : undefined);
-    if (!options?.length)
-      throw new InvariantError("invalid_fields", "a select needs its options", {
-        issues: [{ path: "options", code: "invalid_value", message: "at least one option" }],
-      });
-    base.options = options;
-    const multiple = op.multiple ?? (def.type === "select" ? def.multiple : undefined);
-    if (multiple) base.multiple = true;
-  }
-  return base as unknown as FieldDefinition;
-}
-
 /** The definition the operation ends with; `null` for `remove_field`. */
 export function targetDefinition(def: FieldDefinition, op: FieldOperation): FieldDefinition | null {
+  if (op.sub !== undefined) return subTarget(def, { ...op, sub: op.sub });
   switch (op.op) {
     case "rename_field":
       return { ...def, key: op.to };
@@ -97,17 +77,10 @@ export function targetDefinition(def: FieldDefinition, op: FieldOperation): Fiel
 /** Checks the request against the collection; throws when it can never run as written. */
 export function checkOperation(site: Site, op: FieldOperation): void {
   const { defs, def } = currentDefinition(site, op);
-  // RFC-0045 §2.6: no operation turns a field into, or rewrites, a reference or repeater until
-  // rollout step 4.
-  if (
-    isReferenceFieldType(def.type) ||
-    (op.op === "change_field_type" && isReferenceFieldType(op.type))
-  )
-    throw refuse(
-      "field_operation_unsupported",
-      `field operations on reference and repeater fields are not available yet (${def.key})`,
-    );
-  if (op.op === "rename_field") {
+  // RFC-0045 §7: reference and repeater fields take every operation; the types themselves stay
+  // refused by `checkFieldDefinitions`' gate until rollout step 7.
+  if (op.sub !== undefined) checkSub(def, { ...op, sub: op.sub });
+  else if (op.op === "rename_field") {
     if (!KEY.test(op.to))
       throw refuse("field_key_reserved", `${op.to} is not a field key (lower camelCase)`);
     if (RESERVED_FIELD_KEYS.has(op.to))
@@ -115,12 +88,12 @@ export function checkOperation(site: Site, op: FieldOperation): void {
     if (defs.some((d) => d.key === op.to))
       throw refuse("field_key_duplicate", `${op.to} is already a field of ${op.collection}`);
   }
-  if (op.op === "change_field_type" && def.type === op.type && op.type !== "select")
-    throw new InvariantError("invalid_fields", `${def.key} already is a ${op.type} field`);
+  if (op.op === "change_field_type") checkRetype(def, op);
 }
 
 /** Phase A's marker: the operation id and what readers fall back to. */
 export function markerOf(id: string, def: FieldDefinition, op: FieldOperation): FieldMigration {
+  if (op.sub !== undefined) return subMarkerOf(id, def, { ...op, sub: op.sub });
   switch (op.op) {
     case "rename_field":
       return { id, fromKey: def.key };
@@ -147,10 +120,12 @@ export function withFields(site: Site, collection: string, fields: FieldDefiniti
  */
 export function phaseASite(site: Site, op: FieldOperation, id: string): Site {
   const { defs, def, index } = currentDefinition(site, op);
-  const marked = { ...(targetDefinition(def, op) ?? def), migration: markerOf(id, def, op) };
+  // A removal keeps the definition (a sub-field's too) until phase C.
+  const target = op.op === "remove_field" ? def : (targetDefinition(def, op) ?? def);
+  const marked = { ...target, migration: markerOf(id, def, op) };
   const fields = defs.map((d, i) => (i === index ? (marked as FieldDefinition) : d));
   const next = withFields(site, op.collection, fields);
-  return op.op === "rename_field"
+  return op.op === "rename_field" && op.sub === undefined
     ? renameSettingsReferences(next, op.collection, op.from, op.to)
     : next;
 }
@@ -168,10 +143,19 @@ export function phaseCSite(site: Site, collection: string, id: string): Site | u
   if (!found) return undefined;
   const { defs, def, index } = found;
   const { migration, ...plain } = def;
-  const removing = migration && Object.keys(migration).length === 1;
-  const fields = removing
-    ? defs.filter((_, i) => i !== index)
-    : defs.map((d, i) => (i === index ? (plain as FieldDefinition) : d));
+  const removing =
+    migration?.fromKey === undefined &&
+    migration?.fromType === undefined &&
+    migration?.fromLocalized === undefined;
+  const sub = migration?.sub;
+  const ended =
+    removing && sub !== undefined && plain.type === "repeater"
+      ? withoutSub(plain, sub)
+      : (plain as FieldDefinition);
+  const fields =
+    removing && sub === undefined
+      ? defs.filter((_, i) => i !== index)
+      : defs.map((d, i) => (i === index ? ended : d));
   return withFields(site, collection, fields);
 }
 
@@ -180,15 +164,14 @@ export function isApplied(site: Site, op: FieldOperation, target: FieldDefinitio
   const defs = site.collections?.[op.collection]?.fields ?? [];
   if (defs.some((d) => d.migration)) return false;
   const now = defs.find((d) => d.key === finalKey(op));
+  if (op.sub !== undefined)
+    return !!now && !!target && subApplied(now, { ...op, sub: op.sub }, target);
   if (op.op === "remove_field") return now === undefined;
   if (!now || !target) return false;
   if (op.op === "rename_field") return !defs.some((d) => d.key === op.from);
   if (op.op === "set_field_localized") return now.localized === op.localized;
-  return (
-    now.type === target.type &&
-    (now.type !== "select" ||
-      (target.type === "select" && (now.multiple === true) === (target.multiple === true)))
-  );
+  const list = (d: FieldDefinition) => "multiple" in d && d.multiple === true;
+  return now.type === target.type && list(now) === list(target);
 }
 
 const IN_COLLECTION =
@@ -199,8 +182,16 @@ function jsonTypes(def: FieldDefinition): string[] {
   if (def.type === "number") return ["integer", "real"];
   if (def.type === "boolean") return ["true", "false"];
   if (def.type === "datetime") return ["object"];
-  if (def.type === "select" && def.multiple) return ["array"];
+  if ((def.type === "select" || def.type === "reference") && def.multiple) return ["array"];
+  if (def.type === "repeater") return ["array"];
   return ["text"];
+}
+
+/** The JSON type of an unconverted list's first element, where both types store arrays. */
+function listItemType(def: FieldDefinition, from: string): string | undefined {
+  if (def.type === "repeater" && from === "reference") return "text";
+  if (def.type === "reference" && def.multiple && from === "repeater") return "object";
+  return undefined;
 }
 
 /**
@@ -216,6 +207,7 @@ export function pendingCondition(
   if (!m) return undefined;
   const path = `$.fields.${def.key}`;
   const base = { sql: IN_COLLECTION, params: [siteId, collection] };
+  if (m.sub !== undefined) return subPending(base, def, jsonTypes);
   if (m.fromKey !== undefined)
     return {
       sql: `${base.sql} AND json_type(body, ?) IS NOT NULL`,
@@ -223,9 +215,24 @@ export function pendingCondition(
     };
   if (m.fromType !== undefined) {
     const types = jsonTypes(def);
+    // RFC-0045 §7: a list of ids and a list of items are both arrays; their first element differs.
+    const item = listItemType(def, m.fromType);
+    const multiple = "multiple" in def && def.multiple === true;
+    const id = !multiple
+      ? textReferencePending(def.type, m.fromType, { doc: "body", path, field: def.key })
+      : def.type === "reference" && m.fromType === "text"
+        ? listRowsPending(path, def.key)
+        : undefined;
     return {
-      sql: `${base.sql} AND json_type(body, ?) IS NOT NULL AND json_type(body, ?) NOT IN (${types.map(() => "?").join(", ")})`,
-      params: [...base.params, path, path, ...types],
+      sql: `${base.sql} AND json_type(body, ?) IS NOT NULL AND (json_type(body, ?) NOT IN (${types.map(() => "?").join(", ")})${item ? " OR json_type(body, ?) = ?" : ""}${id ? ` OR ${id.sql}` : ""})`,
+      params: [
+        ...base.params,
+        path,
+        path,
+        ...types,
+        ...(item ? [`${path}[0]`, item] : []),
+        ...(id?.params ?? []),
+      ],
     };
   }
   if (m.fromLocalized !== undefined) {

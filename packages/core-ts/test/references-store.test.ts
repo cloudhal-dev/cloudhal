@@ -294,6 +294,48 @@ describe("release dependencies (§2.7)", () => {
 
   it("leaves bodies without reference definitions as they are", () => {
     expect(stripReferences({ collections: {} }, body)).toBe(body);
+    // RFC-0045 §7: through the markers, a sub-field rename's old key and a conversion from references
+    const marked = {
+      collections: {
+        events: {
+          fields: [
+            {
+              key: "speakers",
+              type: "repeater",
+              labels: { en: { label: "S" } },
+              localized: false,
+              fields: [
+                {
+                  key: "host",
+                  type: "reference",
+                  labels: { en: { label: "H" } },
+                  collections: ["places"],
+                },
+              ],
+              migration: { id: "snap_01HZX8K3Q9OP", sub: "host", fromKey: "person" },
+            },
+            {
+              key: "venue",
+              type: "text",
+              labels: { en: { label: "V" } },
+              localized: false,
+              migration: { id: "snap_01HZX8K3Q9OP", fromType: "reference" },
+            },
+          ],
+        },
+      },
+    } as never;
+    const stale = {
+      collection: "events",
+      fields: {
+        speakers: [{ person: "entry_HALL000001", name: "Ada" }],
+        venue: "entry_ROOM000001",
+      },
+    };
+    expect(stripReferences(marked, stale)).toEqual({
+      collection: "events",
+      fields: { speakers: [{ name: "Ada" }], venue: undefined },
+    });
   });
 });
 

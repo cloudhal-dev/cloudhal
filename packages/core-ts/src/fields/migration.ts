@@ -7,8 +7,10 @@
  * reader agrees however many entries remain. Pure and Worker-safe.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { type ConvertContext, convertFieldValue } from "./conversions.ts";
-import { isRecord, type SiteFields, sameJson } from "./types.ts";
+import { type Conversion, type ConvertContext, convertFieldValue } from "./conversions.ts";
+import { rewriteItems, subAsField } from "./migration-sub.ts";
+import { type FieldRows, textReferenceOutcome } from "./text-reference.ts";
+import { isRecord, renamedFrom, type SiteFields, sameJson } from "./types.ts";
 import { valueIssues } from "./value-checks.ts";
 
 export type FieldMigrationKind = "rename" | "retype" | "localize" | "remove";
@@ -23,8 +25,12 @@ export function migrationKind(def: FieldDefinition): FieldMigrationKind | undefi
   return "remove";
 }
 
-/** True while an operation removes the field: readers treat it as gone. */
-export const isBeingRemoved = (def: FieldDefinition): boolean => migrationKind(def) === "remove";
+/**
+ * True while an operation removes the field: readers treat it as gone. A sub-field removal
+ * (RFC-0045 `sub`) removes only that sub-value from items; the field stays.
+ */
+export const isBeingRemoved = (def: FieldDefinition): boolean =>
+  migrationKind(def) === "remove" && def.migration?.sub === undefined;
 
 /** The conversion context of a site (`UTC` and `en` when it names none). */
 export function convertContext(site: SiteFields) {
@@ -49,6 +55,21 @@ export interface RewriteInput {
   readonly pristine: boolean;
   /** `"clear"` drops values that cannot be converted; otherwise they stay as stored. */
   readonly onInvalid?: "clear" | undefined;
+  /**
+   * RFC-0045 §7: a person's write only: the field's stored value, so a value the write changed
+   * counts as written under the new type (`text-reference.ts`).
+   */
+  readonly baseline?: { readonly value: unknown } | undefined;
+  /**
+   * RFC-0045 §7: the node's `entry_refs` rows for the converting field path, which decide text ↔
+   * reference values for the writers (`text-reference.ts`); absent for readers.
+   */
+  readonly rows?: FieldRows | undefined;
+  /**
+   * A person's write: a repeater converts its items one by one, keeping a failing item as stored
+   * (phase B, the dry run and the revert treat any failing item as the entry's failure).
+   */
+  readonly partial?: boolean | undefined;
 }
 
 /** How one entry's value changes under a marker. */
@@ -63,6 +84,17 @@ export interface RewriteResult {
   /** The new `fields`, or undefined when nothing changes. */
   readonly values: Record<string, unknown> | undefined;
   readonly change: ValueChange | undefined;
+  /**
+   * RFC-0045 §7: the values that did not convert, as stored (a field's value, or a repeater's
+   * failing sub-values), so a person's write can keep their rows as they are.
+   */
+  readonly failed?: readonly FailedValue[] | undefined;
+}
+
+/** A value that did not convert, and whether it is the stored one (a person did not write it). */
+export interface FailedValue {
+  readonly value: unknown;
+  readonly stored: boolean;
 }
 
 const NOTHING: RewriteResult = { values: undefined, change: undefined };
@@ -78,9 +110,31 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   const from = def.migration?.fromType;
   if (!from || !Object.hasOwn(values, def.key)) return NOTHING;
   const before = values[def.key];
-  const fits = valueIssues(def, before, "v").length === 0;
+  // RFC-0045 §7: for text ↔ reference, "fits" says nothing; one rule decides (`text-reference.ts`).
+  const written = input.baseline !== undefined && !sameJson(before, input.baseline.value);
+  const decided = textReferenceOutcome({
+    from,
+    def,
+    value: before,
+    convert,
+    rows: input.rows,
+    written,
+  });
+  if (decided?.kind === "keep") return NOTHING;
+  if (decided?.kind === "check") {
+    // Kept, but written again (a list for a multiple reference) so the guard and rows run.
+    const value = "multiple" in def && def.multiple && !Array.isArray(before) ? [before] : before;
+    return {
+      values: { ...values, [def.key]: value },
+      change: { kind: "converted", before, after: value },
+    };
+  }
+  const fits = decided === undefined && valueIssues(def, before, "v").length === 0;
   if (fits && (!pristine || from === def.type)) return NOTHING;
-  const out = convertFieldValue(from, def, before, convert);
+  const out: Conversion =
+    decided?.kind === "fail"
+      ? { ok: false, reason: decided.reason }
+      : convertFieldValue(from, def, before, convert);
   if (out.ok) {
     if (sameJson(out.value, before)) return NOTHING;
     const next =
@@ -95,13 +149,61 @@ function retype(input: RewriteInput, values: Readonly<Record<string, unknown>>):
   return {
     values: undefined,
     change: { kind: "unconvertible", before, after: undefined, reason: out.reason },
+    failed: [{ value: before, stored: !written }],
   };
 }
+
+/** RFC-0045 §7 `sub`: the repeater's items rewritten, each through the sub-field's own rule. */
+function rewriteSub(input: RewriteInput, values: Readonly<Record<string, unknown>>): RewriteResult {
+  const { def } = input;
+  if (def.type !== "repeater" || !Object.hasOwn(values, def.key)) return NOTHING;
+  const before = values[def.key];
+  const r = rewriteItems(def, before, {
+    convert: input.convert,
+    pristine: input.pristine,
+    onInvalid: input.onInvalid,
+    baseline: input.baseline,
+    rows: input.rows,
+    rewrite: rewriteFields,
+  });
+  if (r.unconvertible !== undefined) {
+    const change = {
+      kind: "unconvertible" as const,
+      before,
+      after: undefined,
+      reason: r.unconvertible,
+    };
+    // A person's write keeps the items that converted, when every failing one still fits the new
+    // sub-field (an id-shaped value: else the write would not check); the passes fail the entry.
+    const sub = def.migration?.sub === undefined ? undefined : subAsField(def, def.migration.sub);
+    const fit = (r.failed ?? []).every((f) => !sub || valueIssues(sub, f.value, "v").length === 0);
+    const kept =
+      input.partial && fit && r.next !== "unchanged"
+        ? r.next === undefined
+          ? without(values, def.key)
+          : { ...values, [def.key]: r.next }
+        : undefined;
+    return { values: kept, change, failed: r.failed };
+  }
+  if (r.next === "unchanged") return NOTHING;
+  const next = r.next === undefined ? without(values, def.key) : { ...values, [def.key]: r.next };
+  const kind = r.cleared !== undefined ? "cleared" : SUB_KIND[migrationKind(def) ?? "remove"];
+  const reason = r.cleared === undefined ? {} : { reason: r.cleared };
+  return { values: next, change: { kind, before, after: r.next, ...reason } };
+}
+
+const SUB_KIND = {
+  rename: "moved",
+  retype: "converted",
+  localize: "converted",
+  remove: "removed",
+} as const satisfies Record<FieldMigrationKind, ValueChange["kind"]>;
 
 /** What an entry's `fields` become under `input.def`'s marker. */
 export function rewriteFields(input: RewriteInput): RewriteResult {
   const { def } = input;
   const values = isRecord(input.values) ? input.values : {};
+  if (def.migration?.sub !== undefined) return rewriteSub(input, values);
   switch (migrationKind(def)) {
     case "rename": {
       const from = def.migration?.fromKey as string;
@@ -132,6 +234,13 @@ export function rewriteFields(input: RewriteInput): RewriteResult {
   }
 }
 
+/** The value `def` reads from stored `fields`: its key, else a running rename's old one. */
+function storedValue(def: FieldDefinition, fields: Readonly<Record<string, unknown>>): unknown {
+  if (Object.hasOwn(fields, def.key)) return fields[def.key];
+  const from = renamedFrom(def);
+  return from !== undefined && Object.hasOwn(fields, from) ? fields[from] : undefined;
+}
+
 /**
  * An entry's `fields` normalized through every marker of its collection (the store runs it on a
  * person's write during an operation, so concurrent edits converge). Unconvertible values stay.
@@ -139,13 +248,26 @@ export function rewriteFields(input: RewriteInput): RewriteResult {
 export function normalizeThroughMarkers(
   defs: readonly FieldDefinition[],
   values: Readonly<Record<string, unknown>> | undefined,
-  context: { convert: ConvertContext; translation: boolean },
+  context: {
+    convert: ConvertContext;
+    translation: boolean;
+    /** The stored entry's `fields`, for a person's write (RFC-0045 §7: what the write changed). */
+    stored?: Readonly<Record<string, unknown>> | undefined;
+    /** RFC-0045 §7: the node's rows for a running text ↔ reference conversion's path. */
+    rows?: FieldRows | undefined;
+    /** Called for a definition with values that do not convert (kept as stored), with them. */
+    onUnconvertible?: ((def: FieldDefinition, failed: readonly FailedValue[]) => void) | undefined;
+  },
 ): Record<string, unknown> | undefined {
   let current = values;
   let changed = false;
+  const { stored, onUnconvertible, ...rest } = context;
   for (const def of defs) {
     if (!def.migration) continue;
-    const r = rewriteFields({ def, values: current, ...context, pristine: false });
+    const baseline = stored === undefined ? undefined : { value: storedValue(def, stored) };
+    const partial = stored !== undefined;
+    const r = rewriteFields({ def, values: current, ...rest, pristine: false, baseline, partial });
+    if (r.change?.kind === "unconvertible") onUnconvertible?.(def, r.failed ?? []);
     if (r.values) {
       current = r.values;
       changed = true;

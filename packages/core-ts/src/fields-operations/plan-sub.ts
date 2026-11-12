@@ -1,0 +1,200 @@
+/**
+ * RFC-0045 §7 `sub`: what an operation on one sub-field of a repeater asks of the site node. The
+ * marker sits on the repeater: `{ id, sub: <key once done>, fromKey | fromType }`, or `{ id, sub }`
+ * while the sub-field is being removed (phase A keeps its definition, phase C drops it, as for a
+ * top-level field). Pure but for the predicates' SQL text.
+ */
+import type { FieldDefinition, FieldMigration } from "@cloudhal/core-contracts";
+import { InvariantError } from "../errors.ts";
+import { RESERVED_FIELD_KEYS, type RepeaterFieldDefinition } from "../fields/types.ts";
+import type { Cond } from "../node-sql.ts";
+import { retyped } from "./retype.ts";
+import type { FieldOperation } from "./types.ts";
+
+const KEY = /^[a-z][A-Za-z0-9]{0,39}$/;
+
+function invalid(
+  code: "invalid_fields" | "unknown_field" | "field_key_duplicate" | "field_key_reserved",
+  message: string,
+): never {
+  throw new InvariantError(code, message, { issues: [] });
+}
+
+/** Checks a `sub` request against the repeater; throws when it can never run as written. */
+export function checkSub(def: FieldDefinition, op: FieldOperation & { sub: string }): void {
+  if (def.type !== "repeater")
+    invalid(
+      "invalid_fields",
+      `sub names a repeater's sub-field; ${def.key} is a ${def.type} field`,
+    );
+  if (op.op === "set_field_localized")
+    invalid("invalid_fields", `sub-fields share ${def.key}'s localized; change it without sub`);
+  const keys = def.fields.map((s) => s.key);
+  if (!keys.includes(op.sub))
+    invalid(
+      "unknown_field",
+      `${op.sub} is not a sub-field of ${def.key}; its sub-fields are ${keys.join(", ")}`,
+    );
+  if (op.op === "rename_field") {
+    if (!KEY.test(op.to))
+      invalid("field_key_reserved", `${op.to} is not a field key (lower camelCase)`);
+    if (RESERVED_FIELD_KEYS.has(op.to)) invalid("field_key_reserved", `${op.to} is reserved`);
+    if (keys.includes(op.to))
+      invalid("field_key_duplicate", `${op.to} is already a sub-field of ${def.key}`);
+  }
+  if (op.op === "remove_field" && keys.length === 1)
+    invalid(
+      "invalid_fields",
+      `${op.sub} is ${def.key}'s only sub-field; remove ${def.key} instead`,
+    );
+}
+
+/** The repeater with `from` renamed to `to` (its `itemLabel` follows). */
+function renamedSub(def: RepeaterFieldDefinition, from: string, to: string): FieldDefinition {
+  const fields = def.fields.map((s) => (s.key === from ? { ...s, key: to } : s));
+  const label = def.itemLabel === from ? { itemLabel: to } : {};
+  return { ...def, fields, ...label } as FieldDefinition;
+}
+
+/** The repeater without the sub-field `key` (an `itemLabel` naming it goes too). */
+export function withoutSub(def: RepeaterFieldDefinition, key: string): FieldDefinition {
+  const { itemLabel, ...rest } = def;
+  const fields = def.fields.filter((s) => s.key !== key);
+  const label = itemLabel !== undefined && itemLabel !== key ? { itemLabel } : {};
+  return { ...rest, ...label, fields } as FieldDefinition;
+}
+
+/** The repeater the operation ends with (`op.sub` set). */
+export function subTarget(
+  def: FieldDefinition,
+  op: FieldOperation & { sub: string },
+): FieldDefinition {
+  const repeater = def as RepeaterFieldDefinition;
+  switch (op.op) {
+    case "rename_field":
+      return renamedSub(repeater, op.sub, op.to);
+    case "remove_field":
+      return withoutSub(repeater, op.sub);
+    case "change_field_type":
+      return retyped(def, op);
+    case "set_field_localized":
+      return def;
+  }
+}
+
+/** Phase A's marker of a sub-field operation. */
+export function subMarkerOf(
+  id: string,
+  def: FieldDefinition,
+  op: FieldOperation & { sub: string },
+): FieldMigration {
+  const was = (def as RepeaterFieldDefinition).fields.find((s) => s.key === op.sub);
+  switch (op.op) {
+    case "rename_field":
+      return { id, sub: op.to, fromKey: op.sub };
+    case "change_field_type":
+      return { id, sub: op.sub, fromType: was?.type ?? "text" };
+    default:
+      return { id, sub: op.sub };
+  }
+}
+
+/** True when the repeater already shows the sub-field operation's end state. */
+export function subApplied(
+  now: FieldDefinition,
+  op: FieldOperation & { sub: string },
+  target: FieldDefinition,
+): boolean {
+  if (now.type !== "repeater" || target.type !== "repeater") return false;
+  const has = (k: string) => now.fields.some((s) => s.key === k);
+  if (op.op === "rename_field") return has(op.to) && !has(op.sub);
+  if (op.op === "remove_field") return !has(op.sub);
+  const want = target.fields.find((s) => s.key === op.sub)?.type;
+  return now.fields.find((s) => s.key === op.sub)?.type === want;
+}
+
+/**
+ * Entries whose items the sub-field marker still has work for: an item holding the old key (a
+ * rename), the sub-value being removed, or a sub-value not stored as the new type's JSON.
+ */
+export function subPending(
+  base: Cond,
+  def: FieldDefinition,
+  jsonTypes: (d: FieldDefinition) => string[],
+): Cond | undefined {
+  const m = def.migration;
+  if (def.type !== "repeater" || m?.sub === undefined) return undefined;
+  const items = `$.fields.${def.key}`;
+  const holds = (key: string, extra = "", params: Cond["params"] = []): Cond => ({
+    sql: `${base.sql} AND EXISTS (SELECT 1 FROM json_each(body, ?) i
+            WHERE json_type(i.value, ?) IS NOT NULL${extra})`,
+    params: [...base.params, items, `$.${key}`, ...params],
+  });
+  if (m.fromKey !== undefined) return holds(m.fromKey);
+  if (m.fromType === undefined) return holds(m.sub);
+  const sub = def.fields.find((s) => s.key === m.sub);
+  if (!sub) return undefined;
+  const types = jsonTypes({ ...sub, localized: def.localized } as unknown as FieldDefinition);
+  const at = `$.${m.sub}`;
+  const field = `${def.key}.${m.sub}`;
+  const rows = textReferencePending(sub.type, m.fromType, { doc: "i.value", path: at, field });
+  // To a reference, per item; from one, the rows say what is left, whatever the items look like.
+  const perItem = m.fromType === "text" ? rows : undefined;
+  const mismatch: Cond = {
+    sql: `EXISTS (SELECT 1 FROM json_each(body, ?) i WHERE json_type(i.value, ?) IS NOT NULL
+            AND (json_type(i.value, ?) NOT IN (${types.map(() => "?").join(", ")})${perItem ? ` OR ${perItem.sql}` : ""}))`,
+    params: [items, at, at, ...types, ...(perItem?.params ?? [])],
+  };
+  const left = perItem ? undefined : rows;
+  return {
+    sql: `${base.sql} AND (${mismatch.sql}${left ? ` OR ${left.sql}` : ""})`,
+    params: [...base.params, ...mismatch.params, ...(left?.params ?? [])],
+  };
+}
+
+/** `expr` is a translation group id (`GROUP_ID_PATTERN`: `entry_` and 6 to 32 letters or digits). */
+const isGroupId = (expr: string) =>
+  `(${expr} GLOB 'entry_*' AND length(${expr}) BETWEEN 12 AND 38 AND substr(${expr}, 7) NOT GLOB '*[^A-Za-z0-9]*')`;
+
+/**
+ * RFC-0045 §7: text → multiple reference: a list is pending while any element is not a group id
+ * with its own `entry_refs` row for (node, field path, element), as `text-reference.ts` decides.
+ */
+export function listRowsPending(path: string, field: string): Cond {
+  return {
+    sql: `(json_type(body, ?) = 'array' AND EXISTS (SELECT 1 FROM json_each(body, ?) e
+            WHERE NOT (${isGroupId("e.value")} AND EXISTS (SELECT 1 FROM entry_refs r
+              WHERE r.source_id = nodes.id AND r.field = ? AND r.target_id = e.value))))`,
+    params: [path, path, field],
+  };
+}
+
+/**
+ * RFC-0045 §7: phase C's pending test for text ↔ single reference follows the rows, not the shape
+ * (both store one string; `text-reference.ts` decides values the same way):
+ * - to a reference, a string is converted only when it is a group id with its `entry_refs` row
+ *   for (node, field path, value): what phase B or a person's write left;
+ * - from a reference, a value is converted once no row is left for (node, field path).
+ *
+ * `doc` is the JSON the value sits in at `path`; `field` is the rows' field path. The node is the
+ * pending query's `nodes` row.
+ */
+export function textReferencePending(
+  type: string,
+  from: string | undefined,
+  at: { doc: string; path: string; field: string },
+): Cond | undefined {
+  const { doc, path, field } = at;
+  if (type === "text" && from === "reference")
+    return {
+      sql: "EXISTS (SELECT 1 FROM entry_refs r WHERE r.source_id = nodes.id AND r.field = ?)",
+      params: [field],
+    };
+  if (type !== "reference" || from !== "text") return undefined;
+  const value = `json_extract(${doc}, ?)`;
+  return {
+    sql: `(json_type(${doc}, ?) = 'text' AND (NOT ${isGroupId(value)} OR NOT EXISTS (
+            SELECT 1 FROM entry_refs r WHERE r.source_id = nodes.id AND r.field = ? AND r.target_id = ${value})))`,
+    params: [path, path, path, path, field, path],
+  };
+}

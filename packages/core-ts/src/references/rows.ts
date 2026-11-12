@@ -6,7 +6,7 @@
  * Pairs are deduplicated after the writer canonicalized member ids to group ids. Pure.
  */
 import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
-import { fieldDefinitions, isRecord } from "../fields/types.ts";
+import { fieldDefinitions, isRecord, renamedFrom } from "../fields/types.ts";
 import { referenceUses } from "./values.ts";
 
 /** One row's varying part: target group, field path, top-level key. */
@@ -37,7 +37,7 @@ export function storedKey(
   values: Record<string, unknown>,
 ): string | undefined {
   if (Object.hasOwn(values, def.key)) return def.key;
-  const from = def.migration?.fromKey;
+  const from = renamedFrom(def);
   return from !== undefined && Object.hasOwn(values, from) ? from : undefined;
 }
 
@@ -85,10 +85,13 @@ export function definitionOfPath(
   field: string,
 ): { def: FieldDefinition; collections: readonly string[] } | undefined {
   const [root, sub] = field.split(".");
-  const def = defs.find((d) => d.key === root) ?? defs.find((d) => d.migration?.fromKey === root);
+  const def = defs.find((d) => d.key === root) ?? defs.find((d) => renamedFrom(d) === root);
   if (!def) return undefined;
   if (def.type === "reference" && sub === undefined) return { def, collections: def.collections };
   if (def.type !== "repeater" || sub === undefined) return undefined;
-  const s = def.fields.find((x) => x.key === sub);
+  // A row written before a sub-field rename names the old sub-key (RFC-0045 §7 `sub`).
+  const m = def.migration;
+  const key = m?.sub !== undefined && m.fromKey === sub ? m.sub : sub;
+  const s = def.fields.find((x) => x.key === key);
   return s?.type === "reference" ? { def, collections: s.collections } : undefined;
 }

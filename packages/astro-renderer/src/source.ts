@@ -174,7 +174,10 @@ interface Loaded {
   published: ContentEntry[];
   /** Published entries with a public URL (unlisted ones too); `entries` holds the listed. */
   reachable: ContentEntry[];
-  /** RFC-0045 §7: every entry not archived, drafts included; kept only while a conversion runs. */
+  /**
+   * RFC-0045 §7: every entry, drafts and archived ones included (`conversionEntries` filters what
+   * matches text itself); kept only while a conversion runs.
+   */
   current: ContentEntry[];
   /** Every published entry's derived gate (RFC-0042 §3), computed once per snapshot. */
   derived: ReadonlyMap<string, DerivedGate>;
@@ -385,7 +388,7 @@ export class SnapshotSource implements GraphSource {
         entries: shownEntries,
         published: shownEntries,
         reachable: shownEntries,
-        current: siteConverts(site as Site) ? visible(entries, true) : [],
+        current: siteConverts(site as Site) ? entries : [],
         derived,
         resolved: new Map(),
         taxonomies,

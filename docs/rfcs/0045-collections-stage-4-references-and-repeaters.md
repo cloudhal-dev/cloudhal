@@ -1046,9 +1046,10 @@ The riskiest SQL and interplay. Every phase PR's review checks the items its pha
    - Shards are streamed, and the byte and node budgets are checked before each parse, so an out-of-memory isolate can never skip a purge silently.
    - The short-circuit for sites without reference definitions.
    - `RELEASE_EXECUTOR_COST` is updated for the re-plan.
+   - The release gate reads the published site node, retries once, then purges everything; it never falls back to the working row (#213).
 3. **Marker interplay** (phases 2 to 4).
    - `rename_field`'s `root_key` and `fromKey` lag in the fragment (over-blocks only) and in the rows `INSERT` (`fromKey` match).
-   - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a).
+   - Step 4: the live `referencedBy` reads candidates from `entry_refs`, and a text value has no row until phase B rewrites its entry. So during a text → reference conversion it lists a converting referrer only after phase B, or step 4 makes it read candidates by collection while such a marker runs. The snapshot's index already resolves through the conversion maps (3a). Step 4 chose "only after phase B" (Amended in 4).
    - Text → reference conversion: readers convert on the fly, `field_operation_running` refuses target deletes, moves and group changes, and any marker on `from` or `to` purges everything.
    - `set_field_localized`'s phase-A `UPDATE` of `shared`.
    - `entryRefsRebuild` reading through `fromKey`.
@@ -1225,7 +1226,7 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 - **Release runs.**
   - **The gate is the published site node,** not the working row. A release never carries the site node, so its snapshot publishes the live one's; `publishRelease` returns that ref. Only a node that defines references, or still converts from them, re-plans. Every other site sends the plan stored at pin time, as before 3b (nothing when it purges nothing).
     - That gate costs one blob read per release run that has a purger, except on a first publish: a snapshot's site node is captured before the publish flips the pointer, so the working row equals it only on a site's first publish.
-    - The read is counted but never refused, so a site without references never depends on what other runs left. If it fails, the working row decides: no references, the stored plan; otherwise purge everything.
+    - The read is counted but never refused, so a site without references never depends on what other runs left. If it fails, it is retried once, then the run purges everything ([#213](https://github.com/cloudhal-dev/cloudhal/issues/213), fixed in step 4). The working row never decides: a draft that dropped its reference fields would send the closure-less stored plan and leave referrer pages stale.
   - **The re-plan** goes from the pointer the batch moved (`from`) to the new snapshot. That is `baseSnapshotId` whenever something was live; a first publish purges everything.
     - It runs over the tick's counting driver, never refused, and spends no shard reads on `to`.
     - If it throws, the run purges everything, never the stored plan.
@@ -1246,3 +1247,126 @@ Rollout step 2 shipped in two PRs: 2a, store and integrity, and 2b, the consumer
 
     The rare site-moved retry stays outside it, as before.
 - **The pin-time plan skips the closure** (`references: false`). It would read every body one by one, and for sites with references it is the batch's *expected* outcome only: the run-time re-plan, or purge-everything, covers referrers.
+
+### Amended in 4 (2026-11-12, rollout step 4)
+
+- **`sub`** (§7). The marker sits on the repeater: `{ id, sub, fromKey | fromType }`, or `{ id, sub }` while a sub-field is removed. Phase A keeps a removed sub-field's definition and phase C drops it, as for a whole field. Every item goes through the sub-field's own per-value rule (`fields/migration-sub.ts`), so readers, writers and phase B agree.
+  - A sub-field rename's `fromKey` names a sub-key. Top-level readers ignore it (`renamedFrom`), and the rows `INSERT`'s `fromKey` match requires `migration.sub IS NULL`.
+  - `referenceUses`, `definitionOfPath` and `fieldAssetRefs` read an item's old sub-key while the rename runs.
+  - `set_field_localized` refuses `sub`, because sub-fields share their repeater's `localized`. Removing a repeater's only sub-field is refused: remove the repeater instead.
+- **`change_field_type`'s request checks** (`fields-operations/retype.ts`):
+  - an input the target type does not take is refused, and with `sub` only `collections` (to a reference) and `options` apply;
+  - a reference changes to a reference only to switch `multiple`;
+  - a conversion that carries ids over (reference ↔ reference, reference ↔ repeater) may only widen the target collections, so phase B never writes a carried id where the field no longer allows it;
+  - a repeater converts to text or to a reference only when it has exactly one sub-field, of type text or rich text, or reference. Readers know only the new definition and the marker, so they read each item's one value from its shape.
+  - Repeater → text sets `multiline: true`. A rich-text sub-field's items join as their Markdown source, as stored, because the marker does not record the sub-field's old type.
+  - The dry run checks the site the operation leaves against the contract and `checkFieldDefinitions`, with the store's capability. Until step 7, that is where reference and repeater targets are refused (`fields_unsupported`); `field_operation_unsupported` is no longer raised.
+- **Text → reference never picks the entry's own group** (`ConvertContext.group`), the same rule a person's write follows.
+- **Phase B's target guard covers only the ids a rewrite newly names** (`rewriteTargetGuard`, mode `fresh`), meaning ids that appear nowhere in the stored value. Ids a reshape or a rename carries over are not checked. A value naming a deleted target therefore finishes its conversion as stored, with its row, as rows are kept for a missing target. Guarding carried ids would skip such an entry on every pass, and phase C would never run.
+- **Writers during an operation** (`EntryEngine.write`) load the conversion maps before `normalizeEntryFields`, only while a text ↔ reference conversion runs. They then compare the draft with the stored entry normalized through the same markers, for the target guard and for canonical ids. A person's edit that leaves a reshaped or renamed value alone is therefore not re-checked. Text → reference values converted on a person's write are not guarded as newly chosen: deletes in the target collections are refused meanwhile (`field_operation_running`), and only archiving can race them.
+- **`hasReferenceFields` includes a field still converting from references.** Until phase B rewrites them, its entries keep rows, which every write, rewrite and guard must still see.
+- **`shared` follows `localized` in every operation site write** (`references/localize.ts`, phase A and the revert's first step), as a diff of the two site bodies anchored on the new site hash. In a site with reference fields, every entry write carries the definitions anchor. A holder write planned before phase A therefore fails its batch, and its retry reads the new definitions: R16 resolves by retry.
+- **Revert `dropped`.** Each revert pass reads the members of the ids its decisions name, once. It drops each id with no member in a collection its field allows, whatever the member's status, and guards the rest with a member requirement (mode `present`). A target deleted between the read and the batch skips the entry, and the next pass drops it.
+- **Watch item 3, live `referencedBy`:** it reads candidates from `entry_refs`, so during a text → reference conversion it lists a converting referrer only after phase B rewrites that entry. That is the documented behaviour, and nothing reads candidates by collection while a marker runs. The live-versus-snapshot comparison runs with no marker active, so the difference is never compared.
+- **The CLI and the admin API** take `collections`, `maxItems`, `subFields` and `sub`, and the API also takes `itemLabel`. MCP's operation tools keep their step-1 inputs until step 5.
+- **[#213](https://github.com/cloudhal-dev/cloudhal/issues/213)** (from 3b): the release gate's read of the published site node is retried once, then the run purges everything.
+
+#### Review round 1 (2026-11-12, PM review of PR #214)
+
+- **Values that stop converting while an operation runs** (root cause 1). The dry run sees only the start state; meanwhile a target can be archived or deleted, or a second entry can take the same title. One rule:
+  - **Phase C's pending check reads the value where the JSON type cannot tell.** For text ↔ single reference, top-level and in `sub` items, a string that is no group id is pending to a reference, and a string that still is one is pending from a reference. The test is a `GLOB` plus length bounds, the SQL form of `GROUP_ID_PATTERN`. A list of ids and a list of items are told apart by their first element.
+  - **Each pass reports its unconvertible entries** (`FieldOperationResult.unconvertible`, `FieldRevertResult.unconvertible`: `{ entryId, reason }`, next to `skipped`). They keep the marker, and with it `field_operation_running`.
+  - **The way out.** `continueFieldOperation` and `revertFieldOperation` take `onInvalid: "clear"`, which drops what no longer converts, so the marker can always be lifted. The admin API's continue and revert routes take it in the body, and the CLI's `continue` and `revert` take `--clear`. The CLI stops looping while entries are unconvertible and says how to go on.
+  - Id-shaped legacy text (`entry_…` naming no group) converting to a reference is the one value this cannot tell apart. The dry run counts it unconvertible, and readers show nothing for it.
+- **The "fits" shortcut** (root cause 2). A group id is valid text, and id-shaped text is a valid single reference. For text ↔ reference, top-level and in items, the shortcut is therefore never taken, in `retype`, `normalizeThroughMarkers`, `resolveFields` (`convertsEveryValue`), phase B and revert. Every value goes through the table, and the table keeps a value already in the new type:
+  - text → reference keeps an id of a usable target group that is not the entry's own (`ConversionEntries.usable`);
+  - reference → text keeps a string that is no group id.
+
+  This is the PM's baseline rule in value form. A value a person wrote under the new type is the value the table keeps, and a person's newly chosen id still differs from the normalized stored one, so the writer guards it with the own-group check. Readers need no baseline. Phase B's guard treats every id in a value converting from text as newly chosen (`carriedPart`), so a converted id is guarded.
+- **Revert of a sub-field removal** counts the definition as restored only once the repeater has the sub-field again, so the definition, its values, their rows and the guard come back.
+- **`hasReferenceFields`** counts any marker whose source type can hold references (`fromType` reference or repeater). A repeater converting away keeps its rows visible until each entry is rewritten.
+- **`shared` after a rename's revert** matches the definition's key and its `fromKey` (`root_key IN (key, fromKey)`), so a revert that also restores an older `localized` updates the rows of entries under either key.
+- **Release dependencies through the markers.** For a field carrying a marker, every group-id string in its value, and in its old key's value, is dropped from the dependency walk. Field values name no other entry. This covers a sub-field rename's old key and a conversion from references.
+- **The edition copy** reads a reference sub-value through a running sub-field rename, as `referenceUses` does, so an unusable id is dropped and reported.
+- **The 100-references cap** is counted by the dry run and by every pass's decider for a conversion. Over the cap, the value is unconvertible, or cleared under `onInvalid: "clear"`.
+- **Collections widen only where ids stay.** The check runs only when the field stays a reference, or becomes one with ids carried over. A sub-field reference → text is no longer held to another sub-field's collections.
+- **Titles for reference → text** come from every member, any status, so an archived target converts to its title. The title chosen is the default-locale member's, else the group's original's, else the member with the lowest locale, then id, whatever the read order. Only a group with no member in the site is unconvertible. Archived members still match no text.
+- **Repeater → multiple reference** deduplicates ids, first seen first.
+- **`multiple`** is ignored where it does not apply, as before step 4. The CLI sends `multiple: false` for a reference target without `--multiple`, so multiple → single can be asked for.
+- **Malformed `subFields`** (entries that are not objects) are a 400 in the admin API and a CLI error, never a 500.
+
+#### Review round 2 (2026-11-12, PM verification of c8c00f9e)
+
+Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table re-decided values that were already converted. This round replaces that with one rule.
+
+- **One rule for "already in the new type"** (`fields/text-reference.ts`). Every caller uses it: the dry run, phase B, the revert's decider, a person's write (`normalizeThroughMarkers`), `resolveFields` with and without maps, and so the renderer sources.
+  - **A person's write that changes the value** (it differs from the stored value) is kept when it fits, and the writer's guard checks it as newly chosen. `normalizeEntryFields` passes the stored entry, and items are compared one by one.
+  - **No maps** (`checkRequiredToPublish`, prechecks): a value is kept as stored, never read as missing for want of maps.
+  - The pristine rule this round introduced, and the gap it left, are replaced by round 3's rule below.
+- **Phase C's pending check follows the rows, not the shape** (`textReferencePending`, on top-level values and `sub` items, correlated on the pending query's `nodes.id`, run on SQLite, D1 and DO).
+  - To a reference: a value is pending when it is text that is not a group id, or a group id with no `entry_refs` row for (node, field path, value).
+  - From a reference: a value is pending while any row is left for (node, field path).
+  - A multiple reference keeps its shape test: arrays are converted, strings are pending.
+- **The cap** (`fields-operations/cap.ts`) is applied by the dry run, phase B and the revert's decider. Under `clear`, a `sub` conversion over the cap loses only the converted sub-values (an emptied item goes, an emptied list is no value), never the repeater.
+- **A sub-field operation's revert** starts from the repeater as it is now and puts back only the named sub-field (`revert-sub.ts`):
+  - a removed sub-field goes back in at its old index;
+  - a renamed or retyped one is replaced by its earlier definition under the inverse marker;
+  - a different sub-field of the same key is refused (`field_key_in_use`).
+
+  A removal counts as reverted only when the repeater holds the earlier sub-field unchanged (`sameJson`). Sub-fields added since stay.
+- **The renderer's maps read every entry**, archived ones too, as the store does. An archived target or an archived default-locale member lends its title to reference → text on both sources.
+- **The edition copy** carries text that a running text → reference conversion has not converted yet as it is, rather than dropping it as missing. The edition's own write converts it.
+- **Repeater → reference is always multiple**, as its row is reference (multiple) ↔ repeater. A `multiple: false` (the CLI's default) is ignored there, and `maxItems` is kept.
+
+#### Review round 3 (2026-11-12, PM verification of 23bffe00)
+
+- **The decision reads the facts phase C reads.** Round 2 decided legacy values by whole-entry pristineness (the node's hash against the `before` snapshot), while phase C reads rows. Many writes move a hash without touching the field: a title edit, a status change, source-forward, a term merge or retire, the tags migration. Each one left the two sides disagreeing. `pristine` is gone from these rows' decision (`fields/text-reference.ts`); the other conversion rows keep RFC-0041's rule.
+  - Each pass of the dry run, phase B and the revert loads the collection's `entry_refs` rows for the converting field path once, beside the maps (`references/conversion-rows.ts`, filtered by `site_id`, `source_collection` and `field`). A person's write reads its node's rows.
+  - **Text → reference**, for an id-shaped value (a string, or every element of a multiple's list):
+    - the entry's own group fails first, in every caller;
+    - in the target shape with a row for every id, it is kept;
+    - written under the new type by a person's write (it differs from the stored value) and fitting, it is kept, and the writer's guard checks it;
+    - otherwise it is legacy, and `check` writes it as a reference (a bare string wrapped for a multiple) under the fresh guard, with its rows, when every id names a usable group. Else it fails, is reported, and `clear` drops it;
+    - under a multiple definition a bare string is never kept;
+    - any other text goes through the table (`byText`).
+  - **Reference → text.** A row left for the node and path means the value is still a reference: a group in `titles` converts to its title, any other fails (reported; `clear` removes it and its rows). No row left means it is text already, an id-shaped title included.
+  - **A value the decision does not accept keeps its rows as they are** in a person's write (`held`): a rejected text → reference value gets no row, and a reference → text value that does not convert keeps its rows until phase B reports or clears it.
+  - **Readers** (`resolveFields`, the renderer) have no rows. They keep a display rule: an id-shaped value naming a member group shows as a reference, except the entry's own group; a group's title shows for reference → text, any other string as it is.
+  - Round 2's accepted gap is closed: legacy text is decided by its rows, whatever wrote the entry.
+- **The edition copy** carries text a running text → reference conversion has not converted only when the edition site's maps convert it to exactly one group, so the edition's own write converts it. Any other text is dropped and reported, as in round 1.
+
+#### Review round 4 (2026-11-13, PM verification of 0d170eab)
+
+- **Reference → text is decided per value.**
+  - A string is still a reference only with its own row (`rows.has`); with no row of its own it is text already, even next to a held reference item in the same repeater.
+  - A non-string (a list, `[]` included) is never text yet and goes through the table: joined titles, no value, or a failure.
+  - `rows.any` is phase C's pending predicate only.
+- **`held` is per value.** A person's write keeps stored rows only for the (field path, group id) pairs the decision failed (`HeldRef`), writes rows for every accepted value, and deletes rows for ids no longer in the draft. `rewriteItems` returns item-level results: in a person's write (`partial`) a failing item stays as stored while the others convert, and the operation's passes still treat any failing item as the entry's failure. The writer's guard skips held values, which are stored as they were and reported by phase B.
+- **The writer's "already held" comes from the rows.** While a text → reference conversion runs on a definition or `sub`, an id counts as already held only with its row for that path (`ConvertingRows`, which `normalizeWrite` already reads); every other id is newly chosen, as `rewriteTargetGuard`'s rule treats them. The edition copy follows the same rule.
+- **Rebuilds read a converting path through its earlier type** (`rebuildRows`; pull, push, `import --replace` and `--revert`, snapshot restore).
+  - From text: no rows for the path, so phase B checks every value again.
+  - From references: a stored value that is still a group id of the site keeps its row. An id-shaped title naming no group stays text.
+
+  Sites without such a marker are unchanged, and imports are not refused.
+- **The edition's `textConverts`** uses the converter's own rule: `byText` without the entry's own group, exactly one group left.
+
+#### Review round 5 (2026-11-13, PM verification of 973494e9)
+
+- **Rebuilds.**
+  - Converting from text, only a bare string loses its row; a multiple's list (stored only by phase B or a guarded write) keeps its rows.
+  - Converting from references, every group-id-shaped stored string keeps its row, whether or not its group still has a member, as the live writer keeps it, so phase B reports a deleted target.
+- **Text → multiple reference's pending check follows the rows:** a list is pending while any element is not a group id with its own row for (node, path, element) (`listRowsPending`).
+- **Held only for stored values.** A person's write holds a failing value only when it is the stored one, compared per item with `rewriteItems`' canonical-item match (`FailedValue.stored`); one the person newly wrote is guarded like any choice.
+  - The own-group check runs over every use of a changed key, held or not.
+  - Held pairs are counted per occurrence: an id the draft also holds in an accepted or converted item is not held.
+- **A repeater converts item by item in a person's write only when every failing sub-value still fits the new sub-field** (an id-shaped value). Otherwise the repeater stays as stored, so the write checks; phase B reports it.
+- **`loadNodeRows` filters `source_collection`** by the draft's collection, here and in the edition copy, so a move into a converting collection holds nothing from the old one.
+- **Phase B's guard on a converting path** treats an id that already has its row for the path as carried, read from the pass's rows, as `guardedUses` does. An accepted item whose target was archived later no longer skips the entry forever.
+- **The edition's held check is per path:** on the converting sub-field only `rows.has`, and other sub-fields' stored ids only for those sub-fields.
+
+#### Final gate (2026-11-13, PM verification of cff168d6)
+
+- **Per-occurrence held subtraction applies only to paths converting to references** (`fromType: "text"`), where another occurrence gets its own guard and row. Converting from references, every stored failing id stays held, so a copy of a failing item cannot drop its rows and turn a dangling id into text unreported.
+- **Rebuilds read a running reference (multiple) ↔ repeater conversion through its old type** (`reshapedRows`, top level). A stored value still in the old shape keeps its rows: from a reference, each id-shaped string at the field path; from a repeater, each item's id-shaped sub-value at `<field>.<sub>`. A mid-operation import therefore keeps the target locked.
+- **The edition's per-sub-field held check applies only while a text → reference marker runs on the definition.** Otherwise every stored id of the field is held, as before step 4.
+

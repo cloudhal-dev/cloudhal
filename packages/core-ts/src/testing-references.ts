@@ -571,15 +571,26 @@ export function referencesSuite(ctx: SuiteContext): void {
         expect((await rows(event.id)).map((x) => x.target_id)).toEqual([kept.id]);
       });
 
-      it("refuses operations that name a reference or repeater field (step 4)", async () => {
+      it("operations name reference and repeater fields since step 4 (testing-field-operations)", async () => {
         const site = await world();
-        for (const op of [
-          { op: "rename_field", collection: "events", from: "venue", to: "place" },
-          { op: "remove_field", collection: "events", key: "speakers" },
-        ] as const)
-          expect(await code(runFieldOperation(store(), site.id, op, { actor: person }))).toBe(
-            "field_operation_unsupported",
-          );
+        const hall = await entry(site, "places");
+        const event = await entry(site, "events", { fields: { venue: hall.id } });
+        const op = {
+          op: "rename_field",
+          collection: "events",
+          from: "venue",
+          to: "place",
+        } as const;
+        expect((await runFieldOperation(store(), site.id, op, { actor: person })).done).toBe(true);
+        expect(await rows(event.id)).toEqual([
+          {
+            target_id: hall.id,
+            field: "place",
+            root_key: "place",
+            shared: 1,
+            source_status: "draft",
+          },
+        ]);
       });
     });
 

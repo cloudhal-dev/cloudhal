@@ -3,11 +3,14 @@
  * (`ConvertContext.entries`), so `resolveFields` converts an entry phase B has not rewritten yet
  * exactly as the writers and the operation will.
  *
- * - The snapshot source builds them from the snapshot's own entries (every one not archived,
- *   drafts included: the graph it renders), lazily, once per snapshot, isolate and collection,
- *   and only while the collection carries such a marker.
- * - The live source builds them from the working copy (the graph phase B reads) before resolving
- *   an entry of a collection that carries one.
+ * - The snapshot source builds them from the snapshot's own entries (every one, drafts and
+ *   archived ones included: the graph it renders), lazily, once per snapshot, isolate and
+ *   collection, and only while the collection carries such a marker.
+ * - The live source builds them from the working copy (the graph phase B reads), every entry too,
+ *   before resolving an entry of a collection that carries one.
+ *
+ * Both pass every entry, as the store does: `conversionEntries` keeps archived ones out of what
+ * text matches (`byText`, `usable`), and lets every member lend a title (`titles`).
  *
  * Without such a marker neither reads anything. Worker-safe.
  */

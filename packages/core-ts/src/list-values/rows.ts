@@ -9,7 +9,7 @@
 import type { ContentEntry, FieldDefinition } from "@cloudhal/core-contracts";
 import { FIELD_QUERY_LIMITS, sortKey } from "../fields/query.ts";
 import { type FieldsOriginal, hasFieldValue, resolveFields } from "../fields/resolve.ts";
-import type { SiteFields } from "../fields/types.ts";
+import { renamedFrom, type SiteFields } from "../fields/types.ts";
 
 /** One row: `has` is 0/1 on a field row and 2 on an option row of a multiple select. */
 export interface ListValueRow {
@@ -152,7 +152,7 @@ export function originalIdOf(entry: ListEntry): string | undefined {
 
 function ownKey(fields: ListEntry["fields"], def: FieldDefinition): boolean {
   if (!fields) return false;
-  const from = def.migration?.fromKey;
+  const from = renamedFrom(def);
   return Object.hasOwn(fields, def.key) || (from !== undefined && Object.hasOwn(fields, from));
 }
 

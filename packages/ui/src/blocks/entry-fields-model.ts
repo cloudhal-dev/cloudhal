@@ -4,7 +4,7 @@
  * for its original's value. No React, no English: words come from the caller.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { optionLabel } from "@cloudhal/core-ts/fields";
+import { optionLabel, renamedFrom } from "@cloudhal/core-ts/fields";
 import { dateTimeFormat, formatList, formatNumber } from "@cloudhal/messages/format";
 import { formatDay } from "./schedule-model.ts";
 
@@ -17,7 +17,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 export function readField(values: FieldValues | undefined, def: FieldDefinition): unknown {
   if (!values) return undefined;
   if (Object.hasOwn(values, def.key)) return values[def.key];
-  const from = def.migration?.fromKey;
+  const from = renamedFrom(def);
   return from && Object.hasOwn(values, from) ? values[from] : undefined;
 }
 
@@ -37,7 +37,7 @@ export function writeField(
   v: unknown,
 ): Record<string, unknown> {
   const next: Record<string, unknown> = { ...(values ?? {}) };
-  const from = def.migration?.fromKey;
+  const from = renamedFrom(def);
   if (from) delete next[from];
   if (hasValue(v)) next[def.key] = v;
   else delete next[def.key];

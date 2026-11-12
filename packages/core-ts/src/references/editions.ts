@@ -17,6 +17,8 @@
  */
 import type { ContentEntry, FieldCondition, FieldDefinition } from "@cloudhal/core-contracts";
 import type { SqlDriver } from "@cloudhal/storage";
+import { GROUP_ID_PATTERN } from "../fields/props.ts";
+import type { FieldRows } from "../fields/text-reference.ts";
 import {
   FIELD_LIMITS,
   fieldDefinitions,
@@ -24,6 +26,8 @@ import {
   type SiteFields,
   sameJson,
 } from "../fields/types.ts";
+import { conversionCollections, conversionEntries, foldText } from "./conversion-maps.ts";
+import { convertingPath, loadNodeRows } from "./conversion-rows.ts";
 import { entryRefRows, holdsReferences, storedKey } from "./rows.ts";
 import { readMembers, targetProblem } from "./targets.ts";
 import { referenceUses } from "./values.ts";
@@ -42,6 +46,8 @@ export interface EditionDrop {
 interface Target {
   collections: readonly string[];
   where?: readonly FieldCondition[] | undefined;
+  /** A repeater's sub-field the value sits in (its held ids are read per path). */
+  sub?: string | undefined;
 }
 
 /** Whether the edition takes `groupId` for a target, and why not. */
@@ -52,6 +58,24 @@ interface Carry {
   dropped: EditionDrop[];
   /** References still allowed in this entry (the per-entry cap). */
   budget: { left: number };
+  /**
+   * RFC-0045 §7: under a running text → reference conversion, text the edition site's maps
+   * convert to exactly one group (its own write converts it); any other text is dropped.
+   */
+  converts: (text: string) => boolean;
+}
+
+const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
+
+/** A string that is no group id under a running text → reference marker (top-level or `sub`). */
+function unconvertedText(
+  m: FieldDefinition["migration"],
+  key: string,
+  value: unknown,
+  sub = false,
+): boolean {
+  const converting = m?.fromType === "text" && (sub ? m.sub === key : m.sub === undefined);
+  return converting && typeof value === "string" && !GROUP_ID.test(value);
 }
 
 /** One reference id: kept, or dropped with its reason. */
@@ -75,6 +99,10 @@ function carryReference(
   at: { path: string; carry: Carry },
 ): unknown {
   const { path, carry } = at;
+  // Text a running text → reference conversion has not converted yet: the edition's own write
+  // converts it through its markers, so it is carried as it is.
+  if (unconvertedText(def.migration, def.key, value) && at.carry.converts(value as string))
+    return value;
   const ids = Array.isArray(value) ? value : [value];
   const pathOf = (i: number) => (Array.isArray(value) ? `${path}/${i}` : path);
   const target = { collections: def.collections, where: def.where };
@@ -115,11 +143,19 @@ function carryRepeater(
       return;
     }
     const next: Record<string, unknown> = { ...item };
+    // A running sub-field rename's items still hold the old key (as `referenceUses` reads them).
+    const m = def.migration;
     for (const sub of def.fields) {
-      if (sub.type !== "reference" || next[sub.key] === undefined) continue;
-      const target = { collections: sub.collections };
-      if (!keep(next[sub.key], { path: `${path}/${i}/${sub.key}`, target, carry }))
-        delete next[sub.key];
+      if (sub.type !== "reference") continue;
+      const key =
+        next[sub.key] === undefined && m?.sub === sub.key && m.fromKey !== undefined
+          ? m.fromKey
+          : sub.key;
+      if (next[key] === undefined) continue;
+      if (unconvertedText(m, sub.key, next[key], true) && carry.converts(next[key] as string))
+        continue;
+      const target = { collections: sub.collections, sub: sub.key };
+      if (!keep(next[key], { path: `${path}/${i}/${key}`, target, carry })) delete next[key];
     }
     if (Object.keys(next).length > 0) items.push(next);
     else carry.dropped.push({ path: `${path}/${i}`, reason: "empty" });
@@ -140,9 +176,59 @@ async function usableOn(
   };
 }
 
-/** The group ids a stored value holds for `def`: the freshness test only (not a count). */
-const heldBy = (def: FieldDefinition, value: unknown): Set<string> =>
-  new Set(referenceUses(def, value, "").map((u) => u.groupId));
+/**
+ * Whether text converts to exactly one group on the edition site, under `defs`' running text →
+ * reference conversion: the site's maps over its target collections (one read, only then).
+ */
+async function textConverts(
+  sql: SqlDriver,
+  toSite: SiteFields & { id: string },
+  at: { defs: readonly FieldDefinition[]; group: string | undefined },
+): Promise<(text: string) => boolean> {
+  const { defs, group } = at;
+  const needs = conversionCollections(defs);
+  if (!needs) return () => false;
+  const rows = await sql.all<{ body: string }>(
+    `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
+      AND json_extract(body, '$.collection') IN (SELECT value FROM json_each(?))`,
+    [toSite.id, JSON.stringify([...needs])],
+  );
+  const maps = conversionEntries(
+    rows.map((r) => JSON.parse(r.body) as ContentEntry),
+    toSite.defaultLocale ?? "en",
+    needs,
+  );
+  // The converter's own rule: one group left once the entry's own is set aside.
+  return (text) => (maps.byText.get(foldText(text)) ?? []).filter((g) => g !== group).length === 1;
+}
+
+/**
+ * Whether a stored value already holds a group for `def` (the freshness test only, not a count).
+ * While a text → reference conversion runs on `def`, only an id with its row is held on the
+ * converting path, and a repeater's other sub-fields hold their own stored ids only (RFC-0045 §7).
+ * Otherwise every stored id of the field is held, as before step 4.
+ */
+function heldByRows(
+  def: FieldDefinition,
+  value: unknown,
+  rows: FieldRows | undefined,
+): (group: string, sub?: string) => boolean {
+  const all = new Set(referenceUses(def, value, "").map((u) => u.groupId));
+  const fromText = convertingPath(def) !== undefined && def.migration?.fromType === "text";
+  // Without such a marker: every stored id of the field, as before RFC-0045 step 4.
+  if (!fromText) return (g) => all.has(g);
+  const converting = def.migration?.sub;
+  // Per path: a sub-field's stored ids hold only for that sub-field.
+  const ids = new Map<string, Set<string>>();
+  for (const u of referenceUses(def, value, "")) {
+    const at = def.type === "repeater" ? (u.path.split("/")[2] ?? "") : "";
+    ids.set(at, (ids.get(at) ?? new Set()).add(u.groupId));
+  }
+  return (g, sub = "") =>
+    converting === undefined || converting === sub
+      ? rows?.has(g) === true
+      : ids.get(sub)?.has(g) === true;
+}
 
 /**
  * `entry`'s fields as written on site `toSite` (its own definitions), with what was dropped.
@@ -152,7 +238,8 @@ export async function editionReferences(
   sql: SqlDriver,
   toSite: SiteFields & { id: string },
   input: {
-    entry: Pick<ContentEntry, "collection" | "fields">;
+    entry: Pick<ContentEntry, "collection" | "fields"> &
+      Partial<Pick<ContentEntry, "id" | "translation">>;
     /** The edition's stored version of the entry (a re-save): its values are not fresh. */
     stored?: Pick<ContentEntry, "collection" | "fields"> | undefined;
   },
@@ -162,6 +249,15 @@ export async function editionReferences(
   const ids = [...new Set(entryRefRows(defs, entry.fields).map((r) => r.t))];
   if (ids.length === 0) return { fields: entry.fields, dropped: [] };
   const usable = await usableOn(sql, toSite, ids);
+  const group = entry.translation?.group ?? entry.id;
+  const converts = await textConverts(sql, toSite, { defs, group });
+  // RFC-0045 §7: on a path converting from text, only an id with its row is already held.
+  const rows = await loadNodeRows(sql, {
+    siteId: toSite.id,
+    nodeId: input.stored ? entry.id : undefined,
+    collection: entry.collection,
+    defs,
+  });
   const before: Record<string, unknown> =
     input.stored?.collection === entry.collection ? { ...(input.stored.fields ?? {}) } : {};
   const budget = { left: FIELD_LIMITS.referencesPerEntry };
@@ -179,11 +275,12 @@ export async function editionReferences(
   }
   // Pass 2: the changed keys, carried under what the cap leaves.
   for (const { def, key } of changed) {
-    const held = Object.hasOwn(before, key) ? heldBy(def, before[key]) : new Set<string>();
+    const held = Object.hasOwn(before, key) ? heldByRows(def, before[key], rows) : () => false;
     const carry: Carry = {
-      usable: (g, target) => usable(g, target, !held.has(g)),
+      usable: (g, target) => usable(g, target, !held(g, target.sub)),
       dropped,
       budget,
+      converts,
     };
     const at = { path: `fields/${key}`, carry };
     const value =
