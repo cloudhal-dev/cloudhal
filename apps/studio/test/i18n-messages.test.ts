@@ -75,7 +75,9 @@ describe("message catalogs (RFC-0032 §5)", () => {
       }
     });
     expect(errors).toEqual([]);
-  });
+    // Compiles every catalog of every language synchronously: about 5 s alone, CPU-bound, so it
+    // passed Studio's 20 s default only when `pnpm check` left it a core (RFC-0045 step 6a).
+  }, 60_000);
 
   it("arrives compiled: a message with syntax is data, plain ones stay strings", () => {
     const english = messages("en");

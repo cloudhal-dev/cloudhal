@@ -81,10 +81,12 @@ export const LAZY_ONLY: readonly RegExp[] = [
   /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](taxonomy|seo|activity)\.ts$/,
   // Typed custom fields (RFC-0041 §7): the entry form, its zone helpers, the builder, the operation
   // dialogs and the field model load with a collection that has fields, never with the shell.
-  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](EntryFieldsForm|entry-fields-model|zoned-time)\.tsx?$/,
+  // RFC-0045 §5 adds the reference and repeater blocks, the picker, "Used by", their client and
+  // helpers: they load with the same chunk (+0 kB for the shell).
+  /[\\/]packages[\\/]ui[\\/]src[\\/]blocks[\\/](EntryFieldsForm|EntryRepeater|FieldControl|RepeaterField|ReferenceList|EntryPicker|UsedByList|entry-fields-model|zoned-time)\.tsx?$/,
   /[\\/]packages[\\/]core-ts[\\/]src[\\/]fields[\\/]/,
   /[\\/]apps[\\/]studio[\\/]src[\\/]components[\\/]fields[\\/]/,
-  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](fields|field-form)\.ts$/,
+  /[\\/]apps[\\/]studio[\\/]src[\\/]lib[\\/](fields|field-form|field-references|api[\\/]references)\.ts$/,
   // Collections stage 3 (RFC-0042 §7): the listing, expiry and structured-data cards, the list's
   // field columns and filters, "Create listing page", the content list conditions, their model and
   // client, and the preset table load with their screens (the shell keeps `listing-search.ts`).

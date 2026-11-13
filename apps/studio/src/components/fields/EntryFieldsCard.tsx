@@ -1,4 +1,5 @@
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
+import { memberGroup } from "@cloudhal/core-ts/fields";
 import {
   EntryFieldsForm,
   type EntryFieldsFormLabels,
@@ -12,12 +13,16 @@ import { useMemo } from "react";
 import { type TFunction, useI18n } from "../../i18n/index.tsx";
 import { api } from "../../lib/api.ts";
 import { entryHref } from "../../lib/entry-href.ts";
-import { fieldIssues, issuesByField } from "../../lib/fields.ts";
+import { chooseMember, issuesByPath, referenceIdsIn } from "../../lib/field-references.ts";
+import { fieldIssues } from "../../lib/fields.ts";
 import { languageName } from "../../lib/languages.ts";
 import { zoneLabel } from "../../lib/schedules.ts";
 import { primaryHostname } from "../../lib/site-settings.ts";
 import { BodyEditor } from "../BodyEditor.tsx";
+import { useToast } from "../Toast.ts";
 import { FieldImage } from "./FieldImage.tsx";
+import { FieldReference } from "./FieldReference.tsx";
+import { useGroupCards } from "./useGroupCards.ts";
 
 type FT = TFunction<"fields">;
 
@@ -27,6 +32,8 @@ const ISSUE_CODES = [
   "field_not_localized",
   "required_field",
   "too_large",
+  "unknown_entry",
+  "too_many_references",
 ] as const;
 type IssueCode = (typeof ISSUE_CODES)[number];
 const isIssueCode = (code: string): code is IssueCode =>
@@ -50,6 +57,26 @@ export function fieldHint(t: FT, def: FieldDefinition): string | undefined {
   return parts.length ? parts.join(" ") : undefined;
 }
 
+/** A repeater's words (RFC-0045 §5). */
+function repeaterLabels(t: FT): EntryFieldsFormLabels["repeater"] {
+  const r = "fields.repeater" as const;
+  return {
+    add: t(`${r}.add`),
+    count: (count, max) => t(`${r}.count`, { count, max }),
+    empty: t(`${r}.empty`),
+    moveUp: (index) => t(`${r}.moveUp`, { index }),
+    moveDown: (index) => t(`${r}.moveDown`, { index }),
+    actions: (index) => t(`${r}.actions`, { index }),
+    menuMoveUp: t(`${r}.menuMoveUp`),
+    menuMoveDown: t(`${r}.menuMoveDown`),
+    duplicate: t(`${r}.duplicate`),
+    remove: t(`${r}.remove`),
+    moved: (from, to) => t(`${r}.moved`, { from, to }),
+    removed: (index) => t(`${r}.removed`, { index }),
+    invalidItems: (count) => t(`${r}.invalidItems`, { count }),
+  };
+}
+
 /** The form's words, in the Studio language. */
 function useFormLabels(t: FT, originalLocale: string | undefined, locale: string) {
   return useMemo<EntryFieldsFormLabels>(() => {
@@ -66,6 +93,11 @@ function useFormLabels(t: FT, originalLocale: string | undefined, locale: string
       noValue: t("fields.editor.noValue"),
       clear: t("fields.editor.clear"),
       originalImage: t("fields.editor.originalImage"),
+      sharedList: t("fields.editor.sharedList"),
+      items: (count) => t("fields.editor.originalItems", { count }),
+      itemLegend: (index, name) =>
+        t("fields.editor.itemLegend", { index, named: name ? "yes" : "no", name: name ?? "" }),
+      repeater: repeaterLabels(t),
       date: {
         date: t(`${d}.date`),
         pickDate: t(`${d}.pickDate`),
@@ -119,15 +151,31 @@ export function EntryFieldsCard({
   disabled: boolean;
 }) {
   const { t, locale } = useI18n("fields", "bodyEditor", "media");
+  const toast = useToast();
   const definitions = site.collections?.[entry.collection]?.fields ?? [];
   const original = useOriginal(siteId, entry);
   const labels = useFormLabels(t, original.data?.locale, locale);
   const errors = useMemo(() => {
     const out: Record<string, string> = {};
-    for (const [key, issue] of Object.entries(issuesByField(fieldIssues(error))))
-      out[key] = isIssueCode(issue.code) ? t(`fields.issues.${issue.code}`) : issue.message;
+    for (const [path, issue] of Object.entries(issuesByPath(fieldIssues(error))))
+      out[path] = isIssueCode(issue.code) ? t(`fields.issues.${issue.code}`) : issue.message;
     return out;
   }, [error, t]);
+  // RFC-0045: the members of every target the entry and its original name.
+  const ids = useMemo(
+    () => [
+      ...referenceIdsIn(definitions, entry.fields),
+      ...referenceIdsIn(definitions, original.data?.fields),
+    ],
+    [definitions, entry.fields, original.data?.fields],
+  );
+  const groups = useGroupCards(siteId, ids);
+  const titleOf = (groupId: string) => {
+    const members = groups.cards.get(groupId);
+    const collections = members?.map((m) => m.collection) ?? [];
+    const options = { locale: entry.locale, defaultLocale: site.defaultLocale, collections };
+    return members ? chooseMember(members, options)?.title : undefined;
+  };
   const from: EntryFieldsOriginal | undefined = original.data
     ? {
         values: original.data.fields,
@@ -150,9 +198,31 @@ export function EntryFieldsCard({
         zoneLabel={(zone) => zoneLabel(zone)}
         labels={labels}
         disabled={disabled}
+        multilingual={site.locales.length > 1}
+        referenceTitle={titleOf}
         renderImage={(slot) => (
           <FieldImage siteId={siteId} defaultLocale={defaultLocale} slot={slot} />
         )}
+        renderReference={(slot) => (
+          <FieldReference
+            siteId={siteId}
+            site={site}
+            entryLocale={entry.locale}
+            ownGroup={memberGroup(entry)}
+            slot={slot}
+            cards={groups.cards}
+            onPicked={groups.add}
+          />
+        )}
+        onItemRemoved={({ field, legend, undo }) =>
+          toast.notice({
+            id: `field-item-removed-${field}`,
+            title: t("fields.repeater.removedToast", { item: legend }),
+            tone: "info",
+            timeout: 10_000,
+            actions: [{ label: t("fields.repeater.undo"), onClick: undo }],
+          })
+        }
         renderRichText={(slot) => (
           <div className="grid min-w-0 gap-1.5" data-field-rich-text={slot.def.key}>
             <Label>{slot.label}</Label>

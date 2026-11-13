@@ -21,7 +21,7 @@ import {
 import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArticleCorrectionsCard } from "../components/ArticleCorrections.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { ArticleReachCards } from "../components/article-editor/ArticleAside.tsx";
@@ -44,6 +44,7 @@ import {
   ScheduleAside,
   ScheduleLock,
 } from "../components/EditorSchedule.tsx";
+import { EntryFieldCards } from "../components/EntryFieldCards.tsx";
 import { EntryPath } from "../components/EntryPath.tsx";
 import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -68,11 +69,6 @@ import { primaryHostname } from "../lib/site-settings.ts";
 import { missingPrimaries } from "../lib/taxonomy.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
-
-// RFC-0041 §7: the typed fields form loads only for collections that define fields.
-const EntryFieldsCard = lazy(() =>
-  import("../components/fields/EntryFieldsCard.tsx").then((m) => ({ default: m.EntryFieldsCard })),
-);
 
 /** A copy of the article as a new draft with a free slug. */
 function duplicateOf(entry: ContentEntry, title: string): NewEntry {
@@ -447,18 +443,14 @@ export function ArticleEditorPage() {
                 className="w-full"
               />
             </SectionCard>
-            {site.data?.collections?.[draft.collection]?.fields && (
-              <Suspense fallback={null}>
-                <EntryFieldsCard
-                  siteId={siteId}
-                  site={site.data}
-                  entry={draft}
-                  onChange={(fields) => setDraft({ ...draft, fields })}
-                  error={save.error}
-                  disabled={readOnlyReason !== undefined || locked}
-                />
-              </Suspense>
-            )}
+            <EntryFieldCards
+              siteId={siteId}
+              site={site.data}
+              entry={draft}
+              onChange={(fields) => setDraft({ ...draft, fields })}
+              error={save.error}
+              disabled={readOnlyReason !== undefined || locked}
+            />
             <ArticleTermsCard
               entry={draft}
               onChange={(next) => {

@@ -207,7 +207,11 @@ export const jsonBytes = (value: unknown): number =>
   encoder.encode(JSON.stringify(value) ?? "").length;
 
 /** A label in `locale`, then `defaultLocale`, then any, else the key. */
-export function fieldLabel(def: FieldDefinition, locale: string, defaultLocale: string): string {
+export function fieldLabel(
+  def: Pick<FieldDefinition, "key" | "labels">,
+  locale: string,
+  defaultLocale: string,
+): string {
   const labels = def.labels;
   return (
     labels[locale]?.label ??
@@ -219,7 +223,7 @@ export function fieldLabel(def: FieldDefinition, locale: string, defaultLocale: 
 
 /** A field's help text in `locale`, then `defaultLocale` (no fallback to other locales). */
 export function fieldHelp(
-  def: FieldDefinition,
+  def: Pick<FieldDefinition, "labels">,
   locale: string,
   defaultLocale: string,
 ): string | undefined {
@@ -228,7 +232,7 @@ export function fieldHelp(
 
 /** An option's words in `locale`, then `defaultLocale`, then any, else its value. */
 export function optionLabel(
-  def: FieldDefinition,
+  def: FieldDefinition | SubFieldDefinition,
   value: string,
   locale: string,
   defaultLocale: string,

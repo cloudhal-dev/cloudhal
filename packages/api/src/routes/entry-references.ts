@@ -7,13 +7,17 @@
  *   `cursor` and `truncated` when the row budget ended first (`entry-pick.ts`). `q` is at most
  *   100 characters and refused before it is read further; a per-member window of the
  *   `rate_limits` counters applies.
+ * - `GET …/entries/groups?ids=a,b` (rollout step 6, Studio's chosen targets): each group's members
+ *   in this site, any status, as `{groupId, id, title, collection, status, locale}` cards (the
+ *   membership rule, `getGroupMembers`); a group with no member left gets an empty list. At most
+ *   100 ids, the per-entry reference cap.
  * - `GET …/entries/:entryId/references?limit=&offset=`: the referrers of the entry's translation
  *   group from `entry_refs`, published holders first, each holder with the same-site members that
  *   show its value (`shared` 1, or 2 without their own value), paged (`listReferrers`, which MCP's
  *   `list_references` shares).
  */
-import { listReferrers } from "@cloudhal/core-ts";
-import { memberGroup } from "@cloudhal/core-ts/fields";
+import { getGroupMembers, listReferrers, referenceCard } from "@cloudhal/core-ts";
+import { FIELD_LIMITS, GROUP_ID_PATTERN, memberGroup } from "@cloudhal/core-ts/fields";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -31,6 +35,16 @@ const PICK_LIMIT = 20;
 /** Picker searches per member and site per minute. */
 const PICK_WINDOW = { hits: 120, ms: 60_000 };
 const REFERRERS_LIMIT = 100;
+const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
+
+/** The groups' query: one to 100 well-formed group ids. */
+function groupIds(c: Context<Env>): string[] {
+  const ids = [...new Set((c.req.query("ids") ?? "").split(",").filter((s) => s !== ""))];
+  if (ids.length === 0 || ids.length > FIELD_LIMITS.referencesPerEntry)
+    throw badRequest(`ids lists one to ${FIELD_LIMITS.referencesPerEntry} translation group ids`);
+  if (!ids.every((id) => GROUP_ID.test(id))) throw badRequest("ids are translation group ids");
+  return ids;
+}
 
 function intParam(raw: string | undefined, max: number, fallback: number): number {
   if (raw === undefined || raw === "") return fallback;
@@ -73,6 +87,16 @@ export const entryReferences: Hono<Env> = new Hono<Env>()
     if (await rateLimited(c, siteId))
       throw apiError(429, "rate_limited", "too many picker searches; wait a minute");
     return c.json(await pickEntries(c.get("store").sql, siteId, query));
+  })
+  .get("/groups", async (c) => {
+    const siteId = param(c, "siteId");
+    const ids = groupIds(c);
+    const store = c.get("store");
+    if (!(await store.getSite(siteId))) throw notFound("site not found");
+    const members = await getGroupMembers(store.sql, siteId, ids);
+    return c.json({
+      groups: Object.fromEntries([...members].map(([g, list]) => [g, list.map(referenceCard)])),
+    });
   })
   .get("/:entryId/references", async (c) => {
     const store = c.get("store");

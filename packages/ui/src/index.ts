@@ -252,13 +252,29 @@ export {
   type TransitionArrowProps,
 } from "./blocks/DirectionalIcon.tsx";
 export {
+  type AnyFieldDefinition,
   EntryFieldsForm,
   type EntryFieldsFormLabels,
   type EntryFieldsFormProps,
   type EntryFieldsOriginal,
   type FieldImageSlot,
+  type FieldReferenceSlot,
   type FieldRichTextSlot,
 } from "./blocks/EntryFieldsForm.tsx";
+export {
+  EntryPicker,
+  type EntryPickerItem,
+  type EntryPickerLabels,
+  type EntryPickerPage,
+  type EntryPickerProps,
+} from "./blocks/EntryPicker.tsx";
+export {
+  describeField,
+  FieldControl,
+  type FieldControlContext,
+  type FieldControlLabels,
+  type FieldControlProps,
+} from "./blocks/FieldControl.tsx";
 export {
   type FocalPoint,
   FocalPointPicker,
@@ -357,6 +373,19 @@ export {
   type RecurrenceEditorLabels,
   type RecurrenceEditorProps,
 } from "./blocks/RecurrenceEditor.tsx";
+export {
+  ReferenceList,
+  type ReferenceListItem,
+  type ReferenceListLabels,
+  type ReferenceListProps,
+  type ReferenceTargetStatus,
+} from "./blocks/ReferenceList.tsx";
+export {
+  RepeaterField,
+  type RepeaterFieldLabels,
+  type RepeaterFieldProps,
+  type RepeaterItemErrors,
+} from "./blocks/RepeaterField.tsx";
 export {
   type RescheduleApprovalEffect,
   RescheduleDialog,
@@ -498,6 +527,12 @@ export {
   type TimezoneNoteProps,
 } from "./blocks/TimezoneNote.tsx";
 export { ToggletipBadge, type ToggletipBadgeProps } from "./blocks/ToggletipBadge.tsx";
+export {
+  UsedByList,
+  type UsedByListLabels,
+  type UsedByListProps,
+  type UsedByRow,
+} from "./blocks/UsedByList.tsx";
 export {
   type ChartColors,
   mixHex,
