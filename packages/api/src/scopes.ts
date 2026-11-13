@@ -175,6 +175,7 @@ export const ROUTE_SCOPES: readonly (readonly [Method, string, RouteRequirement]
   // RFC-0045 §5: the entry picker and an entry's referrers
   ["GET", `${S}/entries/pick`, "content:read"],
   ["GET", `${S}/entries/groups`, "content:read"],
+  ["GET", `${S}/entries/reference-issues`, "content:read"],
   ["GET", `${S}/entries/:entryId/references`, "content:read"],
   ["GET", `${S}/entries/:entryId`, "content:read"],
   ["PUT", `${S}/entries/:entryId`, "content:draft:own"],

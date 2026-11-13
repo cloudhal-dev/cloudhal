@@ -1,5 +1,4 @@
 import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { isReferenceFieldType } from "@cloudhal/core-ts/fields";
 import { Badge, Button, DropdownMenu, Text, Tooltip } from "@cloudhal/ui";
 import {
   ArrowDown,
@@ -13,6 +12,12 @@ import {
 } from "@phosphor-icons/react";
 import { useI18n } from "../../i18n/index.tsx";
 import { type OperationKind, targetTypes } from "./FieldOperationDialog.tsx";
+
+/** A field, or one of a repeater's sub-fields, has a type it can change to. */
+const retypable = (def: FieldDefinition, referenceTypes: boolean) =>
+  targetTypes(def.type, { referenceTypes }).length > 0 ||
+  (def.type === "repeater" &&
+    def.fields.some((s) => targetTypes(s.type, { referenceTypes, sub: true }).length > 0));
 
 /**
  * One field in the builder: its label, key in mono, type and the Localized / Needed to publish /
@@ -31,6 +36,7 @@ export function FieldRow({
   onEdit,
   onRemoveNew,
   onOperation,
+  referenceTypes,
 }: {
   def: FieldDefinition;
   label: string;
@@ -44,6 +50,8 @@ export function FieldRow({
   onEdit: () => void;
   onRemoveNew: () => void;
   onOperation: (kind: OperationKind) => void;
+  /** The server takes reference and repeater fields (RFC-0045): more types to change to. */
+  referenceTypes: boolean;
 }) {
   const { t } = useI18n("fields");
   const ops = canEdit && !dirty;
@@ -60,10 +68,7 @@ export function FieldRow({
           <Text as="span" variant="mono-secondary">
             {def.key}
           </Text>
-          {/* RFC-0045: reference and repeater get their words with their blocks (rollout step 6). */}
-          {!isReferenceFieldType(def.type) && (
-            <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>
-          )}
+          <Badge variant="secondary">{t(`fields.types.${def.type}`)}</Badge>
           {def.localized && <Badge variant="info">{t("fields.builder.localized")}</Badge>}
           {def.type !== "boolean" && def.requiredToPublish && (
             <Badge variant="outline">{t("fields.editor.neededToPublish")}</Badge>
@@ -129,7 +134,7 @@ export function FieldRow({
                 </DropdownMenu.Item>
                 <DropdownMenu.Item
                   icon={Shapes}
-                  disabled={!ops || targetTypes(def.type).length === 0}
+                  disabled={!ops || !retypable(def, referenceTypes)}
                   onClick={() => onOperation("change_field_type")}
                 >
                   {t("fields.builder.changeType")}

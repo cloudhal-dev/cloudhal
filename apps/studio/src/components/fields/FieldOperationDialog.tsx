@@ -1,116 +1,30 @@
-import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { canConvert, FIELD_TYPES, fieldLabel } from "@cloudhal/core-ts/fields";
-import { Banner, Checkbox, Input, LayerDialog, Loader, Select, Text } from "@cloudhal/ui";
+import type { Site } from "@cloudhal/core-contracts";
+import { fieldLabel } from "@cloudhal/core-ts/fields";
+import { Banner, Checkbox, LayerDialog, Loader, Text } from "@cloudhal/ui";
 import { ArrowCounterClockwise, Camera, CheckCircle, Warning } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { type TFunction, useI18n } from "../../i18n/index.tsx";
-import type { FieldOperationRequest } from "../../lib/api.ts";
 import { apiErrorText } from "../../lib/api-errors.ts";
-import { definitionOf, emptyForm, type FieldForm, formOf } from "../../lib/field-form.ts";
-import { type FieldType, keyProblem } from "../../lib/fields.ts";
-import { OptionFields } from "./FieldDialog.tsx";
+import { emptyForm } from "../../lib/field-form.ts";
+import { keyProblem } from "../../lib/fields.ts";
 import { FieldOperationReport } from "./FieldOperationReport.tsx";
+import {
+  freshInputs,
+  type Inputs,
+  OperationInputs,
+  type OperationKind,
+  type OperationTarget,
+  requestOf,
+  subOf,
+  targetBlocked,
+} from "./OperationInputs.tsx";
+import { StuckOperation } from "./StuckOperation.tsx";
 import { type FieldOperationState, useFieldOperation } from "./useFieldOperation.ts";
 
 type FT = TFunction<"fields">;
-export type OperationKind = FieldOperationRequest["op"];
 
-/** What an operation dialog was opened for: a field and an operation, or a run to pick up. */
-export interface OperationTarget {
-  kind: OperationKind;
-  def: FieldDefinition;
-  /** An operation already started (a closed dialog, another tab, an agent's approved call). */
-  resume?: { operationId: string; reverting: boolean } | undefined;
-}
-
-/** The types a field can change to (RFC-0041 §6's table); a select can also flip `multiple`. */
-export const targetTypes = (from: FieldType) =>
-  FIELD_TYPES.filter((to) => (to === from ? to === "select" : canConvert(from, to)));
-
-interface Inputs {
-  key: string;
-  type: FieldType;
-  options: FieldForm;
-}
-
-function requestOf(target: OperationTarget, inputs: Inputs, clear: boolean): FieldOperationRequest {
-  const { def } = target;
-  switch (target.kind) {
-    case "rename_field":
-      return { op: "rename_field", from: def.key, to: inputs.key };
-    case "set_field_localized":
-      return { op: "set_field_localized", key: def.key, localized: !def.localized };
-    case "remove_field":
-      return { op: "remove_field", key: def.key };
-    default: {
-      const select = inputs.type === "select" ? definitionOf(inputs.options) : undefined;
-      return {
-        op: "change_field_type",
-        key: def.key,
-        type: inputs.type,
-        ...(select?.type === "select"
-          ? { options: select.options, multiple: select.multiple === true }
-          : {}),
-        ...(clear ? { onInvalid: "clear" as const } : {}),
-      };
-    }
-  }
-}
-
-/** The inputs of rename and type change; localization and removal have none. */
-function OperationInputs(props: {
-  t: FT;
-  target: OperationTarget;
-  inputs: Inputs;
-  setInputs: (next: Inputs) => void;
-  keyError: string | undefined;
-  locales: readonly string[];
-  defaultLocale: string;
-  uiLocale: string;
-  disabled: boolean;
-}) {
-  const { t, target, inputs, setInputs } = props;
-  if (target.kind === "rename_field")
-    return (
-      <Input
-        className="w-full font-mono"
-        label={t("fields.operation.newKey")}
-        description={t("fields.dialog.keyHint")}
-        value={inputs.key}
-        onValueChange={(key) => setInputs({ ...inputs, key })}
-        error={props.keyError}
-        maxLength={40}
-        disabled={props.disabled}
-      />
-    );
-  if (target.kind !== "change_field_type") return null;
-  const types = targetTypes(target.def.type);
-  return (
-    <div className="grid gap-5">
-      <Select
-        className="w-full"
-        label={t("fields.operation.newType")}
-        value={inputs.type}
-        disabled={props.disabled}
-        onValueChange={(v) => setInputs({ ...inputs, type: v as FieldType })}
-        items={Object.fromEntries(types.map((ty) => [ty, t(`fields.types.${ty}`)]))}
-        data-testid="field-new-type"
-      />
-      {inputs.type === "select" && (
-        <OptionFields
-          t={t}
-          form={inputs.options}
-          set={(options) => setInputs({ ...inputs, options })}
-          locales={props.locales}
-          defaultLocale={props.defaultLocale}
-          uiLocale={props.uiLocale}
-          isNew
-          problems={{}}
-        />
-      )}
-    </div>
-  );
-}
+export type { OperationKind, OperationTarget } from "./OperationInputs.tsx";
+export { targetTypes } from "./OperationInputs.tsx";
 
 /** The state banners: running, done (with Revert), reverted, and a failure. */
 function OperationStatus({
@@ -140,7 +54,10 @@ function OperationStatus({
           role="status"
           data-testid="field-operation-running"
         >
-          <Loader size="sm" />
+          {/* The words beside it say it; the spinner is only seen. */}
+          <span aria-hidden="true">
+            <Loader size="sm" />
+          </span>
           <Text as="span">
             {step === "running"
               ? t("fields.operation.running", { count: rewritten })
@@ -220,26 +137,79 @@ function OperationNotes({
   );
 }
 
-/** The primary button: check, confirm the run, or close once finished. */
+/** The primary button: check, confirm the run, finish a stuck one, or close once finished. */
 function primaryLabel(t: FT, step: FieldOperationState["step"], kind: OperationKind): string {
   if (step === "choose" || step === "checking") return t("fields.operation.check");
+  if (step === "stuck") return t("fields.operation.stuckFinish");
   if (step === "done" || step === "reverted") return t("fields.operation.close");
   return t(`fields.operation.confirm.${kind}`);
 }
 
-/** Whether the primary button waits: an invalid or unchanged key, or the clear opt-in. */
+/**
+ * Whether the primary button waits: an invalid or unchanged key, a type change's target settings
+ * still missing (collections, sub-fields), the clear opt-in, or a stuck run's confirmation.
+ */
 function primaryBlocked(input: {
   step: FieldOperationState["step"];
   target: OperationTarget | undefined;
-  key: string;
+  inputs: Inputs;
+  defaultLocale: string;
   keyError: string | undefined;
   needsClear: boolean;
+  stuckConfirmed: boolean;
 }): boolean {
-  const { step, target } = input;
+  const { step, target, inputs } = input;
   if (step === "report") return input.needsClear;
+  if (step === "stuck") return !input.stuckConfirmed;
   if (step !== "choose") return false;
   if (!target || input.keyError !== undefined) return true;
-  return target.kind === "rename_field" && input.key === target.def.key;
+  if (target.kind === "change_field_type") return targetBlocked(inputs, input.defaultLocale);
+  const current = inputs.sub ? subOf(target.def, inputs.sub)?.key : target.def.key;
+  return target.kind === "rename_field" && inputs.key === current;
+}
+
+/** The dialog's inputs and opt-ins, started over for each target, and the new key's problem. */
+function useOperationInputs(o: {
+  open: boolean;
+  target: OperationTarget | undefined;
+  taken: readonly string[];
+  locales: readonly string[];
+  referenceTypes: boolean;
+  state: FieldOperationState;
+  t: FT;
+}) {
+  const { open, target, state, locales, referenceTypes } = o;
+  const [inputs, setInputs] = useState<Inputs>({
+    key: "",
+    sub: "",
+    type: "text",
+    form: emptyForm("text", locales),
+  });
+  const [clear, setClear] = useState(false);
+  const [clearStuck, setClearStuck] = useState(false);
+  // A new target or opening starts over.
+  useEffect(() => {
+    if (!open || !target) return state.stop();
+    state.reset();
+    setClear(false);
+    setClearStuck(false);
+    const fresh = freshInputs(target, "", { locales, referenceTypes });
+    setInputs(fresh);
+    if (target.resume) {
+      if (target.resume.reverting) void state.undo(target.resume.operationId);
+      else void state.resume(target.resume.operationId);
+    } else if (target.kind === "set_field_localized" || target.kind === "remove_field")
+      void state.check(requestOf(target, fresh, false));
+  }, [open, target]);
+  // A sub-field's new key must be free among its repeater's other sub-fields.
+  const def = target?.def;
+  const siblings =
+    def?.type === "repeater" && inputs.sub
+      ? def.fields.filter((s) => s.key !== inputs.sub).map((s) => s.key)
+      : o.taken;
+  const problem = target?.kind === "rename_field" ? keyProblem(inputs.key, siblings) : undefined;
+  const keyError = problem ? o.t(`fields.dialog.errors.key.${problem}`) : undefined;
+  return { inputs, setInputs, clear, setClear, clearStuck, setClearStuck, keyError };
 }
 
 /**
@@ -257,6 +227,8 @@ export function FieldOperationDialog({
   taken,
   defaultLocale,
   locales,
+  site,
+  referenceTypes,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -267,35 +239,15 @@ export function FieldOperationDialog({
   taken: readonly string[];
   defaultLocale: string;
   locales: readonly string[];
+  site: Site;
+  /** The server takes reference and repeater fields (RFC-0045). */
+  referenceTypes: boolean;
 }) {
   const { t, locale } = useI18n("fields");
   const state = useFieldOperation(siteId, collection);
-  const [inputs, setInputs] = useState<Inputs>({
-    key: "",
-    type: "text",
-    options: emptyForm("select", locales),
-  });
-  const [clear, setClear] = useState(false);
+  const { inputs, setInputs, clear, setClear, clearStuck, setClearStuck, keyError } =
+    useOperationInputs({ open, target, taken, locales, referenceTypes, state, t });
   const def = target?.def;
-  useEffect(() => {
-    if (!open || !target) return state.stop();
-    state.reset();
-    setClear(false);
-    const types = targetTypes(target.def.type);
-    setInputs({
-      key: target.def.key,
-      type: types[0] ?? target.def.type,
-      options:
-        target.def.type === "select" ? formOf(target.def, locales) : emptyForm("select", locales),
-    });
-    if (target.resume) {
-      if (target.resume.reverting) void state.undo(target.resume.operationId);
-      else void state.resume(target.resume.operationId);
-    } else if (target.kind === "set_field_localized" || target.kind === "remove_field")
-      void state.check(requestOf(target, inputs, false));
-  }, [open, target]);
-  const problem = target?.kind === "rename_field" ? keyProblem(inputs.key, taken) : undefined;
-  const keyError = problem ? t(`fields.dialog.errors.key.${problem}`) : undefined;
   const busy = state.step === "checking" || state.step === "running" || state.step === "reverting";
   const report = state.report?.report;
   const needsClear = (report?.unconvertible ?? 0) > 0 && !clear;
@@ -305,6 +257,10 @@ export function FieldOperationDialog({
     if (!target) return;
     if (state.step === "choose") return void state.check(requestOf(target, inputs, false));
     if (state.step === "report") return void state.run(requestOf(target, inputs, clear));
+    if (state.step === "stuck" && state.stuck) {
+      setClearStuck(false);
+      return void state.finishClearing(state.stuck);
+    }
     onOpenChange(false);
   };
   const finished = state.step === "done" || state.step === "reverted";
@@ -334,12 +290,17 @@ export function FieldOperationDialog({
                 locales={locales}
                 defaultLocale={defaultLocale}
                 uiLocale={locale}
-                disabled={busy || finished}
+                // "Clear and finish" continues the run as it was asked: nothing here changes it.
+                disabled={busy || finished || state.step === "stuck"}
+                site={site}
+                referenceTypes={referenceTypes}
               />
             )}
             {state.step === "checking" && (
               <div className="flex items-center gap-3" role="status">
-                <Loader size="sm" />
+                <span aria-hidden="true">
+                  <Loader size="sm" />
+                </span>
                 <Text as="span">{t("fields.operation.checking")}</Text>
               </div>
             )}
@@ -353,6 +314,14 @@ export function FieldOperationDialog({
                 state={state}
                 clear={clear}
                 setClear={setClear}
+              />
+            )}
+            {state.step === "stuck" && state.stuck && (
+              <StuckOperation
+                t={t}
+                stuck={state.stuck}
+                confirmed={clearStuck}
+                onConfirm={setClearStuck}
               />
             )}
             <OperationStatus
@@ -369,12 +338,15 @@ export function FieldOperationDialog({
           <LayerDialog.Actions.Primary
             onClick={primary}
             loading={busy}
+            variant={state.step === "stuck" ? "destructive" : "primary"}
             disabled={primaryBlocked({
               step: state.step,
               target,
-              key: inputs.key,
+              inputs,
+              defaultLocale,
               keyError,
               needsClear,
+              stuckConfirmed: clearStuck,
             })}
             data-testid="field-operation-primary"
           >

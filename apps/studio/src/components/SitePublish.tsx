@@ -8,7 +8,7 @@ import {
 } from "@phosphor-icons/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { useT } from "../i18n/index.tsx";
 import { api } from "../lib/api.ts";
 import { apiErrorText } from "../lib/api-errors.ts";
@@ -16,6 +16,11 @@ import { UnpublishedPagesNote } from "./PageStatus.tsx";
 import { PendingBadge, pendingText, usePendingChanges } from "./PendingChanges.tsx";
 import { usePublishMode, usePublishSite } from "./Publish.tsx";
 import { useToast } from "./Toast.ts";
+
+// RFC-0045: the publish dialog's reference warnings, a lazy chunk that loads with the dialog.
+const ReferenceWarnings = lazy(() =>
+  import("./fields/PublishWarnings.tsx").then((m) => ({ default: m.ReferenceWarnings })),
+);
 
 /**
  * The site surface's Publish split button (top bar, every site screen): Publish → `ApprovalDialog`
@@ -121,6 +126,9 @@ export function SitePublish({
         onConfirm={() => publish.mutate({ label: t("snapshots.publishedFromStudio") })}
       >
         <UnpublishedPagesNote siteId={siteId} open={open} onNavigate={() => setOpen(false)} />
+        <Suspense fallback={null}>
+          <ReferenceWarnings siteId={siteId} open={open} onNavigate={() => setOpen(false)} />
+        </Suspense>
       </ApprovalDialog>
     </>
   );

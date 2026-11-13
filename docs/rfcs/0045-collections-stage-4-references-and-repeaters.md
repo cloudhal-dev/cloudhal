@@ -1419,3 +1419,30 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 
 - **Duplicate** copies the fields without empty repeater items too (`duplicateOf` runs the same `withoutEmptyItems` as a save).
 - **The index map is built from what the failed save sent** (the mutation's variables), not from the draft when the error arrives, which may have changed while the save was in flight.
+
+### Amended in 6b (2026-11-13, rollout step 6, second PR: builder, delete dialog, publish warnings)
+
+- **The capability Studio reads** is `/api/instance` → `features.referenceFields`, true when the store has `SiteGraphStoreOptions.fieldTypes` (MCP's rule from step 5). The builder offers reference and list (repeater) only then; production answers false until step 7. A per-site refusal still comes from the store (`fields_unsupported`, now worded in `errors.api`).
+- **The delete dialog asks the store.** `DELETE …/entries/:id?rev=&dryRun=1` runs the store's delete plan (`deleteContentEntry(entry, { dryRun })`) and answers its refusal (`entry_referenced` with up to 20 referrers and the total) or `{ dryRun: true }`. Studio's dialog keeps Delete off while the check runs and while it refuses, and lists the referrers from the refusal's details. Draft referrers ("Will show nothing for this field") and the language that loses the card come from `…/references` and `…/groups`.
+- **Unlinking a translation** has no action in Studio today (translations are created, not unlinked); the store's `entry_referenced` and `translation_group_in_use` refusals of a group change are worded in `errors.api` for any path that reaches them. A Studio unlink action, when it comes, reuses the delete dialog's check through a dry-run update.
+- **Publish warnings** come from a new read-only `GET …/entries/reference-issues` (`content:read`): `referenceIssues` over the working copy at the request's instant, the first 50 with each holder's title, and the total; a site without reference fields answers none without reading entries. They show in the site's publish dialog only (the entry editor's "Publish" and snapshot publishes keep RFC-0042's checks).
+- **Stuck operations**: a pass that changed nothing while `unconvertible` (or a revert's) is not empty stops instead of looping; the dialog offers "Clear and finish" behind a ticked confirmation, which sends `onInvalid: "clear"` on the continue or the revert.
+- **`docs/guides/fields.md`** is left to step 7, which enables the types.
+
+#### Review round 1 (2026-11-13, PM review of PR #220)
+
+- **The delete dialog reads its own data.** Group members are cached under their own key (the editor caches `…/groups` answers in another shape). The blocked list shows each holder's real status and the published language versions that show its value (`…/references`' `shownBy`), so a draft original whose translation is published names that translation. "Other entries left" counts only members in a collection some referring field allows. A refusal of the real delete (a stale check, `field_operation_running`) shows in the dialog: its referrers as the blocked state, any other code in its words.
+- **"Change type…" checks the contract's rules and RFC-0045's**, not the builder's default-language labels, and shows its problems inline: a select whose labels are only in another language can be retyped.
+- **A reference's conditions follow its target**: a new single target keeps only conditions on its own listing fields, and the form flags any that remain.
+- **Item fields not saved yet** keep their key and type editable when edited; the item name follows a renamed item field (its options are keyed by the rows' stable ids) and lets go of one whose new type can't name items.
+- **Limits keep focus**: "Add condition" and "Add item field" stay focusable (`aria-disabled`) at their limits.
+- **A stuck operation** locks its inputs and announces itself (`role="alert"`).
+- **Counts say references** where they count references ("And 2 more references.").
+
+#### Review round 2 (2026-11-13, PM verification of 169adfd9)
+
+- **A delete refusal belongs to one opening** of the dialog for one revision: reopening it, or a new revision, asks the store again.
+- **Conditions are dropped only for a new single target**; ticking a second collection, or unticking and re-ticking the only one, keeps them.
+- **A type change's target settings lock** (a disabled `fieldset`) whenever its inputs do: running, stuck or finished.
+- **"Other entries left" is decided per referring field**, as the store decides: referrers whose field has no usable other member are listed as showing nothing, the others name the language that loses the card; both can show.
+- **The blocked count is the store's** (`total`, never capped at the list's 100), the "more references" note shows whenever rows remain unlisted, and a late refusal reads the referrers again.

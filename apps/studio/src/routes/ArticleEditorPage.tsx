@@ -3,7 +3,6 @@ import { collectionPermalink, permalinkPrefix } from "@cloudhal/core-ts/permalin
 import {
   ApprovalDialog,
   Button,
-  DeleteResource,
   DropdownMenu,
   Field,
   type ImagePreviewStatus,
@@ -29,7 +28,6 @@ import { BodyEditor } from "../components/BodyEditor.tsx";
 import { BodyProposals } from "../components/BodyProposals.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { DraftEditorPreview } from "../components/DraftPreview.tsx";
-import { deleteResourceProps } from "../components/deleteLabels.ts";
 import {
   DangerZoneCard,
   type DetailRow,
@@ -44,13 +42,14 @@ import {
   ScheduleAside,
   ScheduleLock,
 } from "../components/EditorSchedule.tsx";
+import { EntryDeleteDialog } from "../components/EntryDeleteDialog.tsx";
 import { EntryFieldCards } from "../components/EntryFieldCards.tsx";
 import { EntryPath } from "../components/EntryPath.tsx";
 import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ViewOnlyBanner } from "../components/Gating.tsx";
 import { EntryAddress, ViewLiveButton } from "../components/LiveAddress.tsx";
-import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
+import { useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { ArticleSeoPreviewCard, CountedHint, CoverImageCard } from "../components/Seo.tsx";
 import { StatusActions } from "../components/StatusActions.tsx";
@@ -575,12 +574,12 @@ export function ArticleEditorPage() {
           setPublishOpen(false);
         }}
       />
-      <DeleteResource
+      <EntryDeleteDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
-        {...deleteResourceProps(t, t("editor.article"))}
-        resourceName={draft.slug}
-        notice={<MenuDeleteNotice refs={menuRefs.data} kind="contentEntry" />}
+        siteId={siteId}
+        entry={draft}
+        menuRefs={menuRefs.data}
         isDeleting={remove.isPending}
         onDelete={async () => {
           await remove.mutateAsync(draft);

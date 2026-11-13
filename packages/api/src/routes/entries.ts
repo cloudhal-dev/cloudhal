@@ -199,6 +199,9 @@ export const entries: Hono<Env> = new Hono<Env>()
         { error: "conflict", message: `entry ${entry.id} is at rev ${entry.rev}` },
         409,
       );
-    await store.deleteContentEntry({ ...entry, rev });
-    return c.body(null, 204);
+    // RFC-0045 §5: Studio's delete dialog asks first; the store's own plan answers (refusals such
+    // as `entry_referenced` with their referrers), and nothing is deleted.
+    const dryRun = c.req.query("dryRun") === "1";
+    await store.deleteContentEntry({ ...entry, rev }, { dryRun });
+    return dryRun ? c.json({ dryRun: true }) : c.body(null, 204);
   });

@@ -11,13 +11,23 @@
  *   in this site, any status, as `{groupId, id, title, collection, status, locale}` cards (the
  *   membership rule, `getGroupMembers`); a group with no member left gets an empty list. At most
  *   100 ids, the per-entry reference cap.
+ * - `GET …/entries/reference-issues` (rollout step 6, Studio's publish dialog): what publishing
+ *   the working copy now would show as nothing, `referenceIssues` over it ("publish warns, never
+ *   fails"), each with the holder's title; the first 50 and the total. A site without reference
+ *   fields answers none without reading its entries.
  * - `GET …/entries/:entryId/references?limit=&offset=`: the referrers of the entry's translation
  *   group from `entry_refs`, published holders first, each holder with the same-site members that
  *   show its value (`shared` 1, or 2 without their own value), paged (`listReferrers`, which MCP's
  *   `list_references` shares).
  */
 import { getGroupMembers, listReferrers, referenceCard } from "@cloudhal/core-ts";
-import { FIELD_LIMITS, GROUP_ID_PATTERN, memberGroup } from "@cloudhal/core-ts/fields";
+import {
+  FIELD_LIMITS,
+  GROUP_ID_PATTERN,
+  hasReferenceFields,
+  memberGroup,
+  referenceIssues,
+} from "@cloudhal/core-ts/fields";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -35,6 +45,7 @@ const PICK_LIMIT = 20;
 /** Picker searches per member and site per minute. */
 const PICK_WINDOW = { hits: 120, ms: 60_000 };
 const REFERRERS_LIMIT = 100;
+const ISSUES_SHOWN = 50;
 const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
 
 /** The groups' query: one to 100 well-formed group ids. */
@@ -96,6 +107,21 @@ export const entryReferences: Hono<Env> = new Hono<Env>()
     const members = await getGroupMembers(store.sql, siteId, ids);
     return c.json({
       groups: Object.fromEntries([...members].map(([g, list]) => [g, list.map(referenceCard)])),
+    });
+  })
+  .get("/reference-issues", async (c) => {
+    const store = c.get("store");
+    const site = await store.getSite(param(c, "siteId"));
+    if (!site) throw notFound("site not found");
+    if (!hasReferenceFields(site)) return c.json({ total: 0, issues: [] });
+    const entries = await store.listContentEntries(site.id);
+    const issues = referenceIssues({ site, entries }, c.get("now")().getTime());
+    const titles = new Map(entries.map((e) => [e.id, e.title]));
+    return c.json({
+      total: issues.length,
+      issues: issues
+        .slice(0, ISSUES_SHOWN)
+        .map((i) => ({ ...i, title: titles.get(i.entryId) ?? "" })),
     });
   })
   .get("/:entryId/references", async (c) => {
