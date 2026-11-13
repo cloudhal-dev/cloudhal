@@ -6,6 +6,7 @@ import {
   sharedFieldIssues,
   sharedFieldKeys,
   translatableFieldValues,
+  translatedItemValues,
 } from "../src/fields/index.ts";
 
 const label = (en: string) => ({ en: { label: en } });
@@ -37,5 +38,133 @@ describe("typed fields in translations", () => {
         message: "host is not localized: set it on entry_1",
       },
     ]);
+  });
+});
+
+describe("repeater paths (RFC-0045)", () => {
+  const G = "entry_01HZX8K3Q9P1";
+  const AGENDA: FieldDefinition[] = [
+    {
+      key: "agenda",
+      type: "repeater",
+      labels: label("Agenda"),
+      localized: true,
+      fields: [
+        { key: "topic", type: "text", labels: label("Topic") },
+        { key: "notes", type: "richText", labels: label("Notes") },
+        { key: "host", type: "reference", labels: label("Host"), collections: ["people"] },
+      ],
+    },
+    {
+      key: "shared",
+      type: "repeater",
+      labels: label("Shared"),
+      localized: false,
+      fields: [{ key: "line", type: "text", labels: label("Line") }],
+    },
+  ];
+  const SOURCE = {
+    agenda: [{ topic: "Opening", host: G }, { host: G }, { topic: "", notes: "**Close**" }],
+    shared: [{ line: "Keep" }],
+  };
+
+  it("lists a localized repeater's text by item path, never a shared one's", () => {
+    expect(translatableFieldValues(AGENDA, SOURCE)).toEqual({
+      "agenda/0/topic": "Opening",
+      "agenda/2/notes": "**Close**",
+    });
+  });
+
+  it("folds translated paths into a copy of the source's list", () => {
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      {
+        "agenda/0/topic": "Açılış",
+        "agenda/2/notes": "**Kapanış**",
+      },
+    );
+    expect(r.issues).toEqual([]);
+    expect(r.values).toEqual({
+      agenda: [{ topic: "Açılış", host: G }, { host: G }, { topic: "", notes: "**Kapanış**" }],
+    });
+    // the source is not touched
+    expect(SOURCE.agenda[0]).toEqual({ topic: "Opening", host: G });
+  });
+
+  it("refuses paths that name no translatable item value, and shared ones as not localized", () => {
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      {
+        "agenda/0/host": "x",
+        "agenda/7/topic": "x",
+        "agenda/x/topic": "x",
+        "agenda/0/topic/extra": "x",
+        "nope/0/topic": "x",
+      },
+    );
+    expect(r.issues.map((i) => i.path)).toEqual([
+      "fields/agenda/0/host",
+      "fields/agenda/7/topic",
+      "fields/agenda/x/topic",
+      "fields/agenda/0/topic/extra",
+    ]);
+    // A key whose first part names no repeater is a plain key, as before item paths existed.
+    expect(r.values["nope/0/topic"]).toBe("x");
+    expect(translatedItemValues([], { source: {} }, { "og/image": "x" })).toEqual({
+      values: { "og/image": "x" },
+      issues: [],
+    });
+    expect(sharedFieldIssues([], { "og/image": "x" }, "entry_1")).toEqual([]);
+    expect(sharedFieldIssues(AGENDA, { "shared/0/line": "x" }, "entry_1")).toEqual([
+      {
+        path: "fields/shared/0/line",
+        code: "field_not_localized",
+        message: "shared is not localized: set it on entry_1",
+      },
+    ]);
+  });
+
+  it("refuses item paths once the translation holds its own list: send it whole", () => {
+    const H = "entry_01HZX8K3Q9H2";
+    const existing = {
+      agenda: [{ topic: "Açılış", host: H }, { topic: "Ara", host: G }, { notes: "Son" }],
+    };
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE, existing },
+      { "agenda/2/notes": "**Kapanış**" },
+    );
+    expect(r.issues.map((i) => [i.path, i.code])).toEqual([
+      ["fields/agenda", "translation_shape_mismatch"],
+    ]);
+    expect(r.issues[0]?.message).toContain("send the whole list");
+    expect(r.values).toEqual({});
+    // The whole list, in the source's order, is the way to re-translate.
+    const whole = [{ topic: "Açılış", host: H }, { host: G }, { notes: "**Kapanış**" }];
+    expect(translatedItemValues(AGENDA, { source: SOURCE, existing }, { agenda: whole })).toEqual({
+      values: { agenda: whole },
+      issues: [],
+    });
+  });
+
+  it("refuses a whole list of another length than the source's (translation_shape_mismatch)", () => {
+    const given = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      { agenda: [{ topic: "a" }], "agenda/0/topic": "x" },
+    );
+    expect(given.issues.map((i) => i.code)).toEqual(["translation_shape_mismatch"]);
+    expect(given.values.agenda).toEqual([{ topic: "a" }]);
+  });
+
+  it("scans a long path in linear time", () => {
+    const long = `agenda/${"9".repeat(100_000)}/topic`;
+    const started = performance.now();
+    expect(translatedItemValues(AGENDA, { source: SOURCE }, { [long]: "x" }).issues).toHaveLength(
+      1,
+    );
+    expect(performance.now() - started).toBeLessThan(200);
   });
 });

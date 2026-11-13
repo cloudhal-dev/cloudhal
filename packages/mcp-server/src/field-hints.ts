@@ -50,6 +50,8 @@ const HINTS: Partial<Record<InvariantCode, string>> = {
     "published entries show this entry through a field that does not allow the new collection: keep it where it is, or ask a person to unpublish or edit those entries first",
   entry_referenced:
     "published entries (details.referrers) show this entry, and it is the last one of its group here: ask a person to unpublish or edit them first; archiving it does not release them",
+  translation_shape_mismatch:
+    "the translation's list has another length than the source's: translate that repeater by hand, or send it whole in the source's order (get_translation_source)",
   translation_group_in_use:
     "other language versions use this entry as their original: unlink or move them first, then change its translation",
   field_operation_running:

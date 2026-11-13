@@ -4,6 +4,10 @@
  * list values are ready), and `limit`/`cursor` paging: with `orderBy` the store pages, without it
  * the list keeps its order (last updated first) and is paged here; without `limit` it is unpaged,
  * as before. Problems are refused as `invalid_query` with their paths (`where/0/value`).
+ *
+ * RFC-0045 §6: each entry carries its `groupId` (`COALESCE(translation.group, id)`), the value a
+ * reference field stores. Reference fields are not list fields until rollout step 8, so `where`
+ * cannot filter by them yet (`checkFieldQuery` refuses them).
  */
 import type { ContentEntry, FieldCondition, FieldOrder } from "@cloudhal/core-contracts";
 import { SiteSchema } from "@cloudhal/core-contracts";
@@ -13,7 +17,9 @@ import {
   InvariantError,
   queryContentEntries,
 } from "@cloudhal/core-ts";
+import { memberGroup } from "@cloudhal/core-ts/fields";
 import type { JsonSchema, ToolContext } from "./common.ts";
+import { ENTRY } from "./content-shared.ts";
 
 const DEFS = SiteSchema.$defs as Record<string, JsonSchema>;
 
@@ -66,8 +72,23 @@ function decodeCursor(raw: string): number {
   return m ? Number(m[1]) : refuse("cursor", "not a cursor this list returned");
 }
 
+/** A listed entry: the contract's entry plus its translation group id. */
+export const ENTRY_LISTED: JsonSchema = {
+  ...ENTRY,
+  properties: {
+    ...(ENTRY.properties as Record<string, JsonSchema>),
+    groupId: {
+      type: "string",
+      description:
+        "The entry's translation group id: what a reference field stores to point at it (RFC-0045)",
+    },
+  },
+};
+
+type Listed = ContentEntry & { groupId: string };
+
 export interface EntryListAnswer {
-  entries: ContentEntry[];
+  entries: Listed[];
   total?: number;
   nextCursor?: string;
 }
@@ -103,7 +124,8 @@ export async function listEntries(
     ...(paged ? { limit, offset } : {}),
     now: (ctx.now?.() ?? new Date()).getTime(),
   });
-  const ordered = orderBy ? result.entries : result.entries.sort(byUpdated);
+  const sorted = orderBy ? result.entries : result.entries.sort(byUpdated);
+  const ordered = sorted.map((e) => ({ ...e, groupId: memberGroup(e) }));
   if (limit === undefined) return { entries: ordered };
   const page = paged ? ordered : ordered.slice(offset, offset + limit);
   const total = paged ? result.total : ordered.length;

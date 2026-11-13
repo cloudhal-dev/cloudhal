@@ -85,6 +85,14 @@ export {
   referrerCandidates,
 } from "./references/reads.ts";
 export {
+  listReferenceTargets,
+  listReferrers,
+  type ReferenceCard,
+  type ReferenceTarget,
+  type Referrer,
+  referenceCard,
+} from "./references/referrers.ts";
+export {
   RELEASE_BLOB_ALLOWANCE,
   releaseBlobAllowance,
 } from "./references/release-purge.ts";
@@ -99,6 +107,9 @@ export * from "./search-provider.ts";
 export * from "./seed.ts";
 export * from "./site-delete.ts";
 export * from "./site-search.ts";
+// RFC-0045 §6: an entry's values through the field-operation markers, as the store reads them
+// (MCP's approval prompts describe changes against it).
+export { normalizeEntryFields } from "./store/entry-fields.ts";
 export * from "./store.ts";
 export * from "./sync.ts";
 export {

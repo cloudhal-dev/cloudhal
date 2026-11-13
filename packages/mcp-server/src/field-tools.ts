@@ -9,8 +9,15 @@
  * An operation that hits its budget answers `done: false` with its `operationId`. A person
  * continues it in Studio, or the agent calls the same tool again with that `operationId`, which
  * needs a new approval (ADR-0043 open question 9: approvals stay single use).
+ *
+ * RFC-0045 §7 (rollout step 4's inputs, as the admin API takes them): `sub` names a repeater's
+ * sub-field (rename, type change, removal); `change_field_type` takes `collections`, `maxItems`,
+ * `subFields` and `itemLabel` for a reference or repeater target, and a continuation takes
+ * `onInvalid: "clear"` to drop values that stopped converting while it ran (`unconvertible`). The
+ * target types follow the store's capability (`FieldTypeOptions`), and the dry run refuses them
+ * (`fields_unsupported`) where the store does not accept them.
  */
-import type { FieldOption } from "@cloudhal/core-contracts";
+import type { FieldOption, SubFieldDefinition } from "@cloudhal/core-contracts";
 import { SiteSchema } from "@cloudhal/core-contracts";
 import {
   continueFieldOperation,
@@ -22,7 +29,8 @@ import {
   InvariantError,
   runFieldOperation,
 } from "@cloudhal/core-ts";
-import { FIELD_TYPES, type FieldType, fieldLabel } from "@cloudhal/core-ts/fields";
+import { ALL_FIELD_TYPES, FIELD_TYPES, type FieldType, fieldLabel } from "@cloudhal/core-ts/fields";
+import type { FieldTypeOptions } from "./collection-fields.ts";
 import {
   id,
   type JsonSchema,
@@ -36,9 +44,18 @@ import {
   ToolError,
   toToolError,
 } from "./common.ts";
+import { defsClosure } from "./schema-transforms.ts";
 
 const DEFS = SiteSchema.$defs as Record<string, JsonSchema>;
 const KEY = DEFS.FieldKey as JsonSchema;
+
+/** RFC-0045 §7: a repeater's sub-field the operation applies to. */
+const SUB: JsonSchema = {
+  ...KEY,
+  description:
+    "A repeater's sub-field key: the operation applies to that sub-field in every item (key/from names the repeater)",
+};
+const sub = (a: Record<string, unknown>) => (typeof a.sub === "string" ? { sub: a.sub } : {});
 
 const COMMON = {
   siteId: id,
@@ -73,6 +90,7 @@ const OUTPUT: JsonSchema = obj(
     report: { ...COUNTS, additionalProperties: true },
     rewritten: { type: "integer" },
     skipped: { type: "array", items: { type: "object" } },
+    unconvertible: { type: "array", items: { type: "object" } },
     status: { type: "object" },
     hint: { type: "string" },
   },
@@ -89,21 +107,32 @@ interface Spec {
   operation: (collection: string, a: Record<string, unknown>) => FieldOperation;
 }
 
+/** The sub-field an operation names, as the prompt says it. */
+function subOf(op: FieldOperation, def: FieldOperationReport["definition"]["before"]) {
+  if (op.op === "set_field_localized" || op.sub === undefined) return undefined;
+  const field = def.type === "repeater" ? def.fields.find((s) => s.key === op.sub) : undefined;
+  return { key: op.sub, type: field?.type };
+}
+
 /** What the operation does, for the prompt's first line. */
 function headline(op: FieldOperation, report: FieldOperationReport, locale: string): string {
   const def = report.definition.before;
-  const field = `"${quote(fieldLabel(def, locale, locale), 40)}" (${def.key}) of ${op.collection}`;
+  const label = `"${quote(fieldLabel(def, locale, locale), 40)}" (${def.key}) of ${op.collection}`;
+  const part = subOf(op, def);
+  const field = part ? `sub-field ${part.key} of the field ${label}` : `field ${label}`;
   switch (op.op) {
     case "rename_field":
-      return `Rename the field ${field} to ${op.to}?`;
+      return `Rename the ${field} to ${op.to}?`;
     case "change_field_type":
-      return `Change the field ${field} from ${def.type} to ${op.type}${op.multiple ? " (multiple)" : ""}?`;
+      return `Change the ${field} from ${part ? (part.type ?? "?") : def.type} to ${op.type}${op.multiple ? " (multiple)" : ""}?`;
     case "set_field_localized":
       return op.localized
-        ? `Make the field ${field} localized (each language version gets its own value)?`
-        : `Make the field ${field} shared by all language versions (translations' own copies are deleted)?`;
+        ? `Make the ${field} localized (each language version gets its own value)?`
+        : `Make the ${field} shared by all language versions (translations' own copies are deleted)?`;
     case "remove_field":
-      return `Remove the field ${field} and its values from every entry?`;
+      return part
+        ? `Remove the ${field} and its values from every item?`
+        : `Remove the ${field} and its values from every entry?`;
   }
 }
 
@@ -197,7 +226,9 @@ async function prompt(spec: Spec, a: Record<string, unknown>, ctx: ToolContext):
   const op = spec.operation(a.collection as string, a);
   if (typeof a.operationId === "string") {
     const status = await continued(ctx, siteId, op, a.operationId);
-    return `Continue the field operation ${status.operationId} (${op.op} on ${op.collection}, started earlier)? ${status.pending} entries are still to rewrite.`;
+    const clear =
+      a.onInvalid === "clear" ? " Values that stopped converting meanwhile are dropped." : "";
+    return `Continue the field operation ${status.operationId} (${op.op} on ${op.collection}, started earlier)? ${status.pending} entries are still to rewrite.${clear}`;
   }
   return describeOperation(op, await dryRun(ctx, siteId, op), await locale(ctx, siteId));
 }
@@ -211,6 +242,7 @@ function answer(r: FieldOperationResult, promptText: string) {
     report: r.report,
     rewritten: r.rewritten,
     skipped: r.skipped,
+    ...(r.unconvertible.length ? { unconvertible: r.unconvertible } : {}),
     ...(!r.dryRun && !r.done
       ? {
           hint: `The operation stopped at its budget. A person can continue it in Studio, or call ${r.report.op} again with operationId "${r.operationId}" (it needs a new approval).`,
@@ -235,8 +267,12 @@ async function handle(spec: Spec, a: Record<string, unknown>, ctx: ToolContext) 
           operationId: status.operationId,
           status,
         };
-      const r = await continueFieldOperation(ctx.store, siteId, status.operationId, options);
-      return answer(r, describeOperation(op, r.report, await locale(ctx, siteId)));
+      const r = await continueFieldOperation(ctx.store, siteId, status.operationId, {
+        ...options,
+        ...(a.onInvalid === "clear" ? { onInvalid: "clear" as const } : {}),
+      });
+      // The stored operation, not this call's arguments, says what is being continued.
+      return answer(r, describeOperation(status.operation, r.report, await locale(ctx, siteId)));
     }
     const r = await runFieldOperation(ctx.store, siteId, op, {
       ...options,
@@ -271,90 +307,138 @@ function operationTool(spec: Spec): ToolDefinition {
   };
 }
 
-const SPECS: Spec[] = [
-  {
-    name: "rename_field",
-    title: "Rename field",
-    description:
-      "Rename a typed custom field's key (RFC-0041 §6): every entry's value moves from `from` to `to`; nothing is converted.",
-    input: {
-      from: { ...KEY, description: "The field's current key" },
-      to: { ...KEY, description: "The new key" },
-    },
-    required: ["from", "to"],
-    destructive: false,
-    operation: (collection, a) => ({
-      op: "rename_field",
-      collection,
-      from: a.from as string,
-      to: a.to as string,
-    }),
-  },
-  {
-    name: "change_field_type",
-    title: "Change field type",
-    description:
-      "Change a typed custom field's type, or a select's multiple (RFC-0041 §6), converting every value by a closed table (text↔richText, text↔number, text↔select, text↔url, date↔datetime, single↔multiple select). Values that cannot be converted refuse the call unless onInvalid is \"clear\".",
-    input: {
-      key: { ...KEY, description: "The field's key" },
-      type: str("The new type", { enum: [...FIELD_TYPES] }),
-      options: {
-        type: "array",
-        description:
-          "A new select's options (default: the field's own when it already is a select)",
-        minItems: 1,
-        maxItems: 50,
-        items: { $ref: "#/$defs/FieldOption" },
-        $defs: { FieldOption: DEFS.FieldOption, Slug: DEFS.Slug, Locale: DEFS.Locale },
+/** The four operations; `change_field_type`'s target types follow the store's capability. */
+function specs(options: FieldTypeOptions): Spec[] {
+  return [
+    {
+      name: "rename_field",
+      title: "Rename field",
+      description:
+        "Rename a typed custom field's key (RFC-0041 §6): every entry's value moves from `from` to `to`; nothing is converted.",
+      input: {
+        from: { ...KEY, description: "The field's current key" },
+        to: { ...KEY, description: "The new key (with sub: the sub-field's new key)" },
+        sub: SUB,
       },
-      multiple: { type: "boolean", description: "For a select: the value is a list of options" },
-      onInvalid: str("Drop values that cannot be converted (the person approving sees how many)", {
-        enum: ["clear"],
+      required: ["from", "to"],
+      destructive: false,
+      operation: (collection, a) => ({
+        op: "rename_field",
+        collection,
+        from: a.from as string,
+        to: a.to as string,
+        ...sub(a),
       }),
     },
-    required: ["key", "type"],
-    destructive: true,
-    operation: (collection, a) => ({
-      op: "change_field_type",
-      collection,
-      key: a.key as string,
-      type: a.type as FieldType,
-      ...(a.options ? { options: a.options as FieldOption[] } : {}),
-      ...(typeof a.multiple === "boolean" ? { multiple: a.multiple } : {}),
-      ...(a.onInvalid === "clear" ? { onInvalid: "clear" as const } : {}),
-    }),
-  },
-  {
-    name: "set_field_localized",
-    title: "Set field localization",
-    description:
-      "Make a typed custom field localized (each language version has its own value; translations fall back to the original's) or shared (only the original holds it; translations' own copies are deleted) (RFC-0041 §5, §6).",
-    input: {
-      key: { ...KEY, description: "The field's key" },
-      localized: { type: "boolean", description: "true: per language version; false: shared" },
+    {
+      name: "change_field_type",
+      title: "Change field type",
+      description:
+        "Change a typed custom field's type, or a select's multiple (RFC-0041 §6), converting every value by a closed table (text↔richText, text↔number, text↔select, text↔url, date↔datetime, single↔multiple select; RFC-0045 where reference and repeater fields are enabled: text↔reference, single↔multiple reference, multiline text↔repeater, multiple reference↔repeater, and with sub a repeater's sub-field). Values that cannot be converted refuse the call unless onInvalid is \"clear\".",
+      input: {
+        key: { ...KEY, description: "The field's key" },
+        type: str("The new type", {
+          enum: [...(options.referenceTypes ? ALL_FIELD_TYPES : FIELD_TYPES)],
+        }),
+        sub: SUB,
+        options: {
+          type: "array",
+          description:
+            "A new select's options (default: the field's own when it already is a select)",
+          minItems: 1,
+          maxItems: 50,
+          items: { $ref: "#/$defs/FieldOption" },
+          $defs: { FieldOption: DEFS.FieldOption, Slug: DEFS.Slug, Locale: DEFS.Locale },
+        },
+        multiple: {
+          type: "boolean",
+          description: "For a select or a reference: the value is a list",
+        },
+        collections: {
+          type: "array",
+          description: "To a reference: the collections a target may belong to (list_collections)",
+          minItems: 1,
+          maxItems: 5,
+          uniqueItems: true,
+          items: { type: "string", pattern: SLUG_PATTERN, maxLength: 64 },
+        },
+        maxItems: {
+          type: "integer",
+          minimum: 1,
+          maximum: 50,
+          description: "To a multiple reference or a repeater: at most this many targets or items",
+        },
+        subFields: {
+          type: "array",
+          description: "To a repeater: its sub-fields, in form order",
+          minItems: 1,
+          maxItems: 10,
+          items: { $ref: "#/$defs/SubFieldDefinition" },
+          $defs: defsClosure(SiteSchema as JsonSchema, "SubFieldDefinition"),
+        },
+        itemLabel: {
+          ...KEY,
+          description: "To a repeater: the text, select or reference sub-field that names an item",
+        },
+        onInvalid: str(
+          "Drop values that cannot be converted (the person approving sees how many); with operationId, also the values that stopped converting while it ran (unconvertible)",
+          { enum: ["clear"] },
+        ),
+      },
+      required: ["key", "type"],
+      destructive: true,
+      operation: (collection, a) => ({
+        op: "change_field_type",
+        collection,
+        key: a.key as string,
+        type: a.type as FieldType,
+        ...(a.options ? { options: a.options as FieldOption[] } : {}),
+        ...(typeof a.multiple === "boolean" ? { multiple: a.multiple } : {}),
+        ...(Array.isArray(a.collections) ? { collections: a.collections as string[] } : {}),
+        ...(typeof a.maxItems === "number" ? { maxItems: a.maxItems } : {}),
+        ...(Array.isArray(a.subFields) ? { subFields: a.subFields as SubFieldDefinition[] } : {}),
+        ...(typeof a.itemLabel === "string" ? { itemLabel: a.itemLabel } : {}),
+        ...(a.onInvalid === "clear" ? { onInvalid: "clear" as const } : {}),
+        ...sub(a),
+      }),
     },
-    required: ["key", "localized"],
-    destructive: false,
-    operation: (collection, a) => ({
-      op: "set_field_localized",
-      collection,
-      key: a.key as string,
-      localized: a.localized as boolean,
-    }),
-  },
-  {
-    name: "remove_field",
-    title: "Remove field",
-    description:
-      "Remove a typed custom field (RFC-0041 §6): its value is deleted from every entry, then its definition.",
-    input: { key: { ...KEY, description: "The field's key" } },
-    required: ["key"],
-    destructive: true,
-    operation: (collection, a) => ({ op: "remove_field", collection, key: a.key as string }),
-  },
-];
+    {
+      name: "set_field_localized",
+      title: "Set field localization",
+      description:
+        "Make a typed custom field localized (each language version has its own value; translations fall back to the original's) or shared (only the original holds it; translations' own copies are deleted) (RFC-0041 §5, §6).",
+      input: {
+        key: { ...KEY, description: "The field's key" },
+        localized: { type: "boolean", description: "true: per language version; false: shared" },
+      },
+      required: ["key", "localized"],
+      destructive: false,
+      operation: (collection, a) => ({
+        op: "set_field_localized",
+        collection,
+        key: a.key as string,
+        localized: a.localized as boolean,
+      }),
+    },
+    {
+      name: "remove_field",
+      title: "Remove field",
+      description:
+        "Remove a typed custom field (RFC-0041 §6): its value is deleted from every entry, then its definition.",
+      input: { key: { ...KEY, description: "The field's key" }, sub: SUB },
+      required: ["key"],
+      destructive: true,
+      operation: (collection, a) => ({
+        op: "remove_field",
+        collection,
+        key: a.key as string,
+        ...sub(a),
+      }),
+    },
+  ];
+}
 
 /** rename_field … remove_field, after the collection tools. */
-export function fieldTools(): ToolDefinition[] {
-  return SPECS.map(operationTool);
+export function fieldTools(options: FieldTypeOptions = {}): ToolDefinition[] {
+  return specs(options).map(operationTool);
 }

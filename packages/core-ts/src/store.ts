@@ -498,8 +498,8 @@ export class SiteGraphStore {
     return out;
   }
 
-  deleteContentEntry(entry: ContentEntry): Promise<void> {
-    return this.#entries.delete(entry);
+  deleteContentEntry(entry: ContentEntry, options?: { dryRun?: boolean }): Promise<void> {
+    return this.#entries.delete(entry, options);
   }
 
   // ───────────────────────────── taxonomies (RFC-0002) ─────────────────────────────

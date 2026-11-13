@@ -6,7 +6,13 @@
  */
 import type { CollectionSettings, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import { SiteSchema } from "@cloudhal/core-contracts";
-import { fieldLabel, fieldsJsonSchema, isReferenceFieldType } from "@cloudhal/core-ts/fields";
+import {
+  fieldLabel,
+  fieldsJsonSchema,
+  isReferenceFieldType,
+  type StrictCost,
+  strictSchemaCost,
+} from "@cloudhal/core-ts/fields";
 import { type JsonSchema, quote } from "./common.ts";
 import { defsClosure } from "./schema-transforms.ts";
 
@@ -23,30 +29,46 @@ function withoutMarker(variant: JsonSchema): JsonSchema {
   return { ...variant, properties };
 }
 
-/**
- * The definitions `update_collection` takes: the contract's variants of the enabled types (RFC-0045's
- * `reference` and `repeater` join at rollout step 7), each without the operation marker.
- */
-const FIELD_DEFINITION: JsonSchema = {
-  ...DEFS.FieldDefinition,
-  oneOf: VARIANTS.filter((v) => !isReferenceFieldType(typeOf(v))).map(withoutMarker),
-};
+/** Which field types a tool list offers (`defineTools`). */
+export interface FieldTypeOptions {
+  /**
+   * The store accepts RFC-0045's `reference` and `repeater` (`SiteGraphStoreOptions.fieldTypes`
+   * is set). Absent or false: the inputs list the enabled types only, as production does until
+   * rollout step 7. The store still decides per site.
+   */
+  referenceTypes?: boolean | undefined;
+}
+
+/** The definitions `update_collection` takes: the offered variants, each without the marker. */
+function fieldDefinition(referenceTypes: boolean): JsonSchema {
+  const offered = referenceTypes
+    ? VARIANTS
+    : VARIANTS.filter((v) => !isReferenceFieldType(typeOf(v)));
+  return { ...DEFS.FieldDefinition, oneOf: offered.map(withoutMarker) };
+}
 
 /**
- * `update_collection`'s `fields`: the enabled definitions, minus the operation marker, with every
+ * `update_collection`'s `fields`: the offered definitions, minus the operation marker, with every
  * `$defs` entry they reach (`defsClosure`), so a contract change cannot leave a `$ref` dangling.
  */
-export const FIELD_DEFINITIONS_INPUT: JsonSchema = {
-  type: "array",
-  maxItems: 30,
-  description:
-    "The collection's typed custom fields, the whole list in form order ([] removes them all). Free edits only: add fields, reorder, change labels and help, add select options or change their labels, toggle multiline, searchable or requiredToPublish, change maxLength/minimum/maximum. Renaming a key, changing a type, localized or multiple, and dropping a key or option still in use need rename_field, change_field_type, set_field_localized or remove_field.",
-  items: { $ref: "#/$defs/FieldDefinition" },
-  $defs: {
-    ...defsClosure(SiteSchema as JsonSchema, FIELD_DEFINITION),
-    FieldDefinition: FIELD_DEFINITION,
-  },
-};
+function fieldDefinitionsInput(referenceTypes: boolean): JsonSchema {
+  const definition = fieldDefinition(referenceTypes);
+  return {
+    type: "array",
+    maxItems: 30,
+    description:
+      "The collection's typed custom fields, the whole list in form order ([] removes them all). Free edits only: add fields, reorder, change labels and help, add select options or change their labels, toggle multiline, searchable or requiredToPublish, change maxLength/minimum/maximum. Renaming a key, changing a type, localized or multiple, and dropping a key or option still in use need rename_field, change_field_type, set_field_localized or remove_field.",
+    items: { $ref: "#/$defs/FieldDefinition" },
+    $defs: {
+      ...defsClosure(SiteSchema as JsonSchema, definition),
+      FieldDefinition: definition,
+    },
+  };
+}
+
+/** The production input (the enabled types only), and the one a capable store's tools take. */
+export const FIELD_DEFINITIONS_INPUT: JsonSchema = fieldDefinitionsInput(false);
+export const FIELD_DEFINITIONS_INPUT_ALL: JsonSchema = fieldDefinitionsInput(true);
 
 /**
  * The settings with `fields` replaced by the agent's list. A running operation's marker stays on
@@ -101,16 +123,34 @@ export function describeFieldEdits(
   return parts.length ? `  fields: ${parts.join("; ")}` : undefined;
 }
 
-/** What `list_collections` adds per collection that has definitions. */
+/** A collection's plural name in `locale` (then the default locale), for the fields schema. */
+const collectionName = (site: Site, locale: string) => (key: string) => {
+  const labels = site.collections?.[key]?.labels;
+  return labels?.[locale]?.plural ?? labels?.[site.defaultLocale]?.plural;
+};
+
+/** What `list_collections` adds per collection that has definitions (RFC-0041 §8, RFC-0045 §6). */
 export function fieldsView(
   site: Site,
   key: string,
   locale: string,
-): { fields: FieldDefinition[]; fieldsSchema: JsonSchema } | Record<string, never> {
+):
+  | {
+      fields: FieldDefinition[];
+      fieldsSchema: JsonSchema;
+      fieldsSchemaStrict: JsonSchema;
+      strictCost: StrictCost;
+    }
+  | Record<string, never> {
   const fields = site.collections?.[key]?.fields;
   if (!fields?.length) return {};
+  const options = { collectionName: collectionName(site, locale) };
+  const open = fieldsJsonSchema(fields, locale, site.defaultLocale, options);
+  const strict = fieldsJsonSchema(fields, locale, site.defaultLocale, { ...options, strict: true });
   return {
     fields,
-    fieldsSchema: fieldsJsonSchema(fields, locale, site.defaultLocale) as unknown as JsonSchema,
+    fieldsSchema: open as unknown as JsonSchema,
+    fieldsSchemaStrict: strict as unknown as JsonSchema,
+    strictCost: strictSchemaCost(strict),
   };
 }
