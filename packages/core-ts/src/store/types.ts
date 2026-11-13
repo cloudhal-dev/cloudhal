@@ -82,6 +82,13 @@ export interface NodeWriteOptions {
    * (the caller checks and audits). Agents never set it.
    */
   readonly correctionEdit?: boolean;
+  /**
+   * Entries only: plan the write and throw its plan-time refusals (values, `requiredToPublish`,
+   * assets, translation links, reference targets, a move or group change), then return the
+   * planned entry without writing anything (MCP's precheck, RFC-0045 §6). The batch-time guards
+   * still decide the real write.
+   */
+  readonly dryRun?: boolean;
 }
 
 export interface SnapshotInput {

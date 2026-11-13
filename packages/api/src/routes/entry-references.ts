@@ -9,11 +9,11 @@
  *   `rate_limits` counters applies.
  * - `GET …/entries/:entryId/references?limit=&offset=`: the referrers of the entry's translation
  *   group from `entry_refs`, published holders first, each holder with the same-site members that
- *   show its value (`shared` 1, or 2 without their own value), paged.
+ *   show its value (`shared` 1, or 2 without their own value), paged (`listReferrers`, which MCP's
+ *   `list_references` shares).
  */
-import type { ContentEntry } from "@cloudhal/core-contracts";
+import { listReferrers } from "@cloudhal/core-ts";
 import { memberGroup } from "@cloudhal/core-ts/fields";
-import type { SqlDriver } from "@cloudhal/storage";
 import type { Context } from "hono";
 import { Hono } from "hono";
 import type { Env } from "../context.ts";
@@ -65,77 +65,6 @@ async function rateLimited(c: Context<Env>, siteId: string): Promise<boolean> {
   return count > PICK_WINDOW.hits;
 }
 
-interface Card {
-  groupId: string;
-  id: string;
-  title: string;
-  collection: string;
-  status: ContentEntry["status"];
-  locale: string;
-}
-
-const cardOf = (e: ContentEntry): Card => ({
-  groupId: memberGroup(e),
-  id: e.id,
-  title: e.title,
-  collection: e.collection,
-  status: e.status,
-  locale: e.locale,
-});
-
-interface RefRow {
-  holder: string;
-  field: string;
-  shared: number;
-  root_key: string;
-  source_status: string;
-  body: string;
-}
-
-/** One page of the group's rows, each holder with the members that show its value. */
-async function referrers(
-  sql: SqlDriver,
-  siteId: string,
-  page: { group: string; limit: number; offset: number },
-) {
-  const rows = await sql.all<RefRow & Record<string, unknown>>(
-    `SELECT r.source_id AS holder, r.field AS field, r.shared AS shared, r.root_key AS root_key,
-        r.source_status AS source_status, n.body AS body
-      FROM entry_refs r JOIN nodes n ON n.id = r.source_id AND n.site_id = r.site_id
-      WHERE r.site_id = ? AND r.target_id = ?
-      ORDER BY r.source_status = 'published' DESC, r.source_id, r.field LIMIT ? OFFSET ?`,
-    [siteId, page.group, page.limit + 1, page.offset],
-  );
-  const shown = rows.slice(0, page.limit);
-  const holders = [...new Set(shown.map((r) => r.holder))];
-  const members = holders.length
-    ? await sql.all<{ body: string }>(
-        `SELECT body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
-          AND json_extract(body, '$.translation.group') IN (SELECT value FROM json_each(?))
-          AND json_extract(body, '$.translation.source.siteId') IS NULL`,
-        [siteId, JSON.stringify(holders)],
-      )
-    : [];
-  const inheriting = members.map((m) => JSON.parse(m.body) as ContentEntry);
-  const items = shown.map((r) => ({
-    ...cardOf(JSON.parse(r.body) as ContentEntry),
-    field: r.field,
-    shownBy: inheriting
-      .filter(
-        (m) =>
-          m.translation?.group === r.holder &&
-          // Only the row's own holder is left out: another holder on this page may still show it.
-          m.id !== r.holder &&
-          (r.shared === 1 || !Object.hasOwn(m.fields ?? {}, r.root_key)),
-      )
-      .map(cardOf),
-  }));
-  return {
-    referrers: items,
-    ...(rows.length > page.limit ? { next: page.offset + page.limit } : {}),
-  };
-}
-
 export const entryReferences: Hono<Env> = new Hono<Env>()
   .get("/pick", async (c) => {
     const siteId = param(c, "siteId");
@@ -154,5 +83,5 @@ export const entryReferences: Hono<Env> = new Hono<Env>()
       limit: Math.max(1, intParam(c.req.query("limit"), REFERRERS_LIMIT, 20)),
       offset: intParam(c.req.query("offset"), Number.MAX_SAFE_INTEGER, 0),
     };
-    return c.json({ groupId: page.group, ...(await referrers(store.sql, entry.siteId, page)) });
+    return c.json({ groupId: page.group, ...(await listReferrers(store.sql, entry.siteId, page)) });
   });

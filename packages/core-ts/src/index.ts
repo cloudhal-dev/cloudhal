@@ -85,6 +85,14 @@ export {
   referrerCandidates,
 } from "./references/reads.ts";
 export {
+  listReferenceTargets,
+  listReferrers,
+  type ReferenceCard,
+  type ReferenceTarget,
+  type Referrer,
+  referenceCard,
+} from "./references/referrers.ts";
+export {
   RELEASE_BLOB_ALLOWANCE,
   releaseBlobAllowance,
 } from "./references/release-purge.ts";

@@ -43,9 +43,10 @@ function resolve(root: unknown, ref: string): unknown {
 }
 
 describe("tool schemas", () => {
-  it("resolve every $ref in every tool's input and output schema", () => {
+  it("resolve every $ref in every tool's input and output schema, with or without the types", () => {
     const dangling: string[] = [];
-    for (const tool of tools)
+    // RFC-0045: a store with `fieldTypes` gets tools whose field inputs list both new types.
+    for (const tool of [...tools, ...defineTools({ referenceTypes: true })])
       for (const [which, schema] of [
         ["input", tool.inputSchema],
         ["output", tool.outputSchema],

@@ -1,7 +1,8 @@
 /** Article (content entry) tools: list, read, create, update, correct and delete. */
 
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
-import type { CorrectionKind, EntryQuery } from "@cloudhal/core-ts";
+import type { CorrectionKind, Creatable, EntryQuery } from "@cloudhal/core-ts";
+import { fieldDefinitions } from "@cloudhal/core-ts/fields";
 import { requireRegistered } from "./collection-tools.ts";
 import {
   autoSnapshot,
@@ -13,6 +14,7 @@ import {
   requireSite,
   SLUG_PATTERN,
   str,
+  type ToolContext,
   type ToolDefinition,
   ToolError,
 } from "./common.ts";
@@ -26,17 +28,59 @@ import {
   unknownBlocks,
   unknownBlocksOf,
 } from "./content-shared.ts";
+import { checkEntryWrite, FIELDS_INPUT, FIELDS_PATCH, mergeFields } from "./entry-fields.ts";
 import {
-  checkEntryFields,
-  describeFieldPatch,
-  FIELDS_INPUT,
-  FIELDS_PATCH,
-  mergeFields,
-} from "./entry-fields.ts";
-import { ENTRY_QUERY_INPUT, listEntries } from "./entry-list.ts";
+  CLEAR_FIELDS_INPUT,
+  DROPPED_ITEMS_OUTPUT,
+  FIELDS_STRICT_INPUT,
+  type FieldsInput,
+  fieldsInputOf,
+} from "./entry-fields-input.ts";
+import { ENTRY_LISTED, ENTRY_QUERY_INPUT, listEntries } from "./entry-list.ts";
 import { entryTerms, reportDeltas } from "./entry-terms.ts";
+import { describeFieldPatch } from "./field-prompts.ts";
 import { menuHint, menuItemsHiddenBy } from "./menu-tools.ts";
+import { listReferencesTool } from "./reference-tools.ts";
 import { assignmentDeltas, describeDeltas, TAGS_INPUT, TERMS_INPUT, termLookup } from "./terms.ts";
+
+/** The call's typed field values (`fields`, `fieldsStrict`, `clearFields`) for `collection`. */
+const fieldsOf = (
+  a: Record<string, unknown>,
+  site: Site,
+  collection: string,
+  stored?: ContentEntry,
+): FieldsInput =>
+  fieldsInputOf(
+    a,
+    fieldDefinitions(site, collection),
+    stored?.collection === collection ? stored.fields : undefined,
+    stored ? "update" : "create",
+  );
+
+const dropped = (input: FieldsInput) =>
+  input.droppedItems.length ? { droppedItems: input.droppedItems } : {};
+
+/** A new draft entry from `create_entry`'s arguments (terms, tags and cover are added by the handler). */
+function newEntry(
+  a: Record<string, unknown>,
+  site: Site,
+  ctx: Pick<ToolContext, "principal">,
+  fields: Record<string, unknown>,
+): Creatable<ContentEntry> {
+  return {
+    siteId: site.id,
+    collection: (a.collection as string | undefined) ?? "posts",
+    slug: a.slug as string,
+    locale: (a.locale as string | undefined) ?? site.defaultLocale,
+    status: "draft",
+    title: a.title as string,
+    ...(a.summary ? { summary: a.summary as string } : {}),
+    body: { format: "markdown", value: a.body as string },
+    fields,
+    tags: [],
+    author: ctx.principal.actor,
+  };
+}
 
 const listEntriesTool: ToolDefinition = {
   name: "list_entries",
@@ -67,7 +111,7 @@ const listEntriesTool: ToolDefinition = {
   ),
   outputSchema: obj(
     {
-      entries: { type: "array", items: ENTRY },
+      entries: { type: "array", items: ENTRY_LISTED },
       total: { type: "integer" },
       nextCursor: { type: "string" },
     },
@@ -124,7 +168,7 @@ const createEntryTool: ToolDefinition = {
   name: "create_entry",
   title: "Create article",
   description:
-    "Create a draft content entry (markdown body) in an existing collection (list_collections; a new one needs create_collection first), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Typed custom fields go in `fields`, following the collection's fieldsSchema from list_collections; invalid values are refused with their paths. Snapshots afterwards.",
+    "Create a draft content entry (markdown body) in an existing collection (list_collections; a new one needs create_collection first), optionally filed under existing terms (`terms`; see list_taxonomies and list_terms). Typed custom fields go in `fields`, following the collection's fieldsSchema from list_collections, or for strict structured output in `fieldsStrict` (its fieldsSchemaStrict: null means no value); invalid values, and reference fields naming entries outside their collections, are refused with their paths. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -140,13 +184,20 @@ const createEntryTool: ToolDefinition = {
       tags: TAGS_INPUT,
       coverImage: COVER_INPUT,
       fields: FIELDS_INPUT,
+      fieldsStrict: FIELDS_STRICT_INPUT,
     },
     ["siteId", "slug", "title", "body"],
   ),
-  outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT, hint: { type: "string" }, unknownBlocks }, [
-    "entry",
-    "snapshot",
-  ]),
+  outputSchema: obj(
+    {
+      entry: ENTRY,
+      snapshot: SNAPSHOT,
+      hint: { type: "string" },
+      unknownBlocks,
+      droppedItems: DROPPED_ITEMS_OUTPUT,
+    },
+    ["entry", "snapshot"],
+  ),
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -162,16 +213,8 @@ const createEntryTool: ToolDefinition = {
     await requireRegistered(ctx, a.siteId as string, collection);
     const site = await ctx.store.getSite(a.siteId as string);
     if (!site) return;
-    await checkEntryFields(ctx, {
-      site,
-      next: {
-        id: "",
-        siteId: site.id,
-        collection,
-        status: "draft",
-        fields: (a.fields as Record<string, unknown> | undefined) ?? {},
-      },
-    });
+    const input = fieldsOf(a, site, collection);
+    await checkEntryWrite(ctx, { create: newEntry(a, site, ctx, input.patch ?? {}) });
   },
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
@@ -180,22 +223,15 @@ const createEntryTool: ToolDefinition = {
       status: "draft",
     });
     const { terms, tags } = await entryTerms(ctx, site, undefined, a);
+    const collection = (a.collection as string | undefined) ?? "posts";
+    const input = fieldsOf(a, site, collection);
     try {
       const entry = await ctx.store.createContentEntry(
         {
-          siteId: site.id,
-          collection: (a.collection as string | undefined) ?? "posts",
-          slug: a.slug as string,
-          locale: (a.locale as string | undefined) ?? site.defaultLocale,
-          status: "draft",
-          title: a.title as string,
-          ...(a.summary ? { summary: a.summary as string } : {}),
-          body: { format: "markdown", value: a.body as string },
-          fields: (a.fields as Record<string, unknown> | undefined) ?? {},
+          ...newEntry(a, site, ctx, input.patch ?? {}),
           tags,
           ...(terms ? { terms } : {}),
           ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
-          author: ctx.principal.actor,
         },
         { writer: mcpWriter(ctx) },
       );
@@ -206,6 +242,7 @@ const createEntryTool: ToolDefinition = {
         entry,
         snapshot,
         ...(hint ? { hint } : {}),
+        ...dropped(input),
         ...unknownBlocksOf(ctx, { markdown: entryMarkdown(entry) }),
       };
     } catch (e) {
@@ -218,7 +255,7 @@ const updateEntryTool: ToolDefinition = {
   name: "update_entry",
   title: "Update article",
   description:
-    "Update title, summary, body, slug, status (draft → review → published), terms (`terms`: add, remove or set categories and tags by id, slug or name) or typed custom fields (`fields`, a merge patch: null removes a key; see the collection's fieldsSchema in list_collections) of an entry. Review and published articles need a primary term in every required taxonomy and every field marked needed to publish. Requires the current `rev`. Changing a published article's slug leaves a redirect. Snapshots afterwards.",
+    "Update title, summary, body, slug, status (draft → review → published), terms (`terms`: add, remove or set categories and tags by id, slug or name) or typed custom fields of an entry: `fields`, a merge patch (null removes a key; see the collection's fieldsSchema in list_collections), or for strict structured output `fieldsStrict` (its fieldsSchemaStrict: null leaves a value as it is), and `clearFields` to remove keys. A given reference or repeater value replaces the whole value. Review and published articles need a primary term in every required taxonomy and every field marked needed to publish. Requires the current `rev`. Changing a published article's slug leaves a redirect. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,
@@ -237,10 +274,15 @@ const updateEntryTool: ToolDefinition = {
       },
       status: { type: "string", enum: ["draft", "review", "published", "archived"] },
       fields: FIELDS_PATCH,
+      fieldsStrict: FIELDS_STRICT_INPUT,
+      clearFields: CLEAR_FIELDS_INPUT,
     },
     ["siteId", "entryId", "rev"],
   ),
-  outputSchema: obj({ entry: ENTRY, snapshot: SNAPSHOT, unknownBlocks }, ["entry", "snapshot"]),
+  outputSchema: obj(
+    { entry: ENTRY, snapshot: SNAPSHOT, unknownBlocks, droppedItems: DROPPED_ITEMS_OUTPUT },
+    ["entry", "snapshot"],
+  ),
   annotations: {
     readOnlyHint: false,
     destructiveHint: false,
@@ -256,11 +298,12 @@ const updateEntryTool: ToolDefinition = {
     if (!entry || entry.siteId !== a.siteId) return;
     const status = (a.status as ContentEntry["status"] | undefined) ?? entry.status;
     if (ctx.limit) await entryLimitCheck(ctx, "update", entry, { author: entry.author, status });
-    if (a.fields === undefined && status === entry.status) return;
     const site = await ctx.store.getSite(entry.siteId);
     if (!site) return;
-    const fields = mergeFields(entry.fields, (a.fields as Record<string, unknown>) ?? {});
-    await checkEntryFields(ctx, { site, next: { ...entry, status, fields }, stored: entry });
+    const { patch } = fieldsOf(a, site, entry.collection, entry);
+    if (patch === undefined && status === entry.status) return;
+    const fields = mergeFields(entry.fields, patch ?? {});
+    await checkEntryWrite(ctx, { update: { ...entry, status, fields } });
   },
   approvalPrompt: async (a, ctx) => {
     const entry = await ctx.store.getContentEntry(a.entryId as string);
@@ -280,10 +323,9 @@ const updateEntryTool: ToolDefinition = {
           : "cover image"
         : "",
     ].filter(Boolean);
-    if (a.fields && site && Object.keys(a.fields).length)
-      changes.push(
-        `fields: ${describeFieldPatch(site, entry.collection, a.fields as Record<string, unknown>)}`,
-      );
+    const patch = site ? fieldsOf(a, site, entry.collection, entry).patch : undefined;
+    if (site && patch && Object.keys(patch).length)
+      changes.push(`fields: ${await describeFieldPatch(ctx, site, entry, patch)}`);
     if (a.terms || a.tags) {
       try {
         const { terms } = await entryTerms(ctx, site as Site, entry, a);
@@ -319,6 +361,7 @@ const updateEntryTool: ToolDefinition = {
       status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
     });
     const { terms, tags } = await entryTerms(ctx, site, entry, a);
+    const input = fieldsOf(a, site, entry.collection, entry);
     const { terms: _old, coverImage: oldCover, ...rest } = entry;
     const cover =
       a.coverImage === undefined
@@ -332,9 +375,7 @@ const updateEntryTool: ToolDefinition = {
       ...(a.title ? { title: a.title as string } : {}),
       ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
       ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
-      ...(a.fields !== undefined
-        ? { fields: mergeFields(entry.fields, a.fields as Record<string, unknown>) }
-        : {}),
+      ...(input.patch !== undefined ? { fields: mergeFields(entry.fields, input.patch) } : {}),
       ...(a.slug ? { slug: a.slug as string } : {}),
       tags,
       ...(terms ? { terms } : {}),
@@ -350,6 +391,7 @@ const updateEntryTool: ToolDefinition = {
       return {
         entry: saved,
         snapshot,
+        ...dropped(input),
         ...unknownBlocksOf(ctx, { markdown: entryMarkdown(saved) }),
       };
     } catch (e) {
@@ -432,7 +474,8 @@ const addCorrectionTool: ToolDefinition = {
 const deleteEntryTool: ToolDefinition = {
   name: "delete_entry",
   title: "Delete article",
-  description: "Delete a content entry. Destructive: requires approval. Snapshots afterwards.",
+  description:
+    "Delete a content entry. Destructive: requires approval. Refused (entry_referenced, with the referrers in details) while published entries show it through a reference field and it is the last entry of its translation group in the site; list_references shows them. Snapshots afterwards.",
   inputSchema: obj({ siteId: id, entryId: id, rev: { type: "integer", minimum: 0 } }, [
     "siteId",
     "entryId",
@@ -447,10 +490,17 @@ const deleteEntryTool: ToolDefinition = {
   },
   scopes: ["content:write"],
   own: "entry",
+  // RFC-0045 §6: a delete that would strand a published reference is refused before anyone is
+  // asked, by the store's own plan (`dryRun`).
   precheck: async (a, ctx) => {
-    if (!ctx.limit) return;
     const entry = await ctx.store.getContentEntry(a.entryId as string);
-    if (entry && entry.siteId === a.siteId) await entryLimitCheck(ctx, "delete", entry);
+    if (!entry || entry.siteId !== a.siteId) return;
+    if (ctx.limit) await entryLimitCheck(ctx, "delete", entry);
+    try {
+      await ctx.store.deleteContentEntry(entry, { dryRun: true });
+    } catch (e) {
+      mapError(e);
+    }
   },
   approvalPrompt: async (a, ctx) => {
     const entry = await ctx.store.getContentEntry(a.entryId as string);
@@ -478,6 +528,8 @@ export function entryTools(): ToolDefinition[] {
   return [
     listEntriesTool,
     getEntryTool,
+    // RFC-0045 §6: an entry's references, both directions.
+    listReferencesTool,
     createEntryTool,
     updateEntryTool,
     addCorrectionTool,

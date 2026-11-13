@@ -32,6 +32,7 @@ import { analyticsTools } from "./analytics-tools.ts";
 import { assetTools } from "./asset-tools.ts";
 import { bodyTools } from "./body-tools.ts";
 import { chromeTools } from "./chrome-tools.ts";
+import type { FieldTypeOptions } from "./collection-fields.ts";
 import { collectionTools } from "./collection-tools.ts";
 import { commentTools } from "./comment-tools.ts";
 import { type ToolContext, type ToolDefinition, ToolError, toToolError } from "./common.ts";
@@ -70,8 +71,12 @@ export { previewDoc } from "./preview-doc.ts";
 export { ownOnlyPublish } from "./publish-tools.ts";
 export { hoistDefs, relaxImageRefs } from "./schema-transforms.ts";
 
-/** All tools, in the deterministic order `tools/list` exposes them (agents see this order). */
-export function defineTools(): ToolDefinition[] {
+/**
+ * All tools, in the deterministic order `tools/list` exposes them (agents see this order).
+ * `referenceTypes`: the store accepts RFC-0045's reference and repeater fields
+ * (`SiteGraphStoreOptions.fieldTypes`), so the field inputs list them; absent, they do not.
+ */
+export function defineTools(options: FieldTypeOptions = {}): ToolDefinition[] {
   return [
     ...siteAndPageTools(),
     ...surfaceTools(),
@@ -90,9 +95,9 @@ export function defineTools(): ToolDefinition[] {
     // media tools (RFC-0004 §6.2), follow the article tools.
     ...taxonomyTools(),
     // RFC-0040 §5: the collection registry; new collections are a person's decision.
-    ...collectionTools(),
+    ...collectionTools(options),
     // RFC-0041 §8: field operations rewrite entries; always a person's decision.
-    ...fieldTools(),
+    ...fieldTools(options),
     // RFC-0038 §5: where a collection's entries live (always a person's decision).
     ...permalinkTools(),
     ...menuTools(),

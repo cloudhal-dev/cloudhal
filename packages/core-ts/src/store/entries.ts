@@ -84,6 +84,7 @@ export class EntryEngine {
       held,
       converting,
     });
+    if (options.dryRun) return draft;
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {
@@ -187,12 +188,14 @@ export class EntryEngine {
   /**
    * CAS delete with its asset references, list values (RFC-0042 §4) and reference rows, in one
    * batch; refused while it would strand a reference a published entry shows (RFC-0045 §2.2).
+   * `dryRun` throws the plan-time refusals and deletes nothing.
    */
-  async delete(entry: ContentEntry): Promise<void> {
+  async delete(entry: ContentEntry, options: { dryRun?: boolean } = {}): Promise<void> {
     await assertUnlocked(this.#ctx.sql, entry.siteId, [entry.id]);
     const site = await this.#ctx.graph.getSite(entry.siteId);
-    const lists = await planListValuesDelete(this.#ctx.sql, site, entry, this.#ctx.stamp());
     const leave = site ? await planLeave(this.#ctx.sql, site, { stored: entry }) : undefined;
+    if (options.dryRun) return;
+    const lists = await planListValuesDelete(this.#ctx.sql, site, entry, this.#ctx.stamp());
     const guard = leave ? ` AND ${leave.guard.sql}` : "";
     const [r] = await this.#ctx.sql.batch([
       {

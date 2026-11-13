@@ -6,6 +6,10 @@
  * translation holds only the values sent (absent localized ones fall back to the original's) and
  * never a copy of a shared value; a language edition copies the source's values (§5: the other
  * site's definitions may differ).
+ *
+ * RFC-0045: a localized repeater's text and rich-text sub-values are translated by item path
+ * (`speakers/0/talk`), and folded back into a copy of the source's list (`translatedItemValues`),
+ * so each item keeps its other sub-values; a path naming no such value is refused in precheck.
  */
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import {
@@ -14,6 +18,7 @@ import {
   sharedFieldIssues,
   sharedFieldKeys,
   translatableFieldValues,
+  translatedItemValues,
 } from "@cloudhal/core-ts/fields";
 import type { JsonSchema } from "./common.ts";
 
@@ -23,7 +28,7 @@ type Values = Record<string, unknown>;
 export const TRANSLATED_FIELDS: JsonSchema = {
   type: "object",
   description:
-    "Entries: your translation of each value in get_translation_source's `fields` (localized text and rich-text fields), by key. Shared fields (`sharedFields`) are read from the original and refused here",
+    "Entries: your translation of each value in get_translation_source's `fields` (localized text and rich-text fields), by the same key: a field key, or a repeater item's path such as speakers/0/talk (the item's other values are kept). Shared fields (`sharedFields`) are read from the original and refused here",
 };
 
 /** What `get_translation_source` returns about an entry's typed fields (nothing for a page). */
@@ -49,7 +54,10 @@ export function refuseSharedFields(site: Site, source: ContentEntry, values: unk
   if (!values || typeof values !== "object") return;
   const defs = fieldDefinitions(site, source.collection);
   const original = source.translation?.group ?? source.id;
-  refuseFieldIssues(sharedFieldIssues(defs, values as Values, original));
+  const shared = sharedFieldIssues(defs, values as Values, original);
+  const items = translatedItemValues(defs, source.fields, values as Values).issues;
+  const sharedPaths = new Set(shared.map((i) => i.path));
+  refuseFieldIssues([...shared, ...items.filter((i) => !sharedPaths.has(i.path))]);
 }
 
 /** The `fields` of a translated entry: the sent values on what the translation may start from. */
@@ -64,5 +72,7 @@ export function translatedFields(input: {
   const { site, source, existing, given, cross } = input;
   const defined = fieldDefinitions(site, source.collection).length > 0;
   const base = existing?.fields ?? (cross || !defined ? (source.fields ?? {}) : {});
-  return { ...base, ...(given ?? {}) };
+  const defs = fieldDefinitions(site, source.collection);
+  const folded = given ? translatedItemValues(defs, source.fields, given).values : {};
+  return { ...base, ...folded };
 }

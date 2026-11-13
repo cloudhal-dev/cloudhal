@@ -15,6 +15,8 @@ import { collectionPermalink } from "@cloudhal/core-ts/permalinks";
 import {
   describeFieldEdits,
   FIELD_DEFINITIONS_INPUT,
+  FIELD_DEFINITIONS_INPUT_ALL,
+  type FieldTypeOptions,
   fieldsView,
   withFields,
 } from "./collection-fields.ts";
@@ -204,6 +206,16 @@ const COLLECTION_OUT: JsonSchema = obj(
     taxonomies: { type: "array", items: { type: "string" } },
     fields: { type: "array", items: { type: "object" } },
     fieldsSchema: { type: "object" },
+    fieldsSchemaStrict: { type: "object" },
+    strictCost: obj(
+      {
+        properties: { type: "integer" },
+        depth: { type: "integer" },
+        enumValues: { type: "integer" },
+        unions: { type: "integer" },
+      },
+      ["properties", "depth", "enumValues", "unions"],
+    ),
     listFields: { type: "array", items: { type: "object" } },
     structuredData: { type: "object" },
   },
@@ -214,7 +226,7 @@ const listCollectionsTool: ToolDefinition = {
   name: "list_collections",
   title: "List collections",
   description:
-    "The site's collections (RFC-0040): declared ones, ones that already have entries, and posts. Each with its names per locale, icon, entry counts by status, its permalink template, feed/sitemap/sort settings (defaults filled in) and the taxonomies that apply. A collection with typed custom fields (RFC-0041) also has `fields` (the definitions) and `fieldsSchema`, the JSON Schema of an entry's `fields` with labels and help in `locale` (default: the site's default locale): read it before create_entry or update_entry with fields. RFC-0042: `listFields` names the fields list_entries and contentList sections may filter (`where`) and sort (`orderBy`) by, each with its operators (`ops`) and whether it sorts; settings.expiry is the collection's date-driven expiry; `structuredData` is the JSON-LD preset's type with every path it offers (required ones, defaults, the sources and vocabulary each takes) and its warnings. Entries may only be created in these collections; call create_collection for a new one.",
+    "The site's collections (RFC-0040): declared ones, ones that already have entries, and posts. Each with its names per locale, icon, entry counts by status, its permalink template, feed/sitemap/sort settings (defaults filled in) and the taxonomies that apply. A collection with typed custom fields (RFC-0041) also has `fields` (the definitions) and `fieldsSchema`, the JSON Schema of an entry's `fields` with labels and help in `locale` (default: the site's default locale): read it before create_entry or update_entry with fields. For strict structured output (every key required, null for \"leave as it is\"), `fieldsSchemaStrict` is the same schema in that profile, written into fieldsStrict, with `strictCost` (properties, depth, enumValues, unions) to check a provider's limits; each property stands alone, so a subset of them is a valid smaller schema (RFC-0045). RFC-0042: `listFields` names the fields list_entries and contentList sections may filter (`where`) and sort (`orderBy`) by, each with its operators (`ops`) and whether it sorts; settings.expiry is the collection's date-driven expiry; `structuredData` is the JSON-LD preset's type with every path it offers (required ones, defaults, the sources and vocabulary each takes) and its warnings. Entries may only be created in these collections; call create_collection for a new one.",
   inputSchema: obj(
     { siteId: id, locale: str("BCP 47 locale of field labels and help; default the site's") },
     ["siteId"],
@@ -249,7 +261,8 @@ const listCollectionsTool: ToolDefinition = {
   },
 };
 
-function writeTool(mode: "create" | "update"): ToolDefinition {
+function writeTool(mode: "create" | "update", options: FieldTypeOptions = {}): ToolDefinition {
+  const fields = options.referenceTypes ? FIELD_DEFINITIONS_INPUT_ALL : FIELD_DEFINITIONS_INPUT;
   const name = `${mode}_collection`;
   return {
     name,
@@ -266,7 +279,7 @@ function writeTool(mode: "create" | "update"): ToolDefinition {
           maxLength: 64,
         }),
         ...SETTINGS_INPUT,
-        ...(mode === "update" ? { fields: FIELD_DEFINITIONS_INPUT, ...LISTINGS_INPUT } : {}),
+        ...(mode === "update" ? { fields, ...LISTINGS_INPUT } : {}),
         ...(mode === "create"
           ? {
               permalink: str("Template, e.g. /etkinlik/{slug}; default /<key>/{slug}", {
@@ -325,6 +338,11 @@ function writeTool(mode: "create" | "update"): ToolDefinition {
   };
 }
 
-export function collectionTools(): ToolDefinition[] {
-  return [listCollectionsTool, writeTool("create"), writeTool("update"), previewStructuredDataTool];
+export function collectionTools(options: FieldTypeOptions = {}): ToolDefinition[] {
+  return [
+    listCollectionsTool,
+    writeTool("create", options),
+    writeTool("update", options),
+    previewStructuredDataTool,
+  ];
 }

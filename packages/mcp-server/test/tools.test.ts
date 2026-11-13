@@ -49,6 +49,7 @@ describe("Cloudhal tools (SDK-independent)", () => {
       "delete_page",
       "list_entries",
       "get_entry",
+      "list_references",
       "create_entry",
       "update_entry",
       // RFC-0019 §2

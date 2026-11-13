@@ -135,11 +135,13 @@ export {
   type ResolvedFields,
   resolveFields,
 } from "./resolve.ts";
+export { type DroppedItem, readStrictFields, type StrictFieldsRead } from "./strict-input.ts";
 export {
   localizedFieldValues,
   sharedFieldIssues,
   sharedFieldKeys,
   translatableFieldValues,
+  translatedItemValues,
 } from "./translation.ts";
 export {
   ALL_FIELD_TYPES,

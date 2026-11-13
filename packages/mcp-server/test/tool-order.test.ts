@@ -16,6 +16,7 @@ const ORDER = [
   "delete_page",
   "list_entries",
   "get_entry",
+  "list_references",
   "create_entry",
   "update_entry",
   "add_correction",

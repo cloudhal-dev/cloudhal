@@ -107,7 +107,7 @@ const getSourceTool: ToolDefinition = {
   name: "get_translation_source",
   title: "Get translation source",
   description:
-    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), for an entry with typed fields the localized text and rich-text values to translate (`fields`) and the shared fields a translation reads from the original (`sharedFields`, never translated), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
+    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), for an entry with typed fields the localized text and rich-text values to translate (`fields`, repeater items by path such as speakers/0/talk) and the shared fields a translation reads from the original (`sharedFields`, never translated), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
   inputSchema: obj(
     {
       siteId: id,
@@ -128,7 +128,7 @@ const getSourceTool: ToolDefinition = {
       fields: {
         type: "object",
         description:
-          "Entries: the localized text and rich-text field values to translate, by key; send them translated as save_translation's `fields`",
+          "Entries: the localized text and rich-text field values to translate, by key, and a localized repeater's by item path (speakers/0/talk); send them translated, under the same keys, as save_translation's `fields`",
       },
       sharedFields: {
         type: "array",
@@ -187,7 +187,7 @@ const saveTranslationTool: ToolDefinition = {
   name: "save_translation",
   title: "Save translation",
   description:
-    "Save your translation of a page or entry into `locale` as a draft linked to the source's current revision, with your model as its provenance. Pages: send title, path and sections (same ids, kinds and order as the source; translated text). Entries: title, slug, body, summary and the translated `fields` (only the localized text and rich-text ones get_translation_source returns; shared fields are refused with field_not_localized). The checks (structure, links, numbers, glossary, length) run and are returned; a failed check keeps it from being published until fixed. A person reviews it in Studio before it goes live where the site asks for review. Refused for a translation a person wrote or reviewed. Snapshots afterwards.",
+    "Save your translation of a page or entry into `locale` as a draft linked to the source's current revision, with your model as its provenance. Pages: send title, path and sections (same ids, kinds and order as the source; translated text). Entries: title, slug, body, summary and the translated `fields` (only the localized text and rich-text ones get_translation_source returns, under its keys, repeater items by path; shared fields are refused with field_not_localized). The checks (structure, links, numbers, glossary, length) run and are returned; a failed check keeps it from being published until fixed. A person reviews it in Studio before it goes live where the site asks for review. Refused for a translation a person wrote or reviewed. Snapshots afterwards.",
   inputSchema: obj(
     {
       siteId: id,

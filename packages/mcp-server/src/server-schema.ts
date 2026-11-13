@@ -7,10 +7,15 @@
 import { fromJsonSchema } from "@modelcontextprotocol/server";
 import { defineTools, type ToolDefinition } from "./tools.ts";
 
-let defaultTools: ToolDefinition[] | undefined;
-export function defaultToolList(): ToolDefinition[] {
-  if (!defaultTools) defaultTools = defineTools();
-  return defaultTools;
+const defaultTools = new Map<boolean, ToolDefinition[]>();
+/** The tools, once per process for each answer of the store's RFC-0045 capability. */
+export function defaultToolList(referenceTypes = false): ToolDefinition[] {
+  let tools = defaultTools.get(referenceTypes);
+  if (!tools) {
+    tools = defineTools({ referenceTypes });
+    defaultTools.set(referenceTypes, tools);
+  }
+  return tools;
 }
 const compiled = new WeakMap<object, Map<string, ReturnType<typeof fromJsonSchema>>>();
 

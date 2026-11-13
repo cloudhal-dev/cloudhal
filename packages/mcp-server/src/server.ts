@@ -90,7 +90,8 @@ export interface CloudhalMcpOptions {
 
 /** Builds a Cloudhal MCP server for one principal. */
 export function createCloudhalMcpServer(options: CloudhalMcpOptions): McpServer {
-  const tools = options.tools ?? defaultToolList();
+  // RFC-0045: the field inputs list reference and repeater fields where the store accepts them.
+  const tools = options.tools ?? defaultToolList(options.store.fieldTypes !== undefined);
   const policy = options.policy ?? new PolicyEngine(toolPolicies(tools));
   const skills = new Map((options.skills ?? []).map((s) => [s.manifest.name, s]));
   const fallback = options.confirmTokenFallback ?? false;
