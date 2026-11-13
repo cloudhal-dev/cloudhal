@@ -100,10 +100,12 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "TableSkeleton",
     "Empty",
     "Pagination",
-    "DeleteResource",
+    // Entries delete through EntryDeleteDialog: DeleteResource with the menu and reference notices.
+    "EntryDeleteDialog",
     "RowMenu",
     "RelativeTime",
   ],
+  "components/EntryDeleteDialog.tsx": ["DeleteResource", "MenuDeleteNotice", "deleteResourceProps"],
   "routes/ArticleEditorPage.tsx": [
     "PageLayout",
     "SiteCrumbs",
@@ -116,7 +118,7 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
     "InputArea",
     "ArticleTermsCard",
     "ApprovalDialog",
-    "DeleteResource",
+    "EntryDeleteDialog",
     "SkeletonLine",
   ],
   "routes/PageEditorPage.tsx": [
@@ -215,10 +217,10 @@ const REQUIRED_IMPORTS: Record<string, string[]> = {
   "components/MenuSaveDialog.tsx": ["LayerDialog", "LayerDialog.Actions.Primary", "InsetPanel"],
   "components/MenuDialogs.tsx": ["LayerDialog", "Radio", "Checkbox", "InsetPanel", "SkeletonLine"],
   "routes/PageEditorPage.tsx#menus": ["UsedInMenusCard", "MenuDeleteNotice"],
-  "routes/ArticleEditorPage.tsx#menus": ["UsedInMenusCard", "MenuDeleteNotice"],
+  "routes/ArticleEditorPage.tsx#menus": ["UsedInMenusCard", "EntryDeleteDialog"],
   "routes/TermEditorPage.tsx#menus": ["UsedInMenusCard"],
   "routes/PagesPage.tsx#menus": ["MenuDeleteNotice"],
-  "routes/ArticlesPage.tsx#menus": ["MenuDeleteNotice"],
+  "routes/ArticlesPage.tsx#menus": ["EntryDeleteDialog"],
   "routes/ActivityPage.tsx": [
     "PageLayout",
     "SiteCrumbs",
@@ -1345,15 +1347,15 @@ describe("design rules (DESIGN.md)", () => {
   });
 
   it("deleting a page or article names the menu items it hides (§2t, RFC-0003 invariant 10)", () => {
-    for (const file of [
-      "routes/PageEditorPage.tsx",
-      "routes/ArticleEditorPage.tsx",
-      "routes/PagesPage.tsx",
-      "routes/ArticlesPage.tsx",
-    ]) {
+    for (const file of ["routes/PageEditorPage.tsx", "routes/PagesPage.tsx"]) {
       const text = screenText(file);
       expect(text, file).toMatch(/<DeleteResource[\s\S]*?notice=\{<MenuDeleteNotice/);
     }
+    // Articles delete through EntryDeleteDialog, whose notice adds the references (RFC-0045 §5).
+    for (const file of ["routes/ArticleEditorPage.tsx", "routes/ArticlesPage.tsx"])
+      expect(screenText(file), file).toMatch(/<EntryDeleteDialog[\s\S]*?menuRefs=/);
+    const dialog = uiSources.find((f) => f.file === "components/EntryDeleteDialog.tsx")?.text;
+    expect(dialog).toMatch(/<DeleteResource[\s\S]*?notice=\{[\s\S]*?<MenuDeleteNotice/);
   });
 
   it("every screen that can pick Auto asks for consent first", () => {

@@ -218,14 +218,14 @@ export function createApi(deps: ApiDeps) {
           analytics: deps.analytics?.feature() ?? ANALYTICS_OFF,
           // RFC-0007 §12: whether comments are served, bot protections, purges waiting.
           comments: await commentsFeature(deps.comments),
-          // RFC-0008 §13: whether schedules are served, the ticker, gates, the limits.
-          // RFC-0016: how this deployment reaches Workers AI (the binding, REST, or not at all).
-          ai: deps.ai?.transport?.kind ?? "none",
+          ai: deps.ai?.transport?.kind ?? "none", // RFC-0016: the AI binding, REST, or none
           schedules: schedulesFeature(
+            // RFC-0008 §13: whether schedules are served, the ticker, gates, the limits.
             schedules,
             schedulesAvailable(schedules) && (await gatesEnforcedEverywhere(deps.store)),
           ),
           ...(playground ? { playground: await playground.info() } : {}), // RFC-0036 §5
+          referenceFields: deps.store.fieldTypes !== undefined, // RFC-0045, MCP's rule (step 5)
         },
         agentModes: agentModesInfo(),
         roles: rolesInfo(),

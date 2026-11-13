@@ -2,7 +2,6 @@ import type { ContentEntry, FieldOrder, Site, Taxonomy } from "@cloudhal/core-co
 import {
   Badge,
   Button,
-  DeleteResource,
   Empty,
   ImagePreview,
   LayerCard,
@@ -31,7 +30,7 @@ import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 import { lazy, type ReactNode, Suspense, useState } from "react";
 import { CollectionActions } from "../components/CollectionActions.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
-import { deleteResourceProps } from "../components/deleteLabels.ts";
+import { EntryDeleteDialog } from "../components/EntryDeleteDialog.tsx";
 import { EntryPath } from "../components/EntryPath.tsx";
 import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -43,7 +42,7 @@ import {
   useListViews,
 } from "../components/ListViews.tsx";
 import { EntryLiveItems } from "../components/LiveRowItems.tsx";
-import { MenuDeleteNotice, useMenuReferences } from "../components/Menus.tsx";
+import { useMenuReferences } from "../components/Menus.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { RowMenu } from "../components/RowMenu.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
@@ -283,12 +282,12 @@ export function ArticlesPage() {
         </LayerCard>
       )}
       <ListPagination server={entries.server} paging={paging} />
-      <DeleteResource
+      <EntryDeleteDialog
         open={toDelete !== undefined}
         onOpenChange={(o) => !o && setToDelete(undefined)}
-        {...deleteResourceProps(t, t("editor.article"))}
-        resourceName={toDelete?.slug ?? ""}
-        notice={<MenuDeleteNotice refs={deleteRefs.data} kind="contentEntry" />}
+        siteId={siteId}
+        entry={toDelete}
+        menuRefs={deleteRefs.data}
         isDeleting={remove.isPending}
         onDelete={async () => {
           if (toDelete) await remove.mutateAsync(toDelete);

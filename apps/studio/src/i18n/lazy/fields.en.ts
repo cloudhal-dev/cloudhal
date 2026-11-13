@@ -11,6 +11,8 @@ export const messages = {
       url: "Link",
       image: "Image",
       select: "Choice",
+      reference: "Reference",
+      repeater: "List",
     },
     editor: {
       title: "Fields",
@@ -116,6 +118,33 @@ export const messages = {
         add: "{count, plural, =0 {Add} one {Add # entry} other {Add # entries}}",
       },
     },
+    publish: {
+      title:
+        "{count, plural, one {# reference will show nothing} other {# references will show nothing}}",
+      description:
+        "Publishing goes ahead. These published entries name an entry the site won't show.",
+      issue:
+        "{language} · {field}: {reason, select, missing {the chosen entry is gone} hidden {the chosen entry isn't published} locale {no version in this language} other {not shown}}",
+    },
+    delete: {
+      blockedTitle:
+        "{count, plural, one {Unpublish or edit this published entry first} other {Unpublish or edit these # published entries first}}",
+      blocked:
+        "They show this entry in a reference field, and it is the last entry they can show. Archiving it doesn't help: they still name it. Change or unpublish them, then delete.",
+      more: "{count, plural, one {And # more entry.} other {And # more entries.}}",
+      draftsTitle:
+        "{count, plural, one {# draft names this entry} other {# drafts name this entry}}",
+      drafts:
+        "No other entry of this group is left, so their field shows nothing until they choose another.",
+      showsNothing: "Will show nothing for this field",
+      localeTitle: "{language} pages lose this card",
+      locale:
+        "Entries in {language} that show this entry in a reference field will show nothing there.",
+      localeFallback:
+        "Entries in {language} that show this entry in a reference field will show the {fallback} version instead.",
+      where: "{collection} · {field}",
+      caption: "Entries that show this entry",
+    },
     usedBy: {
       title: "Used by",
       description: "Entries whose fields reference this one, published first.",
@@ -207,6 +236,54 @@ export const messages = {
       multipleHint: "Entries can pick more than one option.",
       add: "Add field",
       apply: "Apply",
+      reference: {
+        collections: "Target collections",
+        collectionsHint:
+          "Entries of these collections can be chosen, up to {max, plural, one {# collection} other {# collections}}.",
+        multiple: "Several",
+        multipleHint: "Entries can choose more than one, in an order of their own.",
+        maxItems: "At most",
+        maxItemsHint: "How many can be chosen, up to {max, number}. Empty: 20.",
+        where: "Only entries where",
+        whereHint: "Conditions a newly chosen entry meets. Entries chosen before keep their place.",
+        whereOneCollection: "Conditions apply with one target collection.",
+        whereNoListFields:
+          "{collection} has no listing fields to set conditions on. Add them in its settings.",
+        addCondition: "Add condition",
+        errors: {
+          collections: {
+            required: "Choose at least one collection.",
+            limit: "Choose at most five collections.",
+          },
+          maxItems: "Enter a whole number from 1 to {max, number}.",
+        },
+      },
+      repeater: {
+        subFields: "Fields of each item",
+        subFieldsHint:
+          "Every item has these, in this order, up to {max, plural, one {# field} other {# fields}}. A list can't hold another list.",
+        add: "Add item field",
+        addTitle: "Add item field",
+        editTitle: "Edit item field",
+        dialogDescription: "Labels and help show on every item in the editor.",
+        addApply: "Add",
+        removeSaved: "Remove through the field's menu",
+        maxItems: "At most",
+        maxItemsHint: "How many items an entry can have, up to {max, number}. Empty: 20.",
+        itemLabel: "Item name",
+        itemLabelHint: "The field that names each item in the editor and in approvals.",
+        itemLabelFirst: "The first text, choice or reference",
+        errors: {
+          subFields: {
+            required: "Add at least one field for the items.",
+            limit: "A list holds at most ten fields per item.",
+            invalid: "One of the item fields needs a fix.",
+          },
+          sub: "Needs a label, a free key, and for a reference a collection.",
+          maxItems: "Enter a whole number from 1 to {max, number}.",
+          itemLabel: "Choose a text, choice or reference field.",
+        },
+      },
       errors: {
         label: "Give the field a label.",
         maxLength: "Enter a whole number from 1 to {max, number}.",
@@ -246,6 +323,17 @@ export const messages = {
         "Every translation gets a value of its own. Until one is set, it shows the original's.",
       newKey: "New key",
       newType: "New type",
+      appliesTo: "Applies to",
+      wholeField: "The whole field",
+      stuckTitle:
+        "{count, plural, one {# entry no longer converts} other {# entries no longer convert}}",
+      stuckRun:
+        "Their values changed while the field was being changed: a chosen entry was archived or deleted, or a title now matches two entries. The change can't finish while they keep these values.",
+      stuckRevert:
+        "Their values were edited after the change and can't be converted back. The revert can't finish while they keep these values.",
+      stuckConfirm:
+        "Clear {count, plural, one {this value} other {these # values}} to finish. They are kept in the snapshot taken before the change.",
+      stuckFinish: "Clear and finish",
       check: "Check what changes",
       checking: "Checking entries…",
       clear: "Clear {count, plural, one {# value} other {# values}} that can't be converted",

@@ -241,5 +241,56 @@ export function describeReferencesApi(label: string, factory: ApiStoreFactory): 
       expect(bad.status).toBe(422);
       expect(bad.body.error).toBe("unknown_entry");
     });
+
+    it("asks a delete first (dryRun=1): the store's refusal with its referrers, and nothing deleted", async () => {
+      const hall = await entry("places", { title: "Main Hall" });
+      const garden = await entry("places", { title: "Garden" });
+      const event = await entry("events", {
+        title: "Launch",
+        status: "published",
+        fields: { venue: hall.id },
+      });
+      const ask = await call(`/api/sites/${site.id}/entries/${hall.id}?rev=${hall.rev}&dryRun=1`, {
+        method: "DELETE",
+      });
+      expect(ask.status).toBe(409);
+      expect(ask.body.error).toBe("entry_referenced");
+      const details = ask.body.details as { total: number; referrers: { id: string }[] };
+      expect(details.total).toBe(1);
+      expect(details.referrers.map((r) => r.id)).toEqual([event.id]);
+      const free = await call(
+        `/api/sites/${site.id}/entries/${garden.id}?rev=${garden.rev}&dryRun=1`,
+        { method: "DELETE" },
+      );
+      expect(free.status).toBe(200);
+      expect(free.body).toEqual({ dryRun: true });
+      expect(await store.getContentEntry(garden.id)).toBeDefined();
+    });
+
+    it("lists what publishing would show as nothing, with the holder's title", async () => {
+      const hall = await entry("places", { title: "Main Hall" });
+      const event = await entry("events", {
+        title: "Launch",
+        status: "published",
+        fields: { venue: hall.id },
+      });
+      const res = await call(`/api/sites/${site.id}/entries/reference-issues`);
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.issues).toEqual([
+        expect.objectContaining({
+          entryId: event.id,
+          title: "Launch",
+          path: "fields/venue",
+          groupId: hall.id,
+          reason: "hidden",
+        }),
+      ]);
+    });
+
+    it("reports the field-type capability to Studio", async () => {
+      const res = await call("/api/instance");
+      expect((res.body.features as { referenceFields?: boolean }).referenceFields).toBe(true);
+    });
   });
 }

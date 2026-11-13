@@ -40,6 +40,8 @@ export interface InstanceInfo {
     ai?: AiTransportKind;
     /** RFC-0036 §5: set only on a playground session (try.cloudhal.com). */
     playground?: PlaygroundInfo;
+    /** RFC-0045: the server takes reference and repeater fields. Older servers omit it: off. */
+    referenceFields?: boolean;
   };
   /** The server's agent-mode rules (ADR-0015). Older servers omit it; Studio then uses its own copy. */
   agentModes?: AgentModesInfo;
@@ -232,7 +234,13 @@ export type SignUpPolicy = InstanceInfo["signUp"];
 /** The on/off features (`analytics` is an object of its own). */
 export type InstanceFeature = Exclude<
   keyof InstanceInfo["features"],
-  "analytics" | "comments" | "schedules" | "ai" | "playground" | "mcpOauthClients"
+  | "analytics"
+  | "comments"
+  | "schedules"
+  | "ai"
+  | "playground"
+  | "mcpOauthClients"
+  | "referenceFields"
 >;
 
 export const teamApi = {

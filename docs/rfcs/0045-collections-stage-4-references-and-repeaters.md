@@ -1419,3 +1419,12 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 
 - **Duplicate** copies the fields without empty repeater items too (`duplicateOf` runs the same `withoutEmptyItems` as a save).
 - **The index map is built from what the failed save sent** (the mutation's variables), not from the draft when the error arrives, which may have changed while the save was in flight.
+
+### Amended in 6b (2026-11-13, rollout step 6, second PR: builder, delete dialog, publish warnings)
+
+- **The capability Studio reads** is `/api/instance` → `features.referenceFields`, true when the store has `SiteGraphStoreOptions.fieldTypes` (MCP's rule from step 5). The builder offers reference and list (repeater) only then; production answers false until step 7. A per-site refusal still comes from the store (`fields_unsupported`, now worded in `errors.api`).
+- **The delete dialog asks the store.** `DELETE …/entries/:id?rev=&dryRun=1` runs the store's delete plan (`deleteContentEntry(entry, { dryRun })`) and answers its refusal (`entry_referenced` with up to 20 referrers and the total) or `{ dryRun: true }`. Studio's dialog keeps Delete off while the check runs and while it refuses, and lists the referrers from the refusal's details. Draft referrers ("Will show nothing for this field") and the language that loses the card come from `…/references` and `…/groups`.
+- **Unlinking a translation** has no action in Studio today (translations are created, not unlinked); the store's `entry_referenced` and `translation_group_in_use` refusals of a group change are worded in `errors.api` for any path that reaches them. A Studio unlink action, when it comes, reuses the delete dialog's check through a dry-run update.
+- **Publish warnings** come from a new read-only `GET …/entries/reference-issues` (`content:read`): `referenceIssues` over the working copy at the request's instant, the first 50 with each holder's title, and the total; a site without reference fields answers none without reading entries. They show in the site's publish dialog only (the entry editor's "Publish" and snapshot publishes keep RFC-0042's checks).
+- **Stuck operations**: a pass that changed nothing while `unconvertible` (or a revert's) is not empty stops instead of looping; the dialog offers "Clear and finish" behind a ticked confirmation, which sends `onInvalid: "clear"` on the continue or the revert.
+- **`docs/guides/fields.md`** is left to step 7, which enables the types.

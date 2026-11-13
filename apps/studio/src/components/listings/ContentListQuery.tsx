@@ -21,12 +21,19 @@ import { listFieldDefs, sortable, timeKind } from "../../lib/listings.ts";
 
 const NONE = "__none";
 
-/** A condition's defaults when its field or operator changes. */
-function freshCondition(def: FieldDefinition, op?: FieldQueryOp): FieldCondition {
+/**
+ * A condition's defaults when its field or operator changes. `noNow` (a reference's conditions,
+ * RFC-0045 §1) starts dates empty instead of at `now`.
+ */
+export function freshCondition(
+  def: FieldDefinition,
+  op?: FieldQueryOp,
+  noNow = false,
+): FieldCondition {
   const chosen = op ?? FIELD_QUERY_OPS[def.type][0] ?? "set";
   if (chosen === "set" || chosen === "unset") return { field: def.key, op: chosen };
   if (def.type === "date" || def.type === "datetime")
-    return { field: def.key, op: chosen, value: NOW };
+    return { field: def.key, op: chosen, value: noNow ? "" : NOW };
   if (def.type === "boolean") return { field: def.key, op: chosen, value: "true" };
   if (def.type === "select") {
     const first = def.options[0]?.value ?? "";
@@ -173,8 +180,11 @@ export function ContentListQuery({
   );
 }
 
-/** One condition: field, operator (only its type's), the value control, remove. */
-function ConditionRow({
+/**
+ * One condition: field, operator (only its type's), the value control, remove. Shared with the
+ * fields builder's reference conditions (RFC-0045 §5), which pass `noNow`.
+ */
+export function ConditionRow({
   cond,
   defs,
   label,
@@ -182,6 +192,7 @@ function ConditionRow({
   errors,
   onChange,
   onRemove,
+  noNow = false,
 }: {
   cond: FieldCondition;
   defs: readonly FieldDefinition[];
@@ -190,6 +201,8 @@ function ConditionRow({
   errors: readonly string[];
   onChange: (cond: FieldCondition) => void;
   onRemove: () => void;
+  /** No `now` operand: dates are always a date (a reference's `where`). */
+  noNow?: boolean;
 }) {
   const { t } = useI18n("listings");
   const c = "listings.contentList";
@@ -204,7 +217,7 @@ function ConditionRow({
           value={cond.field}
           onValueChange={(v) => {
             const next = defs.find((d) => d.key === v);
-            if (next) onChange(freshCondition(next));
+            if (next) onChange(freshCondition(next, undefined, noNow));
           }}
           items={Object.fromEntries(defs.map((d) => [d.key, label(d)]))}
         />
@@ -212,14 +225,20 @@ function ConditionRow({
           className="w-full"
           label={t(`${c}.op`)}
           value={cond.op}
-          onValueChange={(v) => def && onChange(freshCondition(def, v as FieldQueryOp))}
+          onValueChange={(v) => def && onChange(freshCondition(def, v as FieldQueryOp, noNow))}
           items={Object.fromEntries(
             ops.map((op) => [op, t(`${c}.ops.${op}`, { kind: timeKind(def) })]),
           )}
           data-testid={`condition-op-${cond.field}`}
         />
         {def && (
-          <ValueControl cond={cond} def={def} defaultLocale={defaultLocale} onChange={onChange} />
+          <ValueControl
+            cond={cond}
+            def={def}
+            defaultLocale={defaultLocale}
+            onChange={onChange}
+            noNow={noNow}
+          />
         )}
         <Button
           variant="ghost"
@@ -245,11 +264,13 @@ function ValueControl({
   def,
   defaultLocale,
   onChange,
+  noNow,
 }: {
   cond: FieldCondition;
   def: FieldDefinition;
   defaultLocale: string;
   onChange: (cond: FieldCondition) => void;
+  noNow: boolean;
 }) {
   const { t, locale } = useI18n("listings");
   const c = "listings.contentList";
@@ -302,6 +323,17 @@ function ValueControl({
         value={value}
         onValueChange={(v) => set(v as string)}
         items={{ true: t(`${c}.yes`), false: t(`${c}.no`) }}
+      />
+    );
+  if ((def.type === "date" || def.type === "datetime") && noNow)
+    return (
+      <Input
+        className="w-full"
+        label={label}
+        type={def.type === "date" ? "date" : "text"}
+        value={value}
+        onValueChange={set}
+        description={def.type === "date" ? t(`${c}.dateHint`) : t(`${c}.instantHint`)}
       />
     );
   if (def.type === "date" || def.type === "datetime")

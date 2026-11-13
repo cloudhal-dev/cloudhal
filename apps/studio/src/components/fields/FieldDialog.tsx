@@ -1,5 +1,5 @@
-import type { FieldDefinition } from "@cloudhal/core-contracts";
-import { FIELD_LIMITS, FIELD_TYPES } from "@cloudhal/core-ts/fields";
+import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
+import { FIELD_LIMITS, FIELD_TYPES, REFERENCE_FIELD_TYPES } from "@cloudhal/core-ts/fields";
 import { Button, Input, InsetPanel, LayerDialog, Select, Text } from "@cloudhal/ui";
 import { Plus, Trash } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
@@ -15,9 +15,12 @@ import {
   withLabel,
   withOptionLabel,
 } from "../../lib/field-form.ts";
+import { SUB_TYPES } from "../../lib/field-form-stage4.ts";
 import { type FieldType, localizedByDefault } from "../../lib/fields.ts";
 import { languageName } from "../../lib/languages.ts";
 import { SwitchField } from "../TaxonomySettingsDialog.tsx";
+import { ReferenceFields } from "./ReferenceFieldsForm.tsx";
+import { RepeaterFields } from "./SubFieldList.tsx";
 
 type FT = TFunction<"fields">;
 type SetForm = (next: FieldForm) => void;
@@ -31,6 +34,13 @@ export interface FieldFormContext {
   uiLocale: string;
   isNew: boolean;
   problems: FormProblems;
+  /** RFC-0045: the site (target collections) and whether its server takes the two new types. */
+  site: Site;
+  referenceTypes: boolean;
+  /** A repeater's sub-field: sub-field types, no languages switch, search or "Several". */
+  sub?: boolean;
+  /** A type change's target (the operation dialog): no conditions, which are a free edit after. */
+  operation?: boolean;
 }
 
 /** Label and help per site language; the default language's label is required. */
@@ -77,16 +87,8 @@ function LabelFields({
 }
 
 /** A select's options: value (stored, never shown to readers) and a label per language. */
-export function OptionFields({
-  t,
-  form,
-  set,
-  locales,
-  defaultLocale,
-  uiLocale,
-  isNew,
-  problems,
-}: FieldFormContext) {
+export function OptionFields(c: FieldFormContext) {
+  const { t, form, set, locales, defaultLocale, uiLocale, isNew, problems } = c;
   const many = locales.length > 1;
   return (
     <div className="grid gap-3" data-testid="field-options">
@@ -171,22 +173,56 @@ export function OptionFields({
           {t("fields.dialog.addOption")}
         </Button>
       </div>
-      <SwitchField
-        testId="field-multiple"
-        label={t("fields.dialog.multiple")}
-        hint={isNew ? t("fields.dialog.multipleHint") : t("fields.dialog.needsOperation")}
-        checked={form.multiple}
-        onChange={(multiple) => set({ ...form, multiple })}
-        disabled={!isNew}
-      />
+      {!c.sub && (
+        <SwitchField
+          testId="field-multiple"
+          label={t("fields.dialog.multiple")}
+          hint={isNew ? t("fields.dialog.multipleHint") : t("fields.dialog.needsOperation")}
+          checked={form.multiple}
+          onChange={(multiple) => set({ ...form, multiple })}
+          disabled={!isNew}
+        />
+      )}
     </div>
   );
 }
 
-/** What only some types have: length and lines, bounds, search, options. */
-function TypeFields(c: FieldFormContext) {
+/**
+ * What only some types have: length and lines, bounds, search, options, a reference's targets and
+ * a repeater's sub-fields. The operation dialog draws a type change's target with it too.
+ */
+export function TypeFields(c: FieldFormContext) {
   const { t, form, set, problems } = c;
   if (form.type === "select") return <OptionFields {...c} />;
+  if (form.type === "reference")
+    return (
+      <ReferenceFields
+        site={c.site}
+        form={form}
+        set={set}
+        isNew={c.isNew}
+        problems={problems}
+        sub={c.sub}
+        noConditions={c.operation}
+      />
+    );
+  if (form.type === "repeater")
+    return (
+      <RepeaterFields
+        form={form}
+        set={set}
+        problems={problems}
+        defaultLocale={c.defaultLocale}
+        uiLocale={c.uiLocale}
+        locales={c.locales}
+        renderSubForm={(s) => (
+          <>
+            <CommonFields {...c} {...s} sub />
+            <TypeFields {...c} {...s} sub />
+          </>
+        )}
+      />
+    );
   return (
     <>
       {form.type === "text" && (
@@ -245,7 +281,7 @@ function TypeFields(c: FieldFormContext) {
           />
         </>
       )}
-      {(form.type === "text" || form.type === "richText") && (
+      {!c.sub && (form.type === "text" || form.type === "richText") && (
         <SwitchField
           testId="field-searchable"
           label={t("fields.dialog.searchable")}
@@ -261,7 +297,13 @@ function TypeFields(c: FieldFormContext) {
 /** The type, the key and the switches every type has. */
 function CommonFields(c: FieldFormContext) {
   const { t, form, set, isNew, problems } = c;
-  const types = Object.fromEntries(FIELD_TYPES.map((type) => [type, t(`fields.types.${type}`)]));
+  // RFC-0045: reference and repeater only where the server takes them (a saved one still shows).
+  const offered: readonly FieldType[] = c.sub
+    ? SUB_TYPES
+    : c.referenceTypes || REFERENCE_FIELD_TYPES.includes(form.type as "reference")
+      ? [...FIELD_TYPES, ...REFERENCE_FIELD_TYPES]
+      : FIELD_TYPES;
+  const types = Object.fromEntries(offered.map((type) => [type, t(`fields.types.${type}`)]));
   return (
     <>
       <Select
@@ -294,14 +336,16 @@ function CommonFields(c: FieldFormContext) {
         error={problems.key ? t(`fields.dialog.errors.key.${problems.key}`) : undefined}
         maxLength={40}
       />
-      <SwitchField
-        testId="field-localized"
-        label={t("fields.dialog.localized")}
-        hint={isNew ? t("fields.dialog.localizedHint") : t("fields.dialog.needsOperation")}
-        checked={form.localized}
-        onChange={(localized) => set({ ...form, localized })}
-        disabled={!isNew}
-      />
+      {!c.sub && (
+        <SwitchField
+          testId="field-localized"
+          label={t("fields.dialog.localized")}
+          hint={isNew ? t("fields.dialog.localizedHint") : t("fields.dialog.needsOperation")}
+          checked={form.localized}
+          onChange={(localized) => set({ ...form, localized })}
+          disabled={!isNew}
+        />
+      )}
       {form.type !== "boolean" && (
         <SwitchField
           testId="field-required"
@@ -329,6 +373,8 @@ export function FieldDialog({
   taken,
   defaultLocale,
   locales,
+  site,
+  referenceTypes,
   onApply,
 }: {
   open: boolean;
@@ -341,6 +387,9 @@ export function FieldDialog({
   taken: readonly string[];
   defaultLocale: string;
   locales: readonly string[];
+  site: Site;
+  /** The server takes reference and repeater fields (`/api/instance`, RFC-0045 step 7). */
+  referenceTypes: boolean;
   onApply: (def: FieldDefinition) => void;
 }) {
   const { t, locale } = useI18n("fields");
@@ -361,6 +410,8 @@ export function FieldDialog({
     uiLocale: locale,
     isNew,
     problems: submitted ? problems : {},
+    site,
+    referenceTypes,
   };
   const submit = () => {
     setSubmitted(true);

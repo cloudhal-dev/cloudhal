@@ -1,5 +1,5 @@
 /** RFC-0040: the site's collection registry (declared, inferred from entries, and `posts`). */
-import type { CollectionSettings, Site } from "@cloudhal/core-contracts";
+import type { CollectionSettings, Site, SubFieldDefinition } from "@cloudhal/core-contracts";
 import type {
   FieldOperationResult,
   FieldOperationStatus,
@@ -12,17 +12,26 @@ export type { CollectionInfo, FieldOperationResult, FieldOperationStatus, FieldR
 
 /** RFC-0041 §6: what Studio asks of a field operation (the API's body without `collection`). */
 export type FieldOperationRequest =
-  | { op: "rename_field"; from: string; to: string }
+  | { op: "rename_field"; from: string; to: string; sub?: string }
   | {
       op: "change_field_type";
       key: string;
       type: string;
+      /** RFC-0045: a repeater's sub-field the change applies to. */
+      sub?: string;
       options?: unknown[];
       multiple?: boolean;
+      /** RFC-0045: a reference's target collections (required to a reference). */
+      collections?: string[];
+      /** RFC-0045: a multiple reference's or a repeater's item cap. */
+      maxItems?: number;
+      /** RFC-0045: a repeater's sub-fields (required to a repeater) and the one naming items. */
+      subFields?: SubFieldDefinition[];
+      itemLabel?: string;
       onInvalid?: "clear";
     }
   | { op: "set_field_localized"; key: string; localized: boolean }
-  | { op: "remove_field"; key: string };
+  | { op: "remove_field"; key: string; sub?: string };
 
 const base = (siteId: string) => `/api/sites/${encodeURIComponent(siteId)}/collections`;
 
@@ -50,20 +59,21 @@ export const collectionsApi = {
       ...json(body),
     }),
   /** Resumes an operation that answered `done: false` (or was interrupted). */
-  continueField: (siteId: string, key: string, operationId: string) =>
+  /** RFC-0045 §7: `clear` drops the values that stopped converting, so the run can finish. */
+  continueField: (siteId: string, key: string, operationId: string, clear = false) =>
     request<FieldOperationResult>(
       `${base(siteId)}/${encodeURIComponent(key)}/fields/operations?continue=${encodeURIComponent(operationId)}`,
-      { method: "POST", ...json({}) },
+      { method: "POST", ...json(clear ? { onInvalid: "clear" } : {}) },
     ),
   fieldStatus: (siteId: string, key: string, operationId: string) =>
     request<FieldOperationStatus>(
       `${base(siteId)}/${encodeURIComponent(key)}/fields/operations/${encodeURIComponent(operationId)}`,
     ),
   /** Restores the values before the operation; call again while `done: false`. */
-  revertField: (siteId: string, key: string, operationId: string) =>
+  revertField: (siteId: string, key: string, operationId: string, clear = false) =>
     request<FieldRevertResult>(
       `${base(siteId)}/${encodeURIComponent(key)}/fields/operations/${encodeURIComponent(operationId)}/revert`,
-      { method: "POST", ...json({}) },
+      { method: "POST", ...json(clear ? { onInvalid: "clear" } : {}) },
     ),
   /** Undeclares a collection without entries (409 `collection_in_use` otherwise). */
   remove: (site: Pick<Site, "id" | "rev">, key: string) =>

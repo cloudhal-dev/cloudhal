@@ -697,6 +697,22 @@ export const en = {
         "Content list sections still filter or sort by this field. Change those pages first.",
       gates_unsupported:
         "This site's live server doesn't support this yet. Deploy the site first, then try again.",
+      entry_referenced:
+        "Published entries still show this entry in a reference field. Unpublish or change them first.",
+      reference_target_moved:
+        "Published entries show this entry from its current collection. Unpublish or change them first.",
+      field_operation_running:
+        "A field change is turning values into references to this collection. Wait until it finishes.",
+      unknown_entry:
+        "A chosen entry can't be used: it was deleted, archived or is in another collection.",
+      fields_unsupported: "This server doesn't take reference or list fields yet.",
+      translation_group_in_use:
+        "Translations still belong to this entry. Move or unlink them before changing its group.",
+      too_many_references: "An entry can hold at most 100 references across its fields.",
+      field_key_in_use: "Entries already hold values under this key. Choose another key.",
+      reference_target_unknown: "A reference field names a collection this site doesn't have.",
+      translation_shape_mismatch:
+        "The translated list must have as many items as the original's. Send the whole list.",
       network: "Can't reach the server. Check your connection and try again.",
       status: "The request failed (HTTP {status}).",
     },

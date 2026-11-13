@@ -18,6 +18,7 @@ import {
   type OperationTarget,
 } from "./FieldOperationDialog.tsx";
 import { FieldRow } from "./FieldRow.tsx";
+import { useReferenceTypes } from "./useReferenceTypes.ts";
 
 /** The section's id in the collection settings' table of contents. */
 export const COLLECTION_FIELDS_SECTION = "fields";
@@ -77,6 +78,37 @@ function RunningBanner({
   );
 }
 
+/** The section's footer: "Discard" while the draft differs, and "Save fields". */
+function BuilderFooter(p: {
+  dirty: boolean;
+  pending: boolean;
+  disabled: boolean;
+  reason: string | undefined;
+  onDiscard: () => void;
+  onSave: () => void;
+}) {
+  const { t } = useI18n("fields");
+  return (
+    <>
+      {p.dirty && (
+        <Button variant="ghost" onClick={p.onDiscard} disabled={p.pending}>
+          {t("common.discard")}
+        </Button>
+      )}
+      <Button
+        variant="primary"
+        onClick={p.onSave}
+        loading={p.pending}
+        disabled={p.disabled}
+        title={p.reason}
+        data-testid="save-fields"
+      >
+        {t("fields.builder.save")}
+      </Button>
+    </>
+  );
+}
+
 /**
  * A collection › Settings › Fields (RFC-0041 §7, DESIGN.md §2ah): the typed fields in form order —
  * label, key, type and badges per row, with up/down and a menu. Adding, reordering and editing
@@ -99,14 +131,16 @@ export function FieldsSection({
 }) {
   const { t, locale } = useI18n("fields");
   const { saved, draft, setDraft, dirty, save } = useFieldsBuilder(site, collection, settings);
-  const [editing, setEditing] = useState<{ index: number } | undefined>();
+  // The field being edited, by its key (never its index: the list can move meanwhile).
+  const [editing, setEditing] = useState<{ key: string } | undefined>();
+  const referenceTypes = useReferenceTypes();
   const [adding, setAdding] = useState(false);
   const [operation, setOperation] = useState<OperationTarget>();
   const locales = useMemo(() => formLocales(site.defaultLocale, site.locales), [site]);
   const savedKeys = saved.map((d) => d.key);
   const running = runningOperationId(saved);
   const canEdit = readOnlyReason === undefined && running === undefined;
-  const editDef = editing ? draft[editing.index] : undefined;
+  const editDef = editing ? draft.find((d) => d.key === editing.key) : undefined;
   const open = (kind: OperationKind, def: FieldDefinition) => setOperation({ kind, def });
   const full = draft.length >= FIELD_LIMITS.fieldsPerCollection;
   return (
@@ -129,23 +163,14 @@ export function FieldsSection({
       }
       footer={
         draft.length > 0 || dirty ? (
-          <>
-            {dirty && (
-              <Button variant="ghost" onClick={() => setDraft(saved)} disabled={save.isPending}>
-                {t("common.discard")}
-              </Button>
-            )}
-            <Button
-              variant="primary"
-              onClick={() => save.mutate()}
-              loading={save.isPending}
-              disabled={!canEdit || !dirty}
-              title={readOnlyReason}
-              data-testid="save-fields"
-            >
-              {t("fields.builder.save")}
-            </Button>
-          </>
+          <BuilderFooter
+            dirty={dirty}
+            pending={save.isPending}
+            disabled={!canEdit || !dirty}
+            reason={readOnlyReason}
+            onDiscard={() => setDraft(saved)}
+            onSave={() => save.mutate()}
+          />
         ) : undefined
       }
     >
@@ -186,9 +211,10 @@ export function FieldsSection({
                 canEdit={canEdit}
                 dirty={dirty}
                 onMove={(by) => setDraft(moveField(draft, i, by))}
-                onEdit={() => setEditing({ index: i })}
+                onEdit={() => setEditing({ key: def.key })}
                 onRemoveNew={() => setDraft(draft.filter((_, j) => j !== i))}
                 onOperation={(kind) => open(kind, def)}
+                referenceTypes={referenceTypes}
               />
             ))}
           </div>
@@ -211,8 +237,12 @@ export function FieldsSection({
         taken={draft.filter((d) => d !== editDef).map((d) => d.key)}
         defaultLocale={site.defaultLocale}
         locales={locales}
+        site={site}
+        referenceTypes={referenceTypes}
         onApply={(def) =>
-          setDraft(editing ? draft.map((d, j) => (j === editing.index ? def : d)) : [...draft, def])
+          setDraft((now) =>
+            editing ? now.map((d) => (d.key === editing.key ? def : d)) : [...now, def],
+          )
         }
       />
       <FieldOperationDialog
@@ -226,6 +256,8 @@ export function FieldsSection({
         taken={saved.filter((d) => d.key !== operation?.def.key).map((d) => d.key)}
         defaultLocale={site.defaultLocale}
         locales={locales}
+        site={site}
+        referenceTypes={referenceTypes}
       />
     </SettingsSection>
   );

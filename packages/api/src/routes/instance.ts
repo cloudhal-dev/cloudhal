@@ -63,6 +63,11 @@ export interface InstanceInfo {
     schedules: SchedulesFeature;
     /** RFC-0036 §5: set only in playground mode (the session's end, Reset and Deploy links). */
     playground?: PlaygroundInfo;
+    /**
+     * RFC-0045: the store accepts reference and repeater fields (`SiteGraphStoreOptions.fieldTypes`),
+     * so Studio's fields builder offers them; the store still decides per site.
+     */
+    referenceFields: boolean;
   };
   /** The agent modes an API key can hold and what each defaults to (ADR-0015). */
   agentModes: AgentModesInfo;

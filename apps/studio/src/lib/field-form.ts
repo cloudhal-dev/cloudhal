@@ -3,9 +3,17 @@
  * contract's shape, and what is wrong with it. Pure; words come from the caller. Loads with the
  * fields UI only (`bundle-budget.ts` `LAZY_ONLY`).
  */
-import type { FieldDefinition } from "@cloudhal/core-contracts";
+import type { FieldCondition, FieldDefinition } from "@cloudhal/core-contracts";
 import { FIELD_LIMITS } from "@cloudhal/core-ts/fields";
 import { trimChar } from "@cloudhal/core-ts/names";
+import {
+  referenceDefinition,
+  repeaterDefinition,
+  type Stage4Problems,
+  type SubFieldForm,
+  stage4FormOf,
+  stage4Problems,
+} from "./field-form-stage4.ts";
 import {
   type FieldType,
   fieldKeyFrom,
@@ -38,7 +46,15 @@ export interface FieldForm {
   minimum: string;
   maximum: string;
   options: OptionForm[];
+  /** A select's or (RFC-0045) a reference's "Several". */
   multiple: boolean;
+  /** RFC-0045: a reference's target collections, a list's maximum and a reference's conditions. */
+  collections: string[];
+  maxItems: string;
+  where: FieldCondition[];
+  /** RFC-0045: a repeater's sub-fields and the one naming its items. */
+  subFields: SubFieldForm[];
+  itemLabel: string;
 }
 
 /** The site's languages, default first. */
@@ -64,6 +80,11 @@ export function emptyForm(type: FieldType, locales: readonly string[]): FieldFor
     maximum: "",
     options: [],
     multiple: false,
+    collections: [],
+    maxItems: "",
+    where: [],
+    subFields: [],
+    itemLabel: "",
   };
 }
 
@@ -95,6 +116,9 @@ export function formOf(def: FieldDefinition, locales: readonly string[]): FieldF
           }))
         : [],
     multiple: def.type === "select" && def.multiple === true,
+    ...(def.type === "reference" || def.type === "repeater"
+      ? stage4FormOf(def, (d) => formOf(d, locales))
+      : {}),
   };
 }
 
@@ -136,7 +160,7 @@ export function withOptionLabel(
   return { ...form, options };
 }
 
-export interface FormProblems {
+export interface FormProblems extends Stage4Problems {
   label?: "required";
   key?: KeyProblem;
   maxLength?: "range";
@@ -171,6 +195,7 @@ export function formProblems(
       out.bounds = "number";
     else if (min !== undefined && max !== undefined && min > max) out.bounds = "order";
   }
+  Object.assign(out, stage4Problems(form, ctx.defaultLocale));
   if (form.type === "select") {
     const values = form.options.map((o) => o.value);
     if (form.options.length === 0) out.options = "required";
@@ -240,6 +265,10 @@ export function definitionOf(form: FieldForm): FieldDefinition {
         ...(form.multiple ? { multiple: true } : {}),
       } as FieldDefinition;
     }
+    case "reference":
+      return referenceDefinition(form, base);
+    case "repeater":
+      return repeaterDefinition(form, base, definitionOf);
     default:
       return { ...base, type: form.type, ...required } as FieldDefinition;
   }

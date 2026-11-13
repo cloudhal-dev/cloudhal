@@ -41,6 +41,26 @@ export interface ReferrersPage {
   next?: number;
 }
 
+/** Why a published entry's reference will show nothing (`referenceIssues` in core-ts). */
+export interface ReferenceIssue {
+  entryId: string;
+  /** The holder's title. */
+  title: string;
+  collection: string;
+  locale: string;
+  /** `fields/venue`, `fields/speakers/1/person`. */
+  path: string;
+  groupId: string;
+  reason: "missing" | "hidden" | "locale";
+}
+
+/** The store's `entry_referenced` details: up to 20 published referrers and the total. */
+export interface ReferencedDetails {
+  group: string;
+  referrers: { id: string; title: string; collection: string; field: string }[];
+  total: number;
+}
+
 export const referencesApi = {
   pick: (
     siteId: string,
@@ -58,6 +78,17 @@ export const referencesApi = {
   groups: (siteId: string, ids: readonly string[]) =>
     request<{ groups: Record<string, ReferenceCard[]> }>(
       `/api/sites/${siteId}/entries/groups${query({ ids: ids.join(",") })}`,
+    ),
+  /** What publishing the working copy now would show as nothing: the first 50 and the total. */
+  issues: (siteId: string) =>
+    request<{ total: number; issues: ReferenceIssue[] }>(
+      `/api/sites/${siteId}/entries/reference-issues`,
+    ),
+  /** Asks the store whether `entry` can be deleted; throws its refusal (`entry_referenced`). */
+  deleteCheck: (entry: { siteId: string; id: string; rev: number }) =>
+    request<{ dryRun: true }>(
+      `/api/sites/${entry.siteId}/entries/${entry.id}${query({ rev: entry.rev, dryRun: 1 })}`,
+      { method: "DELETE" },
     ),
   /** The referrers of the entry's group, published holders first. */
   referrers: (siteId: string, entryId: string, page: { limit?: number; offset?: number } = {}) =>

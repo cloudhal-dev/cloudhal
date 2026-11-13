@@ -13,7 +13,7 @@ const UsedByCard = lazy(() =>
 );
 
 /** True when some field of the site, or a repeater's sub-field, can reference `collection`. */
-function referenced(site: Site, collection: string): boolean {
+export function referenced(site: Site, collection: string): boolean {
   return Object.values(site.collections ?? {}).some((settings) =>
     (settings?.fields ?? []).some(
       (def) =>

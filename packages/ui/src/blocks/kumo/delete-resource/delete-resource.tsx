@@ -11,8 +11,9 @@ import {
 import { Check, Copy, WarningCircle, X } from "@phosphor-icons/react";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
-// Copied with `kumo add DeleteResource` and owned by Cloudhal. Changes from upstream: `notice`, and
-// every word comes from `labels` (upstream hard-codes English; AGENTS.md hard rule 10).
+// Copied with `kumo add DeleteResource` and owned by Cloudhal. Changes from upstream: `notice`,
+// `deleteDisabled`, and every word comes from `labels` (upstream hard-codes English; AGENTS.md
+// hard rule 10).
 
 export const KUMO_DELETE_RESOURCE_VARIANTS = {
   size: {
@@ -79,6 +80,8 @@ export interface DeleteResourceProps extends KumoDeleteResourceVariantsProps {
   errorMessage?: string;
   /** Cloudhal: a consequence to read before confirming (e.g. the menu items that will be hidden). */
   notice?: ReactNode;
+  /** Cloudhal: the delete can't go ahead now (the `notice` says why, e.g. published referrers). */
+  deleteDisabled?: boolean;
 }
 
 export function DeleteResource({
@@ -92,6 +95,7 @@ export function DeleteResource({
   size = KUMO_DELETE_RESOURCE_DEFAULT_VARIANTS.size,
   errorMessage,
   notice,
+  deleteDisabled = false,
   className,
 }: DeleteResourceProps) {
   const [confirmationInput, setConfirmationInput] = useState("");
@@ -113,9 +117,9 @@ export function DeleteResource({
     normalizeForComparison(confirmationInput) === normalizeForComparison(resourceName);
 
   const handleDelete = useCallback(async () => {
-    if (!isConfirmed || isDeleting) return;
+    if (!isConfirmed || isDeleting || deleteDisabled) return;
     await onDelete();
-  }, [isConfirmed, isDeleting, onDelete]);
+  }, [isConfirmed, isDeleting, deleteDisabled, onDelete]);
 
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(resourceName);
@@ -213,7 +217,7 @@ export function DeleteResource({
           <Button
             variant="destructive"
             onClick={handleDelete}
-            disabled={!isConfirmed || isDeleting}
+            disabled={!isConfirmed || isDeleting || deleteDisabled}
             loading={isDeleting}
           >
             {labels.delete}
