@@ -62,11 +62,24 @@ export function translatableFieldValues(
   return out;
 }
 
-/** A key's field: the part before an item path's first `/`. */
-const rootOf = (key: string): string => {
+/**
+ * The repeater an item path (`speakers/0/talk`) names: the part before the key's first `/`, when
+ * it is a repeater of `defs`. Any other key is a plain key, `/` included (a collection without
+ * definitions may hold `og/image`), as before item paths existed.
+ */
+export function itemPathRepeater(
+  defs: readonly FieldDefinition[],
+  key: string,
+): string | undefined {
   const at = key.indexOf("/");
-  return at === -1 ? key : key.slice(0, at);
-};
+  if (at === -1) return undefined;
+  const root = key.slice(0, at);
+  return defs.some((d) => d.key === root && d.type === "repeater") ? root : undefined;
+}
+
+/** A key's field: an item path's repeater, else the key itself. */
+const rootOf = (defs: readonly FieldDefinition[], key: string): string =>
+  itemPathRepeater(defs, key) ?? key;
 
 /** Keys of the non-localized fields: a translation reads them from the original. */
 export function sharedFieldKeys(defs: readonly FieldDefinition[]): string[] {
@@ -84,11 +97,11 @@ export function sharedFieldIssues(
 ): FieldIssue[] {
   const shared = new Set(sharedFieldKeys(defs));
   return Object.keys(values ?? {})
-    .filter((key) => shared.has(rootOf(key)))
+    .filter((key) => shared.has(rootOf(defs, key)))
     .map((key) => ({
       path: `fields/${key}`,
       code: "field_not_localized" as const,
-      message: `${rootOf(key)} is not localized: set it on ${originalId}`,
+      message: `${rootOf(defs, key)} is not localized: set it on ${originalId}`,
     }));
 }
 
@@ -107,6 +120,12 @@ export interface TranslatedItemsInput {
   source: Values | undefined;
   /** The existing translation's own values in that locale, when there is one. */
   existing?: Values | undefined;
+  /**
+   * The existing translation was made from the source's current revision
+   * (`translation.source.rev`), so its items line up with the source's by index. Absent or
+   * false: its own list is never a base for item paths.
+   */
+  existingCurrent?: boolean | undefined;
 }
 
 const shapeIssue = (key: string, message: string): FieldIssue => ({
@@ -118,7 +137,9 @@ const shapeIssue = (key: string, message: string): FieldIssue => ({
 /**
  * The list a repeater's translated paths write into: a list given whole in the same call, else
  * the existing translation's own list, else a copy of the source's. Each must have the source's
- * length (`translation_shape_mismatch`), so an index names the same item on both sides.
+ * length, and the translation's own list must have been made from the source's current revision
+ * (`translation_shape_mismatch` otherwise: a reorder of the same length would pair each text
+ * with another item), so an index names the same item on both sides.
  */
 function baseList(
   key: string,
@@ -130,6 +151,13 @@ function baseList(
   const whole = given[key];
   const own = input.existing?.[key];
   const base = Array.isArray(whole) ? whole : Array.isArray(own) ? own : source;
+  if (base === own && !input.existingCurrent)
+    return {
+      issue: shapeIssue(
+        key,
+        `the translation's ${key} was made from an earlier revision of the source, whose items may have moved since; send the whole list in the source's current order`,
+      ),
+    };
   if (base.length !== source.length)
     return {
       issue: shapeIssue(
@@ -158,7 +186,7 @@ export function translatedItemValues(
   const invalid = (path: string, message: string) =>
     issues.push({ path: `fields/${path}`, code: "invalid_value", message });
   for (const [path, value] of Object.entries(given)) {
-    if (!path.includes("/")) {
+    if (itemPathRepeater(defs, path) === undefined) {
       plain.push([path, value]);
       continue;
     }

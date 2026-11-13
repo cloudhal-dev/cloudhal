@@ -8,8 +8,9 @@
  *   all-null items dropped (`droppedItems`), by core-ts's `readStrictFields`.
  * - `clearFields`: keys to remove, with either input; on update only. Setting and clearing one key
  *   is refused (`invalid`), and a key the collection does not define (nor, without definitions,
- *   hold) is `unknown_field`. During a `rename_field`, removing the new or the old key removes
- *   both (`withRenamedRemovals`), in `fields` too.
+ *   hold) is `unknown_field`. During a `rename_field`, the old and the new key are one field:
+ *   removing either removes both (`withRenamedRemovals`), in `fields` too, and setting one while
+ *   removing the other is `invalid`.
  *
  * A given reference or repeater value replaces the whole value in every profile.
  */
@@ -148,8 +149,15 @@ function withRenamedRemovals(patch: Values, renames: ReadonlyMap<string, string>
   const extra: [string, null][] = [];
   for (const [key, value] of Object.entries(patch)) {
     const other = renames.get(key);
-    if (value === null && other !== undefined && !Object.hasOwn(patch, other))
-      extra.push([other, null]);
+    if (value !== null || other === undefined) continue;
+    // The old and the new key are one field while the rename runs: set or clear, not both.
+    if (Object.hasOwn(patch, other) && patch[other] !== null)
+      throw new ToolError(
+        "invalid",
+        `set or clear, not both: ${key} and ${other} are one field while rename_field runs`,
+        { fields: [key, other] },
+      );
+    if (!Object.hasOwn(patch, other)) extra.push([other, null]);
   }
   return extra.length ? { ...patch, ...Object.fromEntries(extra) } : patch;
 }

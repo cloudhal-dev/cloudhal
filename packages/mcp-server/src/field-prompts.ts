@@ -11,10 +11,12 @@ import type {
   Site,
   SubFieldDefinition,
 } from "@cloudhal/core-contracts";
-import { getGroupMembers } from "@cloudhal/core-ts";
+import { canonicalJson, getGroupMembers } from "@cloudhal/core-ts";
 import {
+  convertContext,
   fieldDefinitions,
   fieldLabel,
+  normalizeThroughMarkers,
   optionLabel,
   referenceValues,
   renamedFrom,
@@ -163,16 +165,19 @@ interface Indexed {
 }
 
 /**
- * Items of `next` not in `before`, and the other way round (as multisets, by canonical value),
- * with their indices. An added and a removed item at the same index are one changed item.
+ * Items of `next` not in `before`, and the other way round (as multisets, compared as canonical
+ * JSON, so key order never counts), with their indices. An added and a removed item at the same
+ * index are one changed item. `reordered`: the items both lists hold are in another order.
  */
 function itemChanges(before: readonly unknown[], next: readonly unknown[]) {
-  const left = before.map((item, index) => ({ index, item, key: JSON.stringify(item) }));
+  const left = before.map((item, index) => ({ index, item, key: canonicalJson(item) }));
   const added: Indexed[] = [];
+  const matched: number[] = [];
   next.forEach((item, index) => {
-    const at = left.findIndex((l) => l.key === JSON.stringify(item));
+    const key = canonicalJson(item);
+    const at = left.findIndex((l) => l.key === key);
     if (at === -1) added.push({ index, item });
-    else left.splice(at, 1);
+    else matched.push(...left.splice(at, 1).map((l) => l.index));
   });
   const removedAt = new Map(left.map((l) => [l.index, l.item]));
   const changed = added
@@ -183,6 +188,7 @@ function itemChanges(before: readonly unknown[], next: readonly unknown[]) {
     added: added.filter((a) => !pairs.has(a.index)).map((a) => a.item),
     removed: left.filter((l) => !pairs.has(l.index)).map((l) => l.item),
     changed,
+    reordered: matched.some((v, i) => i > 0 && v < (matched[i - 1] as number)),
   };
 }
 
@@ -198,7 +204,7 @@ function describeChangedItem(
   for (const sub of def.fields) {
     const had = Object.hasOwn(was, sub.key);
     const has = Object.hasOwn(now, sub.key);
-    if (has && (!had || JSON.stringify(was[sub.key]) !== JSON.stringify(now[sub.key])))
+    if (has && (!had || canonicalJson(was[sub.key]) !== canonicalJson(now[sub.key])))
       parts.push(`${sub.key} → ${describeScalar(sub, now[sub.key], words.locale, words.targets)}`);
     else if (had && !has) parts.push(`${sub.key} removed`);
   }
@@ -216,7 +222,7 @@ function describeRepeater(
   const { locale, targets } = words;
   const was = Array.isArray(change.before) ? change.before : [];
   const now = Array.isArray(change.value) ? change.value : [];
-  const { added, removed, changed } = itemChanges(was, now);
+  const { added, removed, changed, reordered } = itemChanges(was, now);
   const notes = [
     added.length ? `added ${some(added.map((i) => describeItem(def, i, locale, targets)))}` : "",
     removed.length
@@ -225,7 +231,7 @@ function describeRepeater(
     ...changed.slice(0, 3).map((c) => describeChangedItem(def, c, words)),
     changed.length > 3 ? `${changed.length - 3} more items changed` : "",
   ].filter(Boolean);
-  if (notes.length === 0 && JSON.stringify(was) !== JSON.stringify(now)) notes.push("reordered");
+  if (reordered) notes.push("reordered");
   return `${items(was.length)} → ${items(now.length)}${notes.length ? ` (${notes.join("; ")})` : ""}`;
 }
 
@@ -252,7 +258,7 @@ export function describeFieldValue(
 export async function describeFieldPatch(
   ctx: ToolContext,
   site: Site,
-  entry: Pick<ContentEntry, "collection" | "locale" | "fields">,
+  entry: Pick<ContentEntry, "id" | "collection" | "locale" | "fields" | "translation">,
   change: { patch: Values; planned?: Values | undefined },
 ): Promise<string> {
   const { patch, planned } = change;
@@ -266,9 +272,15 @@ export async function describeFieldPatch(
     }),
   );
   const locale = site.defaultLocale;
-  const stored = entry.fields ?? {};
+  // The stored values through the field-operation markers, as the planned ones are, so a
+  // running sub-field rename or conversion does not read as every item changing.
+  const raw = entry.fields ?? {};
+  const translation = !!entry.translation && entry.translation.group !== entry.id;
+  const stored =
+    normalizeThroughMarkers(list, raw, { convert: convertContext(site), translation }) ?? raw;
+  // What the store would write wins, also over a `null` it would not apply.
   const shown = (key: string, value: unknown) =>
-    value !== null && planned && Object.hasOwn(planned, key) ? planned[key] : value;
+    planned && Object.hasOwn(planned, key) ? planned[key] : value;
   const values = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, shown(k, v)]));
   const targets = await loadTargets(ctx, site, {
     collection: entry.collection,

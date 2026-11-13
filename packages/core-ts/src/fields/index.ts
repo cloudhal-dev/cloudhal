@@ -137,6 +137,7 @@ export {
 } from "./resolve.ts";
 export { type DroppedItem, readStrictFields, type StrictFieldsRead } from "./strict-input.ts";
 export {
+  itemPathRepeater,
   localizedFieldValues,
   sharedFieldIssues,
   sharedFieldKeys,

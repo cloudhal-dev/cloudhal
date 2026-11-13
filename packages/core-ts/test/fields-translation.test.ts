@@ -109,8 +109,14 @@ describe("repeater paths (RFC-0045)", () => {
       "fields/agenda/7/topic",
       "fields/agenda/x/topic",
       "fields/agenda/0/topic/extra",
-      "fields/nope/0/topic",
     ]);
+    // A key whose first part names no repeater is a plain key, as before item paths existed.
+    expect(r.values["nope/0/topic"]).toBe("x");
+    expect(translatedItemValues([], { source: {} }, { "og/image": "x" })).toEqual({
+      values: { "og/image": "x" },
+      issues: [],
+    });
+    expect(sharedFieldIssues([], { "og/image": "x" }, "entry_1")).toEqual([]);
     expect(sharedFieldIssues(AGENDA, { "shared/0/line": "x" }, "entry_1")).toEqual([
       {
         path: "fields/shared/0/line",
@@ -127,7 +133,7 @@ describe("repeater paths (RFC-0045)", () => {
     };
     const r = translatedItemValues(
       AGENDA,
-      { source: SOURCE, existing },
+      { source: SOURCE, existing, existingCurrent: true },
       { "agenda/2/notes": "**Kapanış**" },
     );
     expect(r.issues).toEqual([]);
@@ -138,11 +144,21 @@ describe("repeater paths (RFC-0045)", () => {
     ]);
   });
 
+  it("never folds into a translation's list made from an earlier revision of the source", () => {
+    // Same length, reordered since: index 0 would pair the text with another item.
+    const existing = { agenda: [{ notes: "Son" }, { host: G }, { topic: "Açılış", host: G }] };
+    const r = translatedItemValues(AGENDA, { source: SOURCE, existing }, { "agenda/0/topic": "x" });
+    expect(r.issues.map((i) => [i.path, i.code])).toEqual([
+      ["fields/agenda", "translation_shape_mismatch"],
+    ]);
+    expect(r.values).toEqual({});
+  });
+
   it("refuses lists of another length than the source's (translation_shape_mismatch)", () => {
     const short = { agenda: [{ topic: "Açılış" }] };
     const own = translatedItemValues(
       AGENDA,
-      { source: SOURCE, existing: short },
+      { source: SOURCE, existing: short, existingCurrent: true },
       { "agenda/0/topic": "x" },
     );
     expect(own.issues.map((i) => [i.path, i.code])).toEqual([

@@ -589,12 +589,120 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
         { topic: "Son", host: bob.id },
       ],
     });
+    // The source reorders its items (same length): the translation's own list was made from
+    // the earlier order, so a partial save is refused rather than paired by index.
+    const stored = (await w.store.getContentEntry(session.id)) as ContentEntry;
+    const items = stored.fields?.agenda as unknown[];
+    await w.store.updateContentEntry({ ...stored, fields: { agenda: [items[1], items[0]] } });
+    const moved = await rejection(
+      save({ "agenda/0/topic": "Kapanış" }, (await source()).sourceRev),
+    );
+    expect(moved.code).toBe("translation_shape_mismatch");
+    expect(moved.message).toContain("whole list");
     // A translation's list of another length than the source's is refused, not overwritten.
     const now = (await w.store.getContentEntry(tr.id)) as ContentEntry;
     await w.store.updateContentEntry({ ...now, fields: { agenda: [{ topic: "Tek" }] } });
     const shape = await rejection(save({ "agenda/0/topic": "x" }, (await source()).sourceRev));
     expect(shape.code).toBe("translation_shape_mismatch");
     expect((await w.store.getContentEntry(tr.id))?.fields).toEqual({ agenda: [{ topic: "Tek" }] });
+  });
+
+  it("keeps keys with / in a collection without definitions as plain keys", async () => {
+    const place = await entry(w, "places", { title: "Hall", fields: { "og/image": "hall.png" } });
+    const saved = (
+      await call(
+        w,
+        "save_translation",
+      )({
+        nodeId: place.id,
+        locale: "tr",
+        title: "Salon",
+        slug: "salon",
+        body: "Gövde",
+        fields: { "og/image": "salon.png" },
+      })
+    ).result as { node: ContentEntry };
+    expect(saved.node.fields).toEqual({ "og/image": "salon.png" });
+  });
+
+  it("compares items by value, notes reorders, and reads the stored list through the markers", async () => {
+    const people = await Promise.all(
+      ["P1", "P2", "P3", "P4", "P5", "P6"].map((title) => entry(w, "people", { title })),
+    );
+    const grace = await entry(w, "people", { title: "Grace Hopper" });
+    const list = people.map((p) => ({ person: p.id, role: "speaker" }));
+    const e = await entry(w, "events", { fields: { speakers: list } });
+    const prompt = async (speakers: unknown[]) =>
+      (await call(w, "update_entry", "manual")({ entryId: e.id, rev: e.rev, fields: { speakers } }))
+        .approvalPrompt as string;
+    // Re-sent unchanged with permuted keys: no notes at all.
+    const same = await prompt(list.map((i) => ({ role: i.role, person: i.person })));
+    expect(same).toContain('"Speakers" (speakers): 6 items → 6 items');
+    expect(same).not.toMatch(/changed|added|removed|reordered/);
+    // Only item 5 changes, and it is the one shown.
+    const fifth = list.map((i, n) =>
+      n === 4 ? { role: "speaker", person: grace.id } : { role: i.role, person: i.person },
+    );
+    expect(await prompt(fifth)).toContain(
+      `6 items → 6 items (changed item 5: person → "Grace Hopper" (${grace.id}, People))`,
+    );
+    // A removal plus a swap shows the reorder too.
+    const swapped = [list[2], list[1], list[3], list[4], list[5]];
+    const both = await prompt(swapped);
+    expect(both).toContain("removed");
+    expect(both).toContain("reordered");
+    // During a sub-field rename, an entry not rewritten yet still reads as unchanged.
+    const both2 = [
+      await entry(w, "events", { fields: { speakers: [{ person: grace.id, talk: "Hi" }] } }),
+      await entry(w, "events", { fields: { speakers: [{ person: grace.id, talk: "Yo" }] } }),
+    ];
+    const started = await runFieldOperation(
+      w.store,
+      w.site.id,
+      { op: "rename_field", collection: "events", from: "speakers", sub: "talk", to: "abstract" },
+      { actor: agent, budget: { entries: 1 } },
+    );
+    expect(started.done).toBe(false);
+    const current = await Promise.all(both2.map((x) => w.store.getContentEntry(x.id)));
+    const holds = (x: ContentEntry | undefined) =>
+      JSON.stringify(x?.fields?.speakers ?? []).includes('"talk"');
+    const raw = current.find(holds) as ContentEntry;
+    const [item] = (raw.fields?.speakers ?? []) as { talk: string }[];
+    const marked = (
+      await call(
+        w,
+        "update_entry",
+        "manual",
+      )({
+        entryId: raw.id,
+        rev: raw.rev,
+        fields: { speakers: [{ person: grace.id, abstract: item?.talk }] },
+      })
+    ).approvalPrompt as string;
+    expect(marked).toContain("1 item → 1 item");
+    expect(marked).not.toMatch(/changed|added|removed|reordered/);
+  });
+
+  it("refuses setting one key of a running rename while clearing the other", async () => {
+    await entry(w, "events", { fields: { venueName: "Hall" } });
+    const e = await entry(w, "events", { fields: { venueName: "Annex" } });
+    await runFieldOperation(
+      w.store,
+      w.site.id,
+      { op: "rename_field", collection: "events", from: "venueName", to: "placeName" },
+      { actor: agent, budget: { entries: 1 } },
+    );
+    const now = (await w.store.getContentEntry(e.id)) as ContentEntry;
+    for (const args of [
+      { fields: { venueName: "Ada" }, clearFields: ["placeName"] },
+      { fields: { venueName: "Ada", placeName: null } },
+      { fields: { placeName: "Ada" }, clearFields: ["venueName"] },
+    ]) {
+      const refused = await rejection(
+        call(w, "update_entry", "manual")({ entryId: now.id, rev: now.rev, ...args }),
+      );
+      expect(refused.code, JSON.stringify(args)).toBe("invalid");
+    }
   });
 
   it("clearFields removes a value during an unfinished rename_field, by either key", async () => {

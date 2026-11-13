@@ -242,7 +242,7 @@ const saveTranslationTool: ToolDefinition = {
     const site = await ctx.store.getSite(a.siteId as string);
     const source = await ctx.store.getContentEntry(a.nodeId as string);
     if (!site || source?.siteId !== site.id) return;
-    checkSourceRev(a, source);
+    checkSourceRev(a, site, source);
     const target = await targetOf(ctx, site, a.targetSiteId);
     const locale = a.locale as string;
     const { existing } = await translationOf(ctx, { site, target, source, locale });
@@ -259,7 +259,7 @@ const saveTranslationTool: ToolDefinition = {
     if (source.locale === locale)
       throw new ToolError("invalid", "the translation's locale differs from its source's");
     // RFC-0045 §3: item paths were read at a revision; checked before marking the original.
-    checkSourceRev(a, source);
+    checkSourceRev(a, site, source as { id: string; rev: number; collection?: string });
     // The source becomes the group's original the first time it is translated (a new revision).
     if (!source.translation) source = await markOriginal(ctx, source);
     const group = await ctx.store.translationGroup(site, source.translation?.group ?? source.id);

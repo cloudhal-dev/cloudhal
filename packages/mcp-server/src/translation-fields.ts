@@ -13,9 +13,10 @@
  * length are `translation_shape_mismatch`. A path names an item by index, so a save with paths
  * names the source revision it was read from (`sourceRev`, `conflict` when it moved on).
  */
-import type { ContentEntry, Site } from "@cloudhal/core-contracts";
+import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import {
   fieldDefinitions,
+  itemPathRepeater,
   refuseFieldIssues,
   sharedFieldIssues,
   sharedFieldKeys,
@@ -41,12 +42,26 @@ export const SOURCE_REV_INPUT: JsonSchema = {
     "Entries: get_translation_source's sourceRev. Required when fields has repeater item paths, which name items by index: refused (conflict) when the source changed since",
 };
 
-const hasItemPaths = (values: unknown): boolean =>
-  !!values && typeof values === "object" && Object.keys(values).some((k) => k.includes("/"));
+/** True when `values` names a repeater item (`speakers/0/talk`); other keys with `/` are plain. */
+const hasItemPaths = (defs: readonly FieldDefinition[], values: unknown): boolean =>
+  !!values &&
+  typeof values === "object" &&
+  Object.keys(values).some((k) => itemPathRepeater(defs, k) !== undefined);
+
+/** A translation made from the source's current revision: its items line up by index. */
+const madeFromCurrent = (
+  existing: Pick<ContentEntry, "translation"> | undefined,
+  source: Pick<ContentEntry, "rev">,
+): boolean => existing?.translation?.source?.rev === source.rev;
 
 /** Item paths need the source revision they were read from, unchanged (RFC-0045 §3). */
-export function checkSourceRev(a: Record<string, unknown>, source: { id: string; rev: number }) {
-  if (!hasItemPaths(a.fields)) return;
+export function checkSourceRev(
+  a: Record<string, unknown>,
+  site: Site,
+  source: { id: string; rev: number; collection?: string },
+) {
+  if (source.collection === undefined) return;
+  if (!hasItemPaths(fieldDefinitions(site, source.collection), a.fields)) return;
   if (typeof a.sourceRev !== "number")
     throw new ToolError(
       "invalid",
@@ -85,13 +100,17 @@ export function refuseSharedFields(
   site: Site,
   source: ContentEntry,
   values: unknown,
-  existing?: { fields?: Values | undefined } | undefined,
+  existing?: Pick<ContentEntry, "fields" | "translation"> | undefined,
 ): void {
   if (!values || typeof values !== "object") return;
   const defs = fieldDefinitions(site, source.collection);
   const original = source.translation?.group ?? source.id;
   const shared = sharedFieldIssues(defs, values as Values, original);
-  const input = { source: source.fields, existing: existing?.fields };
+  const input = {
+    source: source.fields,
+    existing: existing?.fields,
+    existingCurrent: madeFromCurrent(existing, source),
+  };
   const items = translatedItemValues(defs, input, values as Values).issues;
   const sharedPaths = new Set(shared.map((i) => i.path));
   refuseFieldIssues([...shared, ...items.filter((i) => !sharedPaths.has(i.path))]);
@@ -111,7 +130,11 @@ export function translatedFields(input: {
   const base = existing?.fields ?? (cross || !defined ? (source.fields ?? {}) : {});
   if (!given) return { ...base };
   const defs = fieldDefinitions(site, source.collection);
-  const lists = { source: source.fields, existing: existing?.fields };
+  const lists = {
+    source: source.fields,
+    existing: existing?.fields,
+    existingCurrent: madeFromCurrent(existing, source),
+  };
   // The source may have changed since the precheck: refuse, never drop a path.
   const folded = translatedItemValues(defs, lists, given);
   refuseFieldIssues(folded.issues);
