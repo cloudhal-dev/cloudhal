@@ -12,6 +12,7 @@ import { EntryUsedByCard } from "../src/components/EntryFieldCards.tsx";
 import { EntryFieldsCard } from "../src/components/fields/EntryFieldsCard.tsx";
 import { ApiRequestError } from "../src/lib/api/http.ts";
 import { withoutEmptyItems } from "../src/lib/empty-items.ts";
+import { duplicateOf } from "../src/routes/ArticleEditorPage.tsx";
 import { on, serve, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
@@ -91,10 +92,12 @@ const card = (groupId: string, title: string, status = "published", locale = "en
 function Harness({
   entry = ENTRY,
   error,
+  sent,
   onFields = () => {},
 }: {
   entry?: ContentEntry;
   error?: unknown;
+  sent?: ContentEntry;
   onFields?: (f: Record<string, unknown>) => void;
 }) {
   const [draft, setDraft] = useState(entry);
@@ -108,6 +111,7 @@ function Harness({
         onFields(fields);
       }}
       error={error}
+      sent={sent}
       disabled={false}
     />
   );
@@ -249,6 +253,48 @@ describe("Entry editor › item issues after empty items are left out", () => {
     ).toBeInTheDocument();
     const empty = screen.getByRole("group", { name: "Item 2" });
     expect(empty).not.toHaveAttribute("aria-invalid");
+  });
+});
+
+describe("Entry editor › item issues map through what the save sent", () => {
+  it("uses the entry the save sent, not the draft edited while it was in flight", async () => {
+    serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
+    const sent = {
+      ...ENTRY,
+      fields: { speakers: [{ name: "Ada", role: "Host" }, {}, { name: "Grace" }] },
+    } as unknown as ContentEntry;
+    // Item 2 was filled in after the save left: the draft no longer has an empty item.
+    const draft = {
+      ...sent,
+      fields: { speakers: [{ name: "Ada", role: "Host" }, { name: "Linus" }, { name: "Grace" }] },
+    } as unknown as ContentEntry;
+    const error = new ApiRequestError(422, {
+      error: "required_field",
+      message: "needed",
+      details: {
+        issues: [{ path: "fields/speakers/1/role", code: "required_field", message: "needed" }],
+      },
+    });
+    render(wrap(<Harness entry={draft} sent={sent} error={error} />));
+    const grace = await screen.findByRole("group", { name: "Item 3: Grace" });
+    expect(grace).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByRole("group", { name: "Item 2: Linus" })).not.toHaveAttribute(
+      "aria-invalid",
+    );
+  });
+});
+
+describe("Duplicate leaves empty repeater items out (RFC-0045 §1)", () => {
+  it("copies the fields without empty items", () => {
+    const entry = {
+      ...ENTRY,
+      fields: { venue: "entry_hall0001", speakers: [{}, { name: "Ada" }] },
+    } as unknown as ContentEntry;
+    const t = ((key: string) => key) as unknown as Parameters<typeof duplicateOf>[1];
+    expect(duplicateOf(entry, t, SITE).fields).toEqual({
+      venue: "entry_hall0001",
+      speakers: [{ name: "Ada" }],
+    });
   });
 });
 

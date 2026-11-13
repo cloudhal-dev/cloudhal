@@ -71,8 +71,14 @@ import { missingPrimaries } from "../lib/taxonomy.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
-/** A copy of the article as a new draft with a free slug. */
-function duplicateOf(entry: ContentEntry, title: string): NewEntry {
+/** A copy of the article as a new draft with a free slug (no empty repeater item, RFC-0045 §1). */
+export function duplicateOf(
+  draft: ContentEntry,
+  t: ReturnType<typeof useT>,
+  site?: Site,
+): NewEntry {
+  const entry = withoutEmptyItems(draft, site);
+  const title = t("editor.copyTitle", { title: entry.title || t("articles.untitled") });
   const suffix = `-copy-${Date.now().toString(36).slice(-4)}`;
   return {
     collection: entry.collection,
@@ -195,10 +201,7 @@ export function ArticleEditorPage() {
   });
   const duplicate = useMutation({
     mutationFn: (entry: ContentEntry) =>
-      api.entries.create(
-        siteId,
-        duplicateOf(entry, t("editor.copyTitle", { title: entry.title || t("articles.untitled") })),
-      ),
+      api.entries.create(siteId, duplicateOf(entry, t, site.data)),
     onSuccess: async (created) => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
       toast.success(t("editor.duplicated"), created.slug);
@@ -450,7 +453,7 @@ export function ArticleEditorPage() {
               site={site.data}
               entry={draft}
               onChange={(fields) => setDraft((d) => d && { ...d, fields })}
-              error={save.error}
+              save={save}
               disabled={readOnlyReason !== undefined || locked}
             />
             <ArticleTermsCard

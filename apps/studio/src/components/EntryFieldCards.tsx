@@ -33,14 +33,15 @@ export function EntryFieldCards({
   site,
   entry,
   onChange,
-  error,
+  save,
   disabled,
 }: {
   siteId: string;
   site: Site | undefined;
   entry: ContentEntry;
   onChange: (fields: Record<string, unknown>) => void;
-  error: unknown;
+  /** The editor's save: its error, and the entry it sent (the issues' item indices count its items). */
+  save: { error: unknown; variables?: ContentEntry | undefined };
   disabled: boolean;
 }) {
   if (!site?.collections?.[entry.collection]?.fields) return null;
@@ -51,7 +52,8 @@ export function EntryFieldCards({
         site={site}
         entry={entry}
         onChange={onChange}
-        error={error}
+        error={save.error}
+        sent={save.variables}
         disabled={disabled}
       />
     </Suspense>

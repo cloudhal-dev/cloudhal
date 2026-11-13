@@ -142,6 +142,7 @@ export function EntryFieldsCard({
   entry,
   onChange,
   error,
+  sent,
   disabled,
 }: {
   siteId: string;
@@ -150,6 +151,8 @@ export function EntryFieldsCard({
   onChange: (fields: Record<string, unknown>) => void;
   /** The last save's error: its `details.issues` show on the fields. */
   error: unknown;
+  /** The entry that save sent (before empty items were left out); the draft when not given. */
+  sent?: ContentEntry | undefined;
   disabled: boolean;
 }) {
   const { t, locale } = useI18n("fields", "bodyEditor", "media");
@@ -157,10 +160,11 @@ export function EntryFieldsCard({
   const definitions = site.collections?.[entry.collection]?.fields ?? [];
   const original = useOriginal(siteId, entry);
   const labels = useFormLabels(t, original.data?.locale, locale);
-  // The draft as it was when the error arrived: a save leaves empty items out, so the server's item
-  // indices are mapped back onto the draft's once, then follow their items (RepeaterField).
-  const drafted = useRef({ entry, site });
-  drafted.current = { entry, site };
+  // What the failed save sent: it left empty items out, so the server's item indices are mapped
+  // back onto those items once, then follow their items (RepeaterField). Not the draft at error
+  // time, which may have changed while the save was in flight.
+  const drafted = useRef({ entry: sent ?? entry, site });
+  drafted.current = { entry: sent ?? entry, site };
   const errors = useMemo(() => {
     const sent = sentIndexes(drafted.current.entry, drafted.current.site);
     const out: Record<string, string> = {};

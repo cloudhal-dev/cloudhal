@@ -1414,3 +1414,8 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 
 - **Item issues after empty items are left out.** The server counts the items that were sent; the editor maps each issue's item index back onto the draft's items (`sentIndexes`, `draftPath`) before the error map is built, so a problem never lands on an empty item.
 - **Read-only.** Every repeater item is open when the form is read-only (its toggles sit in the editor's disabled fieldset). "Used by" moved to the reach cards, beside "In menus" and outside that fieldset, so its "Show more" works on an article the person can't edit.
+
+#### Review round 3 (2026-11-13, PM check of 98a7e3b3)
+
+- **Duplicate** copies the fields without empty repeater items too (`duplicateOf` runs the same `withoutEmptyItems` as a save).
+- **The index map is built from what the failed save sent** (the mutation's variables), not from the draft when the error arrives, which may have changed while the save was in flight.
