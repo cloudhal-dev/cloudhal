@@ -93,16 +93,18 @@ export interface RepeaterFieldProps<S extends { key: string }> {
  * remove. Moving is done with buttons only. After "Add item" focus goes to the new item's first
  * control; after "Remove" to the next item's toggle, else "Add item", and the host gets an undo.
  * Moves and removals are announced in a polite live region. Items with problems open when a new
- * `itemErrors` arrives; collapsed ones are listed above the items.
+ * `itemErrors` arrives; collapsed ones are listed above the items. Read-only, every item is open.
  */
 export function RepeaterField<S extends { key: string }>(props: RepeaterFieldProps<S>) {
   const { items, max, labels, readOnly = false } = props;
   const id = useId();
   const { root, keys, open, said, errors, toggle, add, move, duplicate, remove, reveal, setSub } =
     useRepeater(props);
+  // Read-only, every item is open: its toggle may be off (a read-only editor's disabled fieldset).
+  const isOpen = (key: string) => readOnly || open.has(key);
   const collapsedInvalid = keys.current
     .map((key, i) => ({ key, i }))
-    .filter(({ key }) => errors.has(key) && !open.has(key));
+    .filter(({ key }) => errors.has(key) && !isOpen(key));
   const full = items.length >= max;
   return (
     <fieldset
@@ -151,7 +153,7 @@ export function RepeaterField<S extends { key: string }>(props: RepeaterFieldPro
                 itemKey={key}
                 index={i}
                 count={items.length}
-                open={open.has(key)}
+                open={isOpen(key)}
                 onOpen={(on) => toggle(key, on)}
                 legend={props.legend(i, item)}
                 errors={errors.get(key)}

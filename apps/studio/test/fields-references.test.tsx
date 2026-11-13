@@ -8,7 +8,7 @@ import { Button } from "@cloudhal/ui";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EntryFieldCards } from "../src/components/EntryFieldCards.tsx";
+import { EntryUsedByCard } from "../src/components/EntryFieldCards.tsx";
 import { EntryFieldsCard } from "../src/components/fields/EntryFieldsCard.tsx";
 import { ApiRequestError } from "../src/lib/api/http.ts";
 import { withoutEmptyItems } from "../src/lib/empty-items.ts";
@@ -227,6 +227,31 @@ function EditorHarness({
   );
 }
 
+describe("Entry editor › item issues after empty items are left out", () => {
+  it("maps the server's item index back onto the draft", async () => {
+    serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
+    const entry = {
+      ...ENTRY,
+      fields: { speakers: [{ name: "Ada", role: "Host" }, {}, { name: "Grace" }] },
+    } as unknown as ContentEntry;
+    // What was sent was [Ada, Grace]: the server names Grace as item 1.
+    const error = new ApiRequestError(422, {
+      error: "required_field",
+      message: "needed",
+      details: {
+        issues: [{ path: "fields/speakers/1/role", code: "required_field", message: "needed" }],
+      },
+    });
+    render(wrap(<Harness entry={entry} error={error} />));
+    const grace = await screen.findByRole("group", { name: "Item 3: Grace" });
+    expect(
+      within(grace).getByText("Needed to publish. Add a value, or keep the entry as a draft."),
+    ).toBeInTheDocument();
+    const empty = screen.getByRole("group", { name: "Item 2" });
+    expect(empty).not.toHaveAttribute("aria-invalid");
+  });
+});
+
 describe("Entry editor › repeater undo (review fixes)", () => {
   it("keeps every edit made after the removal", async () => {
     serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
@@ -319,24 +344,35 @@ describe("Saving drops empty repeater items (RFC-0045 §1)", () => {
   });
 });
 
+const siteRoute = (site: Site) => on("GET", "/api/sites/site_1", { status: 200, body: site });
+const referrer = (id: string, title: string) => ({
+  ...card(id, title),
+  collection: "events",
+  field: "venue",
+  shownBy: [] as unknown[],
+});
+
 describe("Entry editor › Used by", () => {
-  it("lists referrers where some field can reference the collection", async () => {
-    serve(
-      on("GET", "/api/sites/site_1/entries/entry_hall0001/references", {
+  it("lists referrers where some field can reference the collection, and pages", async () => {
+    const fetch = serve(siteRoute(SITE), (url) => {
+      if (!url.startsWith("/api/sites/site_1/entries/entry_hall0001/references")) return undefined;
+      const second = url.includes("offset=20");
+      return {
         status: 200,
-        body: {
-          groupId: "entry_hall0001",
-          referrers: [
-            {
-              ...card("entry_event001", "Launch"),
-              collection: "events",
-              field: "venue",
-              shownBy: [{ ...card("entry_event0tr", "Lansman", "published", "tr") }],
+        body: second
+          ? { groupId: "entry_hall0001", referrers: [referrer("entry_event021", "Encore")] }
+          : {
+              groupId: "entry_hall0001",
+              next: 20,
+              referrers: [
+                {
+                  ...referrer("entry_event001", "Launch"),
+                  shownBy: [card("entry_event0tr", "Lansman", "published", "tr")],
+                },
+              ],
             },
-          ],
-        },
-      }),
-    );
+      };
+    });
     const hall = {
       ...ENTRY,
       id: "entry_hall0001",
@@ -344,18 +380,7 @@ describe("Entry editor › Used by", () => {
       title: "Main hall",
       fields: {},
     } as ContentEntry;
-    render(
-      wrap(
-        <EntryFieldCards
-          siteId="site_1"
-          site={SITE}
-          entry={hall}
-          onChange={() => {}}
-          error={undefined}
-          disabled={false}
-        />,
-      ),
-    );
+    render(wrap(<EntryUsedByCard siteId="site_1" entry={hall} />));
     const table = await screen.findByRole("table", { name: "Entries that reference this one" });
     expect(await within(table).findByRole("link", { name: "Launch" })).toHaveAttribute(
       "href",
@@ -363,22 +388,22 @@ describe("Entry editor › Used by", () => {
     );
     expect(within(table).getByText(/· English · Venue$/)).toBeInTheDocument();
     expect(within(table).getByText("Also shown in Turkish")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show more" }));
+    expect(await within(table).findByRole("link", { name: "Encore" })).toBeInTheDocument();
+    expect(fetch.mock.calls.some(([u]) => String(u).includes("offset=20"))).toBe(true);
   });
 
-  it("shows nothing for a collection no field can reference", () => {
-    serve();
+  it("shows nothing for a collection no field can reference", async () => {
+    const fetch = serve(siteRoute({ ...SITE, collections: { places: {} } } as unknown as Site));
     const { container } = render(
       wrap(
-        <EntryFieldCards
+        <EntryUsedByCard
           siteId="site_1"
-          site={{ ...SITE, collections: { places: {} } } as unknown as Site}
           entry={{ ...ENTRY, collection: "places", fields: {} } as ContentEntry}
-          onChange={() => {}}
-          error={undefined}
-          disabled={false}
         />,
       ),
     );
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
     expect(container).toBeEmptyDOMElement();
   });
 });

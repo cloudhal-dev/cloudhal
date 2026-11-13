@@ -9,9 +9,10 @@ import {
   Text,
 } from "@cloudhal/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { type TFunction, useI18n } from "../../i18n/index.tsx";
 import { api } from "../../lib/api.ts";
+import { draftPath, sentIndexes } from "../../lib/empty-items.ts";
 import { entryHref } from "../../lib/entry-href.ts";
 import { chooseMember, issuesByPath, referenceIdsIn } from "../../lib/field-references.ts";
 import { fieldIssues } from "../../lib/fields.ts";
@@ -156,10 +157,17 @@ export function EntryFieldsCard({
   const definitions = site.collections?.[entry.collection]?.fields ?? [];
   const original = useOriginal(siteId, entry);
   const labels = useFormLabels(t, original.data?.locale, locale);
+  // The draft as it was when the error arrived: a save leaves empty items out, so the server's item
+  // indices are mapped back onto the draft's once, then follow their items (RepeaterField).
+  const drafted = useRef({ entry, site });
+  drafted.current = { entry, site };
   const errors = useMemo(() => {
+    const sent = sentIndexes(drafted.current.entry, drafted.current.site);
     const out: Record<string, string> = {};
     for (const [path, issue] of Object.entries(issuesByPath(fieldIssues(error))))
-      out[path] = isIssueCode(issue.code) ? t(`fields.issues.${issue.code}`) : issue.message;
+      out[draftPath(path, sent)] = isIssueCode(issue.code)
+        ? t(`fields.issues.${issue.code}`)
+        : issue.message;
     return out;
   }, [error, t]);
   // RFC-0045: the members of every target the entry and its original name.

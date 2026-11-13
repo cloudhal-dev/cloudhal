@@ -1409,3 +1409,8 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **The groups read** sends only well-formed group ids. Anything else (text a running conversion has not rewritten) shows as "Not found". A failed read shows an error banner with "Try again".
 - **During a running field operation** the editor reads values through the markers. A top-level rename's old key and a sub-field rename's old key in each item are shown under the new key, and a write leaves only the new key. A value a type change has not converted yet (its shape is not the new type's, `fitsShape`) is shown read-only, as stored, with "Being changed", top level or per item. The UI never converts it; phase B does.
 - **No empty item is sent.** "Add item" keeps its empty item in the form while it is being filled; the save leaves out items without a value (the collection's repeater definitions only), and a list left empty is no value.
+
+#### Review round 2 (2026-11-13, PM verification of 5311a1b9)
+
+- **Item issues after empty items are left out.** The server counts the items that were sent; the editor maps each issue's item index back onto the draft's items (`sentIndexes`, `draftPath`) before the error map is built, so a problem never lands on an empty item.
+- **Read-only.** Every repeater item is open when the form is read-only (its toggles sit in the editor's disabled fieldset). "Used by" moved to the reach cards, beside "In menus" and outside that fieldset, so its "Show more" works on an article the person can't edit.

@@ -487,3 +487,34 @@ describe("EntryFieldsForm during a running field operation (RFC-0045 §7)", () =
     expect(onChange).not.toHaveBeenCalled();
   });
 });
+
+describe("EntryFieldsForm read-only (RFC-0045 §5)", () => {
+  it("shows every repeater item open inside a disabled fieldset", () => {
+    const people = [1, 2, 3, 4].map((n) => ({ talk: `Talk ${n}` }));
+    render(
+      <fieldset disabled>
+        <EntryFieldsForm
+          definitions={[
+            {
+              key: "speakers",
+              type: "repeater",
+              labels: L("Speakers"),
+              localized: true,
+              fields: [{ key: "talk", type: "text", labels: L("Talk") }],
+            },
+          ]}
+          value={{ speakers: people }}
+          onChange={() => {}}
+          locale="en"
+          defaultLocale="en"
+          timeZone="UTC"
+          zoneLabel={(z) => z}
+          labels={labels}
+          disabled
+        />
+      </fieldset>,
+    );
+    const talks = screen.getAllByRole("textbox", { name: "Talk" });
+    expect(talks.map((t) => (t as HTMLInputElement).value)).toEqual(people.map((p) => p.talk));
+  });
+});

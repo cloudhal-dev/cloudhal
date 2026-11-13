@@ -1,5 +1,7 @@
 import type { ContentEntry, Site } from "@cloudhal/core-contracts";
+import { useQuery } from "@tanstack/react-query";
 import { lazy, Suspense } from "react";
+import { api } from "../lib/api.ts";
 
 // RFC-0041 §7: the typed fields form loads only for collections that define fields.
 const EntryFieldsCard = lazy(() =>
@@ -23,9 +25,8 @@ function referenced(site: Site, collection: string): boolean {
 }
 
 /**
- * The entry editor's field cards, each a lazy chunk of its own: "Fields" for a collection with
- * definitions (RFC-0041), and "Used by" when a reference can point at this collection (RFC-0045).
- * A site without either loads neither.
+ * The entry editor's "Fields" card (RFC-0041), a lazy chunk of its own, for a collection with
+ * definitions; a collection without any loads nothing.
  */
 export function EntryFieldCards({
   siteId,
@@ -42,26 +43,33 @@ export function EntryFieldCards({
   error: unknown;
   disabled: boolean;
 }) {
-  if (!site) return null;
+  if (!site?.collections?.[entry.collection]?.fields) return null;
   return (
-    <>
-      {site.collections?.[entry.collection]?.fields && (
-        <Suspense fallback={null}>
-          <EntryFieldsCard
-            siteId={siteId}
-            site={site}
-            entry={entry}
-            onChange={onChange}
-            error={error}
-            disabled={disabled}
-          />
-        </Suspense>
-      )}
-      {referenced(site, entry.collection) && (
-        <Suspense fallback={null}>
-          <UsedByCard siteId={siteId} site={site} entry={entry} />
-        </Suspense>
-      )}
-    </>
+    <Suspense fallback={null}>
+      <EntryFieldsCard
+        siteId={siteId}
+        site={site}
+        entry={entry}
+        onChange={onChange}
+        error={error}
+        disabled={disabled}
+      />
+    </Suspense>
+  );
+}
+
+/**
+ * "Used by" (RFC-0045 §5), a lazy chunk of its own, shown only when some field of the site can
+ * reference the entry's collection. It sits with the editor's reach cards, outside the read-only
+ * fieldset, so "Show more" works on an article the person can't edit. The site comes from the
+ * editor's cached query.
+ */
+export function EntryUsedByCard({ siteId, entry }: { siteId: string; entry: ContentEntry }) {
+  const site = useQuery({ queryKey: ["site", siteId], queryFn: () => api.sites.get(siteId) });
+  if (!site.data || !referenced(site.data, entry.collection)) return null;
+  return (
+    <Suspense fallback={null}>
+      <UsedByCard siteId={siteId} site={site.data} entry={entry} />
+    </Suspense>
   );
 }
