@@ -219,8 +219,8 @@ catalogs:
       specifier: 6.43.15
       version: 6.43.15
     '@hono/node-server':
-      specifier: ^2.1.4
-      version: 2.1.5
+      specifier: ^2.1.6
+      version: 2.1.8
     '@lezer/highlight':
       specifier: 1.2.5
       version: 1.2.5
@@ -656,7 +656,7 @@ importers:
         version: 5.20261007.1
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.1.5(hono@4.13.13)
+        version: 2.1.8(hono@4.13.13)
       '@modelcontextprotocol/client':
         specifier: 'catalog:'
         version: 2.4.0
@@ -771,7 +771,7 @@ importers:
         version: link:../storage
       '@hono/node-server':
         specifier: 'catalog:'
-        version: 2.1.5(hono@4.13.13)
+        version: 2.1.8(hono@4.13.13)
       better-sqlite3:
         specifier: 'catalog:'
         version: 13.0.3
@@ -2164,8 +2164,8 @@ packages:
   '@floating-ui/utils@0.2.12':
     resolution: {integrity: sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==}
 
-  '@hono/node-server@2.1.5':
-    resolution: {integrity: sha512-MgP/I06GdvsilDspMk/qmRzpk8LOUStP6jFAbSRi40W09DhoyUn+Mj7eyKICPqeYKybOjVFLVIAQzvu1bfIa7Q==}
+  '@hono/node-server@2.1.8':
+    resolution: {integrity: sha512-jdf7FHh6A1lzjpHHQUgxsg2GeER2vMetnAOfeActzcoli6jamlK+NAwL6Dsr5Fl3BS3tYUQzCdtZjU8Qxv7bEA==}
     engines: {node: '>=20'}
     peerDependencies:
       hono: ^4 || ^5.0.0-0
@@ -5953,7 +5953,7 @@ snapshots:
 
   '@floating-ui/utils@0.2.12': {}
 
-  '@hono/node-server@2.1.5(hono@4.13.13)':
+  '@hono/node-server@2.1.8(hono@4.13.13)':
     dependencies:
       hono: 4.13.13
 
