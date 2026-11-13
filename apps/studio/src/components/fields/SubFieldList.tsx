@@ -29,6 +29,13 @@ export type RenderSubForm = (c: {
   problems: FormProblems;
 }) => ReactNode;
 
+interface Editing {
+  id: string;
+  draft: FieldForm;
+  isNew: boolean;
+  adding: boolean;
+}
+
 type Focus = { id: string; at: "up" | "down" | "menu" } | "add" | null;
 
 /**
@@ -57,7 +64,8 @@ export function RepeaterFields({
 }) {
   const { t } = useI18n("fields");
   const d = "fields.dialog.repeater" as const;
-  const [editing, setEditing] = useState<{ id: string; draft: FieldForm; isNew: boolean }>();
+  // `isNew`: not saved yet (key and type editable); `adding`: not in the list yet.
+  const [editing, setEditing] = useState<Editing>();
   const root = useRef<HTMLDivElement>(null);
   const focus = useRef<Focus>(null);
   // Every write reads the latest form: the nested dialog applies after the outer one re-rendered.
@@ -79,6 +87,7 @@ export function RepeaterFields({
     )?.focus();
   });
   const subs = form.subFields;
+  const full = subs.length >= STAGE4_LIMITS.subFields;
   const remove = (id: string) => {
     const i = subs.findIndex((s) => s.id === id);
     const next = subs[i + 1] ?? subs[i - 1];
@@ -122,7 +131,9 @@ export function RepeaterFields({
                   focus.current = { id: s.id, at: by < 0 ? "up" : "down" };
                   set({ ...form, subFields: moveSub(subs, s.id, by) });
                 }}
-                onEdit={() => setEditing({ id: s.id, draft: s.form, isNew: false })}
+                onEdit={() =>
+                  setEditing({ id: s.id, draft: s.form, isNew: !s.saved, adding: false })
+                }
                 onRemove={() => remove(s.id)}
               />
             ))}
@@ -133,10 +144,18 @@ export function RepeaterFields({
             variant="secondary"
             size="sm"
             icon={<Plus />}
-            disabled={subs.length >= STAGE4_LIMITS.subFields}
-            onClick={() =>
-              setEditing({ id: subId(), draft: emptyForm("text", locales), isNew: true })
-            }
+            // At the limit it stays focusable (focus comes back here when the dialog closes).
+            aria-disabled={full || undefined}
+            className={full ? "cursor-not-allowed opacity-50" : undefined}
+            onClick={() => {
+              if (full) return;
+              setEditing({
+                id: subId(),
+                draft: emptyForm("text", locales),
+                isNew: true,
+                adding: true,
+              });
+            }}
             data-sub-add=""
           >
             {t(`${d}.add`)}
@@ -147,7 +166,7 @@ export function RepeaterFields({
         form={form}
         set={set}
         problems={problems}
-        named={named.map((n) => ({ key: n.form.key, label: label(n) }))}
+        named={named.map((n) => ({ id: n.id, key: n.form.key, label: label(n) }))}
       />
       <SubFieldDialog
         t={t}
@@ -156,12 +175,16 @@ export function RepeaterFields({
         taken={(id) => latest.current.subFields.filter((s) => s.id !== id).map((s) => s.form.key)}
         defaultLocale={defaultLocale}
         renderSubForm={renderSubForm}
-        onApply={(id, draft, isNew) => {
+        onApply={(id, draft) => {
           const now = latest.current;
-          const subFields = isNew
-            ? [...now.subFields, { id, saved: false, form: draft }]
-            : now.subFields.map((s) => (s.id === id ? { ...s, form: draft } : s));
-          set({ ...now, subFields });
+          const was = now.subFields.find((s) => s.id === id)?.form;
+          const subFields = was
+            ? now.subFields.map((s) => (s.id === id ? { ...s, form: draft } : s))
+            : [...now.subFields, { id, saved: false, form: draft }];
+          // The item name follows a renamed item field, and lets go of one that can't name items.
+          const named = was?.key === now.itemLabel;
+          const itemLabel = !named ? now.itemLabel : namesItems(draft) ? draft.key : "";
+          set({ ...now, subFields, itemLabel });
         }}
       />
     </div>
@@ -178,8 +201,12 @@ function RepeaterLimits({
   form: FieldForm;
   set: (next: FieldForm) => void;
   problems: FormProblems;
-  named: { key: string; label: string }[];
+  /** The item fields that can name items, by their stable row id. */
+  named: { id: string; key: string; label: string }[];
 }) {
+  // Options are the rows' ids, not their keys: renaming the chosen field keeps it chosen.
+  const byId = new Map(named.map((n) => [n.id, n.key]));
+  const chosen = named.find((n) => n.key === form.itemLabel)?.id;
   const { t } = useI18n("fields");
   const d = "fields.dialog.repeater" as const;
   return (
@@ -201,11 +228,13 @@ function RepeaterLimits({
         className="w-full"
         label={t(`${d}.itemLabel`)}
         description={t(`${d}.itemLabelHint`)}
-        value={form.itemLabel || NONE}
-        onValueChange={(v) => set({ ...form, itemLabel: v === NONE ? "" : (v as string) })}
+        value={chosen ?? NONE}
+        onValueChange={(v) =>
+          set({ ...form, itemLabel: v === NONE ? "" : (byId.get(v as string) ?? "") })
+        }
         items={{
           [NONE]: t(`${d}.itemLabelFirst`),
-          ...Object.fromEntries(named.map((s) => [s.key, s.label])),
+          ...Object.fromEntries(named.map((s) => [s.id, s.label])),
         }}
         error={problems.itemLabel ? t(`${d}.errors.itemLabel`) : undefined}
       />
@@ -324,12 +353,12 @@ function SubFieldDialog({
   onApply,
 }: {
   t: FT;
-  editing: { id: string; draft: FieldForm; isNew: boolean } | undefined;
+  editing: Editing | undefined;
   onClose: () => void;
   taken: (id: string) => string[];
   defaultLocale: string;
   renderSubForm: RenderSubForm;
-  onApply: (id: string, form: FieldForm, isNew: boolean) => void;
+  onApply: (id: string, form: FieldForm) => void;
 }) {
   const d = "fields.dialog.repeater" as const;
   const [form, setForm] = useState<FieldForm>();
@@ -350,7 +379,7 @@ function SubFieldDialog({
     <LayerDialog.Root open={editing !== undefined} onOpenChange={(o) => !o && onClose()}>
       <LayerDialog.Content size="lg" closeLabel={t("common.close")}>
         <LayerDialog.Title>
-          {editing?.isNew ? t(`${d}.addTitle`) : t(`${d}.editTitle`)}
+          {editing?.adding ? t(`${d}.addTitle`) : t(`${d}.editTitle`)}
         </LayerDialog.Title>
         <LayerDialog.Description>{t(`${d}.dialogDescription`)}</LayerDialog.Description>
         <LayerDialog.Body>
@@ -370,12 +399,12 @@ function SubFieldDialog({
             onClick={() => {
               setSubmitted(true);
               if (!current || !editing || hasProblems(problems)) return;
-              onApply(editing.id, current, editing.isNew);
+              onApply(editing.id, current);
               onClose();
             }}
             data-testid="sub-field-apply"
           >
-            {editing?.isNew ? t(`${d}.addApply`) : t("fields.dialog.apply")}
+            {editing?.adding ? t(`${d}.addApply`) : t("fields.dialog.apply")}
           </LayerDialog.Actions.Primary>
         </LayerDialog.Actions>
       </LayerDialog.Content>

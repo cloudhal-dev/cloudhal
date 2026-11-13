@@ -55,9 +55,16 @@ export function ReferenceFields({
         }
         value={form.collections}
         allValues={keys}
-        onValueChange={(next: string[]) =>
-          set({ ...form, collections: keys.filter((k) => next.includes(k)) })
-        }
+        onValueChange={(next: string[]) => {
+          const collections = keys.filter((k) => next.includes(k));
+          // Conditions are on the one target's listing fields: a new target keeps only its own.
+          const only = collections.length === 1 ? collections[0] : undefined;
+          const fits = new Set(
+            only ? listFieldDefs(site.collections?.[only]).map((d) => d.key) : [],
+          );
+          const where = only === target ? form.where : form.where.filter((w) => fits.has(w.field));
+          set({ ...form, collections, where });
+        }}
       >
         {keys.map((k) => (
           <Checkbox.Item key={k} value={k} label={name(k)} />
@@ -89,6 +96,11 @@ export function ReferenceFields({
               min={1}
               max={STAGE4_LIMITS.maxItems}
             />
+          )}
+          {problems.where && (
+            <Text variant="error" size="sm" as="span">
+              {t(`${d}.errors.where`)}
+            </Text>
           )}
           {!noConditions && (
             <Conditions
@@ -125,6 +137,7 @@ function Conditions({
   const { t, locale } = useI18n("fields");
   const d = "fields.dialog.reference" as const;
   const label = (def: (typeof defs)[number]) => fieldLabel(def, locale, site.defaultLocale);
+  const full = form.where.length >= STAGE4_LIMITS.conditions;
   return (
     <div className="grid gap-3" data-testid="reference-where">
       <div className="grid gap-0.5">
@@ -162,11 +175,13 @@ function Conditions({
             variant="secondary"
             size="sm"
             icon={<Plus />}
-            disabled={form.where.length >= STAGE4_LIMITS.conditions}
-            onClick={() =>
-              defs[0] &&
-              set({ ...form, where: [...form.where, freshCondition(defs[0], undefined, true)] })
-            }
+            // At the limit it stays focusable, so focus isn't lost after adding the last one.
+            aria-disabled={full || undefined}
+            className={full ? "cursor-not-allowed opacity-50" : undefined}
+            onClick={() => {
+              if (full || !defs[0]) return;
+              set({ ...form, where: [...form.where, freshCondition(defs[0], undefined, true)] });
+            }}
           >
             {t(`${d}.addCondition`)}
           </Button>

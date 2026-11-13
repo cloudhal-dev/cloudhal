@@ -18,6 +18,7 @@ import {
 import { SUB_TYPES } from "../../lib/field-form-stage4.ts";
 import { type FieldType, localizedByDefault } from "../../lib/fields.ts";
 import { languageName } from "../../lib/languages.ts";
+import { listFieldDefs } from "../../lib/listings.ts";
 import { SwitchField } from "../TaxonomySettingsDialog.tsx";
 import { ReferenceFields } from "./ReferenceFieldsForm.tsx";
 import { RepeaterFields } from "./SubFieldList.tsx";
@@ -400,7 +401,12 @@ export function FieldDialog({
     setForm(initial ? formOf(initial, locales) : emptyForm("text", locales));
     setSubmitted(false);
   }, [open]);
-  const problems = formProblems(form, { defaultLocale, taken, isNew });
+  const problems = formProblems(form, {
+    defaultLocale,
+    taken,
+    isNew,
+    listFields: (c) => listFieldDefs(site.collections?.[c]).map((d) => d.key),
+  });
   const ctx: FieldFormContext = {
     t,
     form,

@@ -49,6 +49,8 @@ export const namesItems = (f: Pick<FieldForm, "type">) =>
 export interface Stage4Problems {
   collections?: "required" | "limit";
   maxItems?: "range";
+  /** A condition on a field that is no listing field of the one target collection. */
+  where?: "field";
   subFields?: "required" | "limit" | "invalid";
   itemLabel?: "type";
   /** The first sub-field's problem, by its id (its row shows it). */
@@ -62,12 +64,20 @@ const maxItemsOk = (s: string) => {
 };
 
 /** What keeps a reference or repeater form from saving. */
-export function stage4Problems(form: FieldForm, defaultLocale: string): Stage4Problems {
+export function stage4Problems(
+  form: FieldForm,
+  defaultLocale: string,
+  /** A collection's listing field keys (a reference's conditions must use them). */
+  listFields?: (collection: string) => readonly string[],
+): Stage4Problems {
   const out: Stage4Problems = {};
   if (form.type === "reference") {
     if (form.collections.length === 0) out.collections = "required";
     else if (form.collections.length > STAGE4_LIMITS.collections) out.collections = "limit";
     if (form.multiple && !maxItemsOk(form.maxItems)) out.maxItems = "range";
+    const only = form.collections.length === 1 ? form.collections[0] : undefined;
+    const fits = only && listFields ? new Set(listFields(only)) : undefined;
+    if (fits && form.where.some((w) => !fits.has(w.field))) out.where = "field";
   }
   if (form.type !== "repeater") return out;
   if (!maxItemsOk(form.maxItems)) out.maxItems = "range";

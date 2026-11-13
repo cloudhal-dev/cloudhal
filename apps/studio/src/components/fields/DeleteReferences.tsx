@@ -4,7 +4,7 @@ import { Banner, UsedByList, type UsedByRow } from "@cloudhal/ui";
 import { LinkBreak, Prohibit } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
-import { type TFunction, useI18n } from "../../i18n/index.tsx";
+import { formatList, type TFunction, useI18n } from "../../i18n/index.tsx";
 import { ApiRequestError } from "../../lib/api/http.ts";
 import {
   type ReferenceCard,
@@ -14,7 +14,7 @@ import {
 } from "../../lib/api/references.ts";
 import { collectionName } from "../../lib/collections.ts";
 import { entryHref } from "../../lib/entry-href.ts";
-import { referrerFieldWords } from "../../lib/field-references.ts";
+import { fieldCollections, referrerFieldWords } from "../../lib/field-references.ts";
 import { languageName } from "../../lib/languages.ts";
 
 type FT = TFunction<"fields">;
@@ -53,11 +53,14 @@ export function DeleteReferences({
   site,
   entry,
   open,
+  refused,
   onBlocked,
 }: {
   site: Site;
   entry: ContentEntry;
   open: boolean;
+  /** The real delete's own refusal (the check went stale): shown as the blocked state. */
+  refused?: ReferencedDetails | undefined;
   onBlocked: (blocked: boolean | undefined) => void;
 }) {
   const { t, locale } = useI18n("fields");
@@ -65,76 +68,131 @@ export function DeleteReferences({
   const check = useQuery({
     queryKey: ["delete-check", site.id, entry.id, entry.rev],
     queryFn: () => deleteCheck(entry),
-    enabled: open,
+    enabled: open && !refused,
     retry: false,
     gcTime: 0,
   });
+  const details = refused ?? check.data ?? null;
   const referrers = useQuery({
     queryKey: ["entry-referrers", site.id, entry.id, "delete"],
     queryFn: () => referencesApi.referrers(site.id, entry.id, { limit: 100 }),
-    enabled: open && check.data === null,
+    enabled: open && (details !== null || check.data === null),
   });
+  // Its own key: the editor caches `…/groups` answers by group id in another shape.
   const members = useQuery({
-    queryKey: ["entry-groups", site.id, group],
+    queryKey: ["delete-group-members", site.id, group],
     queryFn: () => referencesApi.groups(site.id, [group]),
-    enabled: open && check.data === null,
+    enabled: open && check.data === null && !refused,
   });
   const report = useRef(onBlocked);
   report.current = onBlocked;
-  const blocked = check.isPending ? undefined : check.isError ? false : check.data !== null;
+  const blocked = refused
+    ? true
+    : check.isPending
+      ? undefined
+      : check.isError
+        ? false
+        : check.data !== null;
   useEffect(() => report.current(blocked), [blocked]);
-  if (check.data) return <Blocked t={t} site={site} details={check.data} locale={locale} />;
+  if (details)
+    return (
+      <Blocked
+        t={t}
+        site={site}
+        details={details}
+        referrers={referrers.data?.referrers}
+        locale={locale}
+      />
+    );
   if (!referrers.data || !members.data) return null;
-  const others = (members.data.groups[group] ?? []).filter(
-    (m) => m.id !== entry.id && m.status !== "archived",
-  );
   const rows = referrers.data.referrers;
   if (rows.length === 0) return null;
+  // Only entries in a collection some referring field allows can still be shown.
+  const allowed = new Set(rows.flatMap((r) => fieldCollections(site, r.collection, r.field)));
+  const others = (members.data.groups[group] ?? []).filter(
+    (m) => m.id !== entry.id && m.status !== "archived" && allowed.has(m.collection),
+  );
   if (others.length === 0)
     return <DraftsShowNothing t={t} site={site} rows={rows} locale={locale} />;
   return <LocaleLoses t={t} site={site} entry={entry} others={others} locale={locale} />;
 }
 
-/** The store refuses: published referrers, and why archiving doesn't help. */
+/** Where a referrer's value sits: "Events · Speakers: Person". */
+function whereOf(t: FT, site: Site, r: { collection: string; field: string }, locale: string) {
+  const words = referrerFieldWords(site, r.collection, r.field, locale);
+  return t("fields.delete.where", {
+    collection: collectionName(site, r.collection, locale, t("nav.articles")),
+    field: words.sub
+      ? t("fields.usedBy.subField", { field: words.field, sub: words.sub })
+      : words.field,
+  });
+}
+
+/**
+ * The store refuses: the entries that keep it, each with its real status and the published
+ * language versions that show its value (a draft original whose translation is published), and
+ * why archiving doesn't help. Until the referrers are read, the refusal's own list stands in.
+ */
 function Blocked({
   t,
   site,
   details,
+  referrers,
   locale,
 }: {
   t: FT;
   site: Site;
   details: ReferencedDetails;
+  referrers: readonly Referrer[] | undefined;
   locale: string;
 }) {
-  const rows: UsedByRow[] = details.referrers.map((r) => {
-    const words = referrerFieldWords(site, r.collection, r.field, locale);
-    return {
-      id: `${r.id} ${r.field}`,
-      title: r.title,
-      href: entryHref(site.id, r.id, r.collection),
-      detail: t("fields.delete.where", {
-        collection: collectionName(site, r.collection, locale, t("nav.articles")),
-        field: words.sub
-          ? t("fields.usedBy.subField", { field: words.field, sub: words.sub })
-          : words.field,
-      }),
-      status: "published",
-    };
-  });
+  const published = (r: Referrer) => r.shownBy.filter((m) => m.status === "published");
+  // The referrers read now; if they no longer hold a blocker (read before a late refusal), the
+  // refusal's own list stands in.
+  const read = referrers?.filter((r) => r.status === "published" || published(r).length > 0);
+  const blocking = read?.length ? read : undefined;
+  const rows: UsedByRow[] = blocking
+    ? blocking.map((r) => {
+        const shown = published(r);
+        return {
+          id: `${r.id} ${r.field}`,
+          title: r.title,
+          href: entryHref(site.id, r.id, r.collection),
+          detail: whereOf(t, site, r, locale),
+          status: r.status,
+          ...(shown.length
+            ? {
+                note: t("fields.delete.shownByPublished", {
+                  languages: formatList(
+                    locale,
+                    shown.map((m) => languageName(locale, m.locale)),
+                  ),
+                }),
+              }
+            : {}),
+        };
+      })
+    : details.referrers.map((r) => ({
+        id: `${r.id} ${r.field}`,
+        title: r.title,
+        href: entryHref(site.id, r.id, r.collection),
+        detail: whereOf(t, site, r, locale),
+        status: "published",
+      }));
+  const total = blocking ? blocking.length : details.total;
   return (
     <div className="grid gap-3" data-testid="delete-references" data-blocked="">
       <Banner
         variant="error"
         icon={<Prohibit weight="fill" />}
-        title={t("fields.delete.blockedTitle", { count: details.total })}
+        title={t("fields.delete.blockedTitle", { count: total })}
         description={t("fields.delete.blocked")}
       />
       <UsedByList rows={rows} labels={listLabels(t)} />
-      {details.total > rows.length && (
+      {!blocking && details.total > rows.length && (
         <Banner
           variant="default"
-          description={t("fields.delete.more", { count: details.total - rows.length })}
+          description={t("fields.delete.moreReferences", { count: details.total - rows.length })}
         />
       )}
     </div>
@@ -168,10 +226,7 @@ function DraftsShowNothing({
           id: `${r.id} ${r.field}`,
           title: r.title,
           href: entryHref(site.id, r.id, r.collection),
-          detail: t("fields.delete.where", {
-            collection: collectionName(site, r.collection, locale, t("nav.articles")),
-            field: referrerFieldWords(site, r.collection, r.field, locale).field,
-          }),
+          detail: whereOf(t, site, r, locale),
           status: r.status,
           note: t("fields.delete.showsNothing"),
         }))}

@@ -12,11 +12,16 @@ import {
   definitionOf,
   emptyForm,
   type FieldForm,
+  type FormProblems,
   formOf,
-  formProblems,
   hasProblems,
 } from "../../lib/field-form.ts";
-import { SUB_TYPES, subAsDefinition, subDefinition } from "../../lib/field-form-stage4.ts";
+import {
+  SUB_TYPES,
+  stage4Problems,
+  subAsDefinition,
+  subDefinition,
+} from "../../lib/field-form-stage4.ts";
 import type { FieldType } from "../../lib/fields.ts";
 import { TypeFields } from "./FieldDialog.tsx";
 
@@ -142,17 +147,33 @@ function targetInputs(to: FieldDefinition, sub: boolean) {
   return {};
 }
 
-/** True when the target type's settings can't be sent yet (no collections, no sub-fields). */
-export function targetBlocked(inputs: Inputs, defaultLocale: string): boolean {
-  if (inputs.type !== "reference" && inputs.type !== "repeater" && inputs.type !== "select")
-    return false;
-  const problems = formProblems(
-    { ...inputs.form, type: inputs.type, labels: { [defaultLocale]: { label: "-", help: "" } } },
-    { defaultLocale, taken: [], isNew: false },
-  );
-  const { label: _l, key: _k, ...rest } = problems;
-  return hasProblems(rest);
+const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * What keeps a type change's target from being sent, by the contract's rules and RFC-0045's own:
+ * a select's options (at least one, slug values, no repeats, a label in some language — not
+ * necessarily the site's default, which may have changed since they were written), a reference's
+ * collections and maximum, a list's item fields, maximum and item name.
+ */
+export function targetProblems(inputs: Inputs, defaultLocale: string): FormProblems {
+  const form = { ...inputs.form, type: inputs.type };
+  if (inputs.type === "select") {
+    const values = form.options.map((o) => o.value);
+    if (form.options.length === 0) return { options: "required" };
+    if (values.some((v) => !SLUG.test(v))) return { options: "value" };
+    if (new Set(values).size !== values.length) return { options: "duplicate" };
+    if (form.options.some((o) => !Object.values(o.labels).some((l) => l.trim())))
+      return { options: "label" };
+    return {};
+  }
+  if (inputs.type === "reference" || inputs.type === "repeater")
+    return stage4Problems(form, defaultLocale);
+  return {};
 }
+
+/** True when the target's settings can't be sent yet; `targetProblems` says why, inline. */
+export const targetBlocked = (inputs: Inputs, defaultLocale: string): boolean =>
+  hasProblems(targetProblems(inputs, defaultLocale));
 
 /**
  * The inputs of rename and type change (localization and removal have none but the sub-field):
@@ -245,7 +266,7 @@ export function OperationInputs(props: {
               defaultLocale={props.defaultLocale}
               uiLocale={props.uiLocale}
               isNew
-              problems={{}}
+              problems={targetProblems(inputs, props.defaultLocale)}
               site={props.site}
               referenceTypes={props.referenceTypes}
               sub={subDef !== undefined}

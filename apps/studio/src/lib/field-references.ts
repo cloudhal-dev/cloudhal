@@ -93,3 +93,17 @@ export function referrerFieldWords(
   const sub = def?.type === "repeater" ? def.fields.find((s) => s.key === subKey) : undefined;
   return { field, sub: sub ? fieldLabel(sub, locale, defaultLocale) : subKey };
 }
+
+/** The collections a referrer's field (`venue`, `speakers.person`) allows, from its definition. */
+export function fieldCollections(
+  site: Site | undefined,
+  collection: string,
+  path: string,
+): readonly string[] {
+  const [key = path, subKey] = path.split(".");
+  const def = site?.collections?.[collection]?.fields?.find((d) => d.key === key);
+  if (def?.type === "reference") return def.collections;
+  if (def?.type !== "repeater") return [];
+  const sub = def.fields.find((s) => s.key === subKey);
+  return sub?.type === "reference" ? sub.collections : [];
+}

@@ -94,7 +94,7 @@ export function PublishWarnings({
         })}
         {data.total > SHOWN && (
           <Text variant="secondary" size="sm" as="span">
-            {t("fields.delete.more", { count: data.total - SHOWN })}
+            {t("fields.delete.moreReferences", { count: data.total - SHOWN })}
           </Text>
         )}
       </InsetPanel>

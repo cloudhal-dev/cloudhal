@@ -8,10 +8,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntryDeleteDialog } from "../src/components/EntryDeleteDialog.tsx";
 import { FieldsSection } from "../src/components/fields/FieldsSection.tsx";
-import { requestOf } from "../src/components/fields/OperationInputs.tsx";
+import { requestOf, targetProblems } from "../src/components/fields/OperationInputs.tsx";
 import { PublishWarnings } from "../src/components/fields/PublishWarnings.tsx";
+import { ApiRequestError } from "../src/lib/api/http.ts";
 import { emptyForm, formOf } from "../src/lib/field-form.ts";
-import { bodyOf, on, serve, wrap } from "./roles-fixtures.tsx";
+import { stage4Problems } from "../src/lib/field-form-stage4.ts";
+import { bodyOf, on, serve, testQueryClient, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
   cleanup();
@@ -352,9 +354,7 @@ describe("Delete dialog › references (RFC-0045 §5)", () => {
     );
     render(wrap(<Delete />));
     const notice = await screen.findByTestId("delete-references");
-    expect(
-      within(notice).getByText("Unpublish or edit this published entry first"),
-    ).toBeInTheDocument();
+    expect(within(notice).getByText("Unpublish or edit this entry first")).toBeInTheDocument();
     expect(within(notice).getByText(/Archiving it doesn't help/)).toBeInTheDocument();
     expect(within(notice).getByRole("link", { name: "Launch" })).toBeInTheDocument();
     confirmName();
@@ -456,5 +456,260 @@ describe("Publish dialog › reference warnings", () => {
     expect(
       within(warnings).getByText("English · Speakers: Name: the chosen entry isn't published"),
     ).toBeInTheDocument();
+  });
+});
+
+// ── Review round 1 (PR #220) ──────────────────────────────────────────────────────────────────
+
+const okCheck = (url: string, init?: RequestInit) =>
+  init?.method === "DELETE" && url.includes("dryRun=1")
+    ? { status: 200, body: { dryRun: true } }
+    : undefined;
+const referrersRoute = (referrers: unknown[]) =>
+  on("GET", "/api/sites/site_1/entries/entry_hall0001/references", {
+    status: 200,
+    body: { groupId: "entry_hallen01", referrers },
+  });
+const groupsRoute = (members: unknown[]) =>
+  on("GET", "/api/sites/site_1/entries/groups", {
+    status: 200,
+    body: { groups: { entry_hallen01: members } },
+  });
+
+describe("Review round 1 › the delete dialog", () => {
+  it("does not read the editor's cached groups as its own (another shape, its own key)", async () => {
+    serve(siteRoute, okCheck, referrersRoute([]), groupsRoute([]));
+    const qc = testQueryClient();
+    // What the editor's reference fields cache for the same group (`useGroupCards`).
+    qc.setQueryData(["entry-groups", "site_1", "entry_hallen01"], {
+      entry_hallen01: [card("entry_hallen01", "Main hall", "published", "en", "places")],
+    });
+    render(wrap(<Delete />, "en", qc));
+    confirmName();
+    await waitFor(() => expect(deleteButton()).toBeEnabled());
+    expect(qc.getQueryData(["entry-groups", "site_1", "entry_hallen01"])).toEqual({
+      entry_hallen01: [expect.objectContaining({ id: "entry_hallen01" })],
+    });
+  });
+
+  it("names a draft holder's published version as what keeps the entry", async () => {
+    serve(
+      siteRoute,
+      (url, init) =>
+        init?.method === "DELETE" && url.includes("dryRun=1")
+          ? {
+              status: 409,
+              body: {
+                error: "entry_referenced",
+                message: "referenced",
+                details: {
+                  group: "entry_hallen01",
+                  total: 1,
+                  referrers: [
+                    { id: "entry_ev1", title: "Launch", collection: "events", field: "venue" },
+                  ],
+                },
+              },
+            }
+          : undefined,
+      referrersRoute([
+        {
+          ...card("entry_ev1", "Launch", "draft"),
+          field: "venue",
+          shownBy: [card("entry_ev1tr", "Lansman", "published", "tr")],
+        },
+      ]),
+    );
+    render(wrap(<Delete />));
+    const notice = await screen.findByTestId("delete-references");
+    expect(
+      await within(notice).findByText("Shown by its published version in Turkish"),
+    ).toBeInTheDocument();
+    expect(within(notice).getByText("Draft")).toBeInTheDocument();
+    expect(within(notice).getByText("Unpublish or edit this entry first")).toBeInTheDocument();
+  });
+
+  it("counts only entries the referring fields allow as left", async () => {
+    serve(
+      siteRoute,
+      okCheck,
+      referrersRoute([
+        { ...card("entry_ev2", "Draft talk", "draft"), field: "venue", shownBy: [] },
+      ]),
+      // The other language version sits in a collection `venue` doesn't allow.
+      groupsRoute([
+        card("entry_hallen01", "Main hall", "published", "en", "people"),
+        card("entry_hall0001", "Ana salon", "published", "tr", "places"),
+      ]),
+    );
+    render(wrap(<Delete />));
+    const notice = await screen.findByTestId("delete-references");
+    expect(notice).toHaveAttribute("data-drafts");
+    expect(within(notice).getByText("Will show nothing for this field")).toBeInTheDocument();
+  });
+
+  it("shows the real delete's refusal in the dialog: its referrers, Delete off", async () => {
+    serve(siteRoute, okCheck, referrersRoute([]), groupsRoute([]));
+    const onDelete = vi.fn(async () => {
+      throw new ApiRequestError(409, {
+        error: "entry_referenced",
+        message: "referenced",
+        details: {
+          group: "entry_hallen01",
+          total: 1,
+          referrers: [
+            { id: "entry_ev9", title: "Late launch", collection: "events", field: "venue" },
+          ],
+        },
+      });
+    });
+    render(
+      wrap(
+        <EntryDeleteDialog
+          open
+          onOpenChange={() => {}}
+          siteId="site_1"
+          entry={HALL}
+          menuRefs={[]}
+          isDeleting={false}
+          onDelete={onDelete}
+        />,
+      ),
+    );
+    confirmName();
+    await waitFor(() => expect(deleteButton()).toBeEnabled());
+    fireEvent.click(deleteButton());
+    const notice = await screen.findByTestId("delete-references");
+    expect(notice).toHaveAttribute("data-blocked");
+    expect(await within(notice).findByRole("link", { name: "Late launch" })).toBeInTheDocument();
+    expect(deleteButton()).toBeDisabled();
+  });
+});
+
+describe("Review round 1 › the builder and operations", () => {
+  it("retypes a select whose labels are only in another language", () => {
+    const def = {
+      key: "kind",
+      type: "select",
+      labels: L("Kind"),
+      localized: false,
+      options: [{ value: "hall", labels: { tr: "Salon" } }],
+    } as FieldDefinition;
+    const inputs = {
+      key: "kind",
+      sub: "",
+      type: "select" as const,
+      form: formOf(def, ["en", "tr"]),
+    };
+    expect(targetProblems(inputs, "en")).toEqual({});
+    expect(targetProblems({ ...inputs, form: { ...inputs.form, options: [] } }, "en")).toEqual({
+      options: "required",
+    });
+  });
+
+  it("drops conditions that don't fit a new target, and flags any left", async () => {
+    serve(instance(true), registry);
+    render(wrap(<Section />));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions for Venue" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit…" }));
+    const form = await screen.findByTestId("reference-fields");
+    fireEvent.click(within(form).getByRole("button", { name: "Add condition" }));
+    const where = within(form).getByTestId("reference-where");
+    expect(where.querySelector("[data-condition=kind]")).not.toBeNull();
+    const targets = within(form).getByRole("group", { name: "Target collections" });
+    fireEvent.click(within(targets).getByText("Places"));
+    fireEvent.click(within(targets).getByText("People"));
+    await waitFor(() => expect(where.querySelector("[data-condition]")).toBeNull());
+    expect(
+      stage4Problems(
+        {
+          ...emptyForm("reference", ["en"]),
+          collections: ["people"],
+          where: [{ field: "kind", op: "set" }],
+        },
+        "en",
+        () => [],
+      ),
+    ).toEqual({ where: "field" });
+  });
+
+  it("keeps an unsaved item field's key editable, and the item name follows its new key", async () => {
+    const fetch = serve(
+      instance(true),
+      registry,
+      on("PUT", "/api/sites/site_1/collections/events", put),
+    );
+    render(wrap(<Section />));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions for Speakers" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit…" }));
+    const list = await screen.findByTestId("repeater-fields");
+    fireEvent.click(within(list).getByRole("button", { name: "Add item field" }));
+    let sub = await screen.findByTestId("sub-field-form");
+    fireEvent.change(within(sub).getByRole("textbox", { name: "Label (English)" }), {
+      target: { value: "Role" },
+    });
+    fireEvent.click(screen.getByTestId("sub-field-apply"));
+    await waitFor(() => expect(screen.queryByTestId("sub-field-form")).toBeNull());
+    fireEvent.click(within(list).getByRole("combobox", { name: "Item name" }));
+    const option = await screen.findByRole("option", { name: "Role" });
+    fireEvent.pointerDown(option, { pointerType: "mouse" });
+    fireEvent.click(option);
+    await waitFor(() =>
+      expect(within(list).getByRole("combobox", { name: "Item name" })).toHaveTextContent("Role"),
+    );
+    fireEvent.click(within(list).getByRole("button", { name: "Actions for Role" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit…" }));
+    sub = await screen.findByTestId("sub-field-form");
+    const key = within(sub).getByRole("textbox", { name: "Key" });
+    expect(key).toBeEnabled();
+    fireEvent.change(key, { target: { value: "part" } });
+    fireEvent.click(screen.getByTestId("sub-field-apply"));
+    fireEvent.click(screen.getByTestId("field-apply"));
+    fireEvent.click(await screen.findByTestId("save-fields"));
+    await waitFor(() =>
+      expect(
+        bodyOf(fetch, "PUT", "/api/sites/site_1/collections/events")?.settings.fields[1],
+      ).toMatchObject({
+        itemLabel: "part",
+        fields: [{ key: "name" }, { key: "part" }],
+      }),
+    );
+  });
+
+  it('keeps "Add condition" focusable at the limit (aria-disabled, not disabled)', async () => {
+    serve(instance(true), registry);
+    render(wrap(<Section />));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions for Venue" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit…" }));
+    const form = await screen.findByTestId("reference-fields");
+    const add = within(form).getByRole("button", { name: "Add condition" });
+    for (let i = 0; i < 5; i++) fireEvent.click(add);
+    expect(
+      within(form).getByTestId("reference-where").querySelectorAll("[data-condition]"),
+    ).toHaveLength(4);
+    expect(add).toHaveAttribute("aria-disabled", "true");
+    expect(add).toBeEnabled();
+  });
+});
+
+describe("Review round 1 › publish warnings count references", () => {
+  it("says how many more references, not entries", async () => {
+    const issue = (n: number) => ({
+      entryId: `entry_ev${n}`,
+      title: `Event ${n}`,
+      collection: "events",
+      locale: "en",
+      path: "fields/venue",
+      groupId: "entry_gone",
+      reason: "missing",
+    });
+    serve(
+      on("GET", "/api/sites/site_1/entries/reference-issues", {
+        status: 200,
+        body: { total: 7, issues: [1, 2, 3, 4, 5, 6, 7].map(issue) },
+      }),
+    );
+    render(wrap(<PublishWarnings site={SITE} open onNavigate={() => {}} />));
+    expect(await screen.findByText("And 2 more references.")).toBeInTheDocument();
   });
 });

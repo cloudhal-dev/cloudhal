@@ -173,7 +173,13 @@ const parseNum = (s: string) => (s.trim() === "" ? undefined : Number(s));
 /** What keeps the form from saving (keys checked only while the field is new). */
 export function formProblems(
   form: FieldForm,
-  ctx: { defaultLocale: string; taken: readonly string[]; isNew: boolean },
+  ctx: {
+    defaultLocale: string;
+    taken: readonly string[];
+    isNew: boolean;
+    /** RFC-0045: a collection's listing field keys, for a reference's conditions. */
+    listFields?: (collection: string) => readonly string[];
+  },
 ): FormProblems {
   const out: FormProblems = {};
   if (!form.labels[ctx.defaultLocale]?.label.trim()) out.label = "required";
@@ -195,7 +201,7 @@ export function formProblems(
       out.bounds = "number";
     else if (min !== undefined && max !== undefined && min > max) out.bounds = "order";
   }
-  Object.assign(out, stage4Problems(form, ctx.defaultLocale));
+  Object.assign(out, stage4Problems(form, ctx.defaultLocale, ctx.listFields));
   if (form.type === "select") {
     const values = form.options.map((o) => o.value);
     if (form.options.length === 0) out.options = "required";

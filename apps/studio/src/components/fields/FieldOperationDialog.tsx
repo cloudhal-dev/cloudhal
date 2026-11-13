@@ -290,7 +290,8 @@ export function FieldOperationDialog({
                 locales={locales}
                 defaultLocale={defaultLocale}
                 uiLocale={locale}
-                disabled={busy || finished}
+                // "Clear and finish" continues the run as it was asked: nothing here changes it.
+                disabled={busy || finished || state.step === "stuck"}
                 site={site}
                 referenceTypes={referenceTypes}
               />

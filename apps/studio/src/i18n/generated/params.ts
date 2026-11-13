@@ -268,7 +268,8 @@ export interface MessageParams {
   "fields.delete.locale": { language: string | number };
   "fields.delete.localeFallback": { language: string | number; fallback: string | number };
   "fields.delete.localeTitle": { language: string | number };
-  "fields.delete.more": { count: number };
+  "fields.delete.moreReferences": { count: number };
+  "fields.delete.shownByPublished": { languages: string | number };
   "fields.delete.where": { collection: string | number; field: string | number };
   "fields.dialog.errors.maxLength": { max: number };
   "fields.dialog.helpIn": { language: string | number };

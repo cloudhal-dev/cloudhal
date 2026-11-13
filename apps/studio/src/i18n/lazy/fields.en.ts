@@ -128,10 +128,11 @@ export const messages = {
     },
     delete: {
       blockedTitle:
-        "{count, plural, one {Unpublish or edit this published entry first} other {Unpublish or edit these # published entries first}}",
+        "{count, plural, one {Unpublish or edit this entry first} other {Unpublish or edit these # entries first}}",
       blocked:
-        "They show this entry in a reference field, and it is the last entry they can show. Archiving it doesn't help: they still name it. Change or unpublish them, then delete.",
-      more: "{count, plural, one {And # more entry.} other {And # more entries.}}",
+        "Published pages show this entry through their reference fields, and it is the last entry they can show. Archiving it doesn't help: they still name it. Change or unpublish them, then delete.",
+      moreReferences: "{count, plural, one {And # more reference.} other {And # more references.}}",
+      shownByPublished: "Shown by its published version in {languages}",
       draftsTitle:
         "{count, plural, one {# draft names this entry} other {# drafts name this entry}}",
       drafts:
@@ -256,6 +257,7 @@ export const messages = {
             limit: "Choose at most five collections.",
           },
           maxItems: "Enter a whole number from 1 to {max, number}.",
+          where: "A condition uses a field that isn't a listing field of the target collection.",
         },
       },
       repeater: {

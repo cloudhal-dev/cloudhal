@@ -1428,3 +1428,13 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **Publish warnings** come from a new read-only `GET …/entries/reference-issues` (`content:read`): `referenceIssues` over the working copy at the request's instant, the first 50 with each holder's title, and the total; a site without reference fields answers none without reading entries. They show in the site's publish dialog only (the entry editor's "Publish" and snapshot publishes keep RFC-0042's checks).
 - **Stuck operations**: a pass that changed nothing while `unconvertible` (or a revert's) is not empty stops instead of looping; the dialog offers "Clear and finish" behind a ticked confirmation, which sends `onInvalid: "clear"` on the continue or the revert.
 - **`docs/guides/fields.md`** is left to step 7, which enables the types.
+
+#### Review round 1 (2026-11-13, PM review of PR #220)
+
+- **The delete dialog reads its own data.** Group members are cached under their own key (the editor caches `…/groups` answers in another shape). The blocked list shows each holder's real status and the published language versions that show its value (`…/references`' `shownBy`), so a draft original whose translation is published names that translation. "Other entries left" counts only members in a collection some referring field allows. A refusal of the real delete (a stale check, `field_operation_running`) shows in the dialog: its referrers as the blocked state, any other code in its words.
+- **"Change type…" checks the contract's rules and RFC-0045's**, not the builder's default-language labels, and shows its problems inline: a select whose labels are only in another language can be retyped.
+- **A reference's conditions follow its target**: a new single target keeps only conditions on its own listing fields, and the form flags any that remain.
+- **Item fields not saved yet** keep their key and type editable when edited; the item name follows a renamed item field (its options are keyed by the rows' stable ids) and lets go of one whose new type can't name items.
+- **Limits keep focus**: "Add condition" and "Add item field" stay focusable (`aria-disabled`) at their limits.
+- **A stuck operation** locks its inputs and announces itself (`role="alert"`).
+- **Counts say references** where they count references ("And 2 more references.").

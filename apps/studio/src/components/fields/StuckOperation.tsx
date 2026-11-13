@@ -23,14 +23,17 @@ export function StuckOperation({
   const count = stuck.entries.length;
   return (
     <div className="grid gap-3" data-testid="field-operation-stuck">
-      <Banner
-        variant="alert"
-        icon={<Warning weight="fill" />}
-        title={t("fields.operation.stuckTitle", { count })}
-        description={t(
-          stuck.reverting ? "fields.operation.stuckRevert" : "fields.operation.stuckRun",
-        )}
-      />
+      {/* Announced as it appears: the run stopped and waits for the person. */}
+      <div role="alert">
+        <Banner
+          variant="alert"
+          icon={<Warning weight="fill" />}
+          title={t("fields.operation.stuckTitle", { count })}
+          description={t(
+            stuck.reverting ? "fields.operation.stuckRevert" : "fields.operation.stuckRun",
+          )}
+        />
+      </div>
       <Checkbox
         label={t("fields.operation.stuckConfirm", { count })}
         checked={confirmed}
