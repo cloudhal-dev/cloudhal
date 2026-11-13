@@ -7,7 +7,7 @@
  *
  * RFC-0045 (`../references/`): the `reference` and `repeater` types' gate and definition rules,
  * values, strict JSON Schema profile, `pickMember` and `referenceIssues`. Both types are refused on
- * every write path (`fields_unsupported`) until rollout step 7.
+ * every write path (`fields_unsupported`) without the store's capability (`FieldTypeSupport`).
  */
 
 export {

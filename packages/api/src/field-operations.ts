@@ -71,7 +71,7 @@ function stage4Of(b: Body) {
 
 /**
  * The request body as an operation on `collection`; 400 for a malformed one. Reference and
- * repeater targets parse; the store refuses them (`fields_unsupported`) until RFC-0045 step 7.
+ * repeater targets parse; the store refuses them (`fields_unsupported`) without its capability (RFC-0045 §1).
  */
 export function operationOf(collection: string, b: Body): FieldOperation {
   const op = b.op;

@@ -225,7 +225,7 @@ export type InvariantCode =
   /** §3: `expiry.field` is not a date or datetime field of the collection. */
   | "invalid_expiry"
   // ── RFC-0045 (collections stage 4) ──
-  /** §1: a reference or repeater definition; refused on every write path until rollout step 7. */
+  /** §1: a reference or repeater definition where the site's renderer cannot read them (no capability). */
   | "fields_unsupported"
   /** §1: a reference's `collections` names a collection the site neither declares nor uses. */
   | "reference_target_unknown"

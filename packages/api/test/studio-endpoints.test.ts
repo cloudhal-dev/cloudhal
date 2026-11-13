@@ -560,7 +560,7 @@ describe("instance and skills", () => {
           publishNow: false,
           limits: { maxItems: 100, horizonDays: 366, requestHorizonDays: 30, lateMinutes: 60 },
         },
-        // RFC-0045: a store without the field-type capability (production until step 7)
+        // RFC-0045: a store without the field-type capability
         referenceFields: false,
         // RFC-0006 §8: a server without analytics says so
         analytics: {

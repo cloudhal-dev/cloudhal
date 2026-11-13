@@ -19,6 +19,9 @@
  *   REST once it has asked.
  * - **Writer guard (S15).** Against an "old" site Worker (no features endpoint), the admin Worker
  *   refuses `availability` in REST writes and bundle pushes with `409 gates_unsupported`.
+ * - **Field types (RFC-0045 §1, rollout step 7).** The admin Worker takes a pushed collection with
+ *   a reference field once the site Worker reports `fields: 2`, and refuses it against the old one
+ *   with `409 fields_unsupported`.
  *
  * Comments and analytics endpoints are off in these Workers (no key, no dataset); their gate
  * checks run in the renderer sweep (`entryById`, `publishedNode`).
@@ -29,10 +32,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Site } from "@cloudhal/core-contracts";
 import {
+  canonicalJson,
   copySite,
   exportSite,
   GATES_ENFORCED,
   mintPreviewToken,
+  nodeHash,
+  type SiteBundle,
   SiteGraphStore,
 } from "@cloudhal/core-ts";
 import { openLocalStore } from "@cloudhal/core-ts/local";
@@ -130,10 +136,33 @@ const pushBundle = (
     body: JSON.stringify(bundle),
   });
 
+/** `bundle` with two RFC-0045 collections added to its site: places, and events naming them. */
+async function withReferences(bundle: SiteBundle): Promise<SiteBundle> {
+  const copy = structuredClone(bundle);
+  const row = copy.nodes.find((n) => n.kind === "site");
+  if (!row) throw new Error("no site row");
+  const site = JSON.parse(row.body) as Site;
+  const venue = {
+    key: "venue",
+    type: "reference",
+    labels: { en: { label: "Venue" } },
+    localized: false,
+    collections: ["venues"],
+  };
+  const body = {
+    ...site,
+    collections: { ...site.collections, venues: {}, gigs: { fields: [venue] } },
+  } as Site;
+  row.body = canonicalJson(body);
+  row.hash = await nodeHash(body);
+  return copy;
+}
+
 describe("time gates on workerd: the starter's routes, the cache cap, the handshake", () => {
   let p: Awaited<ReturnType<typeof project>>;
   let harness: Harness;
   let remote: SiteGraphStore;
+  let target: { sql: D1Driver; blobs: R2BlobStore };
   let fx: GatesFixture;
   let dx: DerivedGatesFixture;
   let snapshotId: string;
@@ -167,7 +196,7 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     });
     await harness.listen();
     const env = (await harness.getWorker(p.W.site).getEnv()) as { DB: D1Database; BLOBS: R2Bucket };
-    const target = { sql: new D1Driver(env.DB), blobs: new R2BlobStore(env.BLOBS) };
+    target = { sql: new D1Driver(env.DB), blobs: new R2BlobStore(env.BLOBS) };
     await migrate(target.sql, migrations);
     const local = await openLocalStore(path.join(p.projectDir, p.cfg.dataDir));
     await copySite(local, target, p.siteId);
@@ -422,13 +451,22 @@ describe("time gates on workerd: the starter's routes, the cache cap, the handsh
     expect(bad.status).toBe(400);
     expect(((await bad.json()) as { error: string }).error).toBe("invalid_availability");
   });
+
+  it("takes reference fields in a push once the site Worker reports fields 2 (RFC-0045)", async () => {
+    const bundle = await withReferences(await exportSite(target, p.siteId));
+    const pushed = await pushBundle(adminFetch, p.siteId, bundle, "replace");
+    expect(pushed.status, await pushed.clone().text()).toBe(200);
+    expect((await remote.getSite(p.siteId))?.collections?.gigs?.fields?.[0]?.type).toBe(
+      "reference",
+    );
+  });
 });
 
 describe("time gates on workerd: an old site Worker (S15)", () => {
   let p: Awaited<ReturnType<typeof project>>;
   let harness: Harness;
   let gatedBundle: unknown;
-  let plainBundle: unknown;
+  let plainBundle: SiteBundle;
 
   const adminFetch = (route: string, init?: RequestInit) =>
     harness
@@ -506,5 +544,11 @@ describe("time gates on workerd: an old site Worker (S15)", () => {
       body: JSON.stringify({ ...(entry as object), title: "Hello again" }),
     });
     expect(retitle.status, await retitle.clone().text()).toBe(200);
+  });
+
+  it("refuses reference fields in pushes with 409 fields_unsupported (RFC-0045 §1)", async () => {
+    const refused = await pushBundle(adminFetch, p.siteId, await withReferences(plainBundle));
+    expect(refused.status, await refused.clone().text()).toBe(409);
+    expect(((await refused.json()) as { error: string }).error).toBe("fields_unsupported");
   });
 });

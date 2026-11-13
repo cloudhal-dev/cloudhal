@@ -12,6 +12,7 @@ import { canonicalJson, nodeHash } from "./hash.ts";
 import { seedStarterSite } from "./seed.ts";
 import { SiteGraphStore } from "./store.ts";
 import { exportSite, importSite } from "./sync.ts";
+import { fieldTypeGateCases } from "./testing-gates-fields.ts";
 
 const human: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
 /** The store's clock: 2026-10-12T12:00:00Z plus whatever the test moves it by. */
@@ -207,5 +208,8 @@ export function gatesSuite(
         importSite({ sql, blobs }, broken, { mode: "replace", gates: GATES_ENFORCED }),
       ).rejects.toMatchObject({ code: "invalid_availability" });
     });
+
+    // RFC-0045 §1: the field-type gate beside the time-gate bundle cases (rollout step 7).
+    fieldTypeGateCases(() => ({ sql, blobs }));
   });
 }

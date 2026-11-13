@@ -70,7 +70,7 @@ Guide: [`docs/guides/structured-data.md`](../../docs/guides/structured-data.md).
 Derived gates: `unlist` keeps an entry's page (200), comments and menu links but leaves `entries()`, `allEntries()`, `entriesByFilter`/`entriesByTerm` (archives, related), feeds, the sitemap and search; `hide` is a 404 like an expired `availability`. Both sources apply them, the gate index caps the edge cache at every derived instant and at every value instant of date/datetime list fields (for `now` conditions), and previews ignore them with an "Ended on …" notice. The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2 }`; writers refuse `expiry` until it does.
 
 ### References and repeaters (RFC-0045, rollout step 3)
-Additive, and dormant until rollout step 7 lets sites define the two types. `entryFields` (and `source.entryFields`) resolve a `reference` to cards of the targets the page's *view* shows (gates applied at its instant; draft, archived, embargoed and hidden targets resolve to nothing and leave no id, title or empty item) and a `repeater` to its items. `EntryFields.astro` draws both, so old theme copies show them with no change of their own (`theme-v0.8.0` in the compat test).
+Additive. Sites define the two types since rollout step 7, wherever the site Worker reports `fields: 2` (Node always). `entryFields` (and `source.entryFields`) resolve a `reference` to cards of the targets the page's *view* shows (gates applied at its instant; draft, archived, embargoed and hidden targets resolve to nothing and leave no id, title or empty item) and a `repeater` to its items. `EntryFields.astro` draws both, so old theme copies show them with no change of their own (`theme-v0.8.0` in the compat test).
 
 | Export | Signature |
 |---|---|

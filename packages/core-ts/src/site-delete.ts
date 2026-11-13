@@ -46,6 +46,7 @@ export const SITE_TABLES = [
   "media_uploads",
   "asset_refs",
   "entry_refs",
+  "entry_refs_state",
   "snapshot_blobs",
   "media_blobs",
   "approvals",

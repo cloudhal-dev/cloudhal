@@ -135,7 +135,7 @@ export function parseFieldsArgs(
       };
     case "retype": {
       need(a, b);
-      // The store refuses reference and repeater targets until RFC-0045 rollout step 7.
+      // The store refuses reference and repeater targets without its capability (RFC-0045 §1).
       if (!ALL_FIELD_TYPES.includes(b as FieldType))
         throw new Error(`the type is one of ${ALL_FIELD_TYPES.join(", ")}`);
       const op: FieldOperation = {

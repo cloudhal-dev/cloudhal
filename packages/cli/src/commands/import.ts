@@ -57,6 +57,7 @@ import {
   planImport,
   type SiteBundle,
 } from "@cloudhal/core-ts";
+import { FIELDS_SUPPORTED } from "@cloudhal/core-ts/fields";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import { migrate, migrations } from "@cloudhal/storage";
 import { FsBlobStore } from "@cloudhal/storage/fs";
@@ -200,13 +201,24 @@ async function planLocally(
   try {
     if (run.storeExists) {
       run.state.local = await openLocalStore(run.dataDir);
-      return { plan: await planImport(run.state.local, bundle, options) };
+      return {
+        plan: await planImport(run.state.local, bundle, {
+          ...options,
+          fieldTypes: run.state.local.store.fieldTypes,
+        }),
+      };
     }
     const sql = await BetterSqlite3Driver.open(":memory:");
     try {
       await migrate(sql, migrations);
       const blobs = new FsBlobStore(path.join(run.dataDir, "blobs"));
-      return { plan: await planImport({ sql, blobs }, bundle, options) };
+      // The store this import would create reads reference and repeater fields (RFC-0045 §1).
+      return {
+        plan: await planImport({ sql, blobs }, bundle, {
+          ...options,
+          fieldTypes: FIELDS_SUPPORTED,
+        }),
+      };
     } finally {
       await sql.close();
     }

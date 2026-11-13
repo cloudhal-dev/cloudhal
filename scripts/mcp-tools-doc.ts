@@ -75,7 +75,11 @@ async function render(): Promise<string> {
   const a = readme.indexOf(START);
   const b = readme.indexOf(END);
   if (a < 0 || b < a) throw new Error(`${path.relative(ROOT, README)}: tools markers not found`);
-  return readme.slice(0, a) + toolsTable(defineTools()) + readme.slice(b + END.length);
+  return (
+    readme.slice(0, a) +
+    toolsTable(defineTools({ referenceTypes: true })) +
+    readme.slice(b + END.length)
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

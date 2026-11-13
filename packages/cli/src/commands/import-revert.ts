@@ -105,7 +105,13 @@ async function planRevert(
   bundle: SiteBundle,
 ): Promise<{ plan: ImportPlan } | { refusal: string }> {
   try {
-    return { plan: await planImport(local, bundle, { mode: "replace", report: true }) };
+    return {
+      plan: await planImport(local, bundle, {
+        mode: "replace",
+        report: true,
+        fieldTypes: local.store.fieldTypes,
+      }),
+    };
   } catch (e) {
     const refusal = hostRefusal(e, "the snapshot's");
     if (refusal === undefined) throw e;

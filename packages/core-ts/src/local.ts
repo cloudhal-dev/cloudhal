@@ -6,6 +6,8 @@ import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { GATES_ENFORCED } from "./availability.ts";
 import type { BlockRegistry, PropsSchema } from "./blocks.ts";
 import { rebuildListValues } from "./list-values/backfill.ts";
+import { FIELDS_SUPPORTED } from "./references/definitions.ts";
+import { rebuildEntryRefs } from "./references/rebuild-job.ts";
 import { SiteGraphStore, type SiteGraphStoreOptions } from "./store.ts";
 
 export interface LocalStore {
@@ -45,12 +47,16 @@ export async function openLocalStore(
   await migrate(sql, migrations);
   // RFC-0042 §4: list values for collections listed before migration 0029 or left unfinished.
   await rebuildListValues(sql);
+  // RFC-0045 §2.4, rollout step 7: `entry_refs` checked once per site (a safety net; resumes).
+  await rebuildEntryRefs(sql);
   const blobs = new FsBlobStore(path.join(dir, "blobs"));
-  // The renderer that serves this store runs in the same process and enforces gates (S15).
+  // The renderer that serves this store runs in the same process: it enforces gates (S15) and
+  // reads reference and repeater fields (RFC-0045 §1, rollout step 7).
   const store = new SiteGraphStore({
     sql,
     blobs,
     gates: GATES_ENFORCED,
+    fieldTypes: FIELDS_SUPPORTED,
     ...(options.blocks ? { blocks: options.blocks } : {}),
     ...(options.themeSettings ? { themeSettings: options.themeSettings } : {}),
     ...(options.themeDesign ? { themeDesign: options.themeDesign } : {}),

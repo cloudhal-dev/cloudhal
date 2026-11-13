@@ -129,7 +129,11 @@ export async function applyImport(
       ? await take(local, siteId, options.bracket.before)
       : found.snapshot;
   if (before) options.onBefore?.(before);
-  const result = await importSite(local, bundle, { mode: options.mode });
+  const result = await importSite(local, bundle, {
+    mode: options.mode,
+    // RFC-0045 §1: the local renderer reads reference and repeater fields (`openLocalStore`).
+    fieldTypes: local.store.fieldTypes,
+  });
   const after =
     before && options.bracket
       ? await take(local, siteId, options.bracket.after(before.id))

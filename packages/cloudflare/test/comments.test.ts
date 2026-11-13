@@ -25,6 +25,7 @@ import {
   flushCommentPurges,
   runCommentsHourly,
 } from "../src/comments.ts";
+import { everyFiveMinutesOffset } from "../src/entry-refs-job.ts";
 import { everyFiveMinutes } from "../src/list-values-job.ts";
 import { purgeSiteCache } from "../src/purge.ts";
 
@@ -324,6 +325,12 @@ describe("availability and the Worker", () => {
     });
     const tick = (scheduledTime: number) =>
       worker.scheduled({ scheduledTime, cron: "* * * * *" } as ScheduledController, e, ctx);
+    // RFC-0045's one-time `refs.rebuild` is done here already (its steady state: two reads a
+    // run); while a site still has work, it can move a free tick's other jobs to the next minute.
+    await sql.run(
+      "INSERT INTO entry_refs_state (site_id, cursor, done, updated_at) VALUES (?, NULL, 1, ?)",
+      [siteId, new Date().toISOString()],
+    );
     // The first tick registers the hourly jobs' watermarks (RFC-0008 §8.2): nothing runs yet.
     const first = Date.now();
     await tick(first);
@@ -345,8 +352,12 @@ describe("availability and the Worker", () => {
       true,
     );
     expect(lines.some((l) => /^analytics rollup \(none\)/.test(l))).toBe(true);
-    // `lists.backfill` (every five minutes, #110) is due too unless the first tick came after :15.
-    const ran = everyFiveMinutes(new Date(first)).getTime() <= Date.parse(at17) ? 3 : 2;
+    // `lists.backfill` (every five minutes, #110) is due too unless the first tick came after :15,
+    // and `refs.rebuild` (RFC-0045, every five minutes from :02:30) unless it came after :12:30.
+    const ran =
+      2 +
+      (everyFiveMinutes(new Date(first)).getTime() <= Date.parse(at17) ? 1 : 0) +
+      (everyFiveMinutesOffset(new Date(first)).getTime() <= Date.parse(at17) + 4_100 ? 1 : 0);
     expect(lines.some((l) => l.startsWith(`schedules tick (cron): ${ran} ran`))).toBe(true);
     // The watermark moved to the next hour: the next minute does not run it again.
     const n = lines.length;
