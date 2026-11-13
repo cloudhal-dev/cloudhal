@@ -109,7 +109,7 @@ const getSourceTool: ToolDefinition = {
   name: "get_translation_source",
   title: "Get translation source",
   description:
-    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), for an entry with typed fields the localized text and rich-text values to translate (`fields`, repeater items by path such as speakers/0/talk) and the shared fields a translation reads from the original (`sharedFields`, never translated), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
+    "What you need to translate a page or entry into `locale`: the source (translate its title, text, summary and SEO; keep section ids, kinds, links, numbers, images and bindings), for an entry with typed fields the localized text and rich-text values to translate (`fields`, repeater items by path such as speakers/0/talk; a localized repeater whose translation already holds its own list comes whole under its key and is named in `wholeLists`: send it back whole, with sourceRev) and the shared fields a translation reads from the original (`sharedFields`, never translated), the glossary terms it uses (doNotTranslate terms stay as written, given translations are used), and the current translation in that locale if there is one (with `stale` when the source changed since, and for a linked page whose source changed its layout, `layout`: the translation's sections on the new layout, with the `untranslated` ones to translate). Then call save_translation.",
   inputSchema: obj(
     {
       siteId: id,
@@ -136,7 +136,7 @@ const getSourceTool: ToolDefinition = {
         type: "array",
         items: { type: "string" },
         description:
-          "Entries: the localized repeaters the existing translation already holds its own list of. Item paths cannot name their items, so `fields` has the source's whole list for each: translate its text and rich-text sub-values, keep the others, and send the whole list back under the same key, in the same order (item paths for it are refused, translation_shape_mismatch)",
+          "Entries: the localized repeaters the existing translation already holds its own list of. Item paths cannot name their items, so `fields` has the source's whole list for each: translate its text and rich-text sub-values, keep the others, and send the whole list back under the same key, in the same order, with sourceRev (item paths for it are refused, translation_shape_mismatch)",
       },
       sourceRev: {
         type: "integer",

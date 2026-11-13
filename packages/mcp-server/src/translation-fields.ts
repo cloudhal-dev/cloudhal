@@ -42,7 +42,7 @@ export const SOURCE_REV_INPUT: JsonSchema = {
   type: "integer",
   minimum: 0,
   description:
-    "Entries: get_translation_source's sourceRev. Required when fields has repeater item paths, which name items by index: refused (conflict) when the source changed since",
+    "Entries: get_translation_source's sourceRev. Required when fields has repeater item paths, which name items by index: refused (conflict) when the source changed since. Send it with a repeater's whole list (wholeLists) too: given, it is checked the same way, so a list read before the source changed is not saved as current",
 };
 
 /** True when `values` names a repeater item (`speakers/0/talk`); other keys with `/` are plain. */
@@ -51,14 +51,28 @@ const hasItemPaths = (defs: readonly FieldDefinition[], values: unknown): boolea
   typeof values === "object" &&
   Object.keys(values).some((k) => itemPathRepeater(defs, k) !== undefined);
 
-/** Item paths need the source revision they were read from, unchanged (RFC-0045 §3). */
+/** True when `values` gives a repeater's list whole (`wholeLists`). */
+const hasWholeLists = (defs: readonly FieldDefinition[], values: unknown): boolean =>
+  !!values &&
+  typeof values === "object" &&
+  Object.entries(values).some(
+    ([k, v]) => Array.isArray(v) && defs.some((d) => d.key === k && d.type === "repeater"),
+  );
+
+/**
+ * Item paths need the source revision they were read from, unchanged (RFC-0045 §3). A whole
+ * repeater list is checked against `sourceRev` when one is given (#221), so a list read before the
+ * source changed is not linked to its new revision; without one it is saved as before.
+ */
 export function checkSourceRev(
   a: Record<string, unknown>,
   site: Site,
   source: { id: string; rev: number; collection?: string },
 ) {
   if (source.collection === undefined) return;
-  if (!hasItemPaths(fieldDefinitions(site, source.collection), a.fields)) return;
+  const defs = fieldDefinitions(site, source.collection);
+  const paths = hasItemPaths(defs, a.fields);
+  if (!paths && !(typeof a.sourceRev === "number" && hasWholeLists(defs, a.fields))) return;
   if (typeof a.sourceRev !== "number")
     throw new ToolError(
       "invalid",

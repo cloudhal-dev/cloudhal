@@ -664,7 +664,13 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
       ...item,
       topic: ["Hoş geldiniz", "Açılış konuşması"][i] as string,
     }));
-    const saved = (await save({ agenda: translated })).result as { node: ContentEntry };
+    // A whole list read before the source changed is refused when its sourceRev is given...
+    const late = await rejection(save({ agenda: translated }, src.sourceRev - 1));
+    expect(late.code).toBe("conflict");
+    // ...and saves with the revision it was read at.
+    const saved = (await save({ agenda: translated }, src.sourceRev)).result as {
+      node: ContentEntry;
+    };
     expect(saved.node.fields).toEqual({
       agenda: [
         { topic: "Hoş geldiniz", host: ada.id },
