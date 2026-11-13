@@ -7,6 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  featureRoute,
   type SiteConfirmations,
   siteFeatures,
   siteFieldTypeSupport,
@@ -139,31 +140,54 @@ describe("fields: 2 (RFC-0045 §1, admin side)", () => {
   });
 });
 
-describe("siteSupport: both capabilities of the admin Worker's store (RFC-0045 step 7)", () => {
-  it("asks the site Worker for each and remembers each in the isolate's confirmations", async () => {
-    let answer: Record<string, number> = { gates: 2 };
-    const s = site(() => Response.json(answer));
-    const confirmed: SiteConfirmations = { gates: 0, fields: false };
-    const { gates, fieldTypes } = siteSupport({ fetch: s.fetch, token: "tok", confirmed });
-    // a site Worker from before RFC-0045 step 3: gates yes, the types stay refused
-    expect(await gates.enforced("site_01HZX8K3Q9AB")).toBe(true);
-    expect(await fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(false);
-    expect(confirmed).toEqual({ gates: 2, fields: false });
-    answer = { gates: 2, fields: 2 };
-    expect(await fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(true);
-    expect(confirmed).toEqual({ gates: 2, fields: true });
-    // both remembered: no more asking, in this request or the next one built from them
-    const calls = s.calls.length;
-    const next = siteSupport({ fetch: s.fetch, token: "tok", confirmed });
-    expect(await next.fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(true);
-    expect(await next.gates.enforced("site_01HZX8K3Q9AB", 2)).toBe(true);
-    expect(s.calls).toHaveLength(calls);
-    // no binding: refused, never asked
-    const none = siteSupport({
-      fetch: undefined,
-      token: undefined,
-      confirmed: { gates: 0, fields: false },
-    });
-    expect(await none.fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(false);
+describe("siteSupport: both capabilities, per site Worker (RFC-0045 step 7, RFC-0034 §4)", () => {
+  const A = "site_01HZX8K3Q9AAAAAAAAAAAAAA";
+  const B = "site_01HZX8K3Q9BBBBBBBBBBBBBB";
+  /** An admin env with the installation's Worker (`SITE`) and an attached one serving B. */
+  function installation(main: Record<string, number>, attached: Record<string, number>) {
+    const s = site(() => Response.json(main));
+    const a = site(() => Response.json(attached));
+    const env = {
+      SITE: { fetch: s.fetch } as unknown as Fetcher,
+      SITE_1: { fetch: a.fetch } as unknown as Fetcher,
+      CLOUDHAL_SITE_ROUTES: JSON.stringify({ [B]: "SITE_1" }),
+    };
+    return { env, s, a };
+  }
+
+  it("asks the Worker that serves each site and remembers each answer for that Worker only", async () => {
+    // the installation's Worker reads the types; the attached one runs an older renderer
+    const { env, s, a } = installation({ gates: 2, fields: 2 }, { gates: 2 });
+    const confirmed: SiteConfirmations = { gates: {}, fields: {} };
+    const support = () =>
+      siteSupport({ route: (id) => featureRoute(env, id), token: "tok", confirmed });
+    expect(await support().fieldTypes.supported(A)).toBe(true);
+    expect(await support().fieldTypes.supported(B)).toBe(false);
+    expect(confirmed).toEqual({ gates: {}, fields: { SITE: true } });
+    expect(s.calls).toHaveLength(1);
+    expect(a.calls).toHaveLength(1);
+    // A's yes never stands for B: B is asked again, and stays refused
+    expect(await support().fieldTypes.supported(B)).toBe(false);
+    expect(a.calls).toHaveLength(2);
+    // remembered for SITE: no more asking for A
+    expect(await support().fieldTypes.supported(A)).toBe(true);
+    expect(s.calls).toHaveLength(1);
+    // gates are per Worker too
+    expect(await support().gates.enforced(B, 2)).toBe(true);
+    expect(confirmed.gates).toEqual({ SITE_1: 2 });
+  });
+
+  it("a Worker that fails or has no binding is refused and never remembered", async () => {
+    const failing = site(() => new Response("boom", { status: 500 }));
+    const env = { SITE: { fetch: failing.fetch } as unknown as Fetcher };
+    const confirmed: SiteConfirmations = { gates: {}, fields: {} };
+    const support = siteSupport({ route: (id) => featureRoute(env, id), token: "tok", confirmed });
+    expect(await support.fieldTypes.supported(A)).toBe(false);
+    expect(await support.gates.enforced(A)).toBe(false);
+    expect(confirmed).toEqual({ gates: {}, fields: {} });
+    // no site Worker at all: refused, never asked
+    const none = siteSupport({ route: (id) => featureRoute({}, id), token: "tok", confirmed });
+    expect(await none.fieldTypes.supported(A)).toBe(false);
+    expect(await none.gates.enforced(A)).toBe(false);
   });
 });

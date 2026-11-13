@@ -80,7 +80,7 @@ A **repeater** is an ordered list of items with the same sub-fields: an agenda's
 
 A reference holds its target in place while a **published** entry shows it, its own value or one a published translation inherits:
 
-- **Deleting** the target's last version in the site, **moving** it to a collection the field does not allow, or **relinking** it into another translation group is refused with `409 entry_referenced`, which names up to 20 published referrers and the total. Studio's delete dialog lists them before you confirm; drafts that would lose the value are listed too, without blocking. Deleting one language version while another remains is allowed: that language's pages then fall back or show nothing, and the dialog says which.
+- **Deleting** the target's last version in the site, or **relinking** it into another translation group, is refused with `409 entry_referenced`; **moving** it to a collection the field does not allow, with `409 reference_target_moved`. Both name up to 20 published referrers and the total. Studio's delete dialog lists them before you confirm; drafts that would lose the value are listed too, without blocking. Deleting one language version while another remains is allowed: that language's pages then fall back or show nothing, and the dialog says which.
 - **Archiving or unpublishing** the target is always allowed. It renders nothing from then on, but it does **not** release the lock: the referrers still hold it, so the delete stays refused until they change or are unpublished. Unpublishing a referrer releases its hold at once.
 - Drafts, entries in review and archived entries lock nothing on their own. A contributor, who cannot publish, therefore never pins anyone's entry.
 - **"Used by"** on an entry's page in Studio lists the entries that reference it, published or not, with the field. Agents use `list_references` (`direction: "to"` or `"from"`).
@@ -111,10 +111,10 @@ The four operations above work on both types, and take `sub` to work on one sub-
 
 Both types are accepted on every write path (Studio, MCP, the API, `cloudhal fields`, imports, `push`, `pull`, `cloudhal import --replace` and `--revert`) wherever the renderer serving the site reads them:
 
-- **Cloudflare:** once the site Worker answers `GET /__cloudhal/features` with `fields: 2` (0.9.0 and later). Deploy the site Worker first; until it reports it, the admin Worker refuses both types with `fields_unsupported`, and a push or archive that defines them is refused whole.
+- **Cloudflare:** once the site Worker serving that site answers `GET /__cloudhal/features` with `fields: 2` (0.9.0 and later). With several site Workers (an attached theme, [multi-site](multi-site.md)), each is asked for the sites it serves, so a site on an older attached Worker keeps refusing while the others accept. Deploy the site Worker first; until it reports it, the admin Worker refuses both types for its sites with `fields_unsupported`, and a push or archive that defines them is refused whole.
 - **Node** (`cloudhal dev`, `studio`, self-host, Docker): always, since the renderer runs in the same process.
 
-Upgrading runs a one-time check of every site's reference index (`refs.rebuild`, every five minutes on the admin Worker until each site is done; at start-up on Node). It is a safety net and should find nothing to change.
+Upgrading runs a one-time check of every site's reference index (`refs.rebuild`, every five minutes on the admin Worker until each site is done; at start-up on Node). It is a safety net and should find nothing to change. It leaves a site alone while a text ↔ reference type change runs there, and checks it once the change is done.
 
 ## Languages
 

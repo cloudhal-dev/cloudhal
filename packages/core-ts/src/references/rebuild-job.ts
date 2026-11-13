@@ -14,9 +14,15 @@
  *   `INSERT` per node, in a fixed number of statements a chunk, so the tick budget holds. A node a
  *   writer changed since the read is skipped, since its writer wrote fresh rows (R17). Never a
  *   site-wide `DELETE`.
- * - **The collections anchor** is on every statement of the chunk, the advance included: a
- *   definitions or marker change between the read and the batch makes the whole chunk a no-op,
- *   and it is read again under the new definitions.
+ * - **The site anchor** is on every statement of the chunk, the advance included: the site node's
+ *   `hash` as read with the chunk. A definitions or marker change between the read and the batch
+ *   (any site edit, in fact) makes the whole chunk a no-op, and it is read again. The hash is 64
+ *   characters, so no statement grows with the site's `collections` (up to 256 KB), and one
+ *   entry's rows (at most 100 references, about 25 KB) always fit one `INSERT` below 90 KB.
+ * - **No site with a running text ↔ reference conversion** is touched (`operation_running`). Its
+ *   rows say which values phase B or a person's write accepted (`fields/text-reference.ts`), which
+ *   no rebuild from bodies can know, so the job waits, cursor unmoved, until phase C drops the
+ *   marker. Other markers (renames, reshapes) read the same through `rebuildRows` as the writer.
  * - **The cursor** (`entry_refs_state`) moves in the same batch, guarded on the cursor as read, so
  *   a second runner never moves it back. The last chunk removes the rows of nodes that no longer
  *   exist (`source_id NOT IN (SELECT id FROM nodes WHERE site_id = ?)`) and marks the site done.
@@ -28,6 +34,7 @@ import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { type ListValuesBudget, ListValuesMeter } from "../list-values/meter.ts";
 import { chunks, REFS_STATEMENT_BYTES } from "../media/refs-rebuild.ts";
+import { convertingPath } from "./conversion-rows.ts";
 import { entryRefItemsOf } from "./rebuild.ts";
 
 export interface RebuildEntryRefsOptions {
@@ -42,8 +49,11 @@ export interface RebuiltEntryRefs {
   readonly done: boolean;
   /** Entries read by the chunks this call committed (a node a writer moved meanwhile is skipped, but counted). */
   readonly written: number;
-  /** Why it is not done: the budget ran out, or writers kept the cursor or the site busy. */
-  readonly reason?: "budget" | "busy";
+  /**
+   * Why it is not done: the budget ran out, writers kept the cursor or the site busy, or a text ↔
+   * reference conversion runs (the job waits for it to end).
+   */
+  readonly reason?: "budget" | "busy" | "operation_running";
 }
 
 export interface RebuildEntryRefsResult {
@@ -60,27 +70,26 @@ const MISSES = 20;
  */
 const CHUNK_COST = 5;
 
-const COLLECTIONS =
-  "(SELECT json_extract(body, '$.collections') FROM nodes WHERE id = ? AND kind = 'site') IS ?";
+const SITE_ANCHOR = "EXISTS (SELECT 1 FROM nodes WHERE id = ? AND kind = 'site' AND hash = ?)";
 
 const DELETE_SQL = `DELETE FROM entry_refs WHERE source_id IN (
     SELECT n.id FROM json_each(?) j JOIN nodes n
       ON n.id = json_extract(j.value, '$.n') AND n.hash = json_extract(j.value, '$.x')
     WHERE n.site_id = ? AND n.kind = 'contentEntry')
-  AND ${COLLECTIONS}`;
+  AND ${SITE_ANCHOR}`;
 
 const INSERT_SQL = `INSERT INTO entry_refs (site_id, target_id, source_id, source_collection, field, root_key, shared, source_status)
   SELECT ?, json_extract(r.value, '$.t'), n.id, json_extract(r.value, '$.c'),
     json_extract(r.value, '$.f'), json_extract(r.value, '$.k'), json_extract(r.value, '$.h'), json_extract(r.value, '$.s')
   FROM json_each(?) r JOIN nodes n
     ON n.id = json_extract(r.value, '$.n') AND n.hash = json_extract(r.value, '$.x')
-  WHERE n.site_id = ? AND n.kind = 'contentEntry' AND ${COLLECTIONS}`;
+  WHERE n.site_id = ? AND n.kind = 'contentEntry' AND ${SITE_ANCHOR}`;
 
 const ORPHANS_SQL =
   "DELETE FROM entry_refs WHERE site_id = ? AND source_id NOT IN (SELECT id FROM nodes WHERE site_id = ?)";
 
 const ADVANCE_SQL = `INSERT INTO entry_refs_state (site_id, cursor, done, updated_at)
-  SELECT ?, ?, ?, ? WHERE ${COLLECTIONS}
+  SELECT ?, ?, ?, ? WHERE ${SITE_ANCHOR}
   ON CONFLICT (site_id) DO UPDATE SET cursor = excluded.cursor, done = excluded.done, updated_at = excluded.updated_at
   WHERE entry_refs_state.done = 0 AND entry_refs_state.cursor IS ?`;
 
@@ -88,7 +97,7 @@ const ADVANCE_SQL = `INSERT INTO entry_refs_state (site_id, cursor, done, update
 const ENTRIES_SQL = `SELECT id, key, hash, body FROM nodes WHERE site_id = ? AND kind = 'contentEntry'
   AND key > ? ORDER BY key LIMIT ?`;
 
-const SITE_SQL = `SELECT id, body, json_extract(body, '$.collections') AS c FROM nodes WHERE id = ? AND kind = 'site'`;
+const SITE_SQL = "SELECT id, hash, body FROM nodes WHERE id = ? AND kind = 'site'";
 
 interface State {
   readonly cursor: string | null;
@@ -162,8 +171,8 @@ async function readChunk(
 
 interface ChunkPlan {
   readonly siteId: string;
-  /** The stored text of the site's `collections` as read (`NULL` when absent). */
-  readonly collections: string | null;
+  /** The site node's hash as read with the chunk. */
+  readonly siteHash: string;
   readonly before: string | null;
   readonly cursor: string | null;
   readonly last: boolean;
@@ -171,9 +180,9 @@ interface ChunkPlan {
 
 /** The chunk's batch: the anchored `DELETE`, the `INSERT`s, the orphans when last, the advance. */
 function chunkStatements(reads: readonly Read[], plan: ChunkPlan): SqlStatement[] {
-  const { siteId, collections } = plan;
-  const anchor = [siteId, collections];
-  const fixed = encoder.encode(INSERT_SQL + siteId + siteId + (collections ?? "")).length;
+  const { siteId, siteHash } = plan;
+  const anchor = [siteId, siteHash];
+  const fixed = encoder.encode(INSERT_SQL + siteId + siteId + siteId + siteHash).length;
   const out: SqlStatement[] = [];
   if (reads.length > 0) {
     out.push({
@@ -208,6 +217,13 @@ function fitting(reads: readonly Read[], room: number, plan: (k: number) => Chun
   return lo;
 }
 
+/** A text ↔ reference conversion runs on some field or sub-field of the site (`convertingPath`). */
+function convertsTextReferences(site: Pick<Site, "collections">): boolean {
+  return Object.values(site.collections ?? {}).some((c) =>
+    (c?.fields ?? []).some((def) => convertingPath(def) !== undefined),
+  );
+}
+
 async function rebuildSite(
   meter: ListValuesMeter,
   siteId: string,
@@ -225,14 +241,15 @@ async function rebuildSite(
   let misses = 0;
   while (!state.done) {
     if (meter.out(CHUNK_COST)) return result(false, written, "budget");
-    const row = await sql.get<{ id: string; body: string; c: string | null }>(SITE_SQL, [siteId]);
+    const row = await sql.get<{ id: string; hash: string; body: string }>(SITE_SQL, [siteId]);
     if (!row) return result(true, written); // the site went: nothing of it is left to index
     const site = JSON.parse(row.body) as Site;
+    if (convertsTextReferences(site)) return result(false, written, "operation_running");
     const limit = meter.room();
     const reads = await readChunk(sql, site, state.cursor, limit);
     const plan = (k: number, last = false): ChunkPlan => ({
       siteId,
-      collections: row.c ?? null,
+      siteHash: row.hash,
       before: state.cursor,
       cursor: reads[k - 1]?.key ?? state.cursor,
       last,

@@ -8,6 +8,7 @@
 import { AVAILABILITY_GATES_VERSION, type GateSupport } from "@cloudhal/core-ts/availability";
 import { FIELDS_FEATURE_VERSION, type FieldTypeSupport } from "@cloudhal/core-ts/fields";
 import type { SiteFetch } from "./purge.ts";
+import { type SiteRoutesEnv, siteWorkerFor } from "./site-routes.ts";
 
 const FEATURES_URL = "https://site.internal/__cloudhal/features";
 
@@ -109,40 +110,76 @@ export function siteFieldTypeSupport(options: {
   };
 }
 
-/** What one admin Worker isolate has confirmed so far (plain values, nothing awaited, ADR-0012). */
+/**
+ * What one admin Worker isolate has confirmed so far, per site Worker binding (`SITE`, `SITE_1`,
+ * …; RFC-0034 §4): each attached Worker may run another renderer version, so a confirmation from
+ * one never stands for another. Plain values, nothing awaited across requests (ADR-0012).
+ */
 export interface SiteConfirmations {
-  /** The gates version the site Worker reported; 0: none yet. */
-  gates: number;
-  /** The site Worker reported `fields: 2` or more (RFC-0045). */
-  fields: boolean;
+  /** The gates version each site Worker reported; absent: none yet. */
+  gates: Record<string, number>;
+  /** The site Workers that reported `fields: 2` or more (RFC-0045). */
+  fields: Record<string, true>;
+}
+
+/** The site Worker serving one site: its binding's name and a fetch to it. */
+export interface SiteWorkerRoute {
+  readonly key: string;
+  readonly fetch: SiteFetch;
 }
 
 /**
- * The store's capabilities for one request, both asked of the site Worker over `fetch` and
- * remembered in `confirmed`: time gates (S15) and reference and repeater fields (RFC-0045 §1).
+ * The store's capabilities, each asked of the site Worker that serves the site in question
+ * (`route`) and remembered for that Worker in `confirmed`: time gates (S15) and reference and
+ * repeater fields (RFC-0045 §1). A site with no site Worker is refused both, never asked; a
+ * refusal or a failed probe is not remembered, so it is asked again.
  */
 export function siteSupport(options: {
-  readonly fetch: SiteFetch | undefined;
+  readonly route: (siteId: string) => SiteWorkerRoute | undefined;
   readonly token: string | undefined;
   readonly confirmed: SiteConfirmations;
   readonly log?: (line: string) => void;
 }): { gates: GateSupport; fieldTypes: FieldTypeSupport } {
-  const { fetch, token, confirmed, log } = options;
-  const common = { fetch, token, ...(log ? { log } : {}) };
+  const { route, token, confirmed, log } = options;
+  const common = (siteId: string) => {
+    const r = route(siteId);
+    return { r, base: { fetch: r?.fetch, token, ...(log ? { log } : {}) } };
+  };
   return {
-    gates: siteGateSupport({
-      ...common,
-      confirmed: () => confirmed.gates,
-      remember: (version) => {
-        confirmed.gates = version;
+    gates: {
+      enforced: (siteId, version) => {
+        const { r, base } = common(siteId);
+        return siteGateSupport({
+          ...base,
+          confirmed: () => (r ? (confirmed.gates[r.key] ?? 0) : 0),
+          remember: (v) => {
+            if (r) confirmed.gates[r.key] = v;
+          },
+        }).enforced(siteId, version);
       },
-    }),
-    fieldTypes: siteFieldTypeSupport({
-      ...common,
-      confirmed: () => confirmed.fields,
-      remember: () => {
-        confirmed.fields = true;
+    },
+    fieldTypes: {
+      supported: (siteId) => {
+        const { r, base } = common(siteId);
+        return siteFieldTypeSupport({
+          ...base,
+          confirmed: () => (r ? confirmed.fields[r.key] === true : false),
+          remember: () => {
+            if (r) confirmed.fields[r.key] = true;
+          },
+        }).supported(siteId);
       },
-    }),
+    },
+  };
+}
+
+/** `siteSupport`'s route on the admin Worker: the binding that serves the site (RFC-0034 §4). */
+export function featureRoute(env: SiteRoutesEnv, siteId: string): SiteWorkerRoute | undefined {
+  const w = siteWorkerFor(env, siteId);
+  if (!w) return undefined;
+  const fetcher = w.fetcher;
+  return {
+    key: w.key,
+    fetch: (u, init) => fetcher.fetch(u, init as never) as unknown as Promise<Response>,
   };
 }

@@ -3,6 +3,8 @@
  * Its rows equal the writer's and the import rebuild's (a running rename and a held old-shape value
  * included), it resumes by cursor, removes orphans of its own site only, skips a node a writer
  * moved meanwhile (R17), and a definitions change between its read and its batch fails the chunk.
+ * It waits while a text ↔ reference conversion runs (rows decide what phase B accepted), and no
+ * statement grows with the site's `collections`, so a large site still finishes on Workers Free.
  * Runs on every backend (`describeSiteGraphStore`); the types are enabled with
  * `SiteGraphStoreOptions.fieldTypes`.
  */
@@ -10,7 +12,11 @@ import type { Actor, ContentEntry, FieldDefinition, Site } from "@cloudhal/core-
 import type { SqlDriver, SqlStatement } from "@cloudhal/storage";
 import { describe, expect, it } from "vitest";
 import { GATES_ENFORCED } from "./availability.ts";
-import { type FieldOperation, runFieldOperation } from "./fields-operations/index.ts";
+import {
+  continueFieldOperation,
+  type FieldOperation,
+  runFieldOperation,
+} from "./fields-operations/index.ts";
 import { rebuildEntryRefs } from "./references/rebuild-job.ts";
 import { SiteGraphStore } from "./store.ts";
 import { rebuildingImport } from "./testing-reimport.ts";
@@ -372,6 +378,127 @@ export function entryRefsJobSuite(ctx: SuiteContext): void {
         { siteId: site.id, fieldTypes: ENABLED, addNode: () => entry(site, "places") },
       );
       expect(await rows(site.id)).toEqual(writer);
+    });
+    it("waits while a text → reference conversion runs: rows phase B accepted stay, then it finishes", async () => {
+      const site = await world({
+        events: {
+          fields: [{ key: "venue", type: "text", labels: L("Venue"), localized: false }],
+        },
+        places: {},
+      });
+      const hall = await entry(site, "places", { title: "Main Hall", slug: "main-hall" });
+      const evs = [
+        await entry(site, "events", { slug: "a", fields: { venue: "Main Hall" } }),
+        await entry(site, "events", { slug: "b", fields: { venue: "Main Hall" } }),
+      ];
+      const started = await runFieldOperation(
+        store(),
+        site.id,
+        {
+          op: "change_field_type",
+          collection: "events",
+          key: "venue",
+          type: "reference",
+          collections: ["places"],
+        },
+        { actor: person, budget: { entries: 1 } },
+      );
+      expect(started.done).toBe(false);
+      // phase B accepted one entry's value: its row is what tells phase C it is converted
+      const accepted = await rows(site.id);
+      expect(accepted).toEqual([
+        expect.objectContaining({ t: hall.id, f: "venue", k: "venue", s: 1 }),
+      ]);
+      expect(evs.map((e) => e.id)).toContain(accepted[0]?.n);
+
+      const waiting = await rebuildEntryRefs(ctx.sql(), { siteId: site.id });
+      expect(waiting.sites).toEqual([
+        { siteId: site.id, done: false, written: 0, reason: "operation_running" },
+      ]);
+      expect(await rows(site.id)).toEqual(accepted);
+      expect(await state(site.id)).toBeUndefined();
+
+      const done = await continueFieldOperation(store(), site.id, started.operationId, {
+        actor: person,
+      });
+      expect(done.done).toBe(true);
+      const converted = await rows(site.id);
+      expect(converted).toHaveLength(2);
+      expect((await rebuildEntryRefs(ctx.sql(), { siteId: site.id })).sites[0]?.done).toBe(true);
+      expect(await rows(site.id)).toEqual(converted);
+    });
+
+    it("a collections body over 90 KB and an entry with 20 references finish on the Free budget", async () => {
+      // 20 select fields of 50 options with 100-character labels: about 130 KB of collections
+      const options = Array.from({ length: 50 }, (_, i) => ({
+        value: `o${i}`,
+        labels: { en: `${"x".repeat(96)}${String(i).padStart(4, "0")}` },
+      }));
+      const selects = Array.from({ length: 20 }, (_, i) => ({
+        key: `s${i}`,
+        type: "select",
+        labels: { en: { label: `Select ${i}`, help: "h".repeat(300) } },
+        localized: false,
+        options,
+      })) as unknown as FieldDefinition[];
+      const many = { ...HOSTS, maxItems: 50 } as FieldDefinition;
+      const site = await world({
+        places: {},
+        talks: { fields: [many] },
+        notes: { fields: selects as [FieldDefinition, ...FieldDefinition[]] },
+      });
+      expect(new TextEncoder().encode(JSON.stringify(site.collections)).length).toBeGreaterThan(
+        90_000,
+      );
+      const places: ContentEntry[] = [];
+      for (let i = 0; i < 20; i++)
+        places.push(await entry(site, "places", { title: `Place ${i}`, slug: `place-${i}` }));
+      const talk = await entry(site, "talks", {
+        slug: "big",
+        status: "published",
+        fields: { hosts: places.map((p) => p.id) },
+      });
+      const written = await rows(site.id);
+      expect(written.filter((r) => r.n === talk.id)).toHaveLength(20);
+      await forget(site.id);
+
+      let issued = 0;
+      let largest = 0;
+      const size = (q: string, p: readonly unknown[] = []) =>
+        new TextEncoder().encode(q + p.map((x) => String(x ?? "")).join("")).length;
+      const counted: SqlDriver = {
+        ...ctx.sql(),
+        name: "free",
+        get: (q, p) => {
+          issued++;
+          return ctx.sql().get(q, p);
+        },
+        all: (q, p) => {
+          issued++;
+          return ctx.sql().all(q, p);
+        },
+        run: (q, p) => {
+          issued++;
+          largest = Math.max(largest, size(q, p));
+          return ctx.sql().run(q, p);
+        },
+        batch: (st) => {
+          issued += st.length;
+          for (const x of st) largest = Math.max(largest, size(x.sql, x.params));
+          return ctx.sql().batch(st);
+        },
+      };
+      const free = { entries: 200, ms: 60_000, statements: 12 };
+      let runs = 0;
+      for (; runs < 5; runs++) {
+        issued = 0;
+        const r = await rebuildEntryRefs(counted, { siteId: site.id, budget: free });
+        expect(issued).toBeLessThanOrEqual(12);
+        if (r.sites[0]?.done) break;
+      }
+      expect(runs).toBeLessThan(5);
+      expect(largest).toBeLessThan(90_000);
+      expect(await rows(site.id)).toEqual(written);
     });
   });
 }

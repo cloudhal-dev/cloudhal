@@ -66,7 +66,7 @@ import { R2BlobStore } from "@cloudhal/storage/r2";
 import { type BrowserBinding, browserRenderingRenderer } from "./browser-render.ts";
 import { type BuildRoomsEnv, buildRoomClass, createDurableBuildHub } from "./build-rooms.ts";
 import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
-import { type SiteConfirmations, siteSupport } from "./features.ts";
+import { featureRoute, type SiteConfirmations, siteSupport } from "./features.ts";
 import { adminMail, type MailEnv } from "./mail.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
@@ -344,7 +344,7 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   /** The request backstop's isolate state (RFC-0008 §8.6); plain numbers. */
   const backstop: BackstopState = { lastCheck: 0, lastRun: 0 };
   /** What the site Worker confirmed: gates (RFC-0008 §7.7, RFC-0042 §3.6), fields (RFC-0045). */
-  const confirmed: SiteConfirmations = { gates: 0, fields: false };
+  const confirmed: SiteConfirmations = { gates: {}, fields: {} };
   const ensureMigrated = async (sql: SqlDriver) => {
     if (migrated) return;
     try {
@@ -440,15 +440,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         blocks,
         ...storeExtras(options, env, sql),
         // S15 and RFC-0045 §1: `availability`, and reference and repeater fields, are refused
-        // until the site Worker says it enforces gates and reads those fields (`fields: 2`).
-        ...siteSupport({
-          fetch: siteBinding
-            ? (u, init) => siteBinding.fetch(u, init as never) as unknown as Promise<Response>
-            : undefined,
-          token: purgeToken,
-          confirmed,
-          log,
-        }),
+        // until the site Worker serving the site says it enforces gates and reads those fields.
+        ...siteSupport({ route: (id) => featureRoute(env, id), token: purgeToken, confirmed, log }),
         onPublished: async (site, change) => {
           const binding = routedSite(env);
           if (!binding || !env.CLOUDHAL_PURGE_TOKEN) return;

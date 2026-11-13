@@ -33,6 +33,21 @@ export function bindingFor(env: SiteRoutesEnv, siteId: string | undefined): Fetc
   return isFetcher(bound) ? bound : env.SITE;
 }
 
+/**
+ * The Worker that serves `siteId` and its binding's name (`SITE`, `SITE_1`, …): what the admin
+ * Worker asks about features (RFC-0008 §7.7, RFC-0045 §1), and keys its confirmations by, since
+ * each attached Worker may run another renderer version.
+ */
+export function siteWorkerFor(
+  env: SiteRoutesEnv,
+  siteId: string,
+): { key: string; fetcher: Fetcher } | undefined {
+  const name = routesOf(env)[siteId];
+  const bound = name ? (env as unknown as Record<string, unknown>)[name] : undefined;
+  if (name && isFetcher(bound)) return { key: name, fetcher: bound };
+  return env.SITE ? { key: "SITE", fetcher: env.SITE } : undefined;
+}
+
 /** True when `siteId` is served by an attached Worker (not the installation's own). */
 export function attachedSite(env: SiteRoutesEnv, siteId: string): boolean {
   return routesOf(env)[siteId] !== undefined;
