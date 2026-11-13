@@ -76,10 +76,14 @@ describe("repeater paths (RFC-0045)", () => {
   });
 
   it("folds translated paths into a copy of the source's list", () => {
-    const r = translatedItemValues(AGENDA, SOURCE, {
-      "agenda/0/topic": "Açılış",
-      "agenda/2/notes": "**Kapanış**",
-    });
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      {
+        "agenda/0/topic": "Açılış",
+        "agenda/2/notes": "**Kapanış**",
+      },
+    );
     expect(r.issues).toEqual([]);
     expect(r.values).toEqual({
       agenda: [{ topic: "Açılış", host: G }, { host: G }, { topic: "", notes: "**Kapanış**" }],
@@ -89,13 +93,17 @@ describe("repeater paths (RFC-0045)", () => {
   });
 
   it("refuses paths that name no translatable item value, and shared ones as not localized", () => {
-    const r = translatedItemValues(AGENDA, SOURCE, {
-      "agenda/0/host": "x",
-      "agenda/7/topic": "x",
-      "agenda/x/topic": "x",
-      "agenda/0/topic/extra": "x",
-      "nope/0/topic": "x",
-    });
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      {
+        "agenda/0/host": "x",
+        "agenda/7/topic": "x",
+        "agenda/x/topic": "x",
+        "agenda/0/topic/extra": "x",
+        "nope/0/topic": "x",
+      },
+    );
     expect(r.issues.map((i) => i.path)).toEqual([
       "fields/agenda/0/host",
       "fields/agenda/7/topic",
@@ -112,10 +120,49 @@ describe("repeater paths (RFC-0045)", () => {
     ]);
   });
 
+  it("writes into the translation's own list, keeping its targets and text not sent again", () => {
+    const H = "entry_01HZX8K3Q9H2";
+    const existing = {
+      agenda: [{ topic: "Açılış", host: H }, { topic: "Ara", host: G }, { notes: "Son" }],
+    };
+    const r = translatedItemValues(
+      AGENDA,
+      { source: SOURCE, existing },
+      { "agenda/2/notes": "**Kapanış**" },
+    );
+    expect(r.issues).toEqual([]);
+    expect(r.values.agenda).toEqual([
+      { topic: "Açılış", host: H },
+      { topic: "Ara", host: G },
+      { notes: "**Kapanış**" },
+    ]);
+  });
+
+  it("refuses lists of another length than the source's (translation_shape_mismatch)", () => {
+    const short = { agenda: [{ topic: "Açılış" }] };
+    const own = translatedItemValues(
+      AGENDA,
+      { source: SOURCE, existing: short },
+      { "agenda/0/topic": "x" },
+    );
+    expect(own.issues.map((i) => [i.path, i.code])).toEqual([
+      ["fields/agenda", "translation_shape_mismatch"],
+    ]);
+    const given = translatedItemValues(
+      AGENDA,
+      { source: SOURCE },
+      { agenda: [{ topic: "a" }], "agenda/0/topic": "x" },
+    );
+    expect(given.issues.map((i) => i.code)).toEqual(["translation_shape_mismatch"]);
+    expect(given.values.agenda).toEqual([{ topic: "a" }]);
+  });
+
   it("scans a long path in linear time", () => {
     const long = `agenda/${"9".repeat(100_000)}/topic`;
     const started = performance.now();
-    expect(translatedItemValues(AGENDA, SOURCE, { [long]: "x" }).issues).toHaveLength(1);
+    expect(translatedItemValues(AGENDA, { source: SOURCE }, { [long]: "x" }).issues).toHaveLength(
+      1,
+    );
     expect(performance.now() - started).toBeLessThan(200);
   });
 });

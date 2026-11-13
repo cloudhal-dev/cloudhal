@@ -157,6 +157,8 @@ export type FieldIssueCode =
    * field's collections (missing, foreign, archived, or only in other collections).
    */
   | "unknown_entry"
+  /** RFC-0045 §3: translated repeater items need a list of the source's length. */
+  | "translation_shape_mismatch"
   /** RFC-0045 §2.8: a new reference or repeater field over a key entries already hold. */
   | "field_key_in_use";
 

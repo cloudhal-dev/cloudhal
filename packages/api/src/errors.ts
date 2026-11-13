@@ -98,6 +98,7 @@ export const INVARIANT_STATUS: Record<InvariantCode, 400 | 409 | 410 | 415 | 422
   too_many_references: 422,
   // §2: a target that is not there is 422; what another entry or a running operation holds, 409.
   unknown_entry: 422,
+  translation_shape_mismatch: 409,
   reference_target_moved: 409,
   entry_referenced: 409,
   translation_group_in_use: 409,

@@ -8,7 +8,7 @@
  */
 import { type AgentMode, AuditLog, PolicyEngine } from "@cloudhal/agent-runtime";
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
-import { runFieldOperation, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
+import { nodeHash, runFieldOperation, SiteGraphStore, seedStarterSite } from "@cloudhal/core-ts";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -402,6 +402,36 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
     expect(prompt).toContain(
       `"Speakers" (speakers): 2 items → 3 items (added "Ada Lovelace" (${ada.id}, People), Speaker)`,
     );
+    // A translation's own id is described as the group it stores, not as unknown.
+    const hallTr = await entry(w, "places", {
+      title: "Ana salon",
+      locale: "tr",
+      slug: hall.slug,
+      translation: {
+        group: hall.id,
+        method: "human",
+        source: { id: hall.id, locale: "en", rev: hall.rev, hash: await nodeHash(hall) },
+      },
+    });
+    const grace = await entry(w, "people", { title: "Grace Hopper" });
+    const canonical = await call(
+      w,
+      "update_entry",
+      "manual",
+    )({
+      entryId: e.id,
+      rev: e.rev,
+      fields: {
+        venue: hallTr.id,
+        speakers: [{ person: grace.id, role: "host" }, { person: bob.id }],
+      },
+    });
+    const text = canonical.approvalPrompt as string;
+    expect(text).toContain(`"Venue" (venue) → "Main hall" (${hall.id}, Places)`);
+    expect(text).not.toContain("no entry in this site");
+    expect(text).toContain(
+      `2 items → 2 items (changed item 1: person → "Grace Hopper" (${grace.id}, People))`,
+    );
     const removed = await call(
       w,
       "update_entry",
@@ -485,15 +515,25 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
     expect(foreign.code).toBe("not_found");
   });
 
-  it("translates a localized repeater's text by item path and keeps the other sub-values", async () => {
+  it("translates a localized repeater's text by item path into the translation's own list", async () => {
+    const bob = await entry(w, "people", { title: "Bob" });
     const session = await entry(w, "sessions", {
       title: "Day one",
-      fields: { agenda: [{ topic: "Opening", host: ada.id }, { host: ada.id }] },
+      fields: {
+        agenda: [
+          { topic: "Opening", host: ada.id },
+          { topic: "Close", host: ada.id },
+        ],
+      },
     });
-    const src = (await call(w, "get_translation_source")({ nodeId: session.id, locale: "tr" }))
-      .result as { fields: Record<string, string> };
-    expect(src.fields).toEqual({ "agenda/0/topic": "Opening" });
-    const bad = await rejection(
+    const source = async () =>
+      (await call(w, "get_translation_source")({ nodeId: session.id, locale: "tr" })).result as {
+        fields: Record<string, string>;
+        sourceRev: number;
+      };
+    const src = await source();
+    expect(src.fields).toEqual({ "agenda/0/topic": "Opening", "agenda/1/topic": "Close" });
+    const save = (fields: Record<string, unknown>, sourceRev?: number) =>
       call(
         w,
         "save_translation",
@@ -503,30 +543,102 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
         title: "Birinci gün",
         slug: "birinci-gun",
         body: "Gövde",
-        fields: { "agenda/1/host": "x", "agenda/9/topic": "y" },
-      }),
+        fields,
+        ...(sourceRev === undefined ? {} : { sourceRev }),
+      });
+    // Item paths name items by index: the source revision they were read at is required.
+    expect((await rejection(save({ "agenda/0/topic": "Açılış" }))).code).toBe("invalid");
+    expect((await rejection(save({ "agenda/0/topic": "Açılış" }, src.sourceRev + 7))).code).toBe(
+      "conflict",
+    );
+    const bad = await rejection(
+      save({ "agenda/1/host": "x", "agenda/9/topic": "y" }, src.sourceRev),
     );
     expect(bad.code).toBe("invalid_fields");
     expect((bad.details.issues as { path: string }[]).map((i) => i.path)).toEqual([
       "fields/agenda/1/host",
       "fields/agenda/9/topic",
     ]);
-    const saved = (
-      await call(
-        w,
-        "save_translation",
-      )({
-        nodeId: session.id,
-        locale: "tr",
-        title: "Birinci gün",
-        slug: "birinci-gun",
-        body: "Gövde",
-        fields: { "agenda/0/topic": "Açılış" },
-      })
+    const first = (
+      await save({ "agenda/0/topic": "Açılış", "agenda/1/topic": "Kapanış" }, src.sourceRev)
     ).result as { node: ContentEntry };
-    expect(saved.node.fields).toEqual({
-      agenda: [{ topic: "Açılış", host: ada.id }, { host: ada.id }],
+    expect(first.node.fields).toEqual({
+      agenda: [
+        { topic: "Açılış", host: ada.id },
+        { topic: "Kapanış", host: ada.id },
+      ],
     });
+    // The translation picks its own host for the second item; a partial re-save keeps it, and
+    // keeps the first item's translated text.
+    const tr = first.node;
+    await w.store.updateContentEntry({
+      ...tr,
+      fields: {
+        agenda: [
+          { topic: "Açılış", host: ada.id },
+          { topic: "Kapanış", host: bob.id },
+        ],
+      },
+    });
+    const again = (await save({ "agenda/1/topic": "Son" }, (await source()).sourceRev)).result as {
+      node: ContentEntry;
+    };
+    expect(again.node.fields).toEqual({
+      agenda: [
+        { topic: "Açılış", host: ada.id },
+        { topic: "Son", host: bob.id },
+      ],
+    });
+    // A translation's list of another length than the source's is refused, not overwritten.
+    const now = (await w.store.getContentEntry(tr.id)) as ContentEntry;
+    await w.store.updateContentEntry({ ...now, fields: { agenda: [{ topic: "Tek" }] } });
+    const shape = await rejection(save({ "agenda/0/topic": "x" }, (await source()).sourceRev));
+    expect(shape.code).toBe("translation_shape_mismatch");
+    expect((await w.store.getContentEntry(tr.id))?.fields).toEqual({ agenda: [{ topic: "Tek" }] });
+  });
+
+  it("clearFields removes a value during an unfinished rename_field, by either key", async () => {
+    const a1 = await entry(w, "events", { fields: { venueName: "Hall" } });
+    const a2 = await entry(w, "events", { fields: { venueName: "Annex" } });
+    const started = await runFieldOperation(
+      w.store,
+      w.site.id,
+      { op: "rename_field", collection: "events", from: "venueName", to: "placeName" },
+      { actor: agent, budget: { entries: 1 } },
+    );
+    expect(started.done).toBe(false);
+    const left = [a1, a2];
+    const pending: ContentEntry[] = [];
+    for (const e of left) {
+      const now = (await w.store.getContentEntry(e.id)) as ContentEntry;
+      if (Object.hasOwn(now.fields ?? {}, "venueName")) pending.push(now);
+    }
+    expect(pending).toHaveLength(1);
+    const [one] = pending as [ContentEntry];
+    const ask = await call(
+      w,
+      "update_entry",
+      "manual",
+    )({
+      entryId: one.id,
+      rev: one.rev,
+      clearFields: ["placeName"],
+    });
+    expect(ask.approvalPrompt).toContain('"Venue name" (placeName) removed');
+    expect(ask.approvalPrompt).not.toContain("venueName removed");
+    const r = await call(
+      w,
+      "update_entry",
+    )({ entryId: one.id, rev: one.rev, clearFields: ["placeName"] });
+    expect(created(r).fields).toEqual({});
+    // The old key is a valid name for it too while the rename runs.
+    const other = left.find((e) => e.id !== one.id) as ContentEntry;
+    const fresh = (await w.store.getContentEntry(other.id)) as ContentEntry;
+    const r2 = await call(
+      w,
+      "update_entry",
+    )({ entryId: fresh.id, rev: fresh.rev, clearFields: ["venueName"] });
+    expect(created(r2).fields).toEqual({});
   });
 
   it("operation tools take sub, the reference inputs, and continue with onInvalid clear", async () => {
@@ -582,8 +694,21 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
     expect((stuck.result as { unconvertible: unknown[] }).unconvertible).toHaveLength(1);
     const prompt = await call(w, "change_field_type", "bypass")({ ...resume, onInvalid: "clear" });
     expect(prompt.approvalPrompt).toContain("Values that stopped converting meanwhile are dropped");
-    const done = await call(w, "change_field_type")({ ...resume, onInvalid: "clear" }, true);
-    expect(done.result).toMatchObject({ done: true });
+    // The headline is the stored operation's, whatever this call's type says; the report counts
+    // the dropped value as cleared, with no refusal.
+    const done = await call(w, "change_field_type")(
+      { ...resume, type: "number", onInvalid: "clear" },
+      true,
+    );
+    const res = done.result as {
+      done: boolean;
+      prompt: string;
+      report: { cleared: number; unconvertible: number; refusal?: unknown };
+    };
+    expect(res.done).toBe(true);
+    expect(res.prompt).toContain("from text to reference");
+    expect(res.report).toMatchObject({ cleared: 1, unconvertible: 0 });
+    expect(res.report.refusal).toBeUndefined();
   });
 });
 

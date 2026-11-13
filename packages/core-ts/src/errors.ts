@@ -244,7 +244,9 @@ export type InvariantCode =
   /** §2.6: field operations on reference and repeater fields come with rollout step 4. */
   | "field_operation_unsupported"
   /** §2.8: adding a reference or repeater field over a key entries already hold. */
-  | "field_key_in_use";
+  | "field_key_in_use"
+  /** §3: translated repeater items go into a list of a length other than the source's. */
+  | "translation_shape_mismatch";
 
 export class InvariantError extends Error {
   override readonly name = "InvariantError";

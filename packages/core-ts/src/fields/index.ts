@@ -140,6 +140,7 @@ export {
   localizedFieldValues,
   sharedFieldIssues,
   sharedFieldKeys,
+  type TranslatedItemsInput,
   translatableFieldValues,
   translatedItemValues,
 } from "./translation.ts";

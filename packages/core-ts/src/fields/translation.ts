@@ -3,9 +3,10 @@
  * version's own (absent ones fall back to the original's); non-localized values live on the
  * group's original only and are never copied into a translation. Machine translation gets only
  * the localized `text` and `richText` values to translate: top-level by key, and inside a
- * localized repeater by item path, `speakers/0/talk` (RFC-0045). A translated item path writes
- * into a copy of the source's list, so the item's other sub-values (references, selects, images)
- * come along: a given list replaces the whole list. Worker-safe.
+ * localized repeater by item path, `speakers/0/talk` (RFC-0045 §3). A translated item path
+ * writes into the translation's own list of the source's length, else a copy of the source's, so
+ * an item's other sub-values (references, selects, images, text not sent again) stay as they are;
+ * other lengths are `translation_shape_mismatch`. Worker-safe.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type FieldIssue, isRecord } from "./types.ts";
@@ -100,21 +101,62 @@ function itemPath(path: string): { key: string; index: number; sub: string } | u
   return { key, index: Number(raw), sub };
 }
 
+/** Where translated item paths are folded in. */
+export interface TranslatedItemsInput {
+  /** The source's values: the list a path's index refers to. */
+  source: Values | undefined;
+  /** The existing translation's own values in that locale, when there is one. */
+  existing?: Values | undefined;
+}
+
+const shapeIssue = (key: string, message: string): FieldIssue => ({
+  path: `fields/${key}`,
+  code: "translation_shape_mismatch",
+  message,
+});
+
 /**
- * The given translated values with item paths folded into lists: each localized repeater named by
- * a path starts from the given whole list, else from the source's (`sourceValues`), and takes the
- * translated sub-values. A path that names no translatable sub-value of the source is refused at
- * `fields/<path>` (`invalid_value`).
+ * The list a repeater's translated paths write into: a list given whole in the same call, else
+ * the existing translation's own list, else a copy of the source's. Each must have the source's
+ * length (`translation_shape_mismatch`), so an index names the same item on both sides.
+ */
+function baseList(
+  key: string,
+  input: TranslatedItemsInput,
+  given: Values,
+): { list: unknown[] } | { issue: FieldIssue } | undefined {
+  const source = input.source?.[key];
+  if (!Array.isArray(source)) return undefined;
+  const whole = given[key];
+  const own = input.existing?.[key];
+  const base = Array.isArray(whole) ? whole : Array.isArray(own) ? own : source;
+  if (base.length !== source.length)
+    return {
+      issue: shapeIssue(
+        key,
+        `${key} has ${base.length} items ${base === whole ? "as given" : "in the translation"} and ${source.length} in the source; translated items need the source's length (translate the list by hand, or give the whole list in the source's order)`,
+      ),
+    };
+  return { list: base.map((x) => (isRecord(x) ? { ...x } : x)) };
+}
+
+/**
+ * The given translated values with item paths folded into lists (see `baseList`): each path's
+ * text replaces that sub-value, and the item keeps its other sub-values (a translation's own
+ * targets, images and selects, and text not sent again). A path that names no translatable
+ * sub-value of an item of the source is refused at `fields/<path>` (`invalid_value`).
  */
 export function translatedItemValues(
   defs: readonly FieldDefinition[],
-  sourceValues: Values | undefined,
+  input: TranslatedItemsInput,
   given: Values,
 ): { values: Record<string, unknown>; issues: FieldIssue[] } {
   const byKey = new Map(defs.map((d) => [d.key, d]));
   const issues: FieldIssue[] = [];
-  const lists = new Map<string, unknown[]>();
+  const lists = new Map<string, { list: unknown[] } | { issue: FieldIssue } | undefined>();
   const plain: [string, unknown][] = [];
+  const invalid = (path: string, message: string) =>
+    issues.push({ path: `fields/${path}`, code: "invalid_value", message });
   for (const [path, value] of Object.entries(given)) {
     if (!path.includes("/")) {
       plain.push([path, value]);
@@ -122,27 +164,31 @@ export function translatedItemValues(
     }
     const at = itemPath(path);
     const def = at && byKey.get(at.key);
-    const base = def && (Array.isArray(given[def.key]) ? given[def.key] : sourceValues?.[def.key]);
-    const item = at && Array.isArray(base) ? base[at.index] : undefined;
-    if (!at || !def || !translatableSubs(def).has(at.sub) || !isRecord(item)) {
-      issues.push({
-        path: `fields/${path}`,
-        code: "invalid_value",
-        message: `${path} names no translatable text of an item of the source (get_translation_source lists them)`,
-      });
+    if (!at || !def || !translatableSubs(def).has(at.sub)) {
+      invalid(
+        path,
+        `${path} names no translatable text of an item of the source (get_translation_source lists them)`,
+      );
+      continue;
+    }
+    if (!lists.has(at.key)) lists.set(at.key, baseList(at.key, input, given));
+    const base = lists.get(at.key);
+    if (base && "issue" in base) continue;
+    const item = base?.list[at.index];
+    if (!base || !isRecord(item)) {
+      invalid(path, `${path} names no item of the source (get_translation_source lists them)`);
       continue;
     }
     if (typeof value !== "string") {
-      issues.push({
-        path: `fields/${path}`,
-        code: "invalid_value",
-        message: "a translation is text",
-      });
+      invalid(path, "a translation is text");
       continue;
     }
-    const list = lists.get(at.key) ?? (base as unknown[]).map((x) => (isRecord(x) ? { ...x } : x));
-    (list[at.index] as Record<string, unknown>)[at.sub] = value;
-    lists.set(at.key, list);
+    item[at.sub] = value;
   }
-  return { values: Object.fromEntries([...plain, ...lists]), issues };
+  const folded: [string, unknown][] = [];
+  for (const [key, base] of lists) {
+    if (base && "issue" in base) issues.push(base.issue);
+    else if (base) folded.push([key, base.list]);
+  }
+  return { values: Object.fromEntries([...plain, ...folded]), issues };
 }

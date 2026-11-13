@@ -17,6 +17,7 @@ import {
   fieldLabel,
   optionLabel,
   referenceValues,
+  renamedFrom,
 } from "@cloudhal/core-ts/fields";
 import { quote, type ToolContext } from "./common.ts";
 
@@ -156,22 +157,57 @@ function describeItem(
   return parts.length > 0 ? parts.join(", ") : "an item";
 }
 
-/** Items of `next` not in `before`, and the other way round (as multisets). */
+interface Indexed {
+  index: number;
+  item: unknown;
+}
+
+/**
+ * Items of `next` not in `before`, and the other way round (as multisets, by canonical value),
+ * with their indices. An added and a removed item at the same index are one changed item.
+ */
 function itemChanges(before: readonly unknown[], next: readonly unknown[]) {
-  const left = before.map((x) => JSON.stringify(x));
-  const added: unknown[] = [];
-  for (const item of next) {
-    const at = left.indexOf(JSON.stringify(item));
-    if (at === -1) added.push(item);
+  const left = before.map((item, index) => ({ index, item, key: JSON.stringify(item) }));
+  const added: Indexed[] = [];
+  next.forEach((item, index) => {
+    const at = left.findIndex((l) => l.key === JSON.stringify(item));
+    if (at === -1) added.push({ index, item });
     else left.splice(at, 1);
+  });
+  const removedAt = new Map(left.map((l) => [l.index, l.item]));
+  const changed = added
+    .filter((a) => removedAt.has(a.index))
+    .map((a) => ({ index: a.index, before: removedAt.get(a.index), after: a.item }));
+  const pairs = new Set(changed.map((c) => c.index));
+  return {
+    added: added.filter((a) => !pairs.has(a.index)).map((a) => a.item),
+    removed: left.filter((l) => !pairs.has(l.index)).map((l) => l.item),
+    changed,
+  };
+}
+
+/** `changed item 2: person → "Grace Hopper" (entry_…, People), talk removed`. */
+function describeChangedItem(
+  def: Extract<FieldDefinition, { type: "repeater" }>,
+  change: { index: number; before: unknown; after: unknown },
+  words: { locale: string; targets: Targets },
+): string {
+  const was = (change.before && typeof change.before === "object" ? change.before : {}) as Values;
+  const now = (change.after && typeof change.after === "object" ? change.after : {}) as Values;
+  const parts: string[] = [];
+  for (const sub of def.fields) {
+    const had = Object.hasOwn(was, sub.key);
+    const has = Object.hasOwn(now, sub.key);
+    if (has && (!had || JSON.stringify(was[sub.key]) !== JSON.stringify(now[sub.key])))
+      parts.push(`${sub.key} → ${describeScalar(sub, now[sub.key], words.locale, words.targets)}`);
+    else if (had && !has) parts.push(`${sub.key} removed`);
   }
-  const removed = left.map((x) => JSON.parse(x) as unknown);
-  return { added, removed };
+  return `changed item ${change.index + 1}: ${parts.join(", ") || "its values"}`;
 }
 
 const items = (n: number) => `${n} ${n === 1 ? "item" : "items"}`;
 
-/** `2 items → 3 items (added "Ada Lovelace", Speaker)`. */
+/** `2 items → 3 items (added "Ada Lovelace", Speaker; changed item 1: role → Host)`. */
 function describeRepeater(
   def: Extract<FieldDefinition, { type: "repeater" }>,
   change: { before: unknown; value: unknown },
@@ -180,12 +216,14 @@ function describeRepeater(
   const { locale, targets } = words;
   const was = Array.isArray(change.before) ? change.before : [];
   const now = Array.isArray(change.value) ? change.value : [];
-  const { added, removed } = itemChanges(was, now);
+  const { added, removed, changed } = itemChanges(was, now);
   const notes = [
     added.length ? `added ${some(added.map((i) => describeItem(def, i, locale, targets)))}` : "",
     removed.length
       ? `removed ${some(removed.map((i) => describeItem(def, i, locale, targets)))}`
       : "",
+    ...changed.slice(0, 3).map((c) => describeChangedItem(def, c, words)),
+    changed.length > 3 ? `${changed.length - 3} more items changed` : "",
   ].filter(Boolean);
   if (notes.length === 0 && JSON.stringify(was) !== JSON.stringify(now)) notes.push("reordered");
   return `${items(was.length)} → ${items(now.length)}${notes.length ? ` (${notes.join("; ")})` : ""}`;
@@ -207,28 +245,47 @@ export function describeFieldValue(
 /**
  * "startsAt → 5 Nov 2026 19:30 Istanbul, venue → "Main hall" (entry_…, Places), speakers: 2
  * items → 3 items (added "Ada Lovelace", Speaker), notes removed" for an update of `entry`.
+ * `planned` is the store's dry run of the write: its values are described where it has them, so
+ * the person sees what is stored (a translation's id as its group, items through the markers),
+ * not what the agent typed.
  */
 export async function describeFieldPatch(
   ctx: ToolContext,
   site: Site,
   entry: Pick<ContentEntry, "collection" | "locale" | "fields">,
-  patch: Values,
+  change: { patch: Values; planned?: Values | undefined },
 ): Promise<string> {
-  const defs = new Map(fieldDefinitions(site, entry.collection).map((d) => [d.key, d]));
+  const { patch, planned } = change;
+  const list = fieldDefinitions(site, entry.collection);
+  const defs = new Map(list.map((d) => [d.key, d]));
+  // A running rename's old key, removed together with its new one, is not named twice.
+  const twin = new Set(
+    list.flatMap((d) => {
+      const from = renamedFrom(d);
+      return from !== undefined && Object.hasOwn(patch, d.key) ? [from] : [];
+    }),
+  );
   const locale = site.defaultLocale;
   const stored = entry.fields ?? {};
+  const shown = (key: string, value: unknown) =>
+    value !== null && planned && Object.hasOwn(planned, key) ? planned[key] : value;
+  const values = Object.fromEntries(Object.entries(patch).map(([k, v]) => [k, shown(k, v)]));
   const targets = await loadTargets(ctx, site, {
     collection: entry.collection,
     locale: entry.locale,
-    values: [patch, stored],
+    values: [values, stored],
   });
-  return Object.entries(patch)
+  return Object.entries(values)
+    .filter(([key]) => !twin.has(key) || defs.has(key))
     .map(([key, value]) => {
       const def = defs.get(key);
       const name = def ? `"${quote(fieldLabel(def, locale, locale), 40)}" (${key})` : key;
       if (value === null) return `${name} removed`;
-      if (def?.type === "repeater")
-        return `${name}: ${describeRepeater(def, { before: stored[key], value }, { locale, targets })}`;
+      if (def?.type === "repeater") {
+        const from = renamedFrom(def);
+        const before = Object.hasOwn(stored, key) ? stored[key] : from && stored[from];
+        return `${name}: ${describeRepeater(def, { before, value }, { locale, targets })}`;
+      }
       return `${name} → ${describeFieldValue(def, value, locale, targets)}`;
     })
     .join(", ");

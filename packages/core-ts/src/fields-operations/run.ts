@@ -213,11 +213,19 @@ export async function continueFieldOperation(
   options: FieldOperationOptions,
 ): Promise<FieldOperationResult> {
   const ctx = operationContext(store, options);
-  const record = await readOperation(ctx, siteId, operationId);
+  const stored = await readOperation(ctx, siteId, operationId);
+  // RFC-0045 §7: the call's `onInvalid: "clear"` applies to what is left, so the report counts
+  // the values it drops as cleared, without the stored request's refusal.
+  const record = { ...stored, op: withOnInvalid(stored.op, options.onInvalid) };
   const site = await requireSite(ctx, siteId);
   const report = await remaining(ctx, site, record);
   if (record.after || record.reverted) return result(record, report, { resumed: true });
   return { ...(await proceed(ctx, record, report, options)), resumed: true };
+}
+
+/** `op` with a continuing call's `onInvalid` (only a type change has one). */
+function withOnInvalid(op: FieldOperation, onInvalid: "clear" | undefined): FieldOperation {
+  return onInvalid !== undefined && op.op === "change_field_type" ? { ...op, onInvalid } : op;
 }
 
 /** The report of what is left: through the marker when phase A ran, else the dry run. */

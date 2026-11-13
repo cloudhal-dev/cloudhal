@@ -271,7 +271,8 @@ async function handle(spec: Spec, a: Record<string, unknown>, ctx: ToolContext) 
         ...options,
         ...(a.onInvalid === "clear" ? { onInvalid: "clear" as const } : {}),
       });
-      return answer(r, describeOperation(op, r.report, await locale(ctx, siteId)));
+      // The stored operation, not this call's arguments, says what is being continued.
+      return answer(r, describeOperation(status.operation, r.report, await locale(ctx, siteId)));
     }
     const r = await runFieldOperation(ctx.store, siteId, op, {
       ...options,

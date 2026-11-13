@@ -47,16 +47,19 @@ export function mergeFields(current: Values | undefined, patch: Values): Values 
 
 /**
  * The store's plan-time checks of a write, without writing (`dryRun`): throws what the write
- * would, as tool errors (`invalid_fields`, `unknown_field`, `unknown_entry`, `required_field`, …,
- * every issue at its path). `update` is the stored entry with the call's changes.
+ * would, as tool errors (`invalid_fields`, `unknown_field`, `unknown_entry`, `required_field`,
+ * `required_term`, …, every issue at its path), else returns the entry as the store would write
+ * it (canonical reference ids, values through the markers). `update` is the stored entry with
+ * the call's changes.
  */
 export async function checkEntryWrite(
   ctx: ToolContext,
   write: { update: ContentEntry } | { create: Creatable<ContentEntry> },
-): Promise<void> {
+): Promise<ContentEntry> {
   try {
-    if ("update" in write) await ctx.store.updateContentEntry(write.update, { dryRun: true });
-    else await ctx.store.createContentEntry(write.create, { dryRun: true });
+    if ("update" in write)
+      return await ctx.store.updateContentEntry(write.update, { dryRun: true });
+    return await ctx.store.createContentEntry(write.create, { dryRun: true });
   } catch (e) {
     throw toToolError(e);
   }

@@ -100,7 +100,11 @@ export const listReferencesTool: ToolDefinition = {
       const page = {
         group: groupId,
         limit: Math.max(1, Math.min(Math.trunc((a.limit as number | undefined) ?? 20), LIMIT)),
-        offset: Math.max(0, Math.trunc((a.offset as number | undefined) ?? 0)),
+        // As the API route clamps it: SQLite takes no OFFSET beyond a 64-bit integer.
+        offset: Math.min(
+          Number.MAX_SAFE_INTEGER,
+          Math.max(0, Math.trunc((a.offset as number | undefined) ?? 0)),
+        ),
       };
       return { ...base, ...(await listReferrers(ctx.store.sql, entry.siteId, page)) };
     } catch (e) {

@@ -60,13 +60,13 @@ const fieldsOf = (
 const dropped = (input: FieldsInput) =>
   input.droppedItems.length ? { droppedItems: input.droppedItems } : {};
 
-/** A new draft entry from `create_entry`'s arguments (terms, tags and cover are added by the handler). */
-function newEntry(
-  a: Record<string, unknown>,
-  site: Site,
-  ctx: Pick<ToolContext, "principal">,
-  fields: Record<string, unknown>,
-): Creatable<ContentEntry> {
+/** `create_entry`'s new draft entry from its arguments (precheck and write). */
+async function newEntry(
+  ctx: ToolContext,
+  at: { a: Record<string, unknown>; site: Site; fields: Record<string, unknown> },
+): Promise<Creatable<ContentEntry>> {
+  const { a, site, fields } = at;
+  const { terms, tags } = await entryTerms(ctx, site, undefined, a);
   return {
     siteId: site.id,
     collection: (a.collection as string | undefined) ?? "posts",
@@ -77,8 +77,41 @@ function newEntry(
     ...(a.summary ? { summary: a.summary as string } : {}),
     body: { format: "markdown", value: a.body as string },
     fields,
-    tags: [],
+    tags,
+    ...(terms ? { terms } : {}),
+    ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
     author: ctx.principal.actor,
+  };
+}
+
+/** `update_entry`'s next entry: the stored one with the call's changes (precheck, prompt, write). */
+async function updatedEntry(
+  ctx: ToolContext,
+  at: { a: Record<string, unknown>; site: Site; entry: ContentEntry; input: FieldsInput },
+): Promise<ContentEntry> {
+  const { a, site, entry, input } = at;
+  const { terms, tags } = await entryTerms(ctx, site, entry, a);
+  const { terms: _old, coverImage: oldCover, ...rest } = entry;
+  const cover =
+    a.coverImage === undefined
+      ? oldCover
+      : a.coverImage === null
+        ? undefined
+        : coverImage(a.coverImage);
+  return {
+    ...rest,
+    ...(cover ? { coverImage: cover } : {}),
+    ...(a.title ? { title: a.title as string } : {}),
+    ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
+    ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
+    ...(input.patch !== undefined ? { fields: mergeFields(entry.fields, input.patch) } : {}),
+    ...(a.slug ? { slug: a.slug as string } : {}),
+    tags,
+    ...(terms ? { terms } : {}),
+    ...(a.status ? { status: a.status as ContentEntry["status"] } : {}),
+    ...(a.status === "published" && !entry.publishedAt
+      ? { publishedAt: new Date().toISOString() }
+      : {}),
   };
 }
 
@@ -214,7 +247,9 @@ const createEntryTool: ToolDefinition = {
     const site = await ctx.store.getSite(a.siteId as string);
     if (!site) return;
     const input = fieldsOf(a, site, collection);
-    await checkEntryWrite(ctx, { create: newEntry(a, site, ctx, input.patch ?? {}) });
+    await checkEntryWrite(ctx, {
+      create: await newEntry(ctx, { a, site, fields: input.patch ?? {} }),
+    });
   },
   handler: async (a, ctx) => {
     const site = await requireSite(ctx, a.siteId as string);
@@ -222,19 +257,11 @@ const createEntryTool: ToolDefinition = {
       author: ctx.principal.actor,
       status: "draft",
     });
-    const { terms, tags } = await entryTerms(ctx, site, undefined, a);
     const collection = (a.collection as string | undefined) ?? "posts";
     const input = fieldsOf(a, site, collection);
+    const draft = await newEntry(ctx, { a, site, fields: input.patch ?? {} });
     try {
-      const entry = await ctx.store.createContentEntry(
-        {
-          ...newEntry(a, site, ctx, input.patch ?? {}),
-          tags,
-          ...(terms ? { terms } : {}),
-          ...(a.coverImage ? { coverImage: coverImage(a.coverImage) } : {}),
-        },
-        { writer: mcpWriter(ctx) },
-      );
+      const entry = await ctx.store.createContentEntry(draft, { writer: mcpWriter(ctx) });
       await reportDeltas(ctx, undefined, entry);
       const snapshot = await autoSnapshot(ctx, site.id, "create_entry");
       const hint = await menuHint(ctx, site.id, { kind: "contentEntry", id: entry.id });
@@ -300,10 +327,9 @@ const updateEntryTool: ToolDefinition = {
     if (ctx.limit) await entryLimitCheck(ctx, "update", entry, { author: entry.author, status });
     const site = await ctx.store.getSite(entry.siteId);
     if (!site) return;
-    const { patch } = fieldsOf(a, site, entry.collection, entry);
-    if (patch === undefined && status === entry.status) return;
-    const fields = mergeFields(entry.fields, patch ?? {});
-    await checkEntryWrite(ctx, { update: { ...entry, status, fields } });
+    // The store's own plan of exactly this write (values, references, terms, holds), dry.
+    const input = fieldsOf(a, site, entry.collection, entry);
+    await checkEntryWrite(ctx, { update: await updatedEntry(ctx, { a, site, entry, input }) });
   },
   approvalPrompt: async (a, ctx) => {
     const entry = await ctx.store.getContentEntry(a.entryId as string);
@@ -323,9 +349,17 @@ const updateEntryTool: ToolDefinition = {
           : "cover image"
         : "",
     ].filter(Boolean);
-    const patch = site ? fieldsOf(a, site, entry.collection, entry).patch : undefined;
-    if (site && patch && Object.keys(patch).length)
-      changes.push(`fields: ${await describeFieldPatch(ctx, site, entry, patch)}`);
+    const input = site ? fieldsOf(a, site, entry.collection, entry) : undefined;
+    const patch = input?.patch;
+    if (site && input && patch && Object.keys(patch).length) {
+      // What the store would write (canonical ids), as the precheck planned it.
+      const planned = await checkEntryWrite(ctx, {
+        update: await updatedEntry(ctx, { a, site, entry, input }),
+      }).catch(() => undefined);
+      changes.push(
+        `fields: ${await describeFieldPatch(ctx, site, entry, { patch, planned: planned?.fields })}`,
+      );
+    }
     if (a.terms || a.tags) {
       try {
         const { terms } = await entryTerms(ctx, site as Site, entry, a);
@@ -360,30 +394,8 @@ const updateEntryTool: ToolDefinition = {
       author: entry.author,
       status: (a.status as ContentEntry["status"] | undefined) ?? entry.status,
     });
-    const { terms, tags } = await entryTerms(ctx, site, entry, a);
     const input = fieldsOf(a, site, entry.collection, entry);
-    const { terms: _old, coverImage: oldCover, ...rest } = entry;
-    const cover =
-      a.coverImage === undefined
-        ? oldCover
-        : a.coverImage === null
-          ? undefined
-          : coverImage(a.coverImage);
-    const next: ContentEntry = {
-      ...rest,
-      ...(cover ? { coverImage: cover } : {}),
-      ...(a.title ? { title: a.title as string } : {}),
-      ...(a.summary !== undefined ? { summary: a.summary as string } : {}),
-      ...(a.body !== undefined ? { body: { ...entry.body, value: a.body as string } } : {}),
-      ...(input.patch !== undefined ? { fields: mergeFields(entry.fields, input.patch) } : {}),
-      ...(a.slug ? { slug: a.slug as string } : {}),
-      tags,
-      ...(terms ? { terms } : {}),
-      ...(a.status ? { status: a.status as ContentEntry["status"] } : {}),
-      ...(a.status === "published" && !entry.publishedAt
-        ? { publishedAt: new Date().toISOString() }
-        : {}),
-    };
+    const next = await updatedEntry(ctx, { a, site, entry, input });
     try {
       const saved = await ctx.store.updateContentEntry(next, { writer: mcpWriter(ctx) });
       await reportDeltas(ctx, entry, saved);

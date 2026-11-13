@@ -84,7 +84,6 @@ export class EntryEngine {
       held,
       converting,
     });
-    if (options.dryRun) return draft;
     if (stored)
       await assertUnlocked(this.#ctx.sql, stored.siteId, [stored.id], options.releaseEdit);
     if (draft.body.format === "markdown") {
@@ -117,6 +116,7 @@ export class EntryEngine {
     const refs = await this.#ctx.assets.planRefs("contentEntry", site.id, draft, stored);
     const prepared = await this.#ctx.tax.prepareEntry(refs.node, site, ts);
     const { entry, newTerms } = prepared;
+    if (options.dryRun) return entry; // `NodeWriteOptions.dryRun`
     // RFC-0040 §3: the first entry of a collection claims its default prefix.
     const opening = entersCollection(stored, entry)
       ? await planNewCollection(this.#ctx, site, entry.collection, entry.id)

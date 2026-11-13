@@ -6,7 +6,7 @@ import type { ContentEntry, Site } from "@cloudhal/core-contracts";
 import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { describe, expect, it } from "vitest";
-import { SiteGraphStore } from "../src/index.ts";
+import { SiteGraphStore, seedStarterSite } from "../src/index.ts";
 
 const author = { kind: "human" as const, id: "user_dryrun0001", name: "Halil" };
 const L = (label: string) => ({ en: { label } });
@@ -107,5 +107,26 @@ describe("entry dry runs", () => {
     const annex = await entry("places");
     await store.deleteContentEntry(annex, { dryRun: true });
     expect(await store.getContentEntry(annex.id)).toBeDefined();
+  });
+
+  it("runs the term invariants too: publishing without a required category is refused", async () => {
+    const { store } = await world();
+    const site = await seedStarterSite(store, { name: "Blog", slug: "blog" });
+    const post = await store.createContentEntry({
+      siteId: site.id,
+      collection: "posts",
+      slug: "hello",
+      locale: "en",
+      status: "draft",
+      title: "Hello",
+      body: { format: "markdown", value: "Body" },
+      fields: {},
+      tags: [],
+      author,
+    } as never);
+    await expect(
+      store.updateContentEntry({ ...post, status: "published" }, { dryRun: true }),
+    ).rejects.toMatchObject({ code: "required_term" });
+    expect((await store.getContentEntry(post.id))?.status).toBe("draft");
   });
 });

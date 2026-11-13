@@ -8,7 +8,8 @@
  *   all-null items dropped (`droppedItems`), by core-ts's `readStrictFields`.
  * - `clearFields`: keys to remove, with either input; on update only. Setting and clearing one key
  *   is refused (`invalid`), and a key the collection does not define (nor, without definitions,
- *   hold) is `unknown_field`.
+ *   hold) is `unknown_field`. During a `rename_field`, removing the new or the old key removes
+ *   both (`withRenamedRemovals`), in `fields` too.
  *
  * A given reference or repeater value replaces the whole value in every profile.
  */
@@ -19,6 +20,7 @@ import {
   type FieldIssue,
   readStrictFields,
   refuseFieldIssues,
+  renamedFrom,
 } from "@cloudhal/core-ts/fields";
 import { type JsonSchema, ToolError } from "./common.ts";
 
@@ -99,8 +101,9 @@ export function fieldsInputOf(
   if (mode === "create" && a.clearFields !== undefined)
     throw new ToolError("invalid", "clearFields: a new entry has nothing to clear");
   const defined = new Set(defs.map((d) => d.key));
+  const renames = renamesOf(defs);
   const known = (key: string) =>
-    defs.length > 0 ? defined.has(key) : Object.hasOwn(stored ?? {}, key);
+    defs.length > 0 ? defined.has(key) || renames.has(key) : Object.hasOwn(stored ?? {}, key);
   unknownKeys(clear, (_k, i) => `clearFields/${i}`, known);
   if (strict && defs.length > 0)
     unknownKeys(
@@ -117,5 +120,36 @@ export function fieldsInputOf(
     });
   if (!read.values && clear.length === 0) return { patch: undefined, droppedItems: [] };
   const cleared = Object.fromEntries(clear.map((k) => [k, null]));
-  return { patch: { ...set, ...cleared }, droppedItems: read.droppedItems };
+  return {
+    patch: withRenamedRemovals({ ...set, ...cleared }, renames),
+    droppedItems: read.droppedItems,
+  };
+}
+
+/** A running top-level `rename_field`'s keys, both ways: old key ↔ new key. */
+function renamesOf(defs: readonly FieldDefinition[]): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const def of defs) {
+    const from = renamedFrom(def);
+    if (from === undefined) continue;
+    out.set(from, def.key);
+    out.set(def.key, from);
+  }
+  return out;
+}
+
+/**
+ * While `rename_field` runs, an entry not rewritten yet still holds the value under the old key,
+ * and the writer moves it to the new one. Removing either key therefore removes both, so a
+ * removal is never undone by the move (and the old key is not refused as unknown).
+ */
+function withRenamedRemovals(patch: Values, renames: ReadonlyMap<string, string>): Values {
+  if (renames.size === 0) return patch;
+  const extra: [string, null][] = [];
+  for (const [key, value] of Object.entries(patch)) {
+    const other = renames.get(key);
+    if (value === null && other !== undefined && !Object.hasOwn(patch, other))
+      extra.push([other, null]);
+  }
+  return extra.length ? { ...patch, ...Object.fromEntries(extra) } : patch;
 }

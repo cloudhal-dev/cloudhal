@@ -84,9 +84,11 @@ export interface NodeWriteOptions {
   readonly correctionEdit?: boolean;
   /**
    * Entries only: plan the write and throw its plan-time refusals (values, `requiredToPublish`,
-   * assets, translation links, reference targets, a move or group change), then return the
-   * planned entry without writing anything (MCP's precheck, RFC-0045 §6). The batch-time guards
-   * still decide the real write.
+   * assets, translation links, reference targets, a move or group change, a release hold, time
+   * gates, term invariants such as `required_term`), then return the planned entry, canonical ids
+   * and terms included, without writing anything (MCP's precheck, RFC-0045 §6). Not planned: the
+   * path change (redirects, `path_conflict`), a collection's first entry, list values and
+   * source-forward; the batch-time guards and uniqueness still decide the real write.
    */
   readonly dryRun?: boolean;
 }
