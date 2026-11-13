@@ -1,5 +1,89 @@
 # @cloudhal/core-ts
 
+## 0.9.0
+
+### Patch Changes
+
+- 41d783a: RFC-0045 rollout step 3a: the renderer resolves reference and repeater fields. Both types stay refused on every write path until rollout step 7, so nothing changes for existing sites.
+  
+  - **`@cloudhal/astro-renderer`.**
+    - `entryFields` resolves a reference to cards (`RenderedField.references`: `ReferencedEntry` with group id, id, collection, locale, slug, title, summary, the graph `path` to link with (the locale middleware localizes it), the canonical `url`, cover image and `fromFallbackLocale`), in stored order, by `pickMember`'s locale rule among the members the source's view shows, gates included. `depth: 2` adds each card's own fields, with their references as cards without fields. Resolution is breadth-first over a visited set of groups, one `groupMembers` call per level, and spends the request's 200 targets (`PlaceholderBudget.references`; `placeholderBudget()` includes it); past the budget the rest resolve to nothing, with one `console.warn` per request.
+    - A repeater renders its items' sub-fields (`RenderedField.items`), like fields; empty items are left out.
+    - An unresolved target leaves nothing behind: no id, no title, no empty item. `value` keeps only the resolved group ids.
+    - `GraphSource.groupMembers?` and `GraphSource.referencedBy?` on `SnapshotSource` (in memory: gate-independent indexes built once per snapshot, filtered per view) and `LiveSource` (one `entry_refs` read expanded by the `shared` rule, each candidate resolved like the snapshot's index). `referencedBy` lists entries whose resolved values name the group, exactly as each page resolves them (a translation reads its original only while the view shows it), newest first with ties by id, at most 100.
+    - `GraphSource.conversionEntries?` builds the entry maps of a text ↔ reference conversion while one runs (rollout step 4 adds the conversions).
+    - `EntryFields.astro` draws references as links (`lang` on a fallback-locale card, a `ul.ch-references` for several) and repeaters as an `ol.ch-items` of nested `dl`s. Old theme copies get both with no change of their own.
+    - The site Worker's `GET /__cloudhal/features` answers `{ "gates": 2, "fields": 2 }`.
+  - **`@cloudhal/core-ts`.** `getGroupMembers` and `referrerCandidates` (the live renderer's reads, by `site_id`); `conversionEntries`, `conversionTargets`, `conversionCollections` and `foldText` in `./fields`; `resolveFields` takes an optional fourth argument with the conversion maps (`ConvertContext.entries`).
+- 9aa67d3: RFC-0045 rollout step 3b: publishes purge the pages that show references. Nothing changes for sites without reference definitions. Their publish purge plans are the same, with no bundle read. Their release runs send the plan stored at pin time, as before, with no re-plan; the only addition is one read of the published site node, to tell them apart.
+  
+  - **The referrer closure** (`references/purge.ts`, called by `planCachePurge`).
+    - The seeds are the groups of every changed, added or removed entry, and of every entry whose shown asset changed.
+    - It purges the referrers of those groups, two hops deep, with every language version of each referrer.
+    - It also purges every member of each group a changed entry names, before or after ("used by").
+    - Values are resolved, so a translation that only inherits counts.
+    - It reads only the `from` and `to` snapshots' bodies, never the working copy or `entry_refs`.
+  - **Reads and budgets.** A publish that changes no entry and no shown asset reads nothing. Otherwise the closure keeps one hash-keyed cache:
+    - one bundle (`to`'s, else `from`'s), streamed and cut down as each shard is parsed;
+    - then the missing hashes, read by the closure itself, six at a time, and cut down the same way.
+  
+    A passed budget purges everything:
+    - bytes (`maxBodyBytes`, 32 MB);
+    - nodes (`maxNodes`, 50,000);
+    - reads (`maxReads`, shard reads included);
+    - tags (`maxTags`).
+  
+    So does any field-operation marker on either snapshot's site node, for sites that hold references or convert from them.
+  - **`readSnapshotBundle`** (`SnapshotReader.readSnapshotBundle`, `SiteGraphStore.readSnapshotBundle`, `readSnapshotBundle` in bundles) takes optional `maxBytes`, `maxNodes`, `keep`, `only` (bodies node by node) and `spent` (a shared byte total). A passed budget throws `BundleBudgetError` before the shard is parsed. No new cache tags.
+  - **Release runs on sites with references re-plan their purge at run time** (`references/release-purge.ts`), from the pointer they moved to the snapshot they made, instead of sending the plan stored at pin time.
+    - The test is the published site node, which `publishRelease` now returns (`publishedSite`). That costs one blob read per run with a purger, except on a first publish; the read is counted, never refused. If it fails, the working row decides.
+    - The re-plan runs over the tick's counting driver.
+    - The release graph's blob calls (`refreshSearch`, `labelOf`, the re-plan) are charged to one allowance per invocation, shared by the cron's ticks (`ScheduledTickOptions.releaseBlobs`): 350 on Workers Free, 3,000 on Paid. "Publish now" sizes it from the deployment's tick budget (`ReleaseService` and `SchedulesDeps.tickBudget`).
+    - Past the allowance, or if the re-plan fails, the run purges everything. A re-plan with more distinct terms than reads left purges everything before reading anything.
+    - The pin-time plan skips the closure (`CachePurgeOptions.references: false`): for these sites it is the expected outcome only.
+    - `RELEASE_EXECUTOR_COST` is 26 (it counts `refreshSearch` and `recordPurge` now).
+  - **`@cloudhal/cloudflare`:** the cron handler passes one `releaseBlobs` allowance to both ticks of its invocation (`cronTick`); the alarm and the request backstop run one tick each, with the default allowance.
+- bb43a16: RFC-0045 rollout step 4: the four field operations work on reference and repeater fields. The types themselves stay refused on every production write path until step 7 (`fields_unsupported`, now from the dry run's check of the definitions the operation ends with); the shared suites enable them with `SiteGraphStoreOptions.fieldTypes`. Nothing changes for operations on the nine existing types.
+  
+  - **`sub`** on all four operations (`FieldOperation.sub`, `FieldMigration.sub`): with it, `rename_field`, `change_field_type` and `remove_field` rename, convert or remove one sub-field of a repeater in every item. An item left empty is dropped, and a list left empty is no value. `set_field_localized` refuses `sub` (sub-fields share their repeater's `localized`). Readers, writers and the rows read items through the marker; a top-level reader ignores a sub-field rename's `fromKey` (`renamedFrom`).
+  - **New `change_field_type` inputs:** `collections`, `maxItems`, `subFields` and `itemLabel`, each refused where the target type does not take it. A reference changes to a reference only to switch `multiple`. A conversion that carries ids over may only widen the target collections. A repeater converts to text or to a reference only with exactly one matching sub-field.
+  - **New conversion rows** (`fields/conversions-references.ts`): reference single ↔ multiple, text ↔ reference (through the prefetched `ConvertContext.entries` maps, never the entry's own group), multiline text → repeater, repeater → text, and multiple reference ↔ repeater. The maps are read once per operation pass, and by `EntryEngine.write` while such a conversion runs.
+  - **Text ↔ reference values** are decided by one rule (`fields/text-reference.ts`), per value, from the `entry_refs` rows that phase C's pending check reads too: each operation pass loads the path's rows once, and a person's write reads its node's. A value with its row is kept; a legacy id-shaped text is written as a reference when its group is usable, else reported; a value that does not convert keeps its rows as they are. Readers use a display rule. Rebuilds (pull, push, import, restore) read a converting path through its earlier type. The renderer's conversion maps read archived entries too, so an archived target lends its title.
+  - **Phase B's target guard** covers only the ids a rewrite newly names; ids a reshape or a rename carries over stay as stored, rows kept. **`set_field_localized`** updates the rows' `shared` in the batch of its site write (phase A, and the revert's).
+  - **Revert** drops restored references whose group has no member left in the site, and reports them in `FieldRevertResult.dropped`.
+  - **Values that stop converting while an operation runs** (a target archived or deleted, a second entry with the same title) are reported in `unconvertible` and keep the operation running. `continueFieldOperation` and `revertFieldOperation` take `onInvalid: "clear"` to drop them, as do the admin API's continue and revert routes (in the body) and `cloudhal fields continue|revert --clear`.
+  - **Releases (#213):** when the read of the published site node fails, the run retries it once, then purges everything; it no longer falls back to the working site row.
+  - **`multiple`** on a type change to a type that has none is ignored, as before.
+  - **CLI:** `cloudhal fields retype` takes `--collections a,b`, `--max-items n` and `--sub-fields <file.json>`, and every action takes `--sub <sub-field>`. The admin API's operation route parses the same inputs. MCP's operation tools take them with rollout step 5.
+- dda55ee: RFC-0045 rollout step 5: reference and repeater fields over MCP. The two types stay refused on every production write path until step 7 (`fields_unsupported`), and the field inputs do not list them there; a store with `SiteGraphStoreOptions.fieldTypes` gets tools that do. Nothing changes for the nine existing types, except as listed.
+  
+  - **`list_collections`** returns, beside `fieldsSchema`, its strict profile `fieldsSchemaStrict` (every key required, `null` for "leave as it is") and `strictCost` (`properties`, `depth`, `enumValues`, `unions`). Reference targets are named by their collections' labels.
+  - **`create_entry` / `update_entry`** take `fieldsStrict`, for strict structured output, instead of `fields` (`invalid` when both are given): `null` or a missing key leaves a value as it is (on create, no value); `null` sub-values in repeater items are stripped, and items left empty are dropped and reported in `droppedItems`. `update_entry` also takes `clearFields` (set and clear of one key is `invalid`, an unknown key `unknown_field`); on create it is `invalid`. A given reference or repeater value replaces the whole value.
+  - **Prechecks are the store's own write plan**, run as a dry run: the new `NodeWriteOptions.dryRun` on `createContentEntry`/`updateContentEntry`, and `deleteContentEntry(entry, { dryRun })`, throw the plan-time refusals (values, links, references, a release hold, gates, assets, terms) and write nothing. So `create_entry` and `update_entry` refuse reference targets (`unknown_entry`), repeater items and the references cap before anyone is asked, and `delete_entry` refuses `entry_referenced` with the published referrers. Behaviour change: those prechecks now also run the store's translation-link and canonical-id checks, which the handler ran anyway.
+  - **Approval prompts** name targets readably, from the dry run's planned entry (canonical ids): `venue → "Main hall" (entry_…, Places)`, `speakers: 2 items → 3 items (added "Ada Lovelace", Speaker; changed item 1: person → "Grace Hopper" (entry_…, People))`, quoted and truncated.
+  - **New read-only tool `list_references`** (`content:read`) with `direction: "to"` (referrers, published first, with the members that show them) or `"from"` (the groups an entry names, its original's inherited ones included). 110 → 111 tools. The API's `GET …/entries/:entryId/references` and the tool share core-ts's new `listReferrers` (and `listReferenceTargets`, `referenceCard`).
+  - **`list_entries`** returns each entry's `groupId`, the value a reference stores.
+  - **Translation tools**: `get_translation_source` lists a localized repeater's text and rich-text sub-values by item path (`speakers/0/talk`) with the source's `sourceRev`; `save_translation` takes them back with that `sourceRev` (`conflict` when the source changed) and folds them into a copy of the source's list, keeping each item's other sub-values (core-ts `translatedItemValues`). Once the translation holds its own list for that repeater, item paths are refused and the list is sent whole; a whole list given together with item paths must have the source's length (`translation_shape_mismatch`, new code, 409 in the API). A path naming no such value is refused. Keys whose first part is not a repeater (`og/image`) stay plain keys.
+  - **`normalizeEntryFields`** is exported from `@cloudhal/core-ts`: MCP's approval prompts read stored values through the markers exactly as the store does.
+  - **`continueFieldOperation`** with `onInvalid: "clear"` reports the values it drops as cleared, without the stored request's `field_values_unconvertible` refusal.
+  - **Removals during `rename_field`** over MCP: the old and the new key are one field; removing either removes both, so the writer's move cannot bring the value back, and setting one while removing the other is `invalid`.
+  - **Operation tools** take step 4's inputs: `sub` (`rename_field`, `change_field_type`, `remove_field`), `collections`, `maxItems`, `subFields` and `itemLabel` on `change_field_type`, and `onInvalid: "clear"` on a continuation; results carry `unconvertible`.
+  - **`defineTools({ referenceTypes })`** and `defaultToolList(referenceTypes)`: `createCloudhalMcpServer` passes whether its store has `fieldTypes`.
+- 3678855: RFC-0045 rollout step 6a: reference and repeater fields in Studio's entry editor. The two types stay refused on every production write path until step 7 (`fields_unsupported`), so no production collection can define them yet and Studio looks unchanged there.
+  
+  - **New read-only route `GET /api/sites/:siteId/entries/groups?ids=a,b`** (`content:read`, in the playground's allow-list): each translation group's members in the site, any status, as `{groupId, id, title, collection, status, locale}` cards (core-ts `getGroupMembers` and `referenceCard`); a group with no member left answers `[]`. One to 100 well-formed group ids (the per-entry reference cap), 400 otherwise, 404 for an unknown site. Studio reads the chosen targets' titles and states through it.
+  - **`fieldLabel`, `fieldHelp` and `optionLabel`** (`@cloudhal/core-ts/fields`) also take a repeater's sub-field definitions.
+  - **Studio** (not published): the entry editor's reference fields (`ReferenceList` and `EntryPicker` over `GET …/entries/pick`), repeaters (`RepeaterField`, focus after add and remove, an undo toast, item errors by path), and a "Used by" card from `GET …/entries/:id/references`, with the new `@cloudhal/ui` blocks `FieldControl`, `RepeaterField`, `ReferenceList`, `EntryPicker` and `UsedByList`. They load with the lazy fields chunk; the initial bundle is unchanged.
+- 4a5633d: RFC-0045 rollout step 7a: two fixes ahead of enabling reference and repeater fields. Both types stay refused on every production write path until step 7b; nothing changes for the nine existing types.
+  
+  - **core-ts (#215).** While a top-level conversion from references runs without a text ↔ reference path (reference (multiple) ↔ repeater, reference single ↔ multiple, a repeater converting away), a stored value still in the old shape that does not convert keeps its `entry_refs` rows through a person's unrelated write, such as a title edit. Before, the write dropped them, and the target's delete guard under-blocked. The writer holds the rows at the old type's paths, the same ones the import rebuild keeps (one helper, `oldShapePairs`), so the rows no longer depend on which touched the entry last.
+  - **core-ts: held rows follow their holder's status.** A row a write holds (a value a running conversion did not accept, here or during a text ↔ reference conversion) kept the `source_status` of its last insert, so publishing the holder left the target deletable and unpublishing left it locked. The write now updates the held rows' `source_status` in the same batch, anchored on the entry's new hash.
+  - **mcp-server, core-ts (#218).** Once a translation holds its own list for a localized repeater, `get_translation_source` returns the source's whole list for that key under `fields` (in the source's order, with every sub-value) instead of item paths, and names it in the new `wholeLists` output: send it back whole, translated. `save_translation` already refused item paths there (`translation_shape_mismatch`); its hint and the tool descriptions now say what to send. `save_translation` also checks a given `sourceRev` against whole repeater lists (`conflict` when the source moved on); without one they save as before. New core-ts export: `translationSourceValues`.
+- Updated dependencies [3b8e846]
+  - @cloudhal/core-contracts@0.9.0
+  - @cloudhal/schedules@0.9.0
+  - @cloudhal/storage@0.9.0
+
 ## 0.8.0
 
 ### Minor Changes
