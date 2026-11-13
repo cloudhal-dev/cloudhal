@@ -13,6 +13,7 @@ import { MemoryBlobStore, migrate, migrations } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { JsonSchema } from "../src/common.ts";
+import { describeFieldPatch } from "../src/field-prompts.ts";
 import { defaultToolList } from "../src/server-schema.ts";
 import { defineTools, runTool, type ToolContext, toolPolicies } from "../src/tools.ts";
 
@@ -568,43 +569,82 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
         { topic: "Kapanış", host: ada.id },
       ],
     });
-    // The translation picks its own host for the second item; a partial re-save keeps it, and
-    // keeps the first item's translated text.
+    // Once the translation holds its own list, item paths cannot know which of its items
+    // matches the source's by index: a re-translation by paths is refused...
     const tr = first.node;
     await w.store.updateContentEntry({
       ...tr,
       fields: {
         agenda: [
-          { topic: "Açılış", host: ada.id },
           { topic: "Kapanış", host: bob.id },
+          { topic: "Açılış", host: ada.id },
         ],
       },
     });
-    const again = (await save({ "agenda/1/topic": "Son" }, (await source()).sourceRev)).result as {
-      node: ContentEntry;
-    };
-    expect(again.node.fields).toEqual({
-      agenda: [
-        { topic: "Açılış", host: ada.id },
-        { topic: "Son", host: bob.id },
-      ],
-    });
-    // The source reorders its items (same length): the translation's own list was made from
-    // the earlier order, so a partial save is refused rather than paired by index.
-    const stored = (await w.store.getContentEntry(session.id)) as ContentEntry;
-    const items = stored.fields?.agenda as unknown[];
-    await w.store.updateContentEntry({ ...stored, fields: { agenda: [items[1], items[0]] } });
-    const moved = await rejection(
-      save({ "agenda/0/topic": "Kapanış" }, (await source()).sourceRev),
+    const again = await rejection(save({ "agenda/1/topic": "Son" }, (await source()).sourceRev));
+    expect(again.code).toBe("translation_shape_mismatch");
+    expect(again.message).toContain("send the whole list");
+    // ...and the whole list, in the source's order, re-translates it.
+    const whole = [
+      { topic: "Açılış", host: ada.id },
+      { topic: "Son", host: bob.id },
+    ];
+    const resaved = (await save({ agenda: whole })).result as { node: ContentEntry };
+    expect(resaved.node.fields).toEqual({ agenda: whole });
+    // A whole list of another length than the source's is refused, not stored.
+    const short = await rejection(
+      save({ agenda: [{ topic: "Tek" }], "agenda/0/topic": "x" }, (await source()).sourceRev),
     );
-    expect(moved.code).toBe("translation_shape_mismatch");
-    expect(moved.message).toContain("whole list");
-    // A translation's list of another length than the source's is refused, not overwritten.
-    const now = (await w.store.getContentEntry(tr.id)) as ContentEntry;
-    await w.store.updateContentEntry({ ...now, fields: { agenda: [{ topic: "Tek" }] } });
-    const shape = await rejection(save({ "agenda/0/topic": "x" }, (await source()).sourceRev));
-    expect(shape.code).toBe("translation_shape_mismatch");
-    expect((await w.store.getContentEntry(tr.id))?.fields).toEqual({ agenda: [{ topic: "Tek" }] });
+    expect(short.code).toBe("translation_shape_mismatch");
+    expect((await w.store.getContentEntry(tr.id))?.fields).toEqual({ agenda: whole });
+  });
+
+  it("reads an edition member's stored items as the store does while a localize marker runs", async () => {
+    const items = [{ topic: "A" }, { topic: "B" }, { topic: "C" }];
+    const sessions = w.site.collections?.sessions;
+    const [agenda] = (sessions?.fields ?? []) as FieldDefinition[];
+    const marked = {
+      ...w.site,
+      collections: {
+        ...w.site.collections,
+        sessions: {
+          ...sessions,
+          fields: [
+            {
+              ...agenda,
+              localized: false,
+              migration: { id: "op_localize01", fromLocalized: true },
+            },
+          ],
+        },
+      },
+    } as Site;
+    const member = (source: Record<string, unknown>) =>
+      ({
+        id: "entry_01HZX8K3QMEMBR",
+        siteId: w.site.id,
+        collection: "sessions",
+        locale: "tr",
+        fields: { agenda: items },
+        translation: { group: "entry_01HZX8K3QORIGN", method: "human", source },
+      }) as unknown as ContentEntry;
+    const ctx = { store: w.store } as unknown as ToolContext;
+    const at = { id: "entry_01HZX8K3QORIGN", locale: "en", rev: 0, hash: "h" };
+    // An edition member (its source in another site) keeps its own list: nothing changes.
+    const edition = await describeFieldPatch(
+      ctx,
+      marked,
+      member({ ...at, siteId: "site_01HZX8K3QOTHER" }),
+      {
+        patch: { agenda: items },
+      },
+    );
+    expect(edition).toBe('"Agenda" (agenda): 3 items → 3 items');
+    // A same-site translation's own copy goes under the marker: the store reads none.
+    const translation = await describeFieldPatch(ctx, marked, member(at), {
+      patch: { agenda: items },
+    });
+    expect(translation).toContain("0 items → 3 items");
   });
 
   it("keeps keys with / in a collection without definitions as plain keys", async () => {

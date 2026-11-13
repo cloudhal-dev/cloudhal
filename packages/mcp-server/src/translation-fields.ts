@@ -8,9 +8,9 @@
  * site's definitions may differ).
  *
  * RFC-0045 §3: a localized repeater's text and rich-text sub-values are translated by item path
- * (`speakers/0/talk`), and folded back into the translation's own list, else a copy of the
- * source's (`translatedItemValues`), so each item keeps its other sub-values. Lists of another
- * length are `translation_shape_mismatch`. A path names an item by index, so a save with paths
+ * (`speakers/0/talk`), and folded into a copy of the source's list (`translatedItemValues`), so
+ * each item keeps its other sub-values. Once the translation holds its own list, that repeater
+ * is sent whole; a path or a list of another length is `translation_shape_mismatch`. A path names an item by index, so a save with paths
  * names the source revision it was read from (`sourceRev`, `conflict` when it moved on).
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
@@ -47,12 +47,6 @@ const hasItemPaths = (defs: readonly FieldDefinition[], values: unknown): boolea
   !!values &&
   typeof values === "object" &&
   Object.keys(values).some((k) => itemPathRepeater(defs, k) !== undefined);
-
-/** A translation made from the source's current revision: its items line up by index. */
-const madeFromCurrent = (
-  existing: Pick<ContentEntry, "translation"> | undefined,
-  source: Pick<ContentEntry, "rev">,
-): boolean => existing?.translation?.source?.rev === source.rev;
 
 /** Item paths need the source revision they were read from, unchanged (RFC-0045 §3). */
 export function checkSourceRev(
@@ -100,7 +94,7 @@ export function refuseSharedFields(
   site: Site,
   source: ContentEntry,
   values: unknown,
-  existing?: Pick<ContentEntry, "fields" | "translation"> | undefined,
+  existing?: Pick<ContentEntry, "fields"> | undefined,
 ): void {
   if (!values || typeof values !== "object") return;
   const defs = fieldDefinitions(site, source.collection);
@@ -109,7 +103,6 @@ export function refuseSharedFields(
   const input = {
     source: source.fields,
     existing: existing?.fields,
-    existingCurrent: madeFromCurrent(existing, source),
   };
   const items = translatedItemValues(defs, input, values as Values).issues;
   const sharedPaths = new Set(shared.map((i) => i.path));
@@ -133,7 +126,6 @@ export function translatedFields(input: {
   const lists = {
     source: source.fields,
     existing: existing?.fields,
-    existingCurrent: madeFromCurrent(existing, source),
   };
   // The source may have changed since the precheck: refuse, never drop a path.
   const folded = translatedItemValues(defs, lists, given);

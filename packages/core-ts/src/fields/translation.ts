@@ -3,10 +3,10 @@
  * version's own (absent ones fall back to the original's); non-localized values live on the
  * group's original only and are never copied into a translation. Machine translation gets only
  * the localized `text` and `richText` values to translate: top-level by key, and inside a
- * localized repeater by item path, `speakers/0/talk` (RFC-0045 §3). A translated item path
- * writes into the translation's own list of the source's length, else a copy of the source's, so
- * an item's other sub-values (references, selects, images, text not sent again) stay as they are;
- * other lengths are `translation_shape_mismatch`. Worker-safe.
+ * localized repeater by item path, `speakers/0/talk` (RFC-0045 §3). Item paths write into a copy
+ * of the source's list, so an item's other sub-values (references, selects, images) come along.
+ * Once the translation holds its own list, that repeater is sent whole; other lengths are
+ * `translation_shape_mismatch`. Worker-safe.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type FieldIssue, isRecord } from "./types.ts";
@@ -118,14 +118,8 @@ function itemPath(path: string): { key: string; index: number; sub: string } | u
 export interface TranslatedItemsInput {
   /** The source's values: the list a path's index refers to. */
   source: Values | undefined;
-  /** The existing translation's own values in that locale, when there is one. */
+  /** The existing same-locale translation's own values, when there is one. */
   existing?: Values | undefined;
-  /**
-   * The existing translation was made from the source's current revision
-   * (`translation.source.rev`), so its items line up with the source's by index. Absent or
-   * false: its own list is never a base for item paths.
-   */
-  existingCurrent?: boolean | undefined;
 }
 
 const shapeIssue = (key: string, message: string): FieldIssue => ({
@@ -135,11 +129,10 @@ const shapeIssue = (key: string, message: string): FieldIssue => ({
 });
 
 /**
- * The list a repeater's translated paths write into: a list given whole in the same call, else
- * the existing translation's own list, else a copy of the source's. Each must have the source's
- * length, and the translation's own list must have been made from the source's current revision
- * (`translation_shape_mismatch` otherwise: a reorder of the same length would pair each text
- * with another item), so an index names the same item on both sides.
+ * The list a repeater's translated paths write into: a list given whole in the same call (of the
+ * source's length), else a copy of the source's. When the translation already holds its own list,
+ * a path cannot know which of its items matches the source's by index (either side may have been
+ * reordered or edited since), so that repeater must be sent whole (`translation_shape_mismatch`).
  */
 function baseList(
   key: string,
@@ -149,29 +142,30 @@ function baseList(
   const source = input.source?.[key];
   if (!Array.isArray(source)) return undefined;
   const whole = given[key];
-  const own = input.existing?.[key];
-  const base = Array.isArray(whole) ? whole : Array.isArray(own) ? own : source;
-  if (base === own && !input.existingCurrent)
+  if (Array.isArray(whole)) {
+    if (whole.length === source.length)
+      return { list: whole.map((x) => (isRecord(x) ? { ...x } : x)) };
     return {
       issue: shapeIssue(
         key,
-        `the translation's ${key} was made from an earlier revision of the source, whose items may have moved since; send the whole list in the source's current order`,
+        `${key} has ${whole.length} items as given and ${source.length} in the source; give the whole list in the source's order`,
       ),
     };
-  if (base.length !== source.length)
+  }
+  if (Array.isArray(input.existing?.[key]))
     return {
       issue: shapeIssue(
         key,
-        `${key} has ${base.length} items ${base === whole ? "as given" : "in the translation"} and ${source.length} in the source; translated items need the source's length (translate the list by hand, or give the whole list in the source's order)`,
+        `the translation already holds its own ${key}: send the whole list (translated, in the source's order) instead of item paths`,
       ),
     };
-  return { list: base.map((x) => (isRecord(x) ? { ...x } : x)) };
+  return { list: source.map((x) => (isRecord(x) ? { ...x } : x)) };
 }
 
 /**
  * The given translated values with item paths folded into lists (see `baseList`): each path's
- * text replaces that sub-value, and the item keeps its other sub-values (a translation's own
- * targets, images and selects, and text not sent again). A path that names no translatable
+ * text replaces that sub-value, and the item keeps its other sub-values (the source's targets,
+ * images and selects). A path that names no translatable
  * sub-value of an item of the source is refused at `fields/<path>` (`invalid_value`).
  */
 export function translatedItemValues(

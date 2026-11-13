@@ -11,12 +11,10 @@ import type {
   Site,
   SubFieldDefinition,
 } from "@cloudhal/core-contracts";
-import { canonicalJson, getGroupMembers } from "@cloudhal/core-ts";
+import { canonicalJson, getGroupMembers, normalizeEntryFields } from "@cloudhal/core-ts";
 import {
-  convertContext,
   fieldDefinitions,
   fieldLabel,
-  normalizeThroughMarkers,
   optionLabel,
   referenceValues,
   renamedFrom,
@@ -258,7 +256,7 @@ export function describeFieldValue(
 export async function describeFieldPatch(
   ctx: ToolContext,
   site: Site,
-  entry: Pick<ContentEntry, "id" | "collection" | "locale" | "fields" | "translation">,
+  entry: ContentEntry,
   change: { patch: Values; planned?: Values | undefined },
 ): Promise<string> {
   const { patch, planned } = change;
@@ -272,12 +270,9 @@ export async function describeFieldPatch(
     }),
   );
   const locale = site.defaultLocale;
-  // The stored values through the field-operation markers, as the planned ones are, so a
-  // running sub-field rename or conversion does not read as every item changing.
-  const raw = entry.fields ?? {};
-  const translation = !!entry.translation && entry.translation.group !== entry.id;
-  const stored =
-    normalizeThroughMarkers(list, raw, { convert: convertContext(site), translation }) ?? raw;
+  // The stored values through the field-operation markers, by the store's own reading (an edition
+  // member is not a translation there), so a running operation does not read as items changing.
+  const stored = normalizeEntryFields(site, entry).fields ?? {};
   // What the store would write wins, also over a `null` it would not apply.
   const shown = (key: string, value: unknown) =>
     planned && Object.hasOwn(planned, key) ? planned[key] : value;

@@ -126,44 +126,30 @@ describe("repeater paths (RFC-0045)", () => {
     ]);
   });
 
-  it("writes into the translation's own list, keeping its targets and text not sent again", () => {
+  it("refuses item paths once the translation holds its own list: send it whole", () => {
     const H = "entry_01HZX8K3Q9H2";
     const existing = {
       agenda: [{ topic: "Açılış", host: H }, { topic: "Ara", host: G }, { notes: "Son" }],
     };
     const r = translatedItemValues(
       AGENDA,
-      { source: SOURCE, existing, existingCurrent: true },
+      { source: SOURCE, existing },
       { "agenda/2/notes": "**Kapanış**" },
     );
-    expect(r.issues).toEqual([]);
-    expect(r.values.agenda).toEqual([
-      { topic: "Açılış", host: H },
-      { topic: "Ara", host: G },
-      { notes: "**Kapanış**" },
-    ]);
-  });
-
-  it("never folds into a translation's list made from an earlier revision of the source", () => {
-    // Same length, reordered since: index 0 would pair the text with another item.
-    const existing = { agenda: [{ notes: "Son" }, { host: G }, { topic: "Açılış", host: G }] };
-    const r = translatedItemValues(AGENDA, { source: SOURCE, existing }, { "agenda/0/topic": "x" });
     expect(r.issues.map((i) => [i.path, i.code])).toEqual([
       ["fields/agenda", "translation_shape_mismatch"],
     ]);
+    expect(r.issues[0]?.message).toContain("send the whole list");
     expect(r.values).toEqual({});
+    // The whole list, in the source's order, is the way to re-translate.
+    const whole = [{ topic: "Açılış", host: H }, { host: G }, { notes: "**Kapanış**" }];
+    expect(translatedItemValues(AGENDA, { source: SOURCE, existing }, { agenda: whole })).toEqual({
+      values: { agenda: whole },
+      issues: [],
+    });
   });
 
-  it("refuses lists of another length than the source's (translation_shape_mismatch)", () => {
-    const short = { agenda: [{ topic: "Açılış" }] };
-    const own = translatedItemValues(
-      AGENDA,
-      { source: SOURCE, existing: short, existingCurrent: true },
-      { "agenda/0/topic": "x" },
-    );
-    expect(own.issues.map((i) => [i.path, i.code])).toEqual([
-      ["fields/agenda", "translation_shape_mismatch"],
-    ]);
+  it("refuses a whole list of another length than the source's (translation_shape_mismatch)", () => {
     const given = translatedItemValues(
       AGENDA,
       { source: SOURCE },
