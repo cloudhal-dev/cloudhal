@@ -10,8 +10,11 @@
  * RFC-0045 §3: a localized repeater's text and rich-text sub-values are translated by item path
  * (`speakers/0/talk`), and folded into a copy of the source's list (`translatedItemValues`), so
  * each item keeps its other sub-values. Once the translation holds its own list, that repeater
- * is sent whole; a path or a list of another length is `translation_shape_mismatch`. A path names an item by index, so a save with paths
- * names the source revision it was read from (`sourceRev`, `conflict` when it moved on).
+ * is sent whole: `get_translation_source` hands over the source's whole list for it and names it
+ * in `wholeLists`, and a path for it is `translation_shape_mismatch`. A list given whole together
+ * with paths must have the source's length; a whole list sent alone is the translation's own and
+ * is stored as sent (RFC-0045 "Amended in 7a"). A path names an item by index, so a save with
+ * paths names the source revision it was read from (`sourceRev`, `conflict` when it moved on).
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
 import {
@@ -20,8 +23,8 @@ import {
   refuseFieldIssues,
   sharedFieldIssues,
   sharedFieldKeys,
-  translatableFieldValues,
   translatedItemValues,
+  translationSourceValues,
 } from "@cloudhal/core-ts/fields";
 import { type JsonSchema, ToolError } from "./common.ts";
 
@@ -31,7 +34,7 @@ type Values = Record<string, unknown>;
 export const TRANSLATED_FIELDS: JsonSchema = {
   type: "object",
   description:
-    "Entries: your translation of each value in get_translation_source's `fields` (localized text and rich-text fields), by the same key: a field key, or a repeater item's path such as speakers/0/talk (the item's other values are kept). Shared fields (`sharedFields`) are read from the original and refused here",
+    "Entries: your translation of each value in get_translation_source's `fields` (localized text and rich-text fields), by the same key: a field key, or a repeater item's path such as speakers/0/talk (the item's other values are kept). A repeater named in get_translation_source's `wholeLists` is sent whole instead: the list it returned, its text and rich-text sub-values translated and every other sub-value kept, in the same order, under the repeater's key; item paths for it are refused (translation_shape_mismatch). A whole list sent alone is stored as sent. Shared fields (`sharedFields`) are read from the original and refused here",
 };
 
 /** `save_translation`'s `sourceRev`. */
@@ -39,7 +42,7 @@ export const SOURCE_REV_INPUT: JsonSchema = {
   type: "integer",
   minimum: 0,
   description:
-    "Entries: get_translation_source's sourceRev. Required when fields has repeater item paths, which name items by index: refused (conflict) when the source changed since",
+    "Entries: get_translation_source's sourceRev. Required when fields has repeater item paths, which name items by index: refused (conflict) when the source changed since. Send it with a repeater's whole list (wholeLists) too: given, it is checked the same way, so a list read before the source changed is not saved as current",
 };
 
 /** True when `values` names a repeater item (`speakers/0/talk`); other keys with `/` are plain. */
@@ -48,14 +51,28 @@ const hasItemPaths = (defs: readonly FieldDefinition[], values: unknown): boolea
   typeof values === "object" &&
   Object.keys(values).some((k) => itemPathRepeater(defs, k) !== undefined);
 
-/** Item paths need the source revision they were read from, unchanged (RFC-0045 §3). */
+/** True when `values` gives a repeater's list whole (`wholeLists`). */
+const hasWholeLists = (defs: readonly FieldDefinition[], values: unknown): boolean =>
+  !!values &&
+  typeof values === "object" &&
+  Object.entries(values).some(
+    ([k, v]) => Array.isArray(v) && defs.some((d) => d.key === k && d.type === "repeater"),
+  );
+
+/**
+ * Item paths need the source revision they were read from, unchanged (RFC-0045 §3). A whole
+ * repeater list is checked against `sourceRev` when one is given (#221), so a list read before the
+ * source changed is not linked to its new revision; without one it is saved as before.
+ */
 export function checkSourceRev(
   a: Record<string, unknown>,
   site: Site,
   source: { id: string; rev: number; collection?: string },
 ) {
   if (source.collection === undefined) return;
-  if (!hasItemPaths(fieldDefinitions(site, source.collection), a.fields)) return;
+  const defs = fieldDefinitions(site, source.collection);
+  const paths = hasItemPaths(defs, a.fields);
+  if (!paths && !(typeof a.sourceRev === "number" && hasWholeLists(defs, a.fields))) return;
   if (typeof a.sourceRev !== "number")
     throw new ToolError(
       "invalid",
@@ -68,20 +85,33 @@ export function checkSourceRev(
     );
 }
 
-/** What `get_translation_source` returns about an entry's typed fields (nothing for a page). */
+/**
+ * What `get_translation_source` returns about an entry's typed fields (nothing for a page). A
+ * localized repeater the existing translation (`existing`, the one `save_translation` writes)
+ * already holds its own list of comes whole, named in `wholeLists` (#218).
+ */
 export function translationSourceFields(
   site: Site,
   source: object,
-): { source: object; fields?: Record<string, string>; sharedFields?: string[] } {
+  existing?: object | undefined,
+): {
+  source: object;
+  fields?: Record<string, unknown>;
+  wholeLists?: string[];
+  sharedFields?: string[];
+} {
   if (!("collection" in source)) return { source };
   const entry = source as ContentEntry;
   const defs = fieldDefinitions(site, entry.collection);
   if (defs.length === 0) return { source };
   const { fields, ...rest } = entry;
   const shared = sharedFieldKeys(defs);
+  const own = existing && "fields" in existing ? (existing as ContentEntry).fields : undefined;
+  const values = translationSourceValues(defs, fields, own);
   return {
     source: rest,
-    fields: translatableFieldValues(defs, fields),
+    fields: values.fields,
+    ...(values.whole.length > 0 ? { wholeLists: values.whole } : {}),
     ...(shared.length > 0 ? { sharedFields: shared } : {}),
   };
 }

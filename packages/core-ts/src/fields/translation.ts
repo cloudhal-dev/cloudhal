@@ -5,8 +5,10 @@
  * the localized `text` and `richText` values to translate: top-level by key, and inside a
  * localized repeater by item path, `speakers/0/talk` (RFC-0045 §3). Item paths write into a copy
  * of the source's list, so an item's other sub-values (references, selects, images) come along.
- * Once the translation holds its own list, that repeater is sent whole; other lengths are
- * `translation_shape_mismatch`. Worker-safe.
+ * Once the translation holds its own list, that repeater is sent whole: the source hands it over
+ * whole (`translationSourceValues`), and item paths for it are `translation_shape_mismatch`. A
+ * list given whole together with item paths must have the source's length; a whole list sent
+ * alone is the translation's own and is stored as sent (RFC-0045 "Amended in 7a"). Worker-safe.
  */
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { type FieldIssue, isRecord } from "./types.ts";
@@ -60,6 +62,40 @@ export function translatableFieldValues(
     });
   }
   return out;
+}
+
+/** What a translation source hands over to translate (`translationSourceValues`). */
+export interface TranslationSourceValues {
+  /** `translatableFieldValues`, with a list given whole for each repeater in `whole`. */
+  readonly fields: Record<string, unknown>;
+  /** The repeaters sent whole: the existing translation holds its own list of them. */
+  readonly whole: string[];
+}
+
+/**
+ * RFC-0045 §3 (#218): the values to translate for a source and the existing same-locale
+ * translation, if any. As `translatableFieldValues`, except a localized repeater the translation
+ * already holds its own list of: item paths would be refused for it (`baseList`), so the source's
+ * whole list is handed over under its key instead, in the source's order and with every
+ * sub-value, to be translated and sent back whole.
+ */
+export function translationSourceValues(
+  defs: readonly FieldDefinition[],
+  source: Values | undefined,
+  existing: Values | undefined,
+): TranslationSourceValues {
+  const fields: Record<string, unknown> = translatableFieldValues(defs, source);
+  const whole: string[] = [];
+  for (const def of defs) {
+    const list = source?.[def.key];
+    if (translatableSubs(def).size === 0 || !Array.isArray(list)) continue;
+    if (!Array.isArray(existing?.[def.key])) continue;
+    for (const key of Object.keys(fields))
+      if (itemPathRepeater(defs, key) === def.key) delete fields[key];
+    fields[def.key] = list;
+    whole.push(def.key);
+  }
+  return { fields, whole };
 }
 
 /**
@@ -133,6 +169,8 @@ const shapeIssue = (key: string, message: string): FieldIssue => ({
  * source's length), else a copy of the source's. When the translation already holds its own list,
  * a path cannot know which of its items matches the source's by index (either side may have been
  * reordered or edited since), so that repeater must be sent whole (`translation_shape_mismatch`).
+ * Only paths reach here: a whole list sent with no path for it is the translation's own and is
+ * stored as sent, whatever its length.
  */
 function baseList(
   key: string,

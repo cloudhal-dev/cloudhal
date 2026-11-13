@@ -23,6 +23,7 @@ import { refuseFieldIssues } from "../fields/refusal.ts";
 import type { FieldRows } from "../fields/text-reference.ts";
 import { type FieldIssue, fieldDefinitions, isRecord, sameJson } from "../fields/types.ts";
 import { and, type Cond } from "../node-sql.ts";
+import { heldStatusStatement } from "./held-status.ts";
 import { hasReferenceFields } from "./issues.ts";
 import { memberGroup } from "./members.ts";
 import { definitionsPath, entryRefRows, holdsReferences, storedKey } from "./rows.ts";
@@ -229,6 +230,8 @@ export function entryRefStatements(
       params: [draft.id, ...(kept.size > 0 ? [JSON.stringify([...kept])] : []), draft.id, hash],
     },
   ];
+  const at = { siteId: site.id, nodeId: draft.id, status: draft.status, hash };
+  if (kept.size > 0) out.push(heldStatusStatement(at, kept));
   if (rows.length === 0) return out;
   out.push({
     sql: `INSERT INTO entry_refs (site_id, target_id, source_id, source_collection, field, root_key, shared, source_status)

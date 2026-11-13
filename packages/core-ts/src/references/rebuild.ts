@@ -17,6 +17,7 @@ import { GROUP_ID_PATTERN } from "../fields/props.ts";
 import { fieldDefinitions, isRecord } from "../fields/types.ts";
 import { chunks, REFS_STATEMENT_BYTES } from "../media/refs-rebuild.ts";
 import { convertingPath } from "./conversion-rows.ts";
+import { oldShapePairs } from "./old-shape.ts";
 import { type EntryRefRow, entryRefRows, sharedOf, storedKey } from "./rows.ts";
 
 const GROUP_ID = new RegExp(GROUP_ID_PATTERN);
@@ -64,30 +65,20 @@ export function rebuildRows(site: Pick<Site, "collections">, entry: ContentEntry
 }
 
 /**
- * A running reference (multiple) ↔ repeater conversion (top level): a stored value still in the
- * old shape is read through the old type, so its rows stand until phase B rewrites it. From a
- * reference, each id-shaped string of the list gets a row at the field path; from a repeater,
- * each item's id-shaped sub-value at `<field>.<sub>`.
+ * A running top-level conversion from references with no text ↔ reference path (reference
+ * (multiple) ↔ repeater, among others): a stored value still in the old shape is read through the
+ * old type (`oldShapePairs`, the same pairs a person's write holds for a value that does not
+ * convert), so its rows stand until phase B rewrites it.
  */
 function reshapedRows(
   def: FieldDefinition,
   values: Readonly<Record<string, unknown>>,
   have: readonly EntryRefRow[],
 ): EntryRefRow[] {
-  const from = def.migration?.fromType;
-  if (def.migration?.sub !== undefined || (from !== "reference" && from !== "repeater")) return [];
   const k = storedKey(def, values) ?? def.key;
-  const stored = values[k];
-  const found: { f: string; t: string }[] = [];
-  const id = (v: unknown): v is string => typeof v === "string" && GROUP_ID.test(v);
-  for (const v of Array.isArray(stored) ? stored : [stored]) {
-    if (from === "reference" && id(v)) found.push({ f: k, t: v });
-    if (from === "repeater" && isRecord(v))
-      for (const [sub, t] of Object.entries(v)) if (id(t)) found.push({ f: `${k}.${sub}`, t });
-  }
   const seen = new Set(have.map((r) => `${r.f} ${r.t}`));
   const out: EntryRefRow[] = [];
-  for (const { f, t } of found) {
+  for (const { f, t } of oldShapePairs(def, k, values[k])) {
     if (seen.has(`${f} ${t}`)) continue;
     seen.add(`${f} ${t}`);
     out.push({ t, f, k, shared: sharedOf(def) });

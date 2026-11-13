@@ -142,8 +142,10 @@ export {
   sharedFieldIssues,
   sharedFieldKeys,
   type TranslatedItemsInput,
+  type TranslationSourceValues,
   translatableFieldValues,
   translatedItemValues,
+  translationSourceValues,
 } from "./translation.ts";
 export {
   ALL_FIELD_TYPES,

@@ -33,6 +33,7 @@ import type { Cond } from "../node-sql.ts";
 import { loadConversionEntries } from "../references/conversion-load.ts";
 import type { ConversionEntries } from "../references/conversion-maps.ts";
 import { convertingPath, loadNodeRows } from "../references/conversion-rows.ts";
+import { oldShapePairs } from "../references/old-shape.ts";
 import type { HeldRef } from "../references/writer.ts";
 import type { StoreContext } from "./context.ts";
 
@@ -143,6 +144,17 @@ function heldRefs(
   return out;
 }
 
+/** A stored old-shape value's failures, per old-type field path (`oldShapePairs`). */
+function oldShapeFailures(
+  def: FieldDefinition,
+  stored: readonly FailedValue[],
+): { def: FieldDefinition; f: string; ids: string[] }[] {
+  const by = new Map<string, string[]>();
+  for (const { value } of stored)
+    for (const { f, t } of oldShapePairs(def, def.key, value)) by.set(f, [...(by.get(f) ?? []), t]);
+  return [...by].map(([f, ids]) => ({ def, f, ids }));
+}
+
 /**
  * RFC-0045 §7: a write's draft and its stored entry through the markers. A running text ↔
  * reference conversion's maps, and the node's rows for its path, are read only while one runs:
@@ -179,10 +191,12 @@ export async function normalizeWrite(
     // Per value: only a stored value that did not convert keeps its rows as they are; one the
     // person newly wrote is guarded like any choice.
     onUnconvertible: (def, failed) => {
+      const kept = failed.filter((x) => x.stored);
       const f = convertingPath(def);
-      if (f === undefined) return;
-      const ids = failed.filter((x) => x.stored).flatMap((x) => idsOf(x.value));
-      failures.push({ def, f, ids });
+      if (f !== undefined) failures.push({ def, f, ids: kept.flatMap((x) => idsOf(x.value)) });
+      // #215: a reshape from references (reference ↔ repeater, …) has no row path; its stored
+      // old-shape value keeps the rows the rebuild gives it, at the old type's paths.
+      else failures.push(...oldShapeFailures(def, kept));
     },
   });
   const held = heldRefs(failures, draft.fields);

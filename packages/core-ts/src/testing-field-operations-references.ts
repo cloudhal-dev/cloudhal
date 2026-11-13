@@ -24,7 +24,7 @@ import {
 import { nodeHash } from "./hash.ts";
 import { PNG_1X1 } from "./media/fixtures.ts";
 import { SiteGraphStore } from "./store.ts";
-import { exportSite, importSite } from "./sync.ts";
+import { rebuildingImport } from "./testing-reimport.ts";
 import { racingDriver, type SuiteContext } from "./testing-taxonomy.ts";
 
 const person: Actor = { kind: "human", id: "user_01HZX8K3Q9CD", name: "Halil" };
@@ -134,6 +134,12 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
     const place = (site: Site, title: string, over: Partial<ContentEntry> = {}) =>
       entry(site, "places", { title, slug: title.toLowerCase().replace(/ /g, "-"), ...over });
     const fresh = async (e: ContentEntry) => (await store().getContentEntry(e.id)) as ContentEntry;
+    /** A replace import that really rebuilds the rows (`rebuildingImport`). */
+    const reimport = (site: Site) =>
+      rebuildingImport(
+        { sql: ctx.sql(), blobs: ctx.blobs() },
+        { siteId: site.id, fieldTypes: ENABLED, addNode: () => place(site, `Scratch ${++n}`) },
+      );
     const freshSite = async (site: Site) => (await store().getSite(site.id)) as Site;
     const def = async (site: Site, key: string) =>
       ((await store().getSite(site.id)) as Site).collections?.events?.fields?.find(
@@ -1036,11 +1042,7 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
         const legacy = await entry(a, "events", { fields: { venue: gone.id } });
         const toRefOp = await run(a, toRef(), { budget: { entries: 0 } });
         await store().updateContentEntry({ ...(await fresh(gone)), status: "archived" });
-        const storage = { sql: ctx.sql(), blobs: ctx.blobs() };
-        await importSite(storage, await exportSite(storage, a.id), {
-          mode: "replace",
-          fieldTypes: ENABLED,
-        });
+        await reimport(a);
         expect(await rows(legacy.id)).toEqual([]);
         const stuck = await continueFieldOperation(store(), a.id, toRefOp.operationId, actor);
         expect(stuck.unconvertible.map((u) => u.entryId)).toEqual([legacy.id]);
@@ -1053,10 +1055,7 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
           { op: "change_field_type", collection: "events", key: "venue", type: "text" },
           { budget: { entries: 0 } },
         );
-        await importSite(storage, await exportSite(storage, b.id), {
-          mode: "replace",
-          fieldTypes: ENABLED,
-        });
+        await reimport(b);
         expect(await rows(e.id)).toEqual([{ t: hall.id, f: "venue", k: "venue", s: 1 }]);
         const done = await continueFieldOperation(store(), b.id, toText.operationId, actor);
         expect(done.done).toBe(true);
@@ -1075,12 +1074,6 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
           collections: ["places"],
           ...over,
         }) as FieldOperation;
-      const storage = () => ({ sql: ctx.sql(), blobs: ctx.blobs() });
-      const reimport = async (site: Site) =>
-        importSite(storage(), await exportSite(storage(), site.id), {
-          mode: "replace",
-          fieldTypes: ENABLED,
-        });
 
       it("a rebuild keeps an accepted list's rows; only a bare string is checked again", async () => {
         const site = await world([text("venue")]);
@@ -1266,11 +1259,7 @@ export function fieldOperationsReferencesSuite(ctx: SuiteContext): void {
           },
           { budget: { entries: 0 } },
         );
-        const storage = { sql: ctx.sql(), blobs: ctx.blobs() };
-        await importSite(storage, await exportSite(storage, site.id), {
-          mode: "replace",
-          fieldTypes: ENABLED,
-        });
+        await reimport(site);
         expect(await rows(e.id)).toEqual([{ t: p.id, f: "hosts", k: "hosts", s: 1 }]);
         expect(await code(store().deleteContentEntry(await fresh(p)))).toBe("entry_referenced");
       });

@@ -599,6 +599,90 @@ describe("RFC-0045 over MCP (rollout step 5)", () => {
     expect((await w.store.getContentEntry(tr.id))?.fields).toEqual({ agenda: whole });
   });
 
+  it("re-translates a stale repeater: list_stale_translations → get_translation_source → save_translation (#218)", async () => {
+    const bob = await entry(w, "people", { title: "Bob" });
+    const session = await entry(w, "sessions", {
+      title: "Day one",
+      fields: { agenda: [{ topic: "Opening", host: ada.id }] },
+    });
+    const get = async () =>
+      (await call(w, "get_translation_source")({ nodeId: session.id, locale: "tr" })).result as {
+        fields: Record<string, unknown>;
+        wholeLists?: string[];
+        sourceRev: number;
+        stale?: boolean;
+      };
+    const save = (fields: Record<string, unknown>, sourceRev?: number) =>
+      call(
+        w,
+        "save_translation",
+      )({
+        nodeId: session.id,
+        locale: "tr",
+        title: "Birinci gün",
+        slug: "birinci-gun",
+        body: "Gövde",
+        fields,
+        ...(sourceRev === undefined ? {} : { sourceRev }),
+      });
+    // The first translation goes by item path; the translation then holds its own list.
+    const first = await get();
+    expect(first.fields).toEqual({ "agenda/0/topic": "Opening" });
+    expect(first.wholeLists).toBeUndefined();
+    const tr = (
+      (await save({ "agenda/0/topic": "Açılış" }, first.sourceRev)).result as {
+        node: ContentEntry;
+      }
+    ).node;
+    // The source changes: an item is reworded and one is added.
+    const agenda = [
+      { topic: "Welcome", host: ada.id },
+      { topic: "Keynote", host: bob.id },
+    ];
+    const current = (await w.store.getContentEntry(session.id)) as ContentEntry;
+    await w.store.updateContentEntry({ ...current, fields: { agenda } });
+
+    const stale = (await call(w, "list_stale_translations")({ locale: "tr" })).result as {
+      stale: { id: string }[];
+    };
+    expect(stale.stale.map((m) => m.id)).toEqual([tr.id]);
+    const translation = (await w.store.getContentEntry(tr.id)) as ContentEntry;
+    expect(translation.translation?.source?.id).toBe(session.id);
+
+    // The source hands over its whole list, in its order with every sub-value, not item paths.
+    const src = await get();
+    expect(src.stale).toBe(true);
+    expect(src.wholeLists).toEqual(["agenda"]);
+    expect(src.fields).toEqual({ agenda });
+    // Item paths are still refused, with a hint that names what to send.
+    const paths = await rejection(save({ "agenda/0/topic": "Hoş geldiniz" }, src.sourceRev));
+    expect(paths.code).toBe("translation_shape_mismatch");
+    expect(paths.message).toContain("wholeLists");
+
+    // The list as handed over, its text translated, saves.
+    const translated = (src.fields.agenda as { topic: string; host: string }[]).map((item, i) => ({
+      ...item,
+      topic: ["Hoş geldiniz", "Açılış konuşması"][i] as string,
+    }));
+    // A whole list read before the source changed is refused when its sourceRev is given...
+    const late = await rejection(save({ agenda: translated }, src.sourceRev - 1));
+    expect(late.code).toBe("conflict");
+    // ...and saves with the revision it was read at.
+    const saved = (await save({ agenda: translated }, src.sourceRev)).result as {
+      node: ContentEntry;
+    };
+    expect(saved.node.fields).toEqual({
+      agenda: [
+        { topic: "Hoş geldiniz", host: ada.id },
+        { topic: "Açılış konuşması", host: bob.id },
+      ],
+    });
+    const after = (await call(w, "list_stale_translations")({ locale: "tr" })).result as {
+      stale: unknown[];
+    };
+    expect(after.stale).toEqual([]);
+  });
+
   it("reads an edition member's stored items as the store does while a localize marker runs", async () => {
     const items = [{ topic: "A" }, { topic: "B" }, { topic: "C" }];
     const sessions = w.site.collections?.sessions;

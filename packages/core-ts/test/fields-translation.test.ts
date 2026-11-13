@@ -7,6 +7,7 @@ import {
   sharedFieldKeys,
   translatableFieldValues,
   translatedItemValues,
+  translationSourceValues,
 } from "../src/fields/index.ts";
 
 const label = (en: string) => ({ en: { label: en } });
@@ -157,6 +158,34 @@ describe("repeater paths (RFC-0045)", () => {
     );
     expect(given.issues.map((i) => i.code)).toEqual(["translation_shape_mismatch"]);
     expect(given.values.agenda).toEqual([{ topic: "a" }]);
+  });
+
+  it("a whole list sent alone is the translation's own: stored as sent, whatever its length", () => {
+    const alone = translatedItemValues(AGENDA, { source: SOURCE }, { agenda: [{ topic: "a" }] });
+    expect(alone).toEqual({ values: { agenda: [{ topic: "a" }] }, issues: [] });
+  });
+
+  it("hands over the source's whole list once the translation holds its own (#218)", () => {
+    // no translation yet, or one without its own list: item paths, as before
+    for (const existing of [undefined, {}, { agenda: "not a list" }])
+      expect(translationSourceValues(AGENDA, SOURCE, existing)).toEqual({
+        fields: translatableFieldValues(AGENDA, SOURCE),
+        whole: [],
+      });
+    // its own list: the source's list, in its order, with every sub-value, and no item paths
+    const own = translationSourceValues(AGENDA, { ...SOURCE, title: "x" }, { agenda: [] });
+    expect(own).toEqual({ fields: { agenda: SOURCE.agenda }, whole: ["agenda"] });
+    // what it hands over, translated and sent back whole, is accepted
+    const back = (own.fields.agenda as Record<string, unknown>[]).map((i) => ({ ...i }));
+    expect(
+      translatedItemValues(AGENDA, { source: SOURCE, existing: { agenda: [] } }, { agenda: back })
+        .issues,
+    ).toEqual([]);
+    // a shared repeater, or a source without the list, is never handed over
+    expect(translationSourceValues(AGENDA, { shared: SOURCE.shared }, SOURCE)).toEqual({
+      fields: {},
+      whole: [],
+    });
   });
 
   it("scans a long path in linear time", () => {

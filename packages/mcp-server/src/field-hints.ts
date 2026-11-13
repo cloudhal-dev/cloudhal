@@ -51,7 +51,7 @@ const HINTS: Partial<Record<InvariantCode, string>> = {
   entry_referenced:
     "published entries (details.referrers) show this entry, and it is the last one of its group here: ask a person to unpublish or edit them first; archiving it does not release them",
   translation_shape_mismatch:
-    "the translation's list has another length than the source's: translate that repeater by hand, or send it whole in the source's order (get_translation_source)",
+    "send that repeater as get_translation_source returns it, translated: by item paths, or as the whole list when it is named in `wholeLists` (the translation already holds its own list); a whole list given beside item paths must have the source's length and order",
   translation_group_in_use:
     "other language versions use this entry as their original: unlink or move them first, then change its translation",
   field_operation_running:
