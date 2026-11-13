@@ -33,8 +33,8 @@ function withoutMarker(variant: JsonSchema): JsonSchema {
 export interface FieldTypeOptions {
   /**
    * The store accepts RFC-0045's `reference` and `repeater` (`SiteGraphStoreOptions.fieldTypes`
-   * is set). Absent or false: the inputs list the enabled types only, as production does until
-   * rollout step 7. The store still decides per site.
+   * is set: the admin Worker, Node stores, the playground; rollout step 7). Absent or false: the
+   * inputs list the other types only. The store still decides per site (`fields: 2`).
    */
   referenceTypes?: boolean | undefined;
 }

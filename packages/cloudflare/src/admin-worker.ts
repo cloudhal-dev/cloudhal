@@ -66,7 +66,7 @@ import { R2BlobStore } from "@cloudhal/storage/r2";
 import { type BrowserBinding, browserRenderingRenderer } from "./browser-render.ts";
 import { type BuildRoomsEnv, buildRoomClass, createDurableBuildHub } from "./build-rooms.ts";
 import { adminComments, type CommentsEnv, commentsOn, flushCommentPurges } from "./comments.ts";
-import { siteGateSupport } from "./features.ts";
+import { type SiteConfirmations, siteSupport } from "./features.ts";
 import { adminMail, type MailEnv } from "./mail.ts";
 import { purgeSiteCache } from "./purge.ts";
 import {
@@ -343,8 +343,8 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
   let migrated = false;
   /** The request backstop's isolate state (RFC-0008 §8.6); plain numbers. */
   const backstop: BackstopState = { lastCheck: 0, lastRun: 0 };
-  /** The gates version the site Worker confirmed (RFC-0008 §7.7, RFC-0042 §3.6); 0: none yet. */
-  let gatesConfirmed = 0;
+  /** What the site Worker confirmed: gates (RFC-0008 §7.7, RFC-0042 §3.6), fields (RFC-0045). */
+  const confirmed: SiteConfirmations = { gates: 0, fields: false };
   const ensureMigrated = async (sql: SqlDriver) => {
     if (migrated) return;
     try {
@@ -439,16 +439,14 @@ export function createAdminWorker(options: AdminWorkerOptions = {}) {
         blobs,
         blocks,
         ...storeExtras(options, env, sql),
-        // S15: `availability` is refused until the site Worker says it enforces gates.
-        gates: siteGateSupport({
+        // S15 and RFC-0045 §1: `availability`, and reference and repeater fields, are refused
+        // until the site Worker says it enforces gates and reads those fields (`fields: 2`).
+        ...siteSupport({
           fetch: siteBinding
             ? (u, init) => siteBinding.fetch(u, init as never) as unknown as Promise<Response>
             : undefined,
           token: purgeToken,
-          confirmed: () => gatesConfirmed,
-          remember: (version) => {
-            gatesConfirmed = version;
-          },
+          confirmed,
           log,
         }),
         onPublished: async (site, change) => {

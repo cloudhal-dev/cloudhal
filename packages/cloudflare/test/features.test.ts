@@ -6,7 +6,13 @@
  * packages/cli/test/cloudflare-gates.test.ts.
  */
 import { describe, expect, it } from "vitest";
-import { siteFeatures, siteFieldTypeSupport, siteGateSupport } from "../src/features.ts";
+import {
+  type SiteConfirmations,
+  siteFeatures,
+  siteFieldTypeSupport,
+  siteGateSupport,
+  siteSupport,
+} from "../src/features.ts";
 
 function site(answer: () => Response) {
   const calls: { url: string; auth: string | null; method: string | undefined }[] = [];
@@ -130,5 +136,34 @@ describe("fields: 2 (RFC-0045 §1, admin side)", () => {
       remember: () => {},
     });
     expect(await none.supported("site_01HZX8K3Q9AB")).toBe(false);
+  });
+});
+
+describe("siteSupport: both capabilities of the admin Worker's store (RFC-0045 step 7)", () => {
+  it("asks the site Worker for each and remembers each in the isolate's confirmations", async () => {
+    let answer: Record<string, number> = { gates: 2 };
+    const s = site(() => Response.json(answer));
+    const confirmed: SiteConfirmations = { gates: 0, fields: false };
+    const { gates, fieldTypes } = siteSupport({ fetch: s.fetch, token: "tok", confirmed });
+    // a site Worker from before RFC-0045 step 3: gates yes, the types stay refused
+    expect(await gates.enforced("site_01HZX8K3Q9AB")).toBe(true);
+    expect(await fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(false);
+    expect(confirmed).toEqual({ gates: 2, fields: false });
+    answer = { gates: 2, fields: 2 };
+    expect(await fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(true);
+    expect(confirmed).toEqual({ gates: 2, fields: true });
+    // both remembered: no more asking, in this request or the next one built from them
+    const calls = s.calls.length;
+    const next = siteSupport({ fetch: s.fetch, token: "tok", confirmed });
+    expect(await next.fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(true);
+    expect(await next.gates.enforced("site_01HZX8K3Q9AB", 2)).toBe(true);
+    expect(s.calls).toHaveLength(calls);
+    // no binding: refused, never asked
+    const none = siteSupport({
+      fetch: undefined,
+      token: undefined,
+      confirmed: { gates: 0, fields: false },
+    });
+    expect(await none.fieldTypes.supported("site_01HZX8K3Q9AB")).toBe(false);
   });
 });

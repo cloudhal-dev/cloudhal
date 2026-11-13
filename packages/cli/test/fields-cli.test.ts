@@ -137,14 +137,15 @@ describe("cloudhal fields (RFC-0041 §6)", () => {
     });
   });
 
-  it("reads --sub-fields from a file; the local store still refuses the types (step 7)", async () => {
+  it("reads --sub-fields from a file; the local store takes the types (RFC-0045 step 7)", async () => {
     await writeFile(
       path.join(projectDir, "subs.json"),
       JSON.stringify([{ key: "line", type: "text", labels: { en: { label: "Line" } } }]),
     );
     const cwd = vi.spyOn(process, "cwd").mockReturnValue(projectDir);
-    await expect(
-      main([
+    const out = log();
+    expect(
+      await main([
         "fields",
         "retype",
         "events",
@@ -154,7 +155,9 @@ describe("cloudhal fields (RFC-0041 §6)", () => {
         "subs.json",
         "--dry-run",
       ]),
-    ).rejects.toThrow(/not enabled on this server/);
+    ).toBe(0);
+    expect(lines(out)[0]).toContain("change_field_type events.venue: would touch 1 of 1 entries");
+    out.mockRestore();
     await writeFile(path.join(projectDir, "bad.json"), JSON.stringify([1, "x"]));
     await expect(
       main(["fields", "retype", "events", "venue", "repeater", "--sub-fields", "bad.json"]),

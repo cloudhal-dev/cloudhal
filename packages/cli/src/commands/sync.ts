@@ -201,6 +201,8 @@ export async function pullSite(options: SyncOptions): Promise<{ message: string 
     const result = await importSite(local, bundle, {
       mode: options.replace ? "replace" : "bootstrap",
       log,
+      // RFC-0045 §1: the local renderer reads reference and repeater fields (`openLocalStore`).
+      fieldTypes: local.store.fieldTypes,
     });
     const message = JSON.stringify(result);
     log(`pulled: ${message}`);

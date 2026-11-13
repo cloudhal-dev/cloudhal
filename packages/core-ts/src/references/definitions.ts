@@ -1,6 +1,6 @@
 /**
  * RFC-0045 §1: the gate that refuses `reference` and `repeater` definitions (`fields_unsupported`)
- * on every write path until rollout step 7, and the definition rules for both types that JSON
+ * on every write path without the writer's capability, and the definition rules for both types that JSON
  * Schema cannot express. Pure and Worker-safe; `checkFieldDefinitions` runs both.
  */
 import type { FieldDefinition, Site, SubFieldDefinition } from "@cloudhal/core-contracts";
@@ -28,13 +28,13 @@ export interface FieldTypeSupport {
 
 /**
  * The `fields` value of `GET /__cloudhal/features` from which a site Worker reads reference and
- * repeater fields (rollout step 3 reports it; step 7 starts asking it).
+ * repeater fields (rollout step 3 reports it; the admin Worker asks it from step 7).
  */
 export const FIELDS_FEATURE_VERSION = 2;
 
 /**
  * The renderer in this process reads both types (Node: `cloudhal dev`, `studio`, self-host), the
- * twin of `GATES_ENFORCED`. Not passed by any production caller before rollout step 7.
+ * twin of `GATES_ENFORCED`: `openLocalStore` and the playground pass it (rollout step 7).
  */
 export const FIELDS_SUPPORTED: FieldTypeSupport = { supported: () => true };
 

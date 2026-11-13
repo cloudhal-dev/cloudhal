@@ -7,6 +7,7 @@
  */
 import { createApi } from "@cloudhal/api";
 import { SiteGraphStore } from "@cloudhal/core-ts";
+import { FIELDS_SUPPORTED } from "@cloudhal/core-ts/fields";
 import {
   type BlobStore,
   FetcherBlobStore,
@@ -135,7 +136,9 @@ export function playgroundSiteClass(options: PlaygroundOptions): PlaygroundSiteC
               own,
             )
           : own;
-        const store = new SiteGraphStore({ sql, blobs });
+        // The session's site is rendered by this Worker's own renderer (`options.render`), which
+        // reads reference and repeater fields (RFC-0045 §1, rollout step 7).
+        const store = new SiteGraphStore({ sql, blobs, fieldTypes: FIELDS_SUPPORTED });
         await store.init();
         let siteId = await this.state.storage.get<string>("siteId");
         if (!siteId) {

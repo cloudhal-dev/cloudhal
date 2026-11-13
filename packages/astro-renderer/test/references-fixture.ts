@@ -1,6 +1,6 @@
 /**
  * RFC-0045 step 3 renderer fixture: a site with references and repeaters, enabled on a store of
- * its own (`SiteGraphStoreOptions.fieldTypes`, as the shared suites do; production refuses them).
+ * its own (`SiteGraphStoreOptions.fieldTypes`, as the shared suites do).
  * The store's clock is `T − 24h`; views are taken at `T`.
  *
  * - `places` (no fields): `hall` (en, with a published Turkish member `salon`), `stage` (en

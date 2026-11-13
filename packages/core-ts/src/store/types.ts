@@ -53,8 +53,9 @@ export interface SiteGraphStoreOptions {
   readonly themeDesign?: string;
   /**
    * RFC-0045 §1: whether the renderer serving a site reads `reference` and `repeater` fields.
-   * Without it both types are refused on every write path (`fields_unsupported`); the shared
-   * suites pass one, production stores pass none until rollout step 7.
+   * Without it both types are refused on every write path (`fields_unsupported`). Since rollout
+   * step 7 the admin Worker passes the site Worker's `fields: 2` (`siteSupport`), and Node stores
+   * (`openLocalStore`) and the playground `FIELDS_SUPPORTED`.
    */
   readonly fieldTypes?: FieldTypeSupport;
 }

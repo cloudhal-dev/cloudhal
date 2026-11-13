@@ -38,7 +38,7 @@ export interface CopySiteOptions {
    * RFC-0045 §1: whether the target's renderer reads reference and repeater fields. Without it a
    * bundle defining them is refused (`fields_unsupported`), unlike `gates`.
    */
-  fieldTypes?: FieldTypeSupport;
+  fieldTypes?: FieldTypeSupport | undefined;
 }
 
 export interface CopySiteResult {

@@ -7,6 +7,7 @@ import {
   SiteGraphStore,
   seedStarterSite,
 } from "@cloudhal/core-ts";
+import type { FieldTypeSupport } from "@cloudhal/core-ts/fields";
 import { makePng } from "@cloudhal/core-ts/media/fixtures";
 import { MemoryBlobStore } from "@cloudhal/storage";
 import { BetterSqlite3Driver } from "@cloudhal/storage/sqlite";
@@ -16,10 +17,10 @@ import { createApi } from "../src/app.ts";
 const TOKEN = "deploy-token-for-tests-0123456789abcdef";
 const human = { kind: "human" as const, id: "user_admin000001", name: "Halil" };
 
-async function backend() {
+async function backend(fieldTypes?: FieldTypeSupport) {
   const sql = await BetterSqlite3Driver.open(":memory:");
   const blobs = new MemoryBlobStore();
-  const store = new SiteGraphStore({ sql, blobs });
+  const store = new SiteGraphStore({ sql, blobs, ...(fieldTypes ? { fieldTypes } : {}) });
   await store.init();
   return { sql, blobs, store };
 }
@@ -277,7 +278,7 @@ describe("admin bundle endpoints", () => {
     expect((await put(bundle, "?mode=yolo")).status).toBe(400);
   });
 
-  it("refuses a pushed reference or repeater definition with 409 fields_unsupported (RFC-0045)", async () => {
+  it("refuses a pushed reference or repeater definition with 409 fields_unsupported without the capability (RFC-0045)", async () => {
     const a = await backend();
     const b = await backend();
     const site = await seedStarterSite(a.store, { name: "Pushed", slug: "pushed" });
@@ -322,6 +323,26 @@ describe("admin bundle endpoints", () => {
       ]);
     }
     expect(await b.store.getSite(site.id)).toBeUndefined();
+
+    // rollout step 7: a store whose renderer reads them (`fields: 2`) takes the same push,
+    // per site: another site's capability does not count
+    for (const [support, status] of [
+      [{ supported: (id: string) => id !== site.id }, 409],
+      [{ supported: (id: string) => id === site.id }, 200],
+    ] as const) {
+      const c = await backend(support);
+      const capable = createApi({ store: c.store, admin: { deployToken: TOKEN, storage: c } });
+      const res = await capable.request(`/api/admin/sites/${site.id}/bundle`, {
+        method: "PUT",
+        headers: { authorization: `Bearer ${TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify(bundle),
+      });
+      expect(res.status, await res.clone().text()).toBe(status);
+      if (status === 200)
+        expect((await c.store.getSite(site.id))?.collections?.events?.fields?.[0]?.type).toBe(
+          "reference",
+        );
+    }
   });
 });
 

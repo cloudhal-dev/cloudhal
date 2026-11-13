@@ -9,7 +9,7 @@ export type SubFieldType = SubFieldDefinition["type"];
 export type SelectFieldDefinition = Extract<FieldDefinition, { type: "select" }>;
 export type ReferenceFieldDefinition = Extract<FieldDefinition, { type: "reference" }>;
 export type RepeaterFieldDefinition = Extract<FieldDefinition, { type: "repeater" }>;
-/** RFC-0045: the two stage-4 types, refused on every write path until rollout step 7. */
+/** RFC-0045: the two stage-4 types, accepted only with the store's capability (`fields_unsupported`). */
 export type ReferenceFieldType = "reference" | "repeater";
 /** The types every writer accepts today (`FIELD_TYPES`). */
 export type EnabledFieldType = Exclude<FieldType, ReferenceFieldType>;
@@ -23,8 +23,9 @@ export interface SiteFields {
 }
 
 /**
- * The nine types every writer accepts, in the contract's order: what Studio, MCP, the API and the
- * CLI offer. The stage-4 types (`REFERENCE_FIELD_TYPES`) are not among them until rollout step 7.
+ * The nine types every writer accepts, in the contract's order. The stage-4 types
+ * (`REFERENCE_FIELD_TYPES`) are offered beside them only where the store has the capability
+ * (Studio's `features.referenceFields`, MCP's tool inputs): rollout step 7 enabled them there.
  */
 export const FIELD_TYPES: readonly EnabledFieldType[] = [
   "text",
@@ -38,7 +39,7 @@ export const FIELD_TYPES: readonly EnabledFieldType[] = [
   "select",
 ];
 
-/** RFC-0045: `reference` and `repeater`, gated (`fields_unsupported`) until rollout step 7. */
+/** RFC-0045: `reference` and `repeater`, gated by the store's capability (`fields_unsupported`). */
 export const REFERENCE_FIELD_TYPES: readonly ReferenceFieldType[] = ["reference", "repeater"];
 
 /** Every type of the contract, in its order (`FIELD_TYPES` then `REFERENCE_FIELD_TYPES`). */

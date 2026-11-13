@@ -127,8 +127,8 @@ async function dryRun(
 
 /**
  * RFC-0045 §7: the definitions the operation ends with pass the contract and
- * `checkFieldDefinitions` (with the store's capability: the types stay refused until rollout step
- * 7), so the dry run refuses what phase A or C could not write.
+ * `checkFieldDefinitions` (with the store's capability: without it the types are refused), so the
+ * dry run refuses what phase A or C could not write.
  */
 async function checkEndState(ctx: OperationContext, site: Site, op: FieldOperation) {
   const end = phaseCSite(phaseASite(site, op, DRY_RUN_ID), op.collection, DRY_RUN_ID) ?? site;

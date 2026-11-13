@@ -1,6 +1,7 @@
 /**
- * RFC-0045 rollout step 1: the gate. Until rollout step 7 no write path stores a `reference` or
- * `repeater` definition (`fields_unsupported`): site creates and updates (Studio, MCP and the API
+ * RFC-0045 §1: the gate. Without the store's capability (`SiteGraphStoreOptions.fieldTypes`; the
+ * shared suite's store has none) no write path stores a `reference` or `repeater` definition
+ * (`fields_unsupported`): site creates and updates (Studio, MCP and the API
  * all write through them), field operations, and every bundle `importSite` takes (import, pull,
  * push, `cloudhal import --replace` and `--revert`, snapshot restores and edition copies all go
  * through its `checkBundle`). Called by `describeSiteGraphStore`, so it runs on every backend.
@@ -84,7 +85,7 @@ async function withSnapshotSite(
 }
 
 export function referenceGateSuite(ctx: SuiteContext): void {
-  describe("RFC-0045 step 1: reference and repeater types are refused on every write path", () => {
+  describe("RFC-0045 §1: without the capability, reference and repeater types are refused on every write path", () => {
     let n = 0;
     const store = (): SiteGraphStore => ctx.store();
     const storage = () => ({ sql: ctx.sql(), blobs: ctx.blobs() });

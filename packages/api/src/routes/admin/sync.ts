@@ -142,6 +142,8 @@ export function syncAdminRoutes(deps: AdminDeps): Hono<Env> {
           // Publishing is Studio's (an approved publish or rollback); a push never moves it back.
           published: "target",
           gates: { enforced: (siteId) => store.gatesEnforced(siteId) },
+          // RFC-0045 §1: the types only where the store's renderer reads them (`fields: 2`).
+          fieldTypes: store.fieldTypes,
         });
         const after = await store.getSite(bundle.siteId);
         // A replaced site may point production elsewhere: purge the edge cache like a publish.

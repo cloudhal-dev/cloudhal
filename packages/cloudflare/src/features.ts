@@ -78,8 +78,9 @@ export function siteGateSupport(options: {
 /**
  * RFC-0045 §1: the store's reference and repeater capability for one admin Worker isolate, the
  * twin of `siteGateSupport`: yes once the site Worker answers `{ "fields": 2 }` or more (kept as
- * a plain value); a refusal or an error is asked again. Built in rollout step 2; nothing passes it
- * to a store until step 7 enables the types.
+ * a plain value); a refusal or an error is asked again. Built in rollout step 2; the admin Worker's
+ * store takes it from rollout step 7 (`siteSupport`), so a site Worker older than step 3 keeps the
+ * types refused.
  */
 export function siteFieldTypeSupport(options: {
   readonly fetch: SiteFetch | undefined;
@@ -105,5 +106,43 @@ export function siteFieldTypeSupport(options: {
         return false;
       }
     },
+  };
+}
+
+/** What one admin Worker isolate has confirmed so far (plain values, nothing awaited, ADR-0012). */
+export interface SiteConfirmations {
+  /** The gates version the site Worker reported; 0: none yet. */
+  gates: number;
+  /** The site Worker reported `fields: 2` or more (RFC-0045). */
+  fields: boolean;
+}
+
+/**
+ * The store's capabilities for one request, both asked of the site Worker over `fetch` and
+ * remembered in `confirmed`: time gates (S15) and reference and repeater fields (RFC-0045 §1).
+ */
+export function siteSupport(options: {
+  readonly fetch: SiteFetch | undefined;
+  readonly token: string | undefined;
+  readonly confirmed: SiteConfirmations;
+  readonly log?: (line: string) => void;
+}): { gates: GateSupport; fieldTypes: FieldTypeSupport } {
+  const { fetch, token, confirmed, log } = options;
+  const common = { fetch, token, ...(log ? { log } : {}) };
+  return {
+    gates: siteGateSupport({
+      ...common,
+      confirmed: () => confirmed.gates,
+      remember: (version) => {
+        confirmed.gates = version;
+      },
+    }),
+    fieldTypes: siteFieldTypeSupport({
+      ...common,
+      confirmed: () => confirmed.fields,
+      remember: () => {
+        confirmed.fields = true;
+      },
+    }),
   };
 }

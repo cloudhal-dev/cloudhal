@@ -93,6 +93,44 @@ const INSERT_SQL = `INSERT INTO entry_refs (site_id, target_id, source_id, sourc
 
 const encoder = new TextEncoder();
 
+/** One `entry_refs` row as the rebuild `INSERT`s read it from `json_each`. */
+export interface EntryRefItem {
+  /** Target group. */
+  t: string;
+  /** The holding node. */
+  n: string;
+  /** Its collection. */
+  c: string;
+  /** Field path. */
+  f: string;
+  /** Top-level key as stored. */
+  k: string;
+  /** `shared`, from the definition. */
+  h: 1 | 2;
+  /** The holder's own status. */
+  s: string;
+}
+
+/**
+ * One entry's rows under `site`'s definitions (`rebuildRows`): what an import rebuild writes for
+ * it, and what the step-7 job (`rebuild-job.ts`) writes, so the two cannot drift.
+ */
+export function entryRefItemsOf(
+  site: Pick<Site, "collections">,
+  id: string,
+  entry: ContentEntry,
+): EntryRefItem[] {
+  return rebuildRows(site, entry).map((row) => ({
+    t: row.t,
+    n: id,
+    c: entry.collection,
+    f: row.f,
+    k: row.k,
+    h: row.shared,
+    s: entry.status,
+  }));
+}
+
 /** The rows of a site's entry bodies, JSON-encoded for `json_each`. */
 export function entryRefItems(
   siteId: string,
@@ -102,23 +140,10 @@ export function entryRefItems(
   if (!siteRow) return [];
   const site = JSON.parse(siteRow.body) as Pick<Site, "collections">;
   const out: string[] = [];
-  const entries = rows.flatMap((r) =>
-    r.kind === "contentEntry" ? [{ id: r.id, entry: JSON.parse(r.body) as ContentEntry }] : [],
-  );
-  for (const { id, entry } of entries) {
-    for (const row of rebuildRows(site, entry))
-      out.push(
-        JSON.stringify({
-          t: row.t,
-          n: id,
-          c: entry.collection,
-          f: row.f,
-          k: row.k,
-          h: row.shared,
-          s: entry.status,
-        }),
-      );
-  }
+  for (const r of rows)
+    if (r.kind === "contentEntry")
+      for (const item of entryRefItemsOf(site, r.id, JSON.parse(r.body) as ContentEntry))
+        out.push(JSON.stringify(item));
   return out;
 }
 

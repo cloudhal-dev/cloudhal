@@ -12,6 +12,7 @@ import { assetRefsSuite } from "./testing-asset-refs.ts";
 import { assetsSuite } from "./testing-assets.ts";
 import { collectionsSuite } from "./testing-collections.ts";
 import { entryQuerySuite } from "./testing-entry-query.ts";
+import { entryRefsJobSuite } from "./testing-entry-refs-job.ts";
 import { fieldOperationsSuite } from "./testing-field-operations.ts";
 import { fieldOperationsOldShapeSuite } from "./testing-field-operations-old-shape.ts";
 import { fieldOperationsReferencesSuite } from "./testing-field-operations-references.ts";
@@ -282,6 +283,7 @@ export function describeSiteGraphStore(label: string, factory: StoreFactory): vo
     fieldOperationsSuite(suite);
     fieldOperationsReferencesSuite(suite);
     fieldOperationsOldShapeSuite(suite);
+    entryRefsJobSuite(suite);
     referenceGateSuite(suite);
     referencesSuite(suite);
     referenceReadsSuite(suite);

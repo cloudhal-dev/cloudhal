@@ -85,6 +85,12 @@ export {
   referrerCandidates,
 } from "./references/reads.ts";
 export {
+  type RebuildEntryRefsOptions,
+  type RebuildEntryRefsResult,
+  type RebuiltEntryRefs,
+  rebuildEntryRefs,
+} from "./references/rebuild-job.ts";
+export {
   listReferenceTargets,
   listReferrers,
   type ReferenceCard,

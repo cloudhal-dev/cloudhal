@@ -77,8 +77,8 @@ export function targetDefinition(def: FieldDefinition, op: FieldOperation): Fiel
 /** Checks the request against the collection; throws when it can never run as written. */
 export function checkOperation(site: Site, op: FieldOperation): void {
   const { defs, def } = currentDefinition(site, op);
-  // RFC-0045 §7: reference and repeater fields take every operation; the types themselves stay
-  // refused by `checkFieldDefinitions`' gate until rollout step 7.
+  // RFC-0045 §7: reference and repeater fields take every operation; the types themselves pass
+  // `checkFieldDefinitions`' gate only with the store's capability.
   if (op.sub !== undefined) checkSub(def, { ...op, sub: op.sub });
   else if (op.op === "rename_field") {
     if (!KEY.test(op.to))
