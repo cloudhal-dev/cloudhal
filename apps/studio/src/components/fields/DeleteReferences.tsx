@@ -74,7 +74,8 @@ export function DeleteReferences({
   });
   const details = refused ?? check.data ?? null;
   const referrers = useQuery({
-    queryKey: ["entry-referrers", site.id, entry.id, "delete"],
+    // Read again when a late refusal arrives: the list read before it may miss the blockers.
+    queryKey: ["entry-referrers", site.id, entry.id, "delete", refused ? "refused" : "checked"],
     queryFn: () => referencesApi.referrers(site.id, entry.id, { limit: 100 }),
     enabled: open && (details !== null || check.data === null),
   });
@@ -101,20 +102,33 @@ export function DeleteReferences({
         site={site}
         details={details}
         referrers={referrers.data?.referrers}
+        more={referrers.data?.next !== undefined}
         locale={locale}
       />
     );
   if (!referrers.data || !members.data) return null;
   const rows = referrers.data.referrers;
   if (rows.length === 0) return null;
-  // Only entries in a collection some referring field allows can still be shown.
-  const allowed = new Set(rows.flatMap((r) => fieldCollections(site, r.collection, r.field)));
-  const others = (members.data.groups[group] ?? []).filter(
-    (m) => m.id !== entry.id && m.status !== "archived" && allowed.has(m.collection),
+  // As the store decides, per referring field: does another entry of the group stay in a
+  // collection that field allows? Those that keep one lose this language's card; the others show
+  // nothing. Both can be true at once.
+  const remaining = (members.data.groups[group] ?? []).filter(
+    (m) => m.id !== entry.id && m.status !== "archived",
   );
-  if (others.length === 0)
-    return <DraftsShowNothing t={t} site={site} rows={rows} locale={locale} />;
-  return <LocaleLoses t={t} site={site} entry={entry} others={others} locale={locale} />;
+  const kept = (r: Referrer) => {
+    const allowed = fieldCollections(site, r.collection, r.field);
+    return remaining.filter((m) => allowed.includes(m.collection));
+  };
+  const lost = rows.filter((r) => kept(r).length === 0);
+  const others = rows.flatMap(kept);
+  return (
+    <>
+      <DraftsShowNothing t={t} site={site} rows={lost} locale={locale} />
+      {others.length > 0 && (
+        <LocaleLoses t={t} site={site} entry={entry} others={others} locale={locale} />
+      )}
+    </>
+  );
 }
 
 /** Where a referrer's value sits: "Events · Speakers: Person". */
@@ -138,12 +152,15 @@ function Blocked({
   site,
   details,
   referrers,
+  more,
   locale,
 }: {
   t: FT;
   site: Site;
   details: ReferencedDetails;
   referrers: readonly Referrer[] | undefined;
+  /** The referrers' list has another page. */
+  more: boolean;
   locale: string;
 }) {
   const published = (r: Referrer) => r.shownBy.filter((m) => m.status === "published");
@@ -179,7 +196,8 @@ function Blocked({
         detail: whereOf(t, site, r, locale),
         status: "published",
       }));
-  const total = blocking ? blocking.length : details.total;
+  // The store counts every blocking row; the list read here stops at 100.
+  const total = Math.max(details.total, blocking?.length ?? 0);
   return (
     <div className="grid gap-3" data-testid="delete-references" data-blocked="">
       <Banner
@@ -189,10 +207,12 @@ function Blocked({
         description={t("fields.delete.blocked")}
       />
       <UsedByList rows={rows} labels={listLabels(t)} />
-      {!blocking && details.total > rows.length && (
+      {(total > rows.length || more) && (
         <Banner
           variant="default"
-          description={t("fields.delete.moreReferences", { count: details.total - rows.length })}
+          description={t("fields.delete.moreReferences", {
+            count: Math.max(total - rows.length, 1),
+          })}
         />
       )}
     </div>
@@ -256,7 +276,7 @@ function LocaleLoses({
     entry.locale !== site.defaultLocale &&
     others.some((m) => m.locale === site.defaultLocale);
   return (
-    <div data-testid="delete-references" data-locale-loses={entry.locale}>
+    <div data-testid="delete-references-locale" data-locale-loses={entry.locale}>
       <Banner
         variant="alert"
         icon={<LinkBreak weight="bold" />}

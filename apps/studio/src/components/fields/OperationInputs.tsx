@@ -258,20 +258,23 @@ export function OperationInputs(props: {
           {(inputs.type === "select" ||
             inputs.type === "reference" ||
             inputs.type === "repeater") && (
-            <TypeFields
-              t={t}
-              form={{ ...inputs.form, type: inputs.type }}
-              set={(form) => setInputs({ ...inputs, form })}
-              locales={props.locales}
-              defaultLocale={props.defaultLocale}
-              uiLocale={props.uiLocale}
-              isNew
-              problems={targetProblems(inputs, props.defaultLocale)}
-              site={props.site}
-              referenceTypes={props.referenceTypes}
-              sub={subDef !== undefined}
-              operation
-            />
+            // While disabled (running, stuck, finished) the target's settings are locked too.
+            <fieldset disabled={props.disabled} className="grid min-w-0 gap-5">
+              <TypeFields
+                t={t}
+                form={{ ...inputs.form, type: inputs.type }}
+                set={(form) => setInputs({ ...inputs, form })}
+                locales={props.locales}
+                defaultLocale={props.defaultLocale}
+                uiLocale={props.uiLocale}
+                isNew
+                problems={targetProblems(inputs, props.defaultLocale)}
+                site={props.site}
+                referenceTypes={props.referenceTypes}
+                sub={subDef !== undefined}
+                operation
+              />
+            </fieldset>
           )}
         </>
       )}

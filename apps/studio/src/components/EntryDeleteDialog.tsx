@@ -50,9 +50,12 @@ export function EntryDeleteDialog({
   const [blocked, setBlocked] = useState<boolean | undefined>();
   // The real delete's refusal: its referrers when the check went stale, else its words.
   const [refused, setRefused] = useState<{ details?: unknown; error?: unknown }>();
-  const [shown, setShown] = useState(entry?.id);
-  if (shown !== entry?.id) {
-    setShown(entry?.id);
+  // A refusal belongs to one opening of the dialog for one revision: reopening, or a new revision,
+  // asks the store again (the editor keeps the dialog mounted for the same entry).
+  const session = open && entry ? `${entry.id}:${entry.rev}` : undefined;
+  const [shown, setShown] = useState(session);
+  if (shown !== session) {
+    setShown(session);
     setRefused(undefined);
   }
   const deleteNow = async () => {

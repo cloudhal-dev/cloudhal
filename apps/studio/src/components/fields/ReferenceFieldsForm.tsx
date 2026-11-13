@@ -62,7 +62,9 @@ export function ReferenceFields({
           const fits = new Set(
             only ? listFieldDefs(site.collections?.[only]).map((d) => d.key) : [],
           );
-          const where = only === target ? form.where : form.where.filter((w) => fits.has(w.field));
+          // Only a new single target drops what doesn't fit it; several (or none) keep them for later.
+          const where =
+            !only || only === target ? form.where : form.where.filter((w) => fits.has(w.field));
           set({ ...form, collections, where });
         }}
       >

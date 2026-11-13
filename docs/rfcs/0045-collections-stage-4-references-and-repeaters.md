@@ -1438,3 +1438,11 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **Limits keep focus**: "Add condition" and "Add item field" stay focusable (`aria-disabled`) at their limits.
 - **A stuck operation** locks its inputs and announces itself (`role="alert"`).
 - **Counts say references** where they count references ("And 2 more references.").
+
+#### Review round 2 (2026-11-13, PM verification of 169adfd9)
+
+- **A delete refusal belongs to one opening** of the dialog for one revision: reopening it, or a new revision, asks the store again.
+- **Conditions are dropped only for a new single target**; ticking a second collection, or unticking and re-ticking the only one, keeps them.
+- **A type change's target settings lock** (a disabled `fieldset`) whenever its inputs do: running, stuck or finished.
+- **"Other entries left" is decided per referring field**, as the store decides: referrers whose field has no usable other member are listed as showing nothing, the others name the language that loses the card; both can show.
+- **The blocked count is the store's** (`total`, never capped at the list's 100), the "more references" note shows whenever rows remain unlisted, and a late refusal reads the referrers again.

@@ -8,7 +8,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntryDeleteDialog } from "../src/components/EntryDeleteDialog.tsx";
 import { FieldsSection } from "../src/components/fields/FieldsSection.tsx";
-import { requestOf, targetProblems } from "../src/components/fields/OperationInputs.tsx";
+import {
+  OperationInputs,
+  requestOf,
+  targetProblems,
+} from "../src/components/fields/OperationInputs.tsx";
 import { PublishWarnings } from "../src/components/fields/PublishWarnings.tsx";
 import { ApiRequestError } from "../src/lib/api/http.ts";
 import { emptyForm, formOf } from "../src/lib/field-form.ts";
@@ -419,7 +423,7 @@ describe("Delete dialog › references (RFC-0045 §5)", () => {
       }),
     );
     render(wrap(<Delete />));
-    const notice = await screen.findByTestId("delete-references");
+    const notice = await screen.findByTestId("delete-references-locale");
     expect(within(notice).getByText("Turkish pages lose this card")).toBeInTheDocument();
     expect(within(notice).getByText(/show the English version instead/)).toBeInTheDocument();
   });
@@ -711,5 +715,155 @@ describe("Review round 1 › publish warnings count references", () => {
     );
     render(wrap(<PublishWarnings site={SITE} open onNavigate={() => {}} />));
     expect(await screen.findByText("And 2 more references.")).toBeInTheDocument();
+  });
+});
+
+// ── Review round 2 (PR #220) ──────────────────────────────────────────────────────────────────
+
+describe("Review round 2", () => {
+  it("asks the store again when the dialog reopens after a refusal", async () => {
+    serve(siteRoute, okCheck, referrersRoute([]), groupsRoute([]));
+    const refuse = vi.fn(async () => {
+      throw new ApiRequestError(409, {
+        error: "entry_referenced",
+        message: "referenced",
+        details: { group: "entry_hallen01", total: 1, referrers: [] },
+      });
+    });
+    const dialog = (open: boolean) => (
+      <EntryDeleteDialog
+        open={open}
+        onOpenChange={() => {}}
+        siteId="site_1"
+        entry={HALL}
+        menuRefs={[]}
+        isDeleting={false}
+        onDelete={refuse}
+      />
+    );
+    const qc = testQueryClient();
+    const { rerender } = render(wrap(dialog(true), "en", qc));
+    confirmName();
+    await waitFor(() => expect(deleteButton()).toBeEnabled());
+    fireEvent.click(deleteButton());
+    await waitFor(() => expect(deleteButton()).toBeDisabled());
+    rerender(wrap(dialog(false), "en", qc));
+    rerender(wrap(dialog(true), "en", qc));
+    confirmName();
+    await waitFor(() => expect(deleteButton()).toBeEnabled());
+  });
+
+  it("keeps a reference's conditions when a second target is ticked and unticked", async () => {
+    serve(instance(true), registry);
+    render(wrap(<Section />));
+    fireEvent.click(await screen.findByRole("button", { name: "Actions for Venue" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Edit…" }));
+    const form = await screen.findByTestId("reference-fields");
+    fireEvent.click(within(form).getByRole("button", { name: "Add condition" }));
+    const targets = within(form).getByRole("group", { name: "Target collections" });
+    fireEvent.click(within(targets).getByText("People"));
+    fireEvent.click(within(targets).getByText("People"));
+    await waitFor(() =>
+      expect(within(form).getByRole("checkbox", { name: "People" })).not.toBeChecked(),
+    );
+    expect(
+      within(form).getByTestId("reference-where").querySelector("[data-condition=kind]"),
+    ).not.toBeNull();
+  });
+
+  it("locks the target's settings while the operation can't take input", () => {
+    const def = {
+      key: "kind",
+      type: "text",
+      labels: L("Kind"),
+      localized: false,
+    } as FieldDefinition;
+    const inputs = {
+      key: "kind",
+      sub: "",
+      type: "select" as const,
+      form: {
+        ...emptyForm("select", ["en"]),
+        options: [{ value: "a", valueEdited: true, labels: { en: "A" } }],
+      },
+    };
+    render(
+      wrap(
+        <OperationInputs
+          t={((k: string) => k) as never}
+          target={{ kind: "change_field_type", def }}
+          inputs={inputs}
+          setInputs={() => {}}
+          keyError={undefined}
+          locales={["en"]}
+          defaultLocale="en"
+          uiLocale="en"
+          disabled
+          site={SITE}
+          referenceTypes
+        />,
+      ),
+    );
+    const options = screen.getByTestId("field-options");
+    expect(options.closest("fieldset")).toBeDisabled();
+  });
+
+  it("decides per referring field: one loses the card, another shows nothing", async () => {
+    serve(
+      siteRoute,
+      okCheck,
+      referrersRoute([
+        { ...card("entry_ev1", "Launch", "draft"), field: "venue", shownBy: [] },
+        { ...card("entry_ev2", "Sponsor night", "draft"), field: "sponsor", shownBy: [] },
+      ]),
+      groupsRoute([
+        card("entry_hallen01", "Main hall", "published", "en", "places"),
+        card("entry_hall0001", "Ana salon", "published", "tr", "places"),
+      ]),
+    );
+    render(wrap(<Delete />));
+    expect(await screen.findByTestId("delete-references-locale")).toBeInTheDocument();
+    const drafts = await screen.findByTestId("delete-references");
+    expect(within(drafts).getByRole("link", { name: "Sponsor night" })).toBeInTheDocument();
+    expect(within(drafts).queryByRole("link", { name: "Launch" })).toBeNull();
+  });
+
+  it("counts every blocking reference the store counted, and says more remain", async () => {
+    serve(
+      siteRoute,
+      (url, init) =>
+        init?.method === "DELETE" && url.includes("dryRun=1")
+          ? {
+              status: 409,
+              body: {
+                error: "entry_referenced",
+                message: "referenced",
+                details: {
+                  group: "entry_hallen01",
+                  total: 150,
+                  referrers: [
+                    { id: "entry_ev1", title: "Launch", collection: "events", field: "venue" },
+                  ],
+                },
+              },
+            }
+          : undefined,
+      on("GET", "/api/sites/site_1/entries/entry_hall0001/references", {
+        status: 200,
+        body: {
+          groupId: "entry_hallen01",
+          next: 100,
+          referrers: [{ ...card("entry_ev1", "Launch", "published"), field: "venue", shownBy: [] }],
+        },
+      }),
+    );
+    render(wrap(<Delete />));
+    const notice = await screen.findByTestId("delete-references");
+    await waitFor(() =>
+      expect(
+        within(notice).getByText("Unpublish or edit these 150 entries first"),
+      ).toBeInTheDocument(),
+    );
+    expect(within(notice).getByText("And 149 more references.")).toBeInTheDocument();
   });
 });
