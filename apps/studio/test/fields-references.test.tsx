@@ -4,12 +4,14 @@
  * with an undo toast, item errors by path, and the "Used by" card.
  */
 import type { ContentEntry, FieldDefinition, Site } from "@cloudhal/core-contracts";
+import { Button } from "@cloudhal/ui";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntryFieldCards } from "../src/components/EntryFieldCards.tsx";
 import { EntryFieldsCard } from "../src/components/fields/EntryFieldsCard.tsx";
 import { ApiRequestError } from "../src/lib/api/http.ts";
+import { withoutEmptyItems } from "../src/lib/empty-items.ts";
 import { on, serve, wrap } from "./roles-fixtures.tsx";
 
 afterEach(() => {
@@ -191,6 +193,129 @@ describe("Entry editor › repeater fields", () => {
     expect(
       within(item).getByText("Needed to publish. Add a value, or keep the entry as a draft."),
     ).toBeInTheDocument();
+  });
+});
+
+/** The editor's own way of holding the draft: functional updates, title and fields together. */
+function EditorHarness({
+  entry,
+  onDraft,
+}: {
+  entry: ContentEntry;
+  onDraft: (d: ContentEntry) => void;
+}) {
+  const [draft, setDraft] = useState<ContentEntry | undefined>(entry);
+  const [shown, setShown] = useState(entry.id);
+  if (shown !== entry.id) {
+    setShown(entry.id);
+    setDraft(entry);
+  }
+  if (draft) onDraft(draft);
+  if (!draft) return null;
+  return (
+    <>
+      <Button onClick={() => setDraft((d) => d && { ...d, title: "Renamed" })}>Retitle</Button>
+      <EntryFieldsCard
+        siteId="site_1"
+        site={SITE}
+        entry={draft}
+        onChange={(fields) => setDraft((d) => d && { ...d, fields })}
+        error={undefined}
+        disabled={false}
+      />
+    </>
+  );
+}
+
+describe("Entry editor › repeater undo (review fixes)", () => {
+  it("keeps every edit made after the removal", async () => {
+    serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
+    const onDraft = vi.fn();
+    render(wrap(<EditorHarness entry={ENTRY} onDraft={onDraft} />));
+    const item = await screen.findByRole("group", { name: "Item 1: Ada" });
+    fireEvent.click(within(item).getByRole("button", { name: "Actions for item 1" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retitle" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(onDraft).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          title: "Renamed",
+          fields: { venue: "entry_hall0001", speakers: [{ name: "Ada", role: "Host" }] },
+        }),
+      ),
+    );
+  });
+
+  it("an undo from another entry changes nothing, and its toast closes", async () => {
+    serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
+    const onDraft = vi.fn();
+    const other = { ...ENTRY, id: "entry_event002", title: "Other", fields: {} } as ContentEntry;
+    const { rerender } = render(wrap(<EditorHarness entry={ENTRY} onDraft={onDraft} />));
+    const item = await screen.findByRole("group", { name: "Item 1: Ada" });
+    fireEvent.click(within(item).getByRole("button", { name: "Actions for item 1" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    await screen.findByRole("button", { name: "Undo" });
+    rerender(wrap(<EditorHarness entry={other} onDraft={onDraft} />));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Undo" })).toBeNull());
+    expect(onDraft).toHaveBeenLastCalledWith(other);
+  });
+});
+
+describe("Entry editor › reference fields when the targets can't be read", () => {
+  it("says so with a retry, instead of loading forever", async () => {
+    let fail = true;
+    serve(
+      on("GET", "/api/sites/site_1/entries/groups", () =>
+        fail
+          ? { status: 500, body: { error: "internal", message: "boom" } }
+          : {
+              status: 200,
+              body: { groups: { entry_hall0001: [card("entry_hall0001", "Main hall")] } },
+            },
+      ),
+    );
+    render(wrap(<Harness />));
+    const venue = await screen.findByRole("group", { name: "Venue" });
+    expect(
+      await within(venue).findByText(
+        "The chosen entries couldn't be loaded.",
+        {},
+        { timeout: 5000 },
+      ),
+    ).toBeInTheDocument();
+    fail = false;
+    fireEvent.click(within(venue).getByRole("button", { name: "Try again" }));
+    expect(await within(venue).findByRole("link", { name: "Main hall" })).toBeInTheDocument();
+  });
+
+  it("never sends a value that is no group id; it shows as Not found", async () => {
+    const fetch = serve(groups({ entry_hall0001: [card("entry_hall0001", "Main hall")] }));
+    render(
+      wrap(
+        <Harness entry={{ ...ENTRY, fields: { venue: "Main hall, Istanbul" } } as ContentEntry} />,
+      ),
+    );
+    const venue = await screen.findByRole("group", { name: "Venue" });
+    expect(await within(venue).findByText("Not found")).toBeInTheDocument();
+    expect(fetch.mock.calls.some(([u]) => String(u).includes("/entries/groups"))).toBe(false);
+  });
+});
+
+describe("Saving drops empty repeater items (RFC-0045 §1)", () => {
+  it("keeps items with a value and drops a list left empty", () => {
+    const entry = {
+      ...ENTRY,
+      fields: { speakers: [{}, { name: "Ada" }, {}], venue: "entry_hall0001", other: [{}] },
+    } as unknown as ContentEntry;
+    expect(withoutEmptyItems(entry, SITE).fields).toEqual({
+      speakers: [{ name: "Ada" }],
+      venue: "entry_hall0001",
+      other: [{}],
+    });
+    const empty = { ...ENTRY, fields: { speakers: [{}] } } as unknown as ContentEntry;
+    expect(withoutEmptyItems(empty, SITE).fields).toEqual({});
+    expect(withoutEmptyItems(ENTRY, SITE)).toBe(ENTRY);
   });
 });
 

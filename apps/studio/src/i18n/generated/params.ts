@@ -292,11 +292,13 @@ export interface MessageParams {
   "fields.reference.meta": { collection: string | number; language: string | number };
   "fields.reference.moveDown": { title: string | number };
   "fields.reference.moveUp": { title: string | number };
+  "fields.reference.moved": { title: string | number; position: number };
   "fields.reference.picker.add": { count: number };
   "fields.reference.picker.description": { collections: string | number };
   "fields.reference.picker.remaining": { count: number };
   "fields.reference.picker.results": { count: number };
   "fields.reference.picker.title": { multiple: "yes" | "no" };
+  "fields.reference.removed": { title: string | number };
   "fields.repeater.actions": { index: number };
   "fields.repeater.count": { count: number; max: number };
   "fields.repeater.invalidItems": { count: number };

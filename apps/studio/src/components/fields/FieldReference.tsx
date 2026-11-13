@@ -1,5 +1,6 @@
 import type { Site } from "@cloudhal/core-contracts";
 import {
+  Banner,
   Button,
   EntryPicker,
   type EntryPickerItem,
@@ -10,7 +11,7 @@ import {
   type ReferenceListLabels,
   Text,
 } from "@cloudhal/ui";
-import { PencilSimple, Plus } from "@phosphor-icons/react";
+import { ArrowClockwise, PencilSimple, Plus } from "@phosphor-icons/react";
 import { useMemo, useRef } from "react";
 import { formatList, type TFunction, useI18n } from "../../i18n/index.tsx";
 import { type ReferenceCard, referencesApi } from "../../lib/api/references.ts";
@@ -18,11 +19,12 @@ import { collectionName } from "../../lib/collections.ts";
 import { entryHref } from "../../lib/entry-href.ts";
 import { chooseMember } from "../../lib/field-references.ts";
 import { languageName } from "../../lib/languages.ts";
+import type { useGroupCards } from "./useGroupCards.ts";
 
 type FT = TFunction<"fields">;
 
-/** The targets' members the form knows (any status); `[]` for a group with none left. */
-export type GroupCards = ReadonlyMap<string, readonly ReferenceCard[]>;
+/** The targets' members the form knows (`useGroupCards`). */
+export type GroupCards = ReturnType<typeof useGroupCards>;
 
 function useListLabels(t: FT): ReferenceListLabels {
   return useMemo(
@@ -41,6 +43,8 @@ function useListLabels(t: FT): ReferenceListLabels {
       menuMoveDown: t("fields.reference.menuMoveDown"),
       remove: t("fields.reference.remove"),
       loading: t("common.loading"),
+      moved: (title, position) => t("fields.reference.moved", { title, position }),
+      removed: (title) => t("fields.reference.removed", { title }),
     }),
     [t],
   );
@@ -87,17 +91,15 @@ export function FieldReference({
   entryLocale,
   ownGroup,
   slot,
-  cards,
-  onPicked,
+  groups,
 }: {
   siteId: string;
   site: Site;
   entryLocale: string;
   ownGroup: string;
   slot: FieldReferenceSlot;
-  cards: GroupCards;
-  /** Cards the picker returned, so a new target shows at once. */
-  onPicked: (cards: ReferenceCard[]) => void;
+  /** The targets' members, and where the picker's cards go so a new target shows at once. */
+  groups: GroupCards;
 }) {
   const { t, locale } = useI18n("fields");
   const { def, value, multiple, max } = slot;
@@ -111,7 +113,7 @@ export function FieldReference({
     collections: def.collections,
   };
   const items: ReferenceListItem[] = value.map((id) => {
-    const members = cards.get(id);
+    const members = groups.cards.get(id);
     if (members === undefined) return { id };
     const member = chooseMember(members, options);
     if (!member) return { id, status: "missing" };
@@ -135,26 +137,41 @@ export function FieldReference({
     status: card.status,
     locale: languageName(locale, card.locale),
   });
+  const trigger = useRef<HTMLButtonElement>(null);
   // The picker's cards by group, so a new target shows before the groups' query answers.
   const found = useRef(new Map<string, ReferenceCard>()).current;
   return (
     <div className="grid min-w-0 gap-2" data-field-reference-host={slot.path}>
-      {items.length > 0 && (
-        <ReferenceList
-          label={slot.label}
-          items={items}
-          sortable={multiple && items.length > 1}
-          readOnly={slot.readOnly}
-          onMove={(i, by) => {
-            const next = [...value];
-            const j = i + by;
-            [next[i], next[j]] = [next[j] as string, next[i] as string];
-            set(next);
-          }}
-          onRemove={(i) => set(value.filter((_, n) => n !== i))}
-          labels={listLabels}
+      {groups.failed && (
+        <Banner
+          variant="error"
+          title={t("fields.reference.loadFailed")}
+          action={
+            <Banner.Action
+              icon={<ArrowClockwise />}
+              loading={groups.retrying}
+              onClick={groups.retry}
+            >
+              {t("fields.reference.retry")}
+            </Banner.Action>
+          }
         />
       )}
+      <ReferenceList
+        label={slot.label}
+        items={items}
+        sortable={multiple && items.length > 1}
+        readOnly={slot.readOnly}
+        onMove={(i, by) => {
+          const next = [...value];
+          const j = i + by;
+          [next[i], next[j]] = [next[j] as string, next[i] as string];
+          set(next);
+        }}
+        onRemove={(i) => set(value.filter((_, n) => n !== i))}
+        focusAfterLast={() => trigger.current}
+        labels={listLabels}
+      />
       {!slot.readOnly && (
         <span className="flex flex-wrap items-center gap-3">
           <EntryPicker
@@ -163,7 +180,7 @@ export function FieldReference({
                 variant="secondary"
                 size="sm"
                 icon={!multiple && value.length ? <PencilSimple /> : <Plus />}
-                disabled={remaining <= 0}
+                ref={trigger}
               >
                 {multiple
                   ? t("fields.reference.add")
@@ -173,6 +190,7 @@ export function FieldReference({
               </Button>
             }
             multiple={multiple}
+            disabled={remaining <= 0}
             remaining={Math.max(remaining, 0)}
             unavailable={new Set([...value, ownGroup])}
             search={async (q, cursor) => {
@@ -190,7 +208,7 @@ export function FieldReference({
             }}
             onPick={(picked) => {
               const ids = picked.map((p) => p.id);
-              onPicked(ids.flatMap((id) => found.get(id) ?? []));
+              groups.add(ids.flatMap((id) => found.get(id) ?? []));
               set(multiple ? [...value, ...ids] : ids.slice(0, 1));
             }}
             labels={pickerLabels}

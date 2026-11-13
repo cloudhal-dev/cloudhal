@@ -1,7 +1,7 @@
 import type { RepeaterField as RepeaterDefinition } from "@cloudhal/core-contracts";
 import { FIELD_LIMITS, fieldLabel } from "@cloudhal/core-ts/fields";
 import type { ReactNode } from "react";
-import { itemName, type RepeaterErrors, repeaterItems } from "./entry-fields-model.ts";
+import { itemName, type RepeaterErrors, shownItems, unconverted } from "./entry-fields-model.ts";
 import { describeField, FieldControl, type FieldControlContext } from "./FieldControl.tsx";
 import { RepeaterField, type RepeaterFieldLabels } from "./RepeaterField.tsx";
 
@@ -23,7 +23,9 @@ export interface EntryRepeaterProps {
   context: FieldControlContext;
   labels: EntryRepeaterLabels;
   referenceTitle?: ((groupId: string) => string | undefined) | undefined;
-  onRemoved?: ((removed: { index: number; legend: string; undo: () => void }) => void) | undefined;
+  onRemoved?:
+    | ((removed: { index: number; legend: string; undo: () => boolean }) => void)
+    | undefined;
 }
 
 /**
@@ -44,7 +46,7 @@ export function EntryRepeater(props: EntryRepeaterProps) {
       label={props.label}
       description={props.description}
       error={props.errors.field}
-      items={repeaterItems(props.value)}
+      items={shownItems(def, props.value)}
       onChange={props.onChange}
       subFields={def.fields}
       max={def.maxItems ?? FIELD_LIMITS.listItems}
@@ -53,19 +55,26 @@ export function EntryRepeater(props: EntryRepeaterProps) {
       legend={(i, item) => props.labels.itemLegend(i + 1, itemName(def, item, names))}
       onRemoved={props.onRemoved}
       labels={props.labels.repeater}
-      renderControl={({ sub, index, value, onChange, error, readOnly }) => (
-        <FieldControl
-          def={sub}
-          path={`${def.key}/${index}/${sub.key}`}
-          label={fieldLabel(sub, context.locale, context.defaultLocale)}
-          description={describeField(sub, context)}
-          error={error}
-          value={value}
-          onChange={onChange}
-          readOnly={readOnly}
-          context={context}
-        />
-      )}
+      renderControl={({ sub, index, value, onChange, error, readOnly }) => {
+        // A sub-field a running type change has not converted in this item yet: as stored.
+        const changing = unconverted(def, sub, value);
+        return (
+          <FieldControl
+            def={sub}
+            path={`${def.key}/${index}/${sub.key}`}
+            label={fieldLabel(sub, context.locale, context.defaultLocale)}
+            description={describeField(sub, context, {
+              note: changing ? context.labels.beingChanged : undefined,
+            })}
+            error={error}
+            value={value}
+            onChange={onChange}
+            readOnly={readOnly || changing}
+            asStored={changing}
+            context={context}
+          />
+        );
+      }}
     />
   );
 }

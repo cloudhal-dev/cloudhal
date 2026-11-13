@@ -31,6 +31,7 @@ export const formLabels: EntryFieldsFormLabels = {
   clear: "Clear",
   originalImage: "The original's image",
   sharedList: "Not translated: this list is shared by every language.",
+  beingChanged: "Being changed: a field change converts this value.",
   items: (n) => `${n} items`,
   repeater: repeaterLabels,
   itemLegend: (i, name) => (name ? `Item ${i}: ${name}` : `Item ${i}`),
@@ -63,6 +64,8 @@ export const referenceLabels: ReferenceListLabels = {
   menuMoveDown: "Move down",
   remove: "Remove",
   loading: "Loading",
+  moved: (t, n) => `${t} moved to position ${n}`,
+  removed: (t) => `${t} removed`,
 };
 
 export const pickerLabels: EntryPickerLabels = {

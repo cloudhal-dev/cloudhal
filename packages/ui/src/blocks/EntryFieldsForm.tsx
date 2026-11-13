@@ -1,6 +1,6 @@
 import type { FieldDefinition } from "@cloudhal/core-contracts";
 import { fieldLabel } from "@cloudhal/core-ts/fields";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useMemo, useRef } from "react";
 import { EntryRepeater, type EntryRepeaterLabels } from "./EntryRepeater.tsx";
 import {
   errorUnder,
@@ -11,6 +11,7 @@ import {
   type RepeaterErrors,
   readField,
   repeaterErrors,
+  unconverted,
   writeField,
 } from "./entry-fields-model.ts";
 import {
@@ -75,8 +76,11 @@ export interface EntryFieldsFormProps {
   renderReference?: (slot: FieldReferenceSlot) => ReactNode;
   /** A target's title, when the host knows it (repeater legends, a translation's fallback line). */
   referenceTitle?: (groupId: string) => string | undefined;
-  /** After a repeater item is removed: the host offers `undo` (Studio: a toast). */
-  onItemRemoved?: (removed: { field: string; legend: string; undo: () => void }) => void;
+  /**
+   * After a repeater item is removed: the host offers `undo` (Studio: a toast), which answers false
+   * when it could not put the item back (the list is gone or full).
+   */
+  onItemRemoved?: (removed: { field: string; legend: string; undo: () => boolean }) => void;
   disabled?: boolean;
 }
 
@@ -97,16 +101,19 @@ function fieldState(
   const emptyLocalized = original !== undefined && def.localized && !hasValue(own);
   const fallback =
     emptyLocalized && hasValue(theirs) ? fallbackText(def, theirs, fallbackContext) : undefined;
+  const shown = inherited ? theirs : own;
+  const changing = unconverted(def, def, shown);
   const shared = def.type === "repeater" && !def.localized && props.multilingual === true;
   const description = describeField(def, context, {
     hint: props.hint?.(def),
     fallback,
     inherited: inherited && original ? { href: original.href } : undefined,
-    note: shared ? props.labels.sharedList : undefined,
+    note: changing ? props.labels.beingChanged : shared ? props.labels.sharedList : undefined,
   });
   return {
     inherited,
-    shown: inherited ? theirs : own,
+    changing,
+    shown,
     fallback,
     fallbackValue: emptyLocalized ? theirs : undefined,
     description,
@@ -144,6 +151,8 @@ export function EntryFieldsForm(props: EntryFieldsFormProps) {
   };
   // One map per error object, so a repeater opens its invalid items once per failed save.
   const { errors } = props;
+  const latest = useRef({ value, onChange });
+  latest.current = { value, onChange };
   const nested = useMemo(() => {
     const out = new Map<string, RepeaterErrors>();
     for (const def of definitions)
@@ -153,18 +162,20 @@ export function EntryFieldsForm(props: EntryFieldsFormProps) {
   return (
     <div className="grid min-w-0 gap-5" data-entry-fields-form="">
       {definitions.map((def) => {
-        const { inherited, shown, fallback, fallbackValue, description } = fieldState(
+        const { inherited, changing, shown, fallback, fallbackValue, description } = fieldState(
           def,
           props,
           context,
           fallbackContext,
         );
         const label = fieldLabel(def, locale, defaultLocale);
-        const readOnly = props.disabled === true || inherited;
-        const set = (v: unknown) => onChange(writeField(value, def, v));
+        const readOnly = props.disabled === true || inherited || changing;
+        // Over the latest value and handler: a repeater's undo can run seconds later.
+        const set = (v: unknown) =>
+          latest.current.onChange(writeField(latest.current.value, def, v));
         return (
           <div key={def.key} className="min-w-0" data-field={def.key} data-field-type={def.type}>
-            {def.type === "repeater" ? (
+            {def.type === "repeater" && !changing ? (
               <EntryRepeater
                 def={def}
                 label={label}
@@ -195,6 +206,7 @@ export function EntryFieldsForm(props: EntryFieldsFormProps) {
                 readOnly={readOnly}
                 placeholder={fallback && HAS_PLACEHOLDER.has(def.type) ? fallback : undefined}
                 fallbackValue={fallbackValue}
+                asStored={changing}
                 context={context}
               />
             )}

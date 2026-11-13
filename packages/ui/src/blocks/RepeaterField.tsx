@@ -12,7 +12,7 @@ import {
 import { type ReactNode, useId } from "react";
 import { DirectionalIcon } from "./DirectionalIcon.tsx";
 import type { FieldValues } from "./entry-fields-model.ts";
-import { useRepeater, withSub } from "./repeater-state.ts";
+import { useRepeater } from "./repeater-state.ts";
 import { SectionEmpty } from "./SectionEmpty.tsx";
 
 /** Every word of the block (no English fallback). Item numbers are 1-based. */
@@ -73,10 +73,16 @@ export interface RepeaterFieldProps<S extends { key: string }> {
   /** At most this many items. */
   max: number;
   readOnly?: boolean;
-  /** Problems by item index (0-based); a new map opens the items it names. */
+  /**
+   * Problems by item index (0-based) when the map arrives. A new map opens the items it names;
+   * from then on the problems follow their items through moves and removals.
+   */
   itemErrors?: ReadonlyMap<number, RepeaterItemErrors> | undefined;
-  /** After "Remove": the host offers `undo` (Studio: a toast), which puts the item back. */
-  onRemoved?: (removed: { index: number; legend: string; undo: () => void }) => void;
+  /**
+   * After "Remove": the host offers `undo` (Studio: a toast). It puts the item back and answers
+   * true, or does nothing and answers false when the list is gone or full.
+   */
+  onRemoved?: (removed: { index: number; legend: string; undo: () => boolean }) => void;
   labels: RepeaterFieldLabels;
 }
 
@@ -92,11 +98,11 @@ export interface RepeaterFieldProps<S extends { key: string }> {
 export function RepeaterField<S extends { key: string }>(props: RepeaterFieldProps<S>) {
   const { items, max, labels, readOnly = false } = props;
   const id = useId();
-  const { root, keys, latest, open, said, toggle, add, move, duplicate, remove, reveal } =
+  const { root, keys, open, said, errors, toggle, add, move, duplicate, remove, reveal, setSub } =
     useRepeater(props);
-  const collapsedInvalid = [...(props.itemErrors?.keys() ?? [])]
-    .filter((i) => i < items.length && !open.has(keys.current[i] as string))
-    .sort((a, b) => a - b);
+  const collapsedInvalid = keys.current
+    .map((key, i) => ({ key, i }))
+    .filter(({ key }) => errors.has(key) && !open.has(key));
   const full = items.length >= max;
   return (
     <fieldset
@@ -126,8 +132,8 @@ export function RepeaterField<S extends { key: string }>(props: RepeaterFieldPro
           <Text variant="error" size="sm" as="span">
             {labels.invalidItems(collapsedInvalid.length)}
           </Text>
-          {collapsedInvalid.map((i) => (
-            <Button key={keys.current[i]} variant="ghost" size="sm" onClick={() => reveal(i)}>
+          {collapsedInvalid.map(({ key, i }) => (
+            <Button key={key} variant="ghost" size="sm" onClick={() => reveal(key)}>
               {props.legend(i, items[i] as FieldValues)}
             </Button>
           ))}
@@ -148,7 +154,7 @@ export function RepeaterField<S extends { key: string }>(props: RepeaterFieldPro
                 open={open.has(key)}
                 onOpen={(on) => toggle(key, on)}
                 legend={props.legend(i, item)}
-                errors={props.itemErrors?.get(i)}
+                errors={errors.get(key)}
                 readOnly={readOnly}
                 full={full}
                 labels={labels}
@@ -163,12 +169,8 @@ export function RepeaterField<S extends { key: string }>(props: RepeaterFieldPro
                       item,
                       index: i,
                       value: item[sub.key],
-                      onChange: (v) => {
-                        const next = [...latest.current];
-                        next[i] = withSub(next[i] ?? {}, sub.key, v);
-                        props.onChange(next);
-                      },
-                      error: props.itemErrors?.get(i)?.subs.get(sub.key),
+                      onChange: (v) => setSub(key, sub.key, v),
+                      error: errors.get(key)?.subs.get(sub.key),
                       readOnly,
                     })}
                   </div>

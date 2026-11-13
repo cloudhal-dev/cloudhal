@@ -1,4 +1,4 @@
-import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
+import type { ContentEntry, PublishStatus, Site } from "@cloudhal/core-contracts";
 import { collectionPermalink, permalinkPrefix } from "@cloudhal/core-ts/permalinks";
 import {
   ApprovalDialog,
@@ -62,6 +62,7 @@ import { useSavedToast } from "../components/useLiveSite.ts";
 import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
+import { withoutEmptyItems } from "../lib/empty-items.ts";
 import { entryRoute } from "../lib/entry-href.ts";
 import { entryAccess } from "../lib/roles.ts";
 import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
@@ -91,8 +92,9 @@ function duplicateOf(entry: ContentEntry, title: string): NewEntry {
 
 const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
-/** What is sent: the cover image's fields trimmed. */
-function forSave(entry: ContentEntry): ContentEntry {
+/** What is sent: the cover image's fields trimmed, and no empty repeater item (RFC-0045 §1). */
+function forSave(draft: ContentEntry, site: Site | undefined): ContentEntry {
+  const entry = withoutEmptyItems(draft, site);
   return entry.coverImage ? { ...entry, coverImage: cleanImageRef(entry.coverImage) } : entry;
 }
 
@@ -181,7 +183,7 @@ export function ArticleEditorPage() {
   const self = useSelf();
 
   const save = useMutation({
-    mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry)),
+    mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry, site.data)),
     onSuccess: async (saved) => {
       setDraft(saved);
       setShowErrors(false);
@@ -447,7 +449,7 @@ export function ArticleEditorPage() {
               siteId={siteId}
               site={site.data}
               entry={draft}
-              onChange={(fields) => setDraft({ ...draft, fields })}
+              onChange={(fields) => setDraft((d) => d && { ...d, fields })}
               error={save.error}
               disabled={readOnlyReason !== undefined || locked}
             />

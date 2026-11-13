@@ -6,7 +6,7 @@
  * Loads with the fields UI only (`bundle-budget.ts` `LAZY_ONLY`).
  */
 import type { FieldDefinition, Site } from "@cloudhal/core-contracts";
-import { fieldLabel } from "@cloudhal/core-ts/fields";
+import { fieldLabel, renamedFrom } from "@cloudhal/core-ts/fields";
 import type { ReferenceCard } from "./api/references.ts";
 import type { FieldIssue } from "./fields.ts";
 
@@ -16,19 +16,30 @@ const ids = (v: unknown): string[] =>
 const isItem = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
-/** Every group id the values name, in references and in repeater items' reference sub-fields. */
+/**
+ * Every group id the values name, read as the form shows them: through a running rename's old key
+ * (top level, or a sub-field's in each item), in references and repeater items' reference
+ * sub-fields. Strings that are no group id are returned too; the groups read leaves them out.
+ */
 export function referenceIdsIn(
   definitions: readonly FieldDefinition[],
   values: Readonly<Record<string, unknown>> | undefined,
 ): string[] {
   const out = new Set<string>();
   for (const def of definitions) {
-    const v = values?.[def.key];
+    const from = renamedFrom(def);
+    const v = values?.[def.key] ?? (from ? values?.[from] : undefined);
     if (def.type === "reference") for (const id of ids(v)) out.add(id);
     if (def.type !== "repeater" || !Array.isArray(v)) continue;
-    const subs = def.fields.filter((s) => s.type === "reference").map((s) => s.key);
-    for (const item of v.filter(isItem))
-      for (const key of subs) for (const id of ids(item[key])) out.add(id);
+    const m = def.migration;
+    const subFrom = m?.sub !== undefined && m.fromKey ? { sub: m.sub, from: m.fromKey } : undefined;
+    for (const sub of def.fields) {
+      if (sub.type !== "reference") continue;
+      for (const item of v.filter(isItem)) {
+        const value = item[sub.key] ?? (subFrom?.sub === sub.key ? item[subFrom.from] : undefined);
+        for (const id of ids(value)) out.add(id);
+      }
+    }
   }
   return [...out];
 }

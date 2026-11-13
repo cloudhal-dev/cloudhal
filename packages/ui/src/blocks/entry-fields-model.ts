@@ -199,3 +199,58 @@ export function repeaterErrors(
   }
   return out;
 }
+
+/**
+ * A repeater's items as the form shows them while a sub-field rename runs (RFC-0045 §7, `sub` with
+ * `fromKey`): an item not rewritten yet holds the value under the old key, shown under the new one.
+ * Writing these items back leaves only the new key, as `writeField` does for a field.
+ */
+export function shownItems(def: Repeater, value: unknown): FieldValues[] {
+  const items = repeaterItems(value);
+  const m = def.migration;
+  if (m?.sub === undefined || !m.fromKey) return items;
+  const { sub, fromKey } = m;
+  return items.map((item) => {
+    if (!Object.hasOwn(item, fromKey)) return item;
+    const { [fromKey]: old, ...rest } = item;
+    return Object.hasOwn(rest, sub) ? rest : { ...rest, [sub]: old };
+  });
+}
+
+const isString = (v: unknown) => typeof v === "string";
+
+/** True when a value has the shape of its type (not its limits): what a control can show and edit. */
+export function fitsShape(def: FieldDefinition | SubFieldDefinition, v: unknown): boolean {
+  const several = "multiple" in def && def.multiple === true;
+  switch (def.type) {
+    case "number":
+      return typeof v === "number";
+    case "boolean":
+      return typeof v === "boolean";
+    case "datetime":
+      return instantOf(v) !== undefined;
+    case "select":
+    case "reference":
+      return several ? Array.isArray(v) && v.every(isString) : isString(v);
+    case "repeater":
+      return Array.isArray(v) && v.every(isRecord);
+    default:
+      return isString(v);
+  }
+}
+
+/**
+ * True for a stored value a running type change has not converted yet (RFC-0041 §6, RFC-0045 §7):
+ * the definition (or `sub`'s) carries `fromType` and the value is not of the new type's shape. The
+ * form shows it read-only rather than letting an edit overwrite it; phase B converts it.
+ */
+export function unconverted(
+  repeaterOrField: FieldDefinition,
+  def: FieldDefinition | SubFieldDefinition,
+  v: unknown,
+): boolean {
+  const m = repeaterOrField.migration;
+  if (m?.fromType === undefined || !hasValue(v)) return false;
+  const marked = def === repeaterOrField ? m.sub === undefined : m.sub === def.key;
+  return marked && !fitsShape(def, v);
+}

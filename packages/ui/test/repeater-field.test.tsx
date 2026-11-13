@@ -18,7 +18,7 @@ function Harness({
   initial: FieldValues[];
   max?: number;
   onChange?: (items: FieldValues[]) => void;
-  onRemoved?: (r: { index: number; legend: string; undo: () => void }) => void;
+  onRemoved?: (r: { index: number; legend: string; undo: () => boolean }) => void;
   itemErrors?: ReadonlyMap<number, RepeaterItemErrors>;
 }) {
   const [items, setItems] = useState<FieldValues[]>(initial);
@@ -86,7 +86,9 @@ describe("RepeaterField", () => {
     render(<Harness initial={[{ name: "Ada" }, { name: "Grace" }, { name: "Linus" }]} />);
     fireEvent.click(screen.getByRole("button", { name: "Move item 3 up" }));
     expect(legends()).toEqual(["Speaker 1: Ada", "Speaker 2: Linus", "Speaker 3: Grace"]);
-    expect(screen.getByRole("status")).toHaveTextContent("Item 3 moved to position 2");
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Item 3 moved to position 2"),
+    );
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Move item 2 up" })).toHaveFocus(),
     );
@@ -116,7 +118,9 @@ describe("RepeaterField", () => {
     expect(onRemoved).toHaveBeenCalledWith(
       expect.objectContaining({ index: 1, legend: "Speaker 2: Grace" }),
     );
-    act(() => onRemoved.mock.lastCall?.[0].undo());
+    act(() => {
+      expect(onRemoved.mock.lastCall?.[0].undo()).toBe(true);
+    });
     expect(legends()).toEqual(["Speaker 1: Ada", "Speaker 2: Grace", "Speaker 3: Linus"]);
     await waitFor(() =>
       expect(
@@ -159,5 +163,66 @@ describe("RepeaterField", () => {
     });
     fireEvent.click(back);
     await waitFor(() => expect(screen.getByLabelText("name 3")).toHaveFocus());
+  });
+  it("undo writes over the latest items and handler, and refuses a full list", async () => {
+    const onRemoved = vi.fn();
+    const onChange = vi.fn();
+    render(
+      <Harness
+        initial={[{ name: "Ada" }, { name: "Grace" }]}
+        max={2}
+        onRemoved={onRemoved}
+        onChange={onChange}
+      />,
+    );
+    fireEvent.click(await menuItem(1, "Remove"));
+    // An edit after the removal is kept by the undo.
+    fireEvent.change(screen.getByLabelText("role 1"), { target: { value: "Admiral" } });
+    act(() => {
+      expect(onRemoved.mock.lastCall?.[0].undo()).toBe(true);
+    });
+    expect(onChange).toHaveBeenLastCalledWith([
+      { name: "Ada" },
+      { name: "Grace", role: "Admiral" },
+    ]);
+    // Full again: a second undo of the same removal, or another one, does nothing.
+    fireEvent.click(await menuItem(2, "Remove"));
+    fireEvent.click(screen.getByRole("button", { name: "Add item" }));
+    act(() => {
+      expect(onRemoved.mock.lastCall?.[0].undo()).toBe(false);
+    });
+    expect(items()).toHaveLength(2);
+  });
+
+  it("an undo after the list is gone does nothing", async () => {
+    const onRemoved = vi.fn();
+    const { unmount } = render(<Harness initial={[{ name: "Ada" }]} onRemoved={onRemoved} />);
+    fireEvent.click(await menuItem(1, "Remove"));
+    unmount();
+    expect(onRemoved.mock.lastCall?.[0].undo()).toBe(false);
+  });
+
+  it("problems follow their item when an earlier one is removed", async () => {
+    const errors = new Map([[1, { subs: new Map([["role", "Needed to publish"]]) }]]);
+    render(<Harness initial={[{ name: "Ada" }, { name: "Grace" }]} itemErrors={errors} />);
+    const grace = () => screen.getByRole("group", { name: /Grace/ });
+    expect(within(grace()).getByText("Needed to publish")).toBeInTheDocument();
+    fireEvent.click(await menuItem(1, "Remove"));
+    expect(within(grace()).getByText("Needed to publish")).toBeInTheDocument();
+    expect(grace()).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("announces the same message twice", async () => {
+    render(<Harness initial={[{ name: "Ada" }, { name: "Grace" }, { name: "Linus" }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "Move item 2 down" }));
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Item 2 moved to position 3"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Move item 2 down" }));
+    // The region empties first, so the repeat is a change screen readers announce.
+    expect(screen.getByRole("status")).toHaveTextContent("");
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Item 2 moved to position 3"),
+    );
   });
 });

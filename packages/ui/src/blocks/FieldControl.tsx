@@ -44,6 +44,8 @@ export interface FieldControlLabels {
   originalImage: string;
   /** The date and time controls' words (`DateTimeField`). */
   date: DateTimeFieldLabels;
+  /** Under a value a running type change has not converted yet (shown read-only). */
+  beingChanged: string;
 }
 
 /** What the host renders for a rich text field (Studio: the lazy markdown body editor). */
@@ -123,6 +125,8 @@ export interface FieldControlProps {
   placeholder?: string | undefined;
   /** The original's value itself, for controls that show it their own way (references). */
   fallbackValue?: unknown;
+  /** Show the stored value read-only, as it is: a value a running type change has not converted. */
+  asStored?: boolean | undefined;
   context: FieldControlContext;
 }
 
@@ -493,6 +497,6 @@ export function describeField(
  * ids read-only). `EntryFieldsForm` uses it for fields, `RepeaterField` items for sub-fields.
  */
 export function FieldControl(props: FieldControlProps) {
-  const Control = CONTROLS[props.def.type];
+  const Control = props.asStored ? StoredValueControl : CONTROLS[props.def.type];
   return <Control {...props} />;
 }

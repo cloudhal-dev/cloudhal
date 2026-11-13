@@ -19,10 +19,10 @@ import { languageName } from "../../lib/languages.ts";
 import { zoneLabel } from "../../lib/schedules.ts";
 import { primaryHostname } from "../../lib/site-settings.ts";
 import { BodyEditor } from "../BodyEditor.tsx";
-import { useToast } from "../Toast.ts";
 import { FieldImage } from "./FieldImage.tsx";
 import { FieldReference } from "./FieldReference.tsx";
 import { useGroupCards } from "./useGroupCards.ts";
+import { useItemUndo } from "./useItemUndo.ts";
 
 type FT = TFunction<"fields">;
 
@@ -94,6 +94,7 @@ function useFormLabels(t: FT, originalLocale: string | undefined, locale: string
       clear: t("fields.editor.clear"),
       originalImage: t("fields.editor.originalImage"),
       sharedList: t("fields.editor.sharedList"),
+      beingChanged: t("fields.editor.beingChanged"),
       items: (count) => t("fields.editor.originalItems", { count }),
       itemLegend: (index, name) =>
         t("fields.editor.itemLegend", { index, named: name ? "yes" : "no", name: name ?? "" }),
@@ -151,7 +152,7 @@ export function EntryFieldsCard({
   disabled: boolean;
 }) {
   const { t, locale } = useI18n("fields", "bodyEditor", "media");
-  const toast = useToast();
+  const onItemRemoved = useItemUndo(entry.id);
   const definitions = site.collections?.[entry.collection]?.fields ?? [];
   const original = useOriginal(siteId, entry);
   const labels = useFormLabels(t, original.data?.locale, locale);
@@ -210,19 +211,10 @@ export function EntryFieldsCard({
             entryLocale={entry.locale}
             ownGroup={memberGroup(entry)}
             slot={slot}
-            cards={groups.cards}
-            onPicked={groups.add}
+            groups={groups}
           />
         )}
-        onItemRemoved={({ field, legend, undo }) =>
-          toast.notice({
-            id: `field-item-removed-${field}`,
-            title: t("fields.repeater.removedToast", { item: legend }),
-            tone: "info",
-            timeout: 10_000,
-            actions: [{ label: t("fields.repeater.undo"), onClick: undo }],
-          })
-        }
+        onItemRemoved={onItemRemoved}
         renderRichText={(slot) => (
           <div className="grid min-w-0 gap-1.5" data-field-rich-text={slot.def.key}>
             <Label>{slot.label}</Label>

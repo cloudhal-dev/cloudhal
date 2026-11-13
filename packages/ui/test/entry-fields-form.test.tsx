@@ -413,3 +413,77 @@ describe("EntryFieldsForm: references and repeaters (RFC-0045 §5)", () => {
     );
   });
 });
+
+const L = (label: string) => ({ en: { label } });
+
+describe("EntryFieldsForm during a running field operation (RFC-0045 §7)", () => {
+  const base = { labels: { en: { label: "Speakers" } }, localized: false } as const;
+  const render2 = (defs: FieldDefinition[], value: Record<string, unknown>, onChange = vi.fn()) =>
+    render(
+      <EntryFieldsForm
+        definitions={defs}
+        value={value}
+        onChange={onChange}
+        locale="en"
+        defaultLocale="en"
+        timeZone="UTC"
+        zoneLabel={(z) => z}
+        labels={labels}
+      />,
+    );
+
+  it("shows a sub-field rename's old key under the new one, and writes only the new key", () => {
+    const onChange = vi.fn();
+    render2(
+      [
+        {
+          ...base,
+          key: "speakers",
+          type: "repeater",
+          migration: { id: "snap_1", sub: "talk", fromKey: "title" },
+          fields: [{ key: "talk", type: "text", labels: { en: { label: "Talk" } } }],
+        },
+      ],
+      { speakers: [{ title: "Engines" }] },
+      onChange,
+    );
+    const talk = screen.getByRole("textbox", { name: "Talk" });
+    expect(talk).toHaveValue("Engines");
+    expect(screen.getByRole("group", { name: "Item 1: Engines" })).toBeInTheDocument();
+    fireEvent.change(talk, { target: { value: "Engines, again" } });
+    expect(onChange).toHaveBeenLastCalledWith({ speakers: [{ talk: "Engines, again" }] });
+  });
+
+  it("shows a value a type change has not converted read-only, as stored", () => {
+    const onChange = vi.fn();
+    render2(
+      [
+        {
+          ...base,
+          key: "speakers",
+          type: "repeater",
+          migration: { id: "snap_1", fromType: "reference" },
+          fields: [
+            { key: "person", type: "reference", labels: L("Person"), collections: ["people"] },
+          ],
+        },
+        {
+          key: "hosts",
+          type: "repeater",
+          labels: L("Hosts"),
+          localized: false,
+          migration: { id: "snap_2", sub: "who", fromType: "text" },
+          fields: [{ key: "who", type: "number", labels: L("Who") }],
+        },
+      ],
+      { speakers: "entry_hall0001", hosts: [{ who: "Ada" }] },
+      onChange,
+    );
+    const stored = screen.getByRole("textbox", { name: "Speakers" });
+    expect(stored).toBeDisabled();
+    expect(stored).toHaveValue('"entry_hall0001"');
+    expect(within(field("speakers")).getByText(/Being changed/)).toBeInTheDocument();
+    expect(within(field("hosts")).getByRole("textbox", { name: "Who" })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});

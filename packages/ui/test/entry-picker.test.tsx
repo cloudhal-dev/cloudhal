@@ -1,6 +1,7 @@
 /** RFC-0045 §5: the entry picker, the chosen targets and "Used by". */
 import { Button } from "@cloudflare/kumo";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { EntryPicker, type EntryPickerItem } from "../src/blocks/EntryPicker.tsx";
 import { ReferenceList } from "../src/blocks/ReferenceList.tsx";
@@ -38,6 +39,43 @@ function open(props: Partial<Parameters<typeof EntryPicker>[0]> = {}) {
 }
 
 const box = () => screen.getByRole("combobox", { name: "Search entries" });
+
+function Full() {
+  const [chosen, setChosen] = useState<string[]>([]);
+  return (
+    <EntryPicker
+      trigger={<Button>Add speakers</Button>}
+      search={async () => ({ items: [HALL, ROOM] })}
+      multiple
+      remaining={2 - chosen.length}
+      disabled={chosen.length >= 2}
+      onPick={(items) => setChosen((c) => [...c, ...items.map((i) => i.id)])}
+      labels={pickerLabels}
+    />
+  );
+}
+
+function List({ after }: { after: HTMLElement }) {
+  const [items, setItems] = useState([
+    { id: "entry_ada0001", title: "Ada", status: "published" as const },
+    { id: "entry_grace01", title: "Grace", status: "published" as const },
+  ]);
+  return (
+    <ReferenceList
+      label="Speakers"
+      sortable
+      items={items}
+      onMove={(i, by) => {
+        const next = [...items];
+        [next[i], next[i + by]] = [next[i + by] as (typeof items)[0], next[i] as (typeof items)[0]];
+        setItems(next);
+      }}
+      onRemove={(i) => setItems(items.filter((_, n) => n !== i))}
+      focusAfterLast={() => after}
+      labels={referenceLabels}
+    />
+  );
+}
 
 afterEach(cleanup);
 
@@ -109,6 +147,34 @@ describe("EntryPicker", () => {
   });
 });
 
+describe("EntryPicker: failures and a full field", () => {
+  it("says a failed search failed, politely, instead of 'No entries found'", async () => {
+    open({ search: async () => Promise.reject(new Error("500")) });
+    await waitFor(() =>
+      expect(document.querySelector("[data-entry-picker-status]")).toHaveTextContent(
+        "The search failed",
+      ),
+    );
+    expect(screen.queryByText("No entries found")).toBeNull();
+  });
+
+  it("keeps focus on the trigger when a pick fills the field, and opens nothing then", async () => {
+    render(<Full />);
+    const trigger = screen.getByRole("button", { name: "Add speakers" });
+    fireEvent.click(trigger);
+    await screen.findByRole("option", { name: /Room B/ });
+    fireEvent.keyDown(box(), { key: "Enter" });
+    fireEvent.keyDown(box(), { key: "ArrowDown" });
+    fireEvent.keyDown(box(), { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: "Add 2" }));
+    await waitFor(() => expect(screen.queryByRole("combobox")).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(trigger).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(trigger);
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+});
+
 describe("ReferenceList", () => {
   it("shows each target's state and moves and removes through buttons and the menu", async () => {
     const onMove = vi.fn();
@@ -141,6 +207,30 @@ describe("ReferenceList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Actions for Grace" }));
     fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
     expect(onRemove).toHaveBeenCalledWith(1);
+  });
+
+  it("keeps focus on a moved row and moves it to the next row, or out, after a remove", async () => {
+    const after = document.createElement("button");
+    document.body.append(after);
+    render(<List after={after} />);
+    const down = screen.getByRole("button", { name: "Move Ada down" });
+    down.focus();
+    fireEvent.click(down);
+    // Ada is last now: its down button is disabled, so focus goes to its up button.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Move Ada up" })).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("Ada moved to position 2"),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Grace" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Actions for Ada" })).toHaveFocus(),
+    );
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Grace removed"));
+    fireEvent.click(screen.getByRole("button", { name: "Actions for Ada" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Remove" }));
+    await waitFor(() => expect(after).toHaveFocus());
+    after.remove();
   });
 
   it("read-only shows no actions", () => {

@@ -24,6 +24,8 @@ export const messages = {
       clear: "Clear",
       originalImage: "The original's image",
       sharedList: "Not translated: this list is shared by every language.",
+      beingChanged:
+        "Being changed: a running field change converts this value. You can edit it once the change is done.",
       originalItems: "{count, plural, one {# item} other {# items}}",
       itemLegend:
         "{named, select, yes {Item {index, number}: {name}} no {Item {index, number}} other {Item {index, number}}}",
@@ -73,6 +75,7 @@ export const messages = {
         "{count, plural, one {# collapsed item needs attention:} other {# collapsed items need attention:}}",
       removedToast: "{item} removed",
       undo: "Undo",
+      undoFailed: "The item couldn't be put back: the list is full. Remove an item first.",
     },
     reference: {
       choose: "Choose entry",
@@ -90,6 +93,10 @@ export const messages = {
       menuMoveUp: "Move up",
       menuMoveDown: "Move down",
       remove: "Remove",
+      moved: "{title} moved to position {position, number}",
+      removed: "{title} removed",
+      loadFailed: "The chosen entries couldn't be loaded.",
+      retry: "Try again",
       picker: {
         title:
           "{multiple, select, yes {Choose entries} no {Choose an entry} other {Choose an entry}}",

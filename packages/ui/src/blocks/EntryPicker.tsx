@@ -1,6 +1,14 @@
 import { Badge, Button, cn, Input, LayerDialog, Loader, Text } from "@cloudflare/kumo";
 import { CheckSquare, Square } from "@phosphor-icons/react";
-import { type KeyboardEvent, type ReactElement, useEffect, useId, useRef, useState } from "react";
+import {
+  cloneElement,
+  type KeyboardEvent,
+  type ReactElement,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import { SectionEmpty } from "./SectionEmpty.tsx";
 
 /** One search result (the picker route's card, worded by the host). */
@@ -52,12 +60,17 @@ export interface EntryPickerLabels {
 
 export interface EntryPickerProps {
   /** The button that opens the picker; focus returns to it when the picker closes. */
-  trigger: ReactElement;
+  trigger: ReactElement<{ className?: string; "aria-disabled"?: boolean }>;
   /** Searches the allowed collections (Studio: the picker route). The block makes no API calls. */
   search: (q: string, cursor: string | undefined) => Promise<EntryPickerPage>;
   /** Several targets at once (up to `remaining`), or one. */
   multiple: boolean;
   remaining: number;
+  /**
+   * The field holds all it can: the trigger stays focusable (`aria-disabled`) and opens nothing,
+   * so focus is not lost when a pick fills the field.
+   */
+  disabled?: boolean | undefined;
   /** Group ids that can't be chosen: already chosen ones, the entry's own group. */
   unavailable?: ReadonlySet<string> | undefined;
   onPick: (items: EntryPickerItem[]) => void;
@@ -174,10 +187,21 @@ export function EntryPicker(props: EntryPickerProps) {
   };
 
   const busy = results.state === "loading";
-  const said = busy ? labels.searching : labels.results(items.length);
+  const said = busy
+    ? labels.searching
+    : results.state === "failed"
+      ? labels.failed
+      : labels.results(items.length);
+  // A full field keeps its trigger focusable (focus returns to it after a pick), but it opens nothing.
+  const trigger = props.disabled
+    ? cloneElement(props.trigger, {
+        "aria-disabled": true,
+        className: cn(props.trigger.props.className, "cursor-not-allowed opacity-50"),
+      })
+    : props.trigger;
   return (
-    <LayerDialog.Root open={open} onOpenChange={setOpen}>
-      <LayerDialog.Trigger render={props.trigger} />
+    <LayerDialog.Root open={open} onOpenChange={(next) => setOpen(next && !props.disabled)}>
+      <LayerDialog.Trigger render={trigger} />
       <LayerDialog.Content size="lg" closeLabel={labels.close}>
         <LayerDialog.Title>{labels.title}</LayerDialog.Title>
         {labels.description && (
@@ -200,19 +224,23 @@ export function EntryPicker(props: EntryPickerProps) {
               description={multiple ? labels.remaining(props.remaining - chosen.length) : undefined}
             />
             <span role="status" aria-live="polite" data-entry-picker-status="">
-              <Text as="span" variant="secondary" size="sm">
+              <Text
+                as="span"
+                variant={results.state === "failed" ? "error" : "secondary"}
+                size="sm"
+              >
                 {said}
               </Text>
             </span>
             {busy ? (
               <div className="flex justify-center py-6">
-                <Loader />
+                {/* The status above says "Searching…"; the spinner is only seen. */}
+                <span aria-hidden="true">
+                  <Loader />
+                </span>
               </div>
-            ) : results.state === "failed" && items.length === 0 ? (
-              <Text variant="error" size="sm" as="span">
-                {labels.failed}
-              </Text>
-            ) : items.length === 0 && !results.cursor ? (
+            ) : results.state === "failed" && items.length === 0 ? null : items.length === 0 &&
+              !results.cursor ? (
               <SectionEmpty title={labels.noResults} />
             ) : (
               <div
@@ -270,7 +298,7 @@ const KEY_STEPS: Record<string, (active: number, last: number) => number> = {
   End: (_, last) => last,
 };
 
-/** "Show more", or "Keep searching" after a truncated read, and a failed later page. */
+/** "Show more", or "Keep searching" after a truncated read (a failure is the status's to say). */
 function MoreResults({
   results,
   more,
@@ -293,11 +321,6 @@ function MoreResults({
             {results.truncated ? labels.keepSearching : labels.more}
           </Button>
         </div>
-      )}
-      {results.state === "failed" && results.items.length > 0 && (
-        <Text variant="error" size="sm" as="span">
-          {labels.failed}
-        </Text>
       )}
     </>
   );
