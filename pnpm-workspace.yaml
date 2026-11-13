@@ -48,7 +48,7 @@ catalog:
   "@codemirror/language": 6.13.1
   "@codemirror/lang-markdown": 6.5.2
   "@lezer/highlight": 1.2.5
-  hono: ^4.13.13
+  hono: ^4.13.16
   "@hono/node-server": ^2.1.4
   better-auth: 1.7.18
   "@better-auth/kysely-adapter": 1.7.18
