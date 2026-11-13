@@ -20,7 +20,7 @@
     "packages/core-ts/src/assets.ts": 1370,
     "packages/core-ts/src/automations.ts": 1003,
     "packages/core-ts/src/menu.ts": 928,
-    "packages/core-ts/src/releases.ts": 902,
+    "packages/core-ts/src/releases.ts": 882,
     "packages/core-ts/src/store.ts": 1212,
     "packages/core-ts/src/surface-interop.ts": 1192,
     "packages/core-ts/src/taxonomy.ts": 1718,
@@ -180,7 +180,7 @@
       "lines": 191
     },
     "apps/studio/src/routes/ArticleEditorPage.tsx::ArticleEditorPage": {
-      "lines": 446
+      "lines": 439
     },
     "apps/studio/src/routes/ArticlesPage.tsx::ArticlesPage": {
       "lines": 192
@@ -369,7 +369,7 @@
       "params": 5
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker": {
-      "lines": 262
+      "lines": 261
     },
     "packages/cloudflare/src/admin-worker.ts::createAdminWorker>fetch": {
       "lines": 199
@@ -414,7 +414,7 @@
       "params": 5
     },
     "packages/core-ts/src/cache-purge.ts::planCachePurge": {
-      "lines": 207
+      "lines": 184
     },
     "packages/core-ts/src/media/image.ts::inspectAvif": {
       "depth": 6

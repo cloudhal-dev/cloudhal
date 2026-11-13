@@ -1389,3 +1389,33 @@ Round 1 dropped the "fits" shortcut for text ↔ reference, but then the table r
 - **Removals during `rename_field`.** While a top-level rename runs, an entry not rewritten yet holds the value under the old key, and the writer moves it. The two keys are one field: removing either (`clearFields`, or `null` in `fields`) removes both, so the move cannot bring the value back, the old key is a known name meanwhile, and setting one while removing the other is `invalid`. This is MCP's patch reading; the API and Studio write whole entries.
 - **A continuation's `onInvalid: "clear"`** applies to its report too (`continueFieldOperation`): values it drops are counted as cleared, with no `field_values_unconvertible` refusal. MCP's continuation headline is the stored operation's.
 - **`list_entries`** returns `groupId`; `where` on a reference field stays refused (`invalid_query`) until step 8.
+
+### Amended in 6a (2026-11-13, rollout step 6, first PR: blocks and the entry editor)
+
+- **A route for the chosen targets** (§5 "API"): `GET /sites/:siteId/entries/groups?ids=a,b` (`content:read`) answers each group's members in the site, any status, as the picker's cards; `[]` for a group with none left. The picker route finds new targets only, and `references` lists referrers, so the editor had no way to name a stored id. At most 100 ids, the per-entry cap.
+- **The member the editor shows** for a target: in an allowed collection, the one in the entry's language, else the default language's, else the first, whatever its status. "Draft", "In review" and "Archived" say "Will not show until published"; a group with no member is "Not found". This is the editor's view, not `pickMember`: whether a published member in another language shows depends on `localization.fallback`, which the publish warnings (step 6b, `referenceIssues`) report.
+- **Legends** read "Item 2: Ada Lovelace" (`fields.editor.itemLegend`, a `select` on whether the item has a name). The contract has no singular label for a repeater, so "Speaker 2" is not available; the item's name comes from `itemLabel`, else the first text, select or reference sub-field.
+- **Problems in collapsed items** are listed above that repeater's items (a button per item opens it and focuses its first control), and every item a new save error names opens.
+- **`EntryPicker`** marks several-choice options with a checkbox icon inside each `option` (the search field keeps the focus, `aria-activedescendant`), not a Kumo `Checkbox`, so the listbox has no nested controls. One choice picks and closes. A group found in several languages is listed once.
+- **`FieldControl`** frames a reference in a `fieldset` (label, description, error); the host's `renderReference` fills it.
+- **Gate:** step 6a adds no capability check. No production collection can define the two types before step 7, so the editor never meets them there; the builder (6b) offers them only behind the server's capability.
+
+#### Review round 1 (2026-11-13, PM review of PR #219)
+
+- **Undo writes over the present.** The repeater's undo writes through the latest `onChange` and items, `EntryFieldsForm` writes over its latest value, and the editor updates its draft functionally. An undo seconds later therefore keeps every edit made since the removal (title, body, other fields) and the saved `rev`. The toast belongs to its entry: it closes when the editor leaves the entry or unmounts, and an undo for another entry does nothing. Undo answers false, and Studio says so, when the list is full again or gone.
+- **Item problems follow their items.** The error map arrives by index and is re-keyed to the items' stable keys once, so moves, removals and undos keep each problem, and `aria-invalid`, on its own item.
+- **Announcements** empty the polite region before each message, so a repeated message is announced again (repeater, and `ReferenceList`, whose moves and removals now keep focus on the moved row or move it to the next row, else to the picker's trigger).
+- **`EntryPicker`.** A full field keeps its trigger focusable (`aria-disabled`, opens nothing), so focus returns to it after the pick that fills the field. A failed search is the polite status ("The search didn't finish"), and the spinner is hidden from assistive tech.
+- **The groups read** sends only well-formed group ids. Anything else (text a running conversion has not rewritten) shows as "Not found". A failed read shows an error banner with "Try again".
+- **During a running field operation** the editor reads values through the markers. A top-level rename's old key and a sub-field rename's old key in each item are shown under the new key, and a write leaves only the new key. A value a type change has not converted yet (its shape is not the new type's, `fitsShape`) is shown read-only, as stored, with "Being changed", top level or per item. The UI never converts it; phase B does.
+- **No empty item is sent.** "Add item" keeps its empty item in the form while it is being filled; the save leaves out items without a value (the collection's repeater definitions only), and a list left empty is no value.
+
+#### Review round 2 (2026-11-13, PM verification of 5311a1b9)
+
+- **Item issues after empty items are left out.** The server counts the items that were sent; the editor maps each issue's item index back onto the draft's items (`sentIndexes`, `draftPath`) before the error map is built, so a problem never lands on an empty item.
+- **Read-only.** Every repeater item is open when the form is read-only (its toggles sit in the editor's disabled fieldset). "Used by" moved to the reach cards, beside "In menus" and outside that fieldset, so its "Show more" works on an article the person can't edit.
+
+#### Review round 3 (2026-11-13, PM check of 98a7e3b3)
+
+- **Duplicate** copies the fields without empty repeater items too (`duplicateOf` runs the same `withoutEmptyItems` as a save).
+- **The index map is built from what the failed save sent** (the mutation's variables), not from the draft when the error arrives, which may have changed while the save was in flight.

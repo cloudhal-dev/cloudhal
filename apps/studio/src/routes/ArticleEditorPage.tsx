@@ -1,4 +1,4 @@
-import type { ContentEntry, PublishStatus } from "@cloudhal/core-contracts";
+import type { ContentEntry, PublishStatus, Site } from "@cloudhal/core-contracts";
 import { collectionPermalink, permalinkPrefix } from "@cloudhal/core-ts/permalinks";
 import {
   ApprovalDialog,
@@ -21,7 +21,7 @@ import {
 import { Copy, Trash } from "@phosphor-icons/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArticleCorrectionsCard } from "../components/ArticleCorrections.tsx";
 import { ArticleTermsCard } from "../components/ArticleTerms.tsx";
 import { ArticleReachCards } from "../components/article-editor/ArticleAside.tsx";
@@ -44,6 +44,7 @@ import {
   ScheduleAside,
   ScheduleLock,
 } from "../components/EditorSchedule.tsx";
+import { EntryFieldCards } from "../components/EntryFieldCards.tsx";
 import { EntryPath } from "../components/EntryPath.tsx";
 import { EntryStatus } from "../components/EntryStatus.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
@@ -61,6 +62,7 @@ import { useSavedToast } from "../components/useLiveSite.ts";
 import { useCan, useGate, useSelf } from "../components/useMe.ts";
 import { useT } from "../i18n/index.tsx";
 import { api, type NewEntry } from "../lib/api.ts";
+import { withoutEmptyItems } from "../lib/empty-items.ts";
 import { entryRoute } from "../lib/entry-href.ts";
 import { entryAccess } from "../lib/roles.ts";
 import { cleanImageRef, hasErrors, SEO_LIMITS, validateImageRef } from "../lib/seo.ts";
@@ -69,13 +71,14 @@ import { missingPrimaries } from "../lib/taxonomy.ts";
 import { isDirty, setOptional } from "../lib/util.ts";
 import { slugify } from "../lib/workflow.ts";
 
-// RFC-0041 §7: the typed fields form loads only for collections that define fields.
-const EntryFieldsCard = lazy(() =>
-  import("../components/fields/EntryFieldsCard.tsx").then((m) => ({ default: m.EntryFieldsCard })),
-);
-
-/** A copy of the article as a new draft with a free slug. */
-function duplicateOf(entry: ContentEntry, title: string): NewEntry {
+/** A copy of the article as a new draft with a free slug (no empty repeater item, RFC-0045 §1). */
+export function duplicateOf(
+  draft: ContentEntry,
+  t: ReturnType<typeof useT>,
+  site?: Site,
+): NewEntry {
+  const entry = withoutEmptyItems(draft, site);
+  const title = t("editor.copyTitle", { title: entry.title || t("articles.untitled") });
   const suffix = `-copy-${Date.now().toString(36).slice(-4)}`;
   return {
     collection: entry.collection,
@@ -95,8 +98,9 @@ function duplicateOf(entry: ContentEntry, title: string): NewEntry {
 
 const wordCount = (text: string) => text.split(/\s+/).filter(Boolean).length;
 
-/** What is sent: the cover image's fields trimmed. */
-function forSave(entry: ContentEntry): ContentEntry {
+/** What is sent: the cover image's fields trimmed, and no empty repeater item (RFC-0045 §1). */
+function forSave(draft: ContentEntry, site: Site | undefined): ContentEntry {
+  const entry = withoutEmptyItems(draft, site);
   return entry.coverImage ? { ...entry, coverImage: cleanImageRef(entry.coverImage) } : entry;
 }
 
@@ -185,7 +189,7 @@ export function ArticleEditorPage() {
   const self = useSelf();
 
   const save = useMutation({
-    mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry)),
+    mutationFn: (entry: ContentEntry) => api.entries.update(forSave(entry, site.data)),
     onSuccess: async (saved) => {
       setDraft(saved);
       setShowErrors(false);
@@ -197,10 +201,7 @@ export function ArticleEditorPage() {
   });
   const duplicate = useMutation({
     mutationFn: (entry: ContentEntry) =>
-      api.entries.create(
-        siteId,
-        duplicateOf(entry, t("editor.copyTitle", { title: entry.title || t("articles.untitled") })),
-      ),
+      api.entries.create(siteId, duplicateOf(entry, t, site.data)),
     onSuccess: async (created) => {
       await qc.invalidateQueries({ queryKey: ["entries", siteId] });
       toast.success(t("editor.duplicated"), created.slug);
@@ -447,18 +448,14 @@ export function ArticleEditorPage() {
                 className="w-full"
               />
             </SectionCard>
-            {site.data?.collections?.[draft.collection]?.fields && (
-              <Suspense fallback={null}>
-                <EntryFieldsCard
-                  siteId={siteId}
-                  site={site.data}
-                  entry={draft}
-                  onChange={(fields) => setDraft({ ...draft, fields })}
-                  error={save.error}
-                  disabled={readOnlyReason !== undefined || locked}
-                />
-              </Suspense>
-            )}
+            <EntryFieldCards
+              siteId={siteId}
+              site={site.data}
+              entry={draft}
+              onChange={(fields) => setDraft((d) => d && { ...d, fields })}
+              save={save}
+              disabled={readOnlyReason !== undefined || locked}
+            />
             <ArticleTermsCard
               entry={draft}
               onChange={(next) => {

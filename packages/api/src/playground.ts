@@ -144,8 +144,9 @@ export const PLAYGROUND_ALLOW: ReadonlySet<string> = new Set([
   `POST ${S}/entries/:entryId/preview`,
   `GET ${S}/entries/:entryId/structured-data`,
   `POST ${S}/entries/preview-fragment`,
-  // RFC-0045 §5: the entry picker and an entry's referrers, read-only (content:read).
+  // RFC-0045 §5: the entry picker, chosen targets and an entry's referrers, read-only (content:read).
   `GET ${S}/entries/pick`,
+  `GET ${S}/entries/groups`,
   `GET ${S}/entries/:entryId/references`,
   `GET ${S}/entries/:entryId`,
   `PUT ${S}/entries/:entryId`,

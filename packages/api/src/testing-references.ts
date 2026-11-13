@@ -119,6 +119,38 @@ export function describeReferencesApi(label: string, factory: ApiStoreFactory): 
       ).toBe(404);
     });
 
+    it("answers chosen groups' members in this site, any status, and nothing for a gone one", async () => {
+      const hall = await entry("places", { title: "Main Hall", status: "archived" });
+      const salon = await entry("places", {
+        title: "Ana salon",
+        locale: "tr",
+        slug: `${hall.slug}-tr`,
+        translation: {
+          group: hall.id,
+          method: "human",
+          source: { id: hall.id, locale: hall.locale, rev: hall.rev, hash: await nodeHash(hall) },
+        },
+      });
+      const gone = "entry_01HZX8K3QGONE1";
+      const res = await call(`/api/sites/${site.id}/entries/groups?ids=${hall.id},${gone}`);
+      expect(res.status, JSON.stringify(res.body)).toBe(200);
+      const groups = res.body.groups as Record<string, { id: string; status: string }[]>;
+      expect(groups[hall.id]?.map((m) => [m.id, m.status])).toEqual([
+        [hall.id, "archived"],
+        [salon.id, "draft"],
+      ]);
+      expect(groups[gone]).toEqual([]);
+      expect((await call(`/api/sites/${site.id}/entries/groups`)).status).toBe(400);
+      expect((await call(`/api/sites/${site.id}/entries/groups?ids=nope`)).status).toBe(400);
+      const many = Array.from({ length: 101 }, (_, i) => `entry_${String(i).padStart(8, "0")}`);
+      expect(
+        (await call(`/api/sites/${site.id}/entries/groups?ids=${many.join(",")}`)).status,
+      ).toBe(400);
+      expect(
+        (await call(`/api/sites/site_01HZX8K3QNONE/entries/groups?ids=${hall.id}`)).status,
+      ).toBe(404);
+    });
+
     it("folds case and diacritics on both sides, Turkish İ and ı included", async () => {
       const cicek = await entry("places", { title: "Çiçek Pasajı", slug: "cicek-pasaji" });
       const kongre = await entry("places", { title: "İstanbul Kongre", slug: "kongre" });

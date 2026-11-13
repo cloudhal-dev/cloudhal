@@ -38,6 +38,8 @@ export function useToast() {
       } as never) as unknown as string;
       return id;
     },
+    /** Closes a toast by its id (a notice that no longer applies). */
+    close: (id: string) => manager.close(id),
     error: (title: string, description?: string) =>
       manager.add({ title, description, type: "error" } as never),
     /**
