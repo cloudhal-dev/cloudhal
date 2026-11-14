@@ -330,27 +330,48 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   §10 still applies: the bundle bakes in its build inputs. In `v0.9.0` the manifest's `theme.blockTypes`, `settingsSha256`, `designSha256` and `skills` are placeholders: an empty list and the SHA-256 of the empty string. Consumers ignore those fields, and no check reads them.
 - **The theme check.** Before downloading the tarball, the CLI compares the project with **this CLI version's own starter**, the template it ships and `cloudhal init` copies, which is the starter the bundle was built from (§4 step 3). The comparison covers:
   - every file under `src/` and `public/`;
-  - `astro.config.mjs`;
-  - a root `skills/` directory, which the starter does not have. `resolveSkillsDir` prefers it, and the admin build bakes it in.
+  - the root build inputs the starter has: `astro.config.mjs`, and `tsconfig.json` (Astro reads its `paths`, and the transform reads its `compilerOptions`);
+  - root build inputs the starter does not have, which must not exist:
+    - a `skills/` directory. `resolveSkillsDir` prefers it, and the admin build bakes it in.
+    - `jsconfig.json`.
+    - any PostCSS config Vite loads: `postcss.config.{js,cjs,mjs,ts,cts,mts}`, `.postcssrc`, `.postcssrc.{json,yaml,yml,js,cjs,mjs,ts,cts,mts}`, and a `postcss` key in `package.json`.
 
-  Files are compared byte for byte after CRLF is normalised to LF, so a Windows checkout of an unmodified starter passes. A file the starter has that the project lacks is a difference, and so is a file the project has that the starter lacks. Paths are compared as normalised relative paths, with no pattern over paths or contents. Nothing outside these paths is compared, so `README`, `.gitignore`, lockfiles and `wrangler.jsonc` never matter.
+  The list was checked against the installed Astro 7.4.7 and Vite 8.3.5.
+  - Astro passes `configFile: false` to Vite (`create-vite.js`), so a `vite.config.*` is never loaded and is not compared.
+  - The PostCSS names are the search places of the `postcss-load-config` 6.0.1 that Vite bundles.
+  - `.env*` files are not compared. Vite loads them, but only code that reads a variable can bake it in, and the code is the starter's, which reads no `import.meta.env`.
+  - The list is rechecked on every Astro or Vite major upgrade, and the code PR adds that step to the upgrade notes next to the list.
+
+  Files are compared byte for byte after CRLF is normalised to LF, so a Windows checkout of an unmodified starter passes. A file the starter has that the project lacks is a difference, and so is a file the project has that the starter lacks.
+
+  Three operating-system metadata files are skipped wherever they appear under the compared paths: `.DS_Store`, `Thumbs.db` and `desktop.ini`. They are matched by exact basename, with no patterns, and the starter never contains them. A Finder visit to `public/` must not teach anyone to reach for the flag.
+
+  Paths are compared as normalised relative paths, with no pattern over paths or contents. Nothing outside these paths is compared, so `README`, `.gitignore`, lockfiles and `wrangler.jsonc` never matter.
 
   On any difference, the CLI refuses. It lists the differing files (the first 20, then a count) and names the two ways forward: `cloudhal deploy` without `--release`, which builds the project as it is, or `--discard-local-theme`.
 - **`--discard-local-theme`.** The flag deploys the official theme anyway. The CLI then lists every file that is not deployed (changed, added or missing relative to the starter) before it uploads. The flag is never implied, including in CI and non-interactive runs. It discards nothing on disk: the project's files stay as they are.
 - **Older projects.** A project whose starter files come from an older version differs from this CLI's starter wherever the starter changed between the two versions, even if nobody edited it. Such a project needs `--discard-local-theme` to upgrade or roll back with `--release`. A future `cloudhal starter sync` would bring the local starter files to the CLI's version; it is named here and is out of scope.
 - **Config build keys.** Separately from the theme check, the CLI refuses when `cloudhal.json` sets a key the table below marks `build` to a value other than this version's starter's. `--discard-local-theme` does not cover this. The config is the project's own, so the user changes the key or deploys without `--release`. A `cloudhal.json` key this CLI does not know is refused the same way.
-  - **The table.** It lives in one exported table next to `readProjectConfig`, and each key has one of three classes:
-    - `deploy`: it becomes a binding, a var or a resource, and no build reads it. These are `domains`, `mail`, `ai`, `render`, `observability`, `placement` and `schedules`.
-    - `runtime`: a build reads it, but the deployed Worker overrides it.
+  - **The table.** It lives in one exported table next to `readProjectConfig`. Every key and every sub-key that a reader uses has an explicit class. There is no fallback class: a key the table does not class is a drift-test failure, and it is never assumed. The classes:
+    - `deploy`: the key becomes a binding, a var or a resource, and no build reads it.
+      - `domains`, `mail`, `ai`, `render`, `observability`, `placement`, `schedules`.
+      - `search`, which feeds only `searchDeploymentOf`.
+      - `comments.rateLimit`, which feeds only `commentsRateLimitDeployment`.
+      - `analytics.queryBudget`, `analytics.rawRetentionDays` and `analytics.rateLimit`.
+    - `runtime`: a build reads the key, but the deployed Worker overrides it.
       - `siteId`: the Site Worker's `CLOUDHAL_SITE_ID`/`CLOUDHAL_SITE_IDS` vars override the baked id.
       - `dataDir`: the `cloudflare` target never reads it. The baked value is the CI build's absolute path.
-      - `analytics`: the Site Worker reads its vars instead.
-    - `build`: a build reads it and nothing overrides it.
-      - `comments.available` is always `build`.
-      - `media.transform` is `build` unless the manifest's `features.mediaTransformVar` is true.
-      - Every other key is `build`.
+      - `analytics.enabled`, `analytics.uniqueVisitors` and `analytics.vitalsOneIn`: the Site Worker reads its vars instead.
+      - `analytics.dev`: only `cloudhal dev` reads it.
+    - `build`: a build reads the key and nothing overrides it.
+      - `comments.available`.
+      - `media.transform`, unless the manifest's `features.mediaTransformVar` is true; then it is `runtime`.
+    - `refused`: `sites` and `installation`. The other refusals below handle them.
   - **Drift guards.** These test the builds themselves, not config generation.
-    - **Site.** A repository test scans `starters/blog/astro.config.mjs` for every `project.<key>` it reads. It fails unless that set equals the table's site keys (`siteId`, `dataDir`, `media`, `analytics`, `comments`) with their classes. The theme check guarantees that a project deployed with `--release` carries this exact file. Two further tests hold the `runtime` overrides:
+    - **Every key is classed.** The table's type is mapped over `ProjectConfig`, plus `media`, which only `astro.config.mjs` reads. Objects with mixed classes (`analytics`, `comments`, `media`) map over their sub-keys, so `tsc` fails on a key or sub-key that has no class. A test also checks:
+      - that every key in `config.ts`'s `OWN_KEYS` is a table key;
+      - that every sub-key the `cloudhal()` integration's option types declare for `media`, `analytics` and `comments` is classed.
+    - **Site.** A repository test scans `starters/blog/astro.config.mjs` for every `project.<key>` it reads. It fails unless every such key is in the table. For `media`, `analytics` and `comments`, which the file passes to the integration whole, the sub-key check above applies. The theme check guarantees that a project deployed with `--release` carries this exact file. Two further tests hold the `runtime` overrides:
       - a Site Worker test serves a site whose id differs from the baked one, through `CLOUDHAL_SITE_ID`;
       - an astro-renderer test shows that the `cloudflare` target ignores `dataDir`. If it does not, the integration stops emitting `dataDir` for that target.
     - **Admin.** A test runs `prepareAdminWorker` twice, with different `mail`, `ai`, `browser`, `observability`, `placement`, `domains.studio` and `siteId`. The generated entry, the skills module and the theme-design module must be byte-identical; only the wrangler config may differ. The code the admin build bakes in reads only files (block types, theme settings, `src/DESIGN.md`, skills), and the theme check covers those files.
@@ -366,6 +387,13 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
     - an added `skills/x/SKILL.md`.
   - `--discard-local-theme` turns each of those refusals into a deploy that lists the files not deployed.
   - `comments.available: false` is refused with and without the flag. So is `media.transform` while `features.mediaTransformVar` is false.
+  - Each of these is refused, naming it:
+    - an edited `tsconfig.json`;
+    - an added `postcss.config.mjs` or `.postcssrc.json`;
+    - a `postcss` key in `package.json`;
+    - an added `jsconfig.json`.
+  - A `public/fonts/v1/.DS_Store`, a `Thumbs.db` or a `desktop.ini` under `src/` passes, and so do a `vite.config.ts` and a `.env`.
+  - A project with `search` set, or with `comments.rateLimit` set, passes the config check.
   - Edits to `README.md`, `.gitignore` or `wrangler.jsonc` pass.
   - A starter from the previous version's tag is refused without the flag and passes with it, which covers the upgrade and rollback rule.
   - A wrangler older than `manifest.toolchain.wrangler` is refused.
