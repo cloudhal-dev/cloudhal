@@ -38,12 +38,18 @@ export interface TrustOptions {
   readonly roots?: Readonly<Record<string, { readonly publicKey: string }>>;
 }
 
-/** The trust assets to attach (see the file comment). */
-export async function trustAssets(o: TrustOptions): Promise<LocalAsset[]> {
+export interface TrustAssets {
+  readonly assets: LocalAsset[];
+  /** The verified yank list, for the consumer check of the bundle (none for a published release). */
+  readonly yanked?: unknown;
+}
+
+/** The trust assets to attach (see the file comment), and the yank list they verified. */
+export async function trustAssets(o: TrustOptions): Promise<TrustAssets> {
   const log = o.log ?? ((l: string) => console.log(`publish-ci: ${l}`));
   if (o.release && !o.release.draft) {
     // Immutable: expect exactly what it carries (names + digests; never uploaded again).
-    return o.release.assets
+    const assets = o.release.assets
       .filter((a) => TRUST_ASSET_NAMES.includes(a.name))
       .map((a) => ({
         name: a.name,
@@ -51,12 +57,13 @@ export async function trustAssets(o: TrustOptions): Promise<LocalAsset[]> {
         bytes: a.size,
         sha256: (a.digest ?? "").replace(/^sha256:/, ""),
       }));
+    return { assets };
   }
   const keysFile = path.join(o.root, "security/keys.json");
   const keysSig = path.join(o.root, "security/keys.json.sig");
   if (!existsSync(keysFile) || !existsSync(keysSig)) {
     log("no security/keys.json yet (before the root ceremony): no trust assets attached");
-    return [];
+    return { assets: [] };
   }
   // Loaded here only: the `plan` job runs this script's caller without a pnpm install.
   const rv = await import("../packages/release-verify/src/index.ts");
@@ -75,15 +82,18 @@ export async function trustAssets(o: TrustOptions): Promise<LocalAsset[]> {
   };
   const yanked = await read("yanked.json");
   const yankedSig = await read("yanked.json.sig");
-  await rv.verifyYanked({ document: yanked, signature: yankedSig, keys, now });
+  const verified = await rv.verifyYanked({ document: yanked, signature: yankedSig, keys, now });
   const dir = mkdtempSync(path.join(os.tmpdir(), "cloudhal-trust-"));
   writeFileSync(path.join(dir, "yanked.json"), yanked);
   writeFileSync(path.join(dir, "yanked.json.sig"), yankedSig);
   log(`attaching keys.json and yanked.json (key list ${keys.sha256.slice(0, 12)})`);
-  return [
-    asset("keys.json", keysFile),
-    asset("keys.json.sig", keysSig),
-    asset("yanked.json", path.join(dir, "yanked.json")),
-    asset("yanked.json.sig", path.join(dir, "yanked.json.sig")),
-  ];
+  return {
+    assets: [
+      asset("keys.json", keysFile),
+      asset("keys.json.sig", keysSig),
+      asset("yanked.json", path.join(dir, "yanked.json")),
+      asset("yanked.json.sig", path.join(dir, "yanked.json.sig")),
+    ],
+    yanked: verified,
+  };
 }

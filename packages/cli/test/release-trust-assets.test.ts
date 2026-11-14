@@ -23,7 +23,7 @@ const iso = (ms: number) => new Date(ms).toISOString().replace(".000Z", "Z");
 const quiet = () => {};
 
 /** A repo root with a signed security/keys.json, and the matching signed yank list bytes. */
-function repo() {
+async function repo() {
   const keysDir = tmp();
   const root = rootInit({
     keyId: "cloudhal-root-2026a",
@@ -46,7 +46,7 @@ function repo() {
       },
     ],
   };
-  const signedKeys = signKeys({
+  const signedKeys = await signKeys({
     rootKey: readFileSync(path.join(keysDir, "cloudhal-root-2026a.key.enc"), "utf8"),
     passphrase: "a long passphrase",
     rootPub: root,
@@ -54,16 +54,18 @@ function repo() {
     out: path.join(repoRoot, "security"),
     now: NOW,
   });
-  const yanked = signYanked({
+  const roots = { [root.keyId]: { publicKey: root.publicKey } };
+  const yanked = await signYanked({
     keyId: "cloudhal-yank-2026a",
     keyPem: readFileSync(path.join(keysDir, "cloudhal-yank-2026a.pem"), "utf8"),
-    keys: JSON.parse(new TextDecoder().decode(signedKeys.document)),
+    keyList: signedKeys,
+    roots,
     source: { versions: [], revokedKeys: [] },
     published: undefined,
     out: tmp(),
     now: NOW,
   });
-  return { repoRoot, roots: { [root.keyId]: { publicKey: root.publicKey } }, yanked };
+  return { repoRoot, roots, yanked };
 }
 
 const serve = (y: { document: Uint8Array; signature: Uint8Array }) => async (url: string) =>
@@ -75,12 +77,12 @@ const serve = (y: { document: Uint8Array; signature: Uint8Array }) => async (url
 
 describe("trustAssets", () => {
   it("attaches nothing before the root ceremony (no security/keys.json)", async () => {
-    expect(await trustAssets({ root: tmp(), release: null, log: quiet })).toEqual([]);
+    expect(await trustAssets({ root: tmp(), release: null, log: quiet })).toEqual({ assets: [] });
   });
 
   it("attaches the verified key list and the verified yank list from cloudhal.dev", async () => {
-    const r = repo();
-    const assets = await trustAssets({
+    const r = await repo();
+    const { assets, yanked } = await trustAssets({
       root: r.repoRoot,
       release: null,
       roots: r.roots,
@@ -98,10 +100,12 @@ describe("trustAssets", () => {
     expect(readFileSync((assets[2] as { file: string }).file)).toEqual(
       Buffer.from(r.yanked.document),
     );
+    // The verified yank list, for the consumer check of the bundle.
+    expect((yanked as { document: { serial: number } }).document.serial).toBe(1);
   });
 
   it("refuses an unverifiable key list or yank list, and an unreachable one", async () => {
-    const r = repo();
+    const r = await repo();
     const base = { root: r.repoRoot, release: null, now: new Date(NOW), log: quiet };
     // Pinned roots (none yet) do not sign this list.
     await expect(trustAssets({ ...base, fetchImpl: serve(r.yanked) })).rejects.toMatchObject({
@@ -119,7 +123,7 @@ describe("trustAssets", () => {
 
   it("a published release keeps the trust assets it carries (never refetched)", async () => {
     let fetched = 0;
-    const assets = await trustAssets({
+    const { assets } = await trustAssets({
       root: tmp(),
       release: {
         draft: false,

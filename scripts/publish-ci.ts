@@ -356,19 +356,20 @@ export async function main(argv: readonly string[]): Promise<void> {
         dryRunPublicKey: process.env.RELEASE_DRYRUN_PUBLIC_KEY,
       })
     : {};
-  // Before anything is created or uploaded: every consumer's own verifier accepts this bundle.
-  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys);
   const releases = port.releases(tag);
   const loaded = bundleDir ? loadBundle(bundleDir, version, publicKeys) : null;
   // RFC-0046 §9: the verified key list and yank list ride along as a snapshot (none before the
   // root ceremony; a resumed run of a published release reuses what it carries).
-  const trust = loaded ? await trustAssets({ root: ROOT, release: releases[0] ?? null }) : [];
+  const trust = loaded ? await trustAssets({ root: ROOT, release: releases[0] ?? null }) : null;
+  // Before anything is created or uploaded: every consumer's own verifier accepts this bundle,
+  // the yank list included once there is one.
+  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys, trust?.yanked);
   const steps = await runPublish(port, {
     version,
     head: sh("git", ["rev-parse", "HEAD"], true).trim(),
     dryRun,
     ...(runNumber ? { runNumber } : {}),
-    bundle: loaded ? { ...loaded, assets: [...loaded.assets, ...trust] } : null,
+    bundle: loaded ? { ...loaded, assets: [...loaded.assets, ...(trust?.assets ?? [])] } : null,
     tagCommit: dryRun ? null : remoteTagCommit(tag),
     releases,
     packages: pkgs.map((p) => p.name),

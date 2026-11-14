@@ -24,10 +24,17 @@ describe("the Yank list workflow", () => {
     expect(code(sign)).toContain("environment: release-yank");
   });
 
-  it("hands the yank key to the Sign step only, installs nothing, never force-pushes", () => {
+  it("hands the yank key to the Sign step only, installs only the verifier, never force-pushes", () => {
     expect(code(YANK).match(/secrets\.RELEASE_YANK_KEY/g)).toHaveLength(1);
     expect(step(sign, "Sign")).toContain(`RELEASE_YANK_KEY: ${gha("secrets.RELEASE_YANK_KEY")}`);
-    expect(code(YANK)).not.toMatch(/pnpm install|npm ci|npm install/);
+    // Exactly one install: the verifier's pinned dependencies, no lifecycle scripts, before the key.
+    expect(code(YANK).match(/pnpm install|npm ci|npm install/g)).toHaveLength(1);
+    expect(code(YANK)).toContain(
+      "run: pnpm install --frozen-lockfile --ignore-scripts --filter @cloudhal/release-verify",
+    );
+    expect(code(sign).indexOf("--ignore-scripts")).toBeLessThan(
+      code(sign).indexOf("RELEASE_YANK_KEY"),
+    );
     expect(code(YANK)).not.toMatch(/--force|push -f|\+yank-list/);
     expect(runs(step(sign, "Sign")).join("\n")).toContain("node scripts/release-keys.ts");
   });
