@@ -5,6 +5,7 @@ import {
   DropdownMenu,
   Empty,
   LayerCard,
+  ListToolbar,
   PageLayout,
   Pagination,
   SectionCard,
@@ -38,7 +39,6 @@ import { ConfirmDialog } from "../components/ConfirmDialog.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { InviteDialog, type InviteDraft } from "../components/InviteDialog.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import {
   ChangeRoleDialog,
   MemberIdentity,

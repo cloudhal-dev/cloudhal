@@ -6,6 +6,7 @@ import {
   LayerCard,
   Link,
   LinkButton,
+  ListToolbar,
   PageLayout,
   RefreshButton,
   Select,
@@ -29,7 +30,6 @@ import { ActivityDetailDialog } from "../components/ActivityDetailDialog.tsx";
 import { ActorCell, DecisionCell, Outcome, ToolCell, useToolLabel } from "../components/Audit.tsx";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useCan, useMemberRoles } from "../components/useMe.ts";

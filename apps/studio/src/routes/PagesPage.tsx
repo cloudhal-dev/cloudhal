@@ -7,6 +7,7 @@ import {
   Empty,
   LayerCard,
   Link,
+  ListToolbar,
   PageLayout,
   Pagination,
   Table,
@@ -21,7 +22,6 @@ import { type ReactNode, useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import {
   ListViewsCell,
   type ListViewsColumn,
