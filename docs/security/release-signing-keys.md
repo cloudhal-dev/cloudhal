@@ -123,10 +123,10 @@ This runs once, offline where it says so. Nobody else generates or holds these k
 3. **Tell people.** Publish an advisory under [SECURITY.md](../../SECURITY.md).
 4. **Recover.** Rotate to a new release key (*Rotation*, steps 2 to 4) and release a new version signed by it.
 5. **A stolen yank key, or the yank key's rotation.** A stolen key can deny service, and for stateless consumers it can undo yanks and revocations.
-   - Record every published yank and revocation that still matters in `security/yank-list.json` first: the new key's first list starts from that source alone.
-   - Generate a new yank key (`yank-init`). In one `keys.json`, set the old key `revoked` (stolen) or remove it (rotation), and list the new key as the only `active` yank key. Re-sign it with the root and publish it as in *First-time setup*, steps 6 and 9.
+   - Generate a new yank key (`yank-init`). In one `keys.json`, set the old key `revoked` (stolen) or `retiring` (rotation), keeping it listed, and list the new key as the only `active` yank key. Re-sign it with the root and publish it as in *First-time setup*, steps 6 and 9.
    - Replace `RELEASE_YANK_KEY`, and the key id in `.github/workflows/yank-list.yml`'s Sign step.
-   - Run the *Yank list* workflow once with `rotate` checked. It does not carry the old key's list forward and starts again at serial 1. Consumers with memory start a new memory with the new key, because the newer `keys.json` no longer lists the old one as active; they refuse the old key from then on.
+   - Let the next run sign (or run the *Yank list* workflow by hand). It verifies the old key's published list with the old key as `keys.json` lists it, carries every entry forward, and continues the serial. Consumers with memory move to the new key, because the newer `keys.json` no longer lists the old one as active; they refuse the old key from then on.
+   - **Pruning, or a stolen key whose list you no longer trust:** record every yank and revocation that still matters in `security/yank-list.json` first, then run the workflow once with `rotate` checked. It carries nothing of the old key's list forward and starts again at serial 1.
 
 ## Yanking a version
 

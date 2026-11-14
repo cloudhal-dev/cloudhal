@@ -425,7 +425,9 @@ describe("sign-yanked", () => {
       );
       await expect(
         signYanked({ ...base, out, published: { document: crafted, signature: forged } }),
-      ).rejects.toThrow(/names cloudhal-yank-2099a as its signer.*--rotate/);
+      ).rejects.toThrow(
+        /cloudhal-yank-2099a, which keys.json does not list as a yank key.*--rotate/,
+      );
       expect(readdirSync(out)).toEqual([]);
     });
 
@@ -583,14 +585,18 @@ describe("a yank-key rotation, end to end", () => {
       keyPem: readFileSync(path.join(c.dir, "cloudhal-yank-2026b.pem"), "utf8"),
       keyList: keysT2,
       roots: roots(c.root),
-      published: JSON.parse(new TextDecoder().decode(old.document)),
+      published: old,
       out: tmp(),
       now: NOW,
     };
+    // The old key's list is carried forward even when the source does not list its entries yet
+    // (an emergency yank, say); a crafted one fails the old key's signature.
+    const fresh = await signYanked({ ...base, source: { versions: [], revokedKeys: [] } });
+    const forged = new Uint8Array(old.signature);
+    forged[0] = (forged[0] as number) ^ 1;
     await expect(
-      signYanked({ ...base, source: { versions: [], revokedKeys: [] } }),
-    ).rejects.toThrow(/drops 0.9.3/);
-    const fresh = await signYanked({ ...base, source: yanks });
+      signYanked({ ...base, source: yanks, published: { ...old, signature: forged } }),
+    ).rejects.toThrow(/signed by the replaced key cloudhal-yank-2026a\) does not verify/);
     const doc = JSON.parse(new TextDecoder().decode(fresh.document));
     expect(doc.signing.keyId).toBe("cloudhal-yank-2026b");
     expect(doc.serial).toBe(2);

@@ -49,7 +49,7 @@ on:
         required: false
         default: false
       rotate:
-        description: The first list of a new yank key (after the root replaced the old one; serial 1)
+        description: Prune - start the yank key's list from security/yank-list.json alone (serial 1)
         type: boolean
         required: false
         default: false

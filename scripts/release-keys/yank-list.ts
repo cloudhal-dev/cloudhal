@@ -6,8 +6,10 @@
  * `contents: write` could push to. So nothing of it is carried forward until it verifies exactly
  * as a consumer would verify it: its signature by the active yank key of the pinned-root
  * `keys.json`, its schema, its freshness. A list that fails is refused loudly, never re-signed.
- * After a yank-key rotation the published list is signed by the old key; the run that starts the
- * new key's list (`--rotate`) carries nothing of it forward and starts again at serial 1.
+ * After a yank-key rotation the published list is signed by the old key: it is verified with that
+ * key as the newer `keys.json` still lists it (revoked or retiring), as of its own `issuedAt`, and
+ * every entry is carried forward with the serial continuing. Only `--rotate` prunes: the new key's
+ * list then starts from the committed source alone, at serial 1.
  */
 import { existsSync, readFileSync } from "node:fs";
 import type { VerifiedKeyList, YankMemory } from "../../packages/release-verify/src/index.ts";
@@ -150,10 +152,7 @@ export async function verifyPublished(o: {
       throw new Error(`--rotate: the published list is already signed by ${o.keyId}`);
     return undefined;
   }
-  if (signer !== o.keyId)
-    throw new Error(
-      `the published yank list names ${signer ?? "no key"} as its signer, not ${o.keyId}: after a yank-key rotation run once with --rotate; otherwise the branch holds a list nobody should trust`,
-    );
+  if (signer !== o.keyId) return verifyRotated(o, o.published, signer);
   const pair = o.published;
   const check = (at: number) => o.rv.verifyYanked({ ...pair, keys: o.keys, now: new Date(at) });
   let verified: Awaited<ReturnType<typeof check>>;
@@ -174,6 +173,55 @@ export async function verifyPublished(o: {
     list: { versions: d.versions, revokedKeys: d.revokedKeys },
     serial: d.serial,
     memory: o.rv.rememberYanks(verified, o.keys),
+  };
+}
+
+/** No `keys.json` is known for a list the old yank key signed: the epoch, so the current one is newer. */
+const UNKNOWN_KEY_LIST = "1970-01-01T00:00:00Z";
+
+/**
+ * The last list of the yank key a rotation replaced (see the file comment). The current
+ * `keys.json` must still list that key with role `yank`; its list is verified with it as of the
+ * list's `issuedAt`. The memory names no `keys.json` (`UNKNOWN_KEY_LIST`): the one that list was
+ * valid under is not known here, and the current one replaces the old key, as it does for every
+ * consumer.
+ */
+async function verifyRotated(
+  o: { rv: Verifier; keys: VerifiedKeyList; keyId: string },
+  pair: PublishedPair,
+  signer: string | undefined,
+): Promise<VerifiedPublished> {
+  const old = o.keys.document.keys.find((k) => k.keyId === signer && k.role === "yank");
+  if (!old)
+    throw new Error(
+      `the published yank list is signed by ${signer ?? "no key"}, which keys.json does not list as a yank key: keep the old yank key listed (revoked or retiring) to carry its list forward, or prune with --rotate`,
+    );
+  const asSigned = {
+    ...o.keys,
+    document: {
+      ...o.keys.document,
+      keys: o.keys.document.keys.map((k) =>
+        k.keyId === old.keyId ? { ...k, status: "active" as const } : k,
+      ),
+    },
+  };
+  let verified: Awaited<ReturnType<Verifier["verifyYanked"]>>;
+  try {
+    verified = await o.rv.verifyYanked({
+      ...pair,
+      keys: asSigned,
+      now: new Date(Date.parse(issuedAtOf(pair))),
+    });
+  } catch (e) {
+    throw new Error(
+      `the published yank list (signed by the replaced key ${old.keyId}) does not verify: ${(e as Error).message}; nothing carried forward, nothing signed`,
+    );
+  }
+  const d = verified.document;
+  return {
+    list: { versions: d.versions, revokedKeys: d.revokedKeys },
+    serial: d.serial,
+    memory: { ...o.rv.rememberYanks(verified, o.keys), keysIssuedAt: UNKNOWN_KEY_LIST },
   };
 }
 
