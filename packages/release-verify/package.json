@@ -1,6 +1,6 @@
 {
   "name": "@cloudhal/release-verify",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Verifies a Cloudhal release bundle (RFC-0046 §2, §7, §11a): the Ed25519 release statement against pinned keys, the manifest, and every part of the tarball. Worker-safe; the attestation check is a Node-only subpath.",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
