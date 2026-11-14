@@ -119,11 +119,48 @@ export function yankInit(o: { keyId: string; out: string; log: Log }): PublicKey
   return writePublic(o.out, o.keyId, publicKey, o.log);
 }
 
-/** `iso` plus `months` calendar months (UTC). */
+/** `ms` plus `months` calendar months (UTC), clamped to the target month's last day. */
 function addMonths(ms: number, months: number): number {
   const d = new Date(ms);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.getTime();
+  const target = new Date(
+    Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth() + months,
+      1,
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+    ),
+  );
+  const last = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d.getUTCDate(), last));
+  return target.getTime();
+}
+
+/**
+ * The consumer's own verifier, which checks the exact signed bytes before anything is written
+ * (schema, unique key ids, windows, timestamps, sizes). Needs `@cloudhal/release-verify`'s
+ * dependencies installed (the workflow installs that one package, without scripts).
+ */
+async function verifier() {
+  try {
+    return await import("../packages/release-verify/src/index.ts");
+  } catch (e) {
+    throw new Error(
+      `the release verifier is not installed (pnpm install --filter @cloudhal/release-verify): ${(e as Error).message}`,
+    );
+  }
+}
+
+/** Runs `check`; a refusal names what was about to be signed. */
+async function selfCheck(what: string, check: () => Promise<unknown>): Promise<void> {
+  try {
+    await check();
+  } catch (e) {
+    throw new Error(`the signed ${what} does not verify, nothing written: ${(e as Error).message}`);
+  }
 }
 
 function signDocument(doc: unknown, key: KeyObject, check: KeyObject) {
@@ -135,7 +172,7 @@ function signDocument(doc: unknown, key: KeyObject, check: KeyObject) {
 }
 
 /** `keys.json` + `keys.json.sig`, signed by the root; the root key must match `rootPub`. */
-export function signKeys(o: {
+export async function signKeys(o: {
   rootKey: string;
   passphrase: string;
   rootPub: PublicKeyFile;
@@ -143,7 +180,7 @@ export function signKeys(o: {
   out: string;
   now: number;
   months?: number;
-}): { document: Uint8Array; signature: Uint8Array } {
+}): Promise<{ document: Uint8Array; signature: Uint8Array }> {
   const months = o.months ?? 12;
   if (!(months >= 1 && months <= 13)) throw new Error("keys.json is valid for 1 to 13 months");
   checkKeyId(o.rootPub.keyId, "root");
@@ -167,6 +204,14 @@ export function signKeys(o: {
     keys: o.source.keys,
   };
   const signed = signDocument(doc, key, publicKeyOf(o.rootPub.publicKey));
+  const rv = await verifier();
+  await selfCheck("key list", () =>
+    rv.verifyKeys({
+      ...signed,
+      roots: { [o.rootPub.keyId]: { publicKey: o.rootPub.publicKey } },
+      now: new Date(issued),
+    }),
+  );
   mkdirSync(o.out, { recursive: true });
   writeFileSync(path.join(o.out, "keys.json"), signed.document);
   writeFileSync(path.join(o.out, "keys.json.sig"), signed.signature);
@@ -178,9 +223,10 @@ interface YankSource {
   revokedKeys: { keyId: string; revokedAt: string; reason: string }[];
 }
 
-/** The published list: its entries, and the serial the next one must exceed. */
+/** The published list: its entries, its signer, and the serial the next one must exceed. */
 interface PublishedYankList extends YankSource {
   serial: number;
+  signing?: { keyId?: string };
 }
 
 /** Refuses a source that drops an entry of the published list (the list is append-only). */
@@ -199,28 +245,27 @@ export function checkAppendOnly(source: YankSource, published: YankSource | unde
 }
 
 /** `yanked.json` + `yanked.json.sig`, signed by the yank key that `keys` lists as active. */
-export function signYanked(o: {
+export async function signYanked(o: {
   keyId: string;
   keyPem: string;
-  keys: {
-    keys: {
-      keyId: string;
-      publicKey: string;
-      role: string;
-      status: string;
-      notBefore: string;
-      notAfter: string;
-    }[];
-  };
+  /** `keys.json` and its signature, verified here against `roots` (default: the pinned root). */
+  keyList: { document: Uint8Array; signature: Uint8Array };
+  roots?: Readonly<Record<string, { readonly publicKey: string }>>;
   source: YankSource;
   published: PublishedYankList | undefined;
   out: string;
   now: number;
-}): { document: Uint8Array; signature: Uint8Array } {
+}): Promise<{ document: Uint8Array; signature: Uint8Array }> {
   if (o.published && !(Number.isSafeInteger(o.published.serial) && o.published.serial >= 1))
     throw new Error("the published yank list has no serial");
+  const rv = await verifier();
+  const keys = await rv.verifyKeys({
+    ...o.keyList,
+    ...(o.roots ? { roots: o.roots } : {}),
+    now: new Date(o.now),
+  });
   checkKeyId(o.keyId, "yank");
-  const listed = o.keys.keys.find((k) => k.keyId === o.keyId);
+  const listed = keys.document.keys.find((k) => k.keyId === o.keyId);
   if (listed?.role !== "yank" || listed.status !== "active")
     throw new Error(`keys.json does not list ${o.keyId} as an active yank key`);
   if (o.now < Date.parse(listed.notBefore) || o.now > Date.parse(listed.notAfter))
@@ -249,6 +294,18 @@ export function signYanked(o: {
     revokedKeys: o.source.revokedKeys,
   };
   const signed = signDocument(doc, key, publicKeyOf(listed.publicKey));
+  // The published list is the memory this one must keep (serial, every entry), as consumers do.
+  const memory = o.published
+    ? {
+        keyId: o.published.signing?.keyId ?? o.keyId,
+        serial: o.published.serial,
+        versions: o.published.versions.map((v) => v.version),
+        revokedKeys: o.published.revokedKeys.map((k) => k.keyId),
+      }
+    : undefined;
+  await selfCheck("yank list", () =>
+    rv.verifyYanked({ ...signed, keys, now: new Date(issued), ...(memory ? { memory } : {}) }),
+  );
   mkdirSync(o.out, { recursive: true });
   writeFileSync(path.join(o.out, "yanked.json"), signed.document);
   writeFileSync(path.join(o.out, "yanked.json.sig"), signed.signature);
@@ -331,7 +388,7 @@ export async function main(argv: readonly string[], log: Log = console.log): Pro
   } else if (command === "sign-keys") {
     const pass = await passphrase(v["passphrase-file"], false);
     const out = v.out ?? security;
-    signKeys({
+    await signKeys({
       rootKey: readFileSync(need("root-key"), "utf8"),
       passphrase: pass,
       rootPub: readJson<PublicKeyFile>(need("root-pub")),
@@ -347,10 +404,18 @@ export async function main(argv: readonly string[], log: Log = console.log): Pro
       : (process.env.RELEASE_YANK_KEY ?? "");
     delete process.env.RELEASE_YANK_KEY;
     const out = v.out ?? path.join(ROOT, ".build/yank-list");
-    signYanked({
+    const keysFile = v.keys ?? path.join(security, "keys.json");
+    await signYanked({
       keyId: need("key-id"),
       keyPem,
-      keys: readJson(v.keys ?? path.join(security, "keys.json")),
+      keyList: { document: readFileSync(keysFile), signature: readFileSync(`${keysFile}.sig`) },
+      // Default: the pinned root. --root-pub only before the root is pinned (or in tests).
+      ...(v["root-pub"]
+        ? (() => {
+            const pub = readJson<PublicKeyFile>(v["root-pub"] as string);
+            return { roots: { [pub.keyId]: { publicKey: pub.publicKey } } };
+          })()
+        : {}),
       source: readJson<YankSource>(v.list ?? path.join(security, "yank-list.json")),
       published: await published(v.published, v["first-run"] === true),
       out,

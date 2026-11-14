@@ -6,10 +6,12 @@ import { generateKeyPairSync, type KeyObject, sign } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { canonicalJson } from "../../../scripts/release-bundle/manifest.ts";
 import {
+  addMonths,
   mergeTrust,
   PINNED_KEYS,
   type ReleaseKeys,
   type ReleaseVerifyErrorCode,
+  rememberYanks,
   verifyKeys,
   verifyRelease,
   verifyYanked,
@@ -156,14 +158,76 @@ describe("verifyYanked", () => {
     ).toBe("stale-yank-list");
   });
 
-  it("refuses a rollback below a serial the consumer has seen (stale-yank-list)", async () => {
+  it("a consumer with memory refuses a rollback or a dropped entry (stale-yank-list)", async () => {
     const keys = await keysAt(keysDoc());
-    const s = signed(yankDoc(), YANK.privateKey);
-    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 6 }))).toBe(
-      "stale-yank-list",
+    const yanks = {
+      versions: [{ version: "0.9.3", yankedAt: "2026-11-20T00:00:00Z", reason: "Broken." }],
+      revokedKeys: [
+        { keyId: "cloudhal-release-2025a", revokedAt: "2026-11-20T00:00:00Z", reason: "Old." },
+      ],
+    };
+    const first = await verifyYanked({
+      ...signed(yankDoc(yanks), YANK.privateKey),
+      keys,
+      now: NOW,
+    });
+    const memory = rememberYanks(first);
+    expect(memory).toEqual({
+      keyId: "test-yank-2026a",
+      serial: 5,
+      versions: ["0.9.3"],
+      revokedKeys: ["cloudhal-release-2025a"],
+    });
+    const later = (over: Record<string, unknown>) =>
+      verifyYanked({
+        ...signed(yankDoc({ ...yanks, ...over }), YANK.privateKey),
+        keys,
+        now: NOW,
+        memory,
+      });
+    expect(await codeOf(later({ serial: 6 }))).toBe("ok");
+    expect(await codeOf(later({ serial: 5 }))).toBe("ok");
+    expect(await codeOf(later({ serial: 4 }))).toBe("stale-yank-list");
+    // A stolen yank key signing a fresh list that un-yanks or un-revokes: refused.
+    expect(await codeOf(later({ serial: 6, versions: [] }))).toBe("stale-yank-list");
+    expect(await codeOf(later({ serial: 6, revokedKeys: [] }))).toBe("stale-yank-list");
+  });
+
+  it("a list from another, root-listed yank key starts a new memory (the root's rotation)", async () => {
+    const next = keyPair();
+    const doc = keysDoc();
+    const rotated = {
+      ...doc,
+      keys: [
+        ...doc.keys,
+        {
+          ...(doc.keys[1] as (typeof doc.keys)[number]),
+          keyId: "test-yank-2027a",
+          publicKey: next.raw,
+        },
+      ],
+    };
+    const keys = await keysAt(rotated);
+    const memory = { keyId: "test-yank-2026a", serial: 40, versions: ["0.9.3"], revokedKeys: [] };
+    const fresh = yankDoc({
+      serial: 1,
+      signing: { keyId: "test-yank-2027a", algorithm: "Ed25519", signature: "yanked.json.sig" },
+    });
+    expect(
+      await codeOf(verifyYanked({ ...signed(fresh, next.privateKey), keys, now: NOW, memory })),
+    ).toBe("ok");
+  });
+
+  it("addMonths clamps to the last day of the target month", () => {
+    expect(new Date(addMonths("2027-01-31T10:00:00Z", 13)).toISOString()).toBe(
+      "2028-02-29T10:00:00.000Z",
     );
-    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 5 }))).toBe("ok");
-    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 1 }))).toBe("ok");
+    expect(new Date(addMonths("2026-01-31T00:00:00Z", 1)).toISOString()).toBe(
+      "2026-02-28T00:00:00.000Z",
+    );
+    expect(new Date(addMonths("2026-11-20T12:00:00Z", 12)).toISOString()).toBe(
+      "2027-11-20T12:00:00.000Z",
+    );
   });
 
   it("refuses expires other than 30 days, a non-yank signer, a revoked yank key", async () => {

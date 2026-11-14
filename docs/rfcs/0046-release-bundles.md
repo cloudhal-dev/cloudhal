@@ -215,7 +215,12 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
     - It signs only `yanked.json`.
     - `yanked.json` lists yanked versions and revoked release key ids, so an emergency revocation does not need the offline root.
     - It can only reduce trust: nothing in `yanked.json` adds or re-enables a key. The committed source list, `security/yank-list.json`, is append-only: a yanked version or revoked key id is never removed. `sign-yanked` refuses to sign a list that drops an entry of the currently published `yanked.json`, and a reviewed pull request is the only way to change the source.
-    - A stolen yank key can at worst deny service, by yanking good versions or revoking good keys. The recovery is that the root rotates the yank key (a new `keys.json` revokes the old one).
+    - **A stolen yank key.** It can yank good versions and revoke good keys (denial of service). Its effect on undoing yanks depends on the consumer:
+      - **Stateless consumers** (a Worker deployer): it can also *undo* yanks and revocations by signing a fresh list without them. This lasts until the root rotates the yank key.
+      - **Consumers that keep state** (the CLI): these refuse it. They remember the yank key, the highest `serial`, and every yanked version and revoked key id they have seen (`YankMemory`), and refuse any list from that key that drops one (`stale-yank-list`).
+      - **The cure** is the root: a new `keys.json` revokes the stolen yank key and lists a new one. A list from the new yank key starts a new memory.
+    - **Revocation becomes permanent through the root.** An emergency revocation goes out at once through `yanked.json`, and the root then records it in `keys.json` within days. Only then does it survive a compromised yank key for stateless consumers.
+    - **Size.** `sign-yanked` refuses a list above 256 KiB, which is the consumer's limit. Pruning happens only through a yank-key rotation: at about 200 KiB the root lists a new yank key, and its first list keeps only what still matters (versions signed by keys that can still verify). Consumers with memory start a new memory with the new key.
   - **`yanked.json` freshness.** It carries signed `issuedAt` and `expires`, with `expires` exactly 30 days after `issuedAt`, and a signed `serial` that increases by one at every signing.
     - A consumer that can keep state (the CLI, under the project's `.cloudhal/` or the user's cache directory) refuses a `serial` lower than the last one it saw (`stale-yank-list`). Such a lower serial is a rollback to an older, validly signed list that lacks a recent yank.
     - A stateless consumer (a Worker deployer) cannot detect such a rollback inside the list's 30 days. That is the remaining risk.
@@ -342,9 +347,10 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 - **Which version.** `--release` deploys the CLI's own version and takes no other. The CLI's starter, its config generator and its downgrade guard then match the bundle exactly. To install another version, run that version of the CLI (`npx @cloudhal/cli@<v> deploy --release`). `next` prereleases work the same way.
 - **No bundle, no deploy.** The CLI refuses with `release-unavailable` when `v<version>` has no published release, when the release is still a draft (publish-ci's window between attaching assets and publishing), or when it has no bundle assets (`RELEASE_BUNDLES` off, or `v0.8.0` and older). The message says to run `cloudhal deploy` without `--release`. It never falls back to building.
 - **Revocation.** `PINNED_KEYS` is frozen into each published CLI. A stolen key would therefore stay trusted by every CLI already published, and `--release` sends older versions through exactly those CLIs. So **`deploy --release` ships only after #226's signed `keys.json` exists.**
-  - On every `--release`, the CLI fetches `keys.json` from its stable URL, falling back to the release asset. It verifies it with the root key the CLI pins, checks its `expires`, and applies it reduce-only.
-  - A `keys.json` that cannot be fetched, does not verify, or has expired is a refusal. There is no override.
-  - `--from <dir>` needs `keys.json` in that directory too. The same rules apply, plus a freshness limit (§11c, point 7).
+  - On every `--release`, the CLI fetches both `keys.json` and `yanked.json` (each with its `.sig`) from their canonical URLs (§9). It verifies them with the root key the CLI pins and the yank key `keys.json` lists, checks both expiries and its stored `YankMemory`, applies them reduce-only, and stores the new memory.
+  - It never falls back to a release-asset snapshot or a cached copy. A snapshot can be older than a revocation, so an attacker who blocks cloudhal.dev would otherwise roll trust back.
+  - Either list failing to fetch or verify, either one expired, or a yank list going back on the memory is a refusal. There is no override.
+  - `--from <dir>` needs `keys.json` and `yanked.json` (with their `.sig`) in that directory too. The same rules apply, the memory included. Both lists must be unexpired, so an offline copy is at most 30 days old where revocations are concerned (§9).
   - The verifier package itself can ship before #226. Its callers pass the keys they trust.
 - **Order.**
   1. Steps 1 to 5 of §2, with the keys reduced by `keys.json`.
@@ -445,7 +451,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   - A wrangler older than `manifest.toolchain.wrangler` is refused.
 - **Migrations.** These need nothing new. The admin Worker applies D1 migrations itself, as it does after every deploy, and `manifest.levels.schedules` feeds the existing downgrade guard.
 - **Offline and dry runs.**
-  - `--from <dir>` takes the five assets and `keys.json` from a directory, for offline machines. The same verification runs on them.
+  - `--from <dir>` takes the five assets, `keys.json` and `yanked.json` (with their `.sig`) from a directory, for offline machines. The same verification runs on them.
   - `--release --dry-run` downloads, verifies, extracts and writes the configs, then stops before wrangler. It needs no Cloudflare account.
 
 #### 11c. Open points for this addendum
@@ -454,9 +460,9 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 2. Should `--release` accept another version than the CLI's own? **[default: no, until §10's runtime configuration lands]**
 3. When `gh` is unavailable, does the CLI refuse? **[default: yes. `--allow-single-factor` continues on the release key alone, with a line saying so. A failed attestation is always a refusal]**
 4. Where does the full-tarball test run? **[default: opt-in through `CLOUDHAL_RELEASE_ASSETS`, in its own CI job that downloads `v0.9.0`. The 7.2 MB tarball is never committed]**
-5. What does a key's `notAfter` mean for releases it has already signed? This is #226's decision 6. Until it is settled, the verifier has no `key-expired` code, and `PINNED_KEYS` carries no dates. **[default: #226's answer]**
+5. ~~What does a key's `notAfter` mean for releases it has already signed?~~ **Resolved (#226, §9):** a statement is valid when its `createdAt` lies in the key's window. After `notAfter`, the key verifies only while a fresh `keys.json` lists it as `retiring`; with pinned keys alone it gives `key-expired`.
 6. Should a later release record real `theme` and `skills` values in the manifest, so a host can compare a project without the CLI's starter? **[default: not part of this change. Consumers ignore the placeholders]**
-7. With `--from`, an old `keys.json` replays a key list from before a revocation. **[default: `--from` refuses a `keys.json` whose signed `issuedAt` is more than 30 days old, and the remaining window is documented. This needs #226's format to carry `issuedAt`. Online runs always fetch the current list]**
+7. ~~With `--from`, an old `keys.json` replays a key list from before a revocation.~~ **Resolved (#226, §9):** `--from` requires an unexpired `yanked.json`, at most 30 days old, where emergency revocations land first. It also requires an unexpired `keys.json`.
 
 ## Alternatives considered
 
@@ -496,7 +502,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 ## Open questions
 
 1. Is the Astro and wrangler output byte-stable across two CI runs of one tag? The independent rebuild check waits for the answer.
-2. Where does `keys.json` live: a `cloudhal.dev/.well-known/` URL, release assets only, or both? **[default: both]**
+2. ~~Where does `keys.json` live?~~ **Resolved (#226, §9):** canonically at `https://cloudhal.dev/.well-known/cloudhal/keys.json`, plus a verified snapshot on every release. Online consumers never fall back to the snapshot.
 3. What is the source of truth for `compatibleWithPrevious` (a changeset field, a migration annotation)? **[default: `true` unless a release sets it]**
 4. Should every `next` prerelease ship a bundle? **[default: yes]**
 5. Is the inline `_headers` text in the manifest acceptable, or should it be a signed part? **[default: inline]**

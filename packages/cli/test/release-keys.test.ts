@@ -2,7 +2,7 @@
  * scripts/release-keys.ts (RFC-0046 §9, #226): the root and yank keys a ceremony makes, and the
  * lists it signs, checked with the consumer's own verifier. Throwaway keys in temp directories only.
  */
-import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -15,7 +15,12 @@ import {
   signYanked,
   yankInit,
 } from "../../../scripts/release-keys.ts";
-import { verifyKeys, verifyYanked } from "../../release-verify/src/index.ts";
+import {
+  validateReleaseKeys,
+  validateReleaseYankList,
+} from "../../release-verify/src/generated/validators.js";
+import { PINNED_KEYS, verifyKeys, verifyYanked } from "../../release-verify/src/index.ts";
+import { job, RELEASE, step } from "./fixtures/release-bundle/workflow-text.ts";
 
 const dirs: string[] = [];
 afterEach(() => {
@@ -106,7 +111,7 @@ describe("sign-keys", () => {
   it("signs a key list the consumer verifies, valid for 12 months", async () => {
     const { dir, root, source } = ceremony();
     const out = tmp();
-    const signed = signKeys({
+    const signed = await signKeys({
       rootKey: rootKeyOf(dir),
       passphrase: PASS,
       rootPub: root,
@@ -120,7 +125,7 @@ describe("sign-keys", () => {
     expect(readFileSync(path.join(out, "keys.json.sig")).length).toBe(64);
   });
 
-  it("refuses a wrong passphrase, another root's key, and more than 13 months", () => {
+  it("refuses a wrong passphrase, another root's key, and more than 13 months", async () => {
     const { dir, root, source } = ceremony();
     const out = tmp();
     const base = {
@@ -131,10 +136,14 @@ describe("sign-keys", () => {
       out,
       now: NOW,
     };
-    expect(() => signKeys({ ...base, passphrase: "wrong passphrase!" })).toThrow(/does not open/);
+    await expect(signKeys({ ...base, passphrase: "wrong passphrase!" })).rejects.toThrow(
+      /does not open/,
+    );
     const other = ceremony();
-    expect(() => signKeys({ ...base, rootPub: other.root })).toThrow(/is not cloudhal-root-2026a/);
-    expect(() => signKeys({ ...base, months: 14 })).toThrow(/1 to 13 months/);
+    await expect(signKeys({ ...base, rootPub: other.root })).rejects.toThrow(
+      /is not cloudhal-root-2026a/,
+    );
+    await expect(signKeys({ ...base, months: 14 })).rejects.toThrow(/1 to 13 months/);
   });
 });
 
@@ -142,7 +151,7 @@ describe("sign-yanked", () => {
   async function setup() {
     const c = ceremony();
     const keysOut = tmp();
-    const signedKeys = signKeys({
+    const signedKeys = await signKeys({
       rootKey: rootKeyOf(c.dir),
       passphrase: PASS,
       rootPub: c.root,
@@ -152,7 +161,15 @@ describe("sign-yanked", () => {
     });
     const keys = await verifyKeys({ ...signedKeys, roots: roots(c.root), now: new Date(NOW) });
     const pem = readFileSync(path.join(c.dir, "cloudhal-yank-2026a.pem"), "utf8");
-    return { ...c, keys, pem, keysDoc: keys.document };
+    return {
+      ...c,
+      keys,
+      pem,
+      keysDoc: keys.document,
+      keyList: signedKeys,
+      keysOut,
+      rootsOf: roots(c.root),
+    };
   }
   const empty = { versions: [], revokedKeys: [] };
 
@@ -164,10 +181,11 @@ describe("sign-yanked", () => {
       ],
       revokedKeys: [],
     };
-    const signed = signYanked({
+    const signed = await signYanked({
       keyId: "cloudhal-yank-2026a",
       keyPem: s.pem,
-      keys: s.keysDoc,
+      keyList: s.keyList,
+      roots: s.rootsOf,
       source,
       published: undefined,
       out: tmp(),
@@ -188,21 +206,88 @@ describe("sign-yanked", () => {
     const base = {
       keyId: "cloudhal-yank-2026a",
       keyPem: s.pem,
-      keys: s.keysDoc,
+      keyList: s.keyList,
+      roots: s.rootsOf,
       source: empty,
       published: undefined,
       out: tmp(),
       now: NOW,
     };
     expect(other.keyId).toBe("cloudhal-yank-2026b");
-    expect(() => signYanked({ ...base, keyPem: otherPem })).toThrow(/is not cloudhal-yank-2026a/);
-    expect(() => signYanked({ ...base, keyPem: "" })).toThrow(/missing or not a PKCS#8/);
-    const revoked = {
-      keys: s.keysDoc.keys.map((k) => (k.role === "yank" ? { ...k, status: "revoked" } : k)),
-    };
-    expect(() => signYanked({ ...base, keys: revoked })).toThrow(
+    await expect(signYanked({ ...base, keyPem: otherPem })).rejects.toThrow(
+      /is not cloudhal-yank-2026a/,
+    );
+    await expect(signYanked({ ...base, keyPem: "" })).rejects.toThrow(/missing or not a PKCS#8/);
+    const revokedList = await signKeys({
+      rootKey: rootKeyOf(s.dir),
+      passphrase: PASS,
+      rootPub: s.root,
+      source: {
+        keys: s.source.keys.map((k) => (k.role === "yank" ? { ...k, status: "revoked" } : k)),
+      },
+      out: tmp(),
+      now: NOW,
+    });
+    await expect(signYanked({ ...base, keyList: revokedList })).rejects.toThrow(
       /not list cloudhal-yank-2026a as an active yank key/,
     );
+    // keys.json must verify with the root given (here: none pinned yet).
+    await expect(signYanked({ ...base, roots: {} })).rejects.toThrow(/not a pinned root/);
+  });
+
+  it("verifies the exact bytes before writing: an invalid source is never signed", async () => {
+    const s = await setup();
+    const out = tmp();
+    const base = {
+      keyId: "cloudhal-yank-2026a",
+      keyPem: s.pem,
+      keyList: s.keyList,
+      roots: s.rootsOf,
+      published: undefined,
+      out,
+      now: NOW,
+    };
+    const bad = {
+      versions: [{ version: "0.9.3", yankedAt: "yesterday", reason: "x" }],
+      revokedKeys: [],
+    };
+    await expect(signYanked({ ...base, source: bad })).rejects.toThrow(
+      /does not verify, nothing written/,
+    );
+    const extra = { versions: [], revokedKeys: [], extra: true } as never;
+    await expect(signYanked({ ...base, source: extra })).resolves.toBeDefined(); // only its two lists are signed
+    const twice = { keys: [s.source.keys[0], s.source.keys[0]] as unknown[] };
+    await expect(
+      signKeys({
+        rootKey: rootKeyOf(s.dir),
+        passphrase: PASS,
+        rootPub: s.root,
+        source: twice,
+        out: tmp(),
+        now: NOW,
+      }),
+    ).rejects.toThrow(/does not verify, nothing written/);
+    const window = {
+      keys: [
+        {
+          ...(s.source.keys[0] as object),
+          notAfter: (s.source.keys[0] as { notBefore: string }).notBefore,
+        },
+      ],
+    };
+    await expect(
+      signKeys({
+        rootKey: rootKeyOf(s.dir),
+        passphrase: PASS,
+        rootPub: s.root,
+        source: window,
+        out: tmp(),
+        now: NOW,
+      }),
+    ).rejects.toThrow(/does not verify/);
+    const before = readdirSync(out);
+    await expect(signYanked({ ...base, out, source: bad })).rejects.toThrow();
+    expect(readdirSync(out)).toEqual(before);
   });
 
   it("is append-only: refuses a list that drops a published yank or revocation", () => {
@@ -225,24 +310,26 @@ describe("sign-yanked", () => {
     const base = {
       keyId: "cloudhal-yank-2026a",
       keyPem: s.pem,
-      keys: s.keysDoc,
+      keyList: s.keyList,
+      roots: s.rootsOf,
       source: empty,
       out: tmp(),
       now: NOW,
     };
-    const first = signYanked({ ...base, published: undefined });
+    const first = await signYanked({ ...base, published: undefined });
     const firstDoc = JSON.parse(new TextDecoder().decode(first.document));
     expect(firstDoc.serial).toBe(1);
-    const next = signYanked({ ...base, published: firstDoc });
+    const next = await signYanked({ ...base, published: firstDoc });
     expect(JSON.parse(new TextDecoder().decode(next.document)).serial).toBe(2);
-    expect(() => signYanked({ ...base, published: { ...empty } as never })).toThrow(/no serial/);
+    await expect(signYanked({ ...base, published: { ...empty } as never })).rejects.toThrow(
+      /no serial/,
+    );
   });
 
   it("the CLI reads the key from RELEASE_YANK_KEY, never prints it, and needs --published or --first-run", async () => {
     const s = await setup();
     const work = tmp();
-    const keysFile = path.join(work, "keys.json");
-    writeFileSync(keysFile, JSON.stringify(s.keysDoc));
+    const keysFile = path.join(s.keysOut, "keys.json");
     const listFile = path.join(work, "yank-list.json");
     writeFileSync(listFile, JSON.stringify(empty));
     const out = path.join(work, "out");
@@ -256,6 +343,8 @@ describe("sign-yanked", () => {
       listFile,
       "--out",
       out,
+      "--root-pub",
+      path.join(s.dir, "cloudhal-root-2026a.pub.json"),
     ];
     process.env.RELEASE_YANK_KEY = s.pem;
     await expect(main(args, quiet)).rejects.toThrow(/--published is required/);
@@ -265,5 +354,79 @@ describe("sign-yanked", () => {
     expect(process.env.RELEASE_YANK_KEY).toBeUndefined();
     expect(lines.join("\n")).not.toContain("PRIVATE KEY");
     expect(readFileSync(path.join(out, "yanked.json.sig")).length).toBe(64);
+  });
+});
+
+describe("the committed sources under security/ (CI)", () => {
+  const ROOT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..");
+  const read = (f: string) => JSON.parse(readFileSync(path.join(ROOT_DIR, "security", f), "utf8"));
+  const wrapKeys = (keys: unknown) => ({
+    schemaVersion: 1,
+    format: "cloudhal.release-keys@1",
+    issuedAt: "2026-11-20T00:00:00Z",
+    expires: "2027-11-20T00:00:00Z",
+    signing: { keyId: "cloudhal-root-2026a", algorithm: "Ed25519", signature: "keys.json.sig" },
+    keys,
+  });
+
+  it("keys.source.json is a valid key list with unique ids and real windows", () => {
+    const source = read("keys.source.json");
+    expect(Object.keys(source)).toEqual(["keys"]);
+    expect(
+      validateReleaseKeys(wrapKeys(source.keys)),
+      JSON.stringify(validateReleaseKeys.errors),
+    ).toBe(true);
+    const ids = source.keys.map((k: { keyId: string }) => k.keyId);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const k of source.keys)
+      expect(Date.parse(k.notBefore)).toBeLessThan(Date.parse(k.notAfter));
+  });
+
+  it("its release keys are PINNED_KEYS and bundle-sign's inline key and window", () => {
+    const release = read("keys.source.json").keys.filter(
+      (k: { role: string }) => k.role === "release",
+    );
+    const fromSource = Object.fromEntries(
+      release.map(
+        (k: {
+          keyId: string;
+          publicKey: string;
+          status: string;
+          notBefore: string;
+          notAfter: string;
+        }) => [
+          k.keyId,
+          {
+            publicKey: k.publicKey,
+            status: k.status,
+            notBefore: k.notBefore,
+            notAfter: k.notAfter,
+          },
+        ],
+      ),
+    );
+    expect(fromSource).toEqual(PINNED_KEYS);
+    const sign = step(job(RELEASE, "bundle-sign"), "Sign the statement");
+    const id = /const PINNED_KEY_ID = "([^"]+)";/.exec(sign)?.[1] as string;
+    const pinned = fromSource[id] as { notBefore: string; notAfter: string };
+    expect(sign).toContain(`const PINNED_NOT_BEFORE = "${pinned.notBefore}";`);
+    expect(sign).toContain(`const PINNED_NOT_AFTER = "${pinned.notAfter}";`);
+  });
+
+  it("yank-list.json is a valid yank list source with unique entries", () => {
+    const list = read("yank-list.json");
+    expect(Object.keys(list).sort()).toEqual(["revokedKeys", "versions"]);
+    const doc = {
+      schemaVersion: 1,
+      format: "cloudhal.release-yank-list@1",
+      serial: 1,
+      issuedAt: "2026-11-20T00:00:00Z",
+      expires: "2026-12-20T00:00:00Z",
+      signing: { keyId: "cloudhal-yank-2026a", algorithm: "Ed25519", signature: "yanked.json.sig" },
+      ...list,
+    };
+    expect(validateReleaseYankList(doc), JSON.stringify(validateReleaseYankList.errors)).toBe(true);
+    const versions = list.versions.map((v: { version: string }) => v.version);
+    expect(new Set(versions).size).toBe(versions.length);
   });
 });

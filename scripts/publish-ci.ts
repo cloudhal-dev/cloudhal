@@ -160,19 +160,32 @@ export async function verifyAsConsumer(
   dir: string,
   version: string,
   publicKeys: Readonly<Record<string, string>>,
+  yanked?: unknown,
 ): Promise<void> {
-  const { verifyRelease } = await import("../packages/release-verify/src/index.ts");
+  const rv = await import("../packages/release-verify/src/index.ts");
   const read = (name: string) => readFileSync(path.join(dir, name));
-  const release = await verifyRelease({
+  // The pinned record (with its window) when the key is the pinned one; a dry run's throwaway key
+  // has no window.
+  const keys = Object.fromEntries(
+    Object.entries(publicKeys).map(([id, publicKey]) => {
+      const pinned = Object.hasOwn(rv.PINNED_KEYS, id) ? rv.PINNED_KEYS[id] : undefined;
+      return [
+        id,
+        pinned?.publicKey === publicKey ? pinned : { publicKey, status: "active" as const },
+      ];
+    }),
+  );
+  const release = await rv.verifyRelease({
     request: { version },
     statement: read("release-statement.json"),
     signature: read("release-statement.sig"),
     manifest: read("manifest.json"),
     tarball: () => read(`cloudhal-release-${version}.tar.gz`),
     planVersion: Number.MAX_SAFE_INTEGER,
-    keys: Object.fromEntries(
-      Object.entries(publicKeys).map(([id, publicKey]) => [id, { publicKey, status: "active" }]),
-    ),
+    keys,
+    ...(yanked
+      ? { yanked: yanked as NonNullable<Parameters<typeof rv.verifyRelease>[0]["yanked"]> }
+      : {}),
   });
   for await (const _ of release.entries()) {
     // every entry verified

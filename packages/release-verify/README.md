@@ -59,6 +59,7 @@ await verifyRelease({ ...input, keys: mergeTrust(PINNED_KEYS, { keys, yanked }),
 
 - **Expiry.** A statement's `createdAt` must lie within its key's `[notBefore, notAfter]`. After `notAfter`, the key verifies only while a fresh `keys.json` lists it as `retiring`. With pinned keys alone, the release is refused with `key-expired`.
 - **Yanking.** A yanked version is refused (`yanked`), and a key that `yanked.json` revokes is refused (`key-revoked`).
+- **Keep state if you can.** Pass the `memory` you stored to `verifyYanked`, and store `rememberYanks(yanked)` after every accepted list. A list that goes back in `serial`, or drops a version or key you have already seen yanked or revoked, is refused (`stale-yank-list`). Without memory, a stolen yank key could undo yanks for you until the root rotates it.
 - **Not yet published.** `PINNED_ROOTS` is empty until the root is generated. Until then `verifyKeys` refuses every list, unless you pass `roots`.
 
 ## The second factor

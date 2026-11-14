@@ -25,16 +25,19 @@ export { foldPath, type PathKind, unsafePathReason } from "./paths.ts";
 export { IMPLIED_SCOPES, missingScopes } from "./scopes.ts";
 export type { ByteSource } from "./tar.ts";
 export {
+  addMonths,
   KEYS_FILE,
   mergeTrust,
   PINNED_ROOTS,
   type RootKeys,
+  rememberYanks,
   TRUST_BASE_URL,
   type VerifiedKeyList,
   type VerifiedYankList,
   verifyKeys,
   verifyYanked,
   YANKED_FILE,
+  type YankMemory,
   yankOf,
 } from "./trust.ts";
 export { RELEASE_REPOSITORY, releaseAssetNames, releaseAssetUrls } from "./urls.ts";

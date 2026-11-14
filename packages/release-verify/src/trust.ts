@@ -74,10 +74,71 @@ function signedDoc(
 }
 
 /** `iso` plus `months` calendar months (UTC). */
-function addMonths(iso: string, months: number): number {
+/** `iso` plus `months` calendar months (UTC), clamped to the target month's last day (01-31 + 1 → 02-28/29). */
+export function addMonths(iso: string, months: number): number {
   const d = new Date(iso);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.getTime();
+  const target = new Date(
+    Date.UTC(
+      d.getUTCFullYear(),
+      d.getUTCMonth() + months,
+      1,
+      d.getUTCHours(),
+      d.getUTCMinutes(),
+      d.getUTCSeconds(),
+    ),
+  );
+  const last = new Date(
+    Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  target.setUTCDate(Math.min(d.getUTCDate(), last));
+  return target.getTime();
+}
+
+/**
+ * What a consumer that keeps state remembers of the yank lists it has accepted (RFC-0046 §9): the
+ * yank key that signed them, the highest serial, and every yanked version and revoked key id. A
+ * later list from the same yank key must keep every remembered entry and must not go back in
+ * serial, so a stolen yank key cannot un-yank or un-revoke for such a consumer. A list from another
+ * yank key (one the root listed after rotating) starts a new memory: that is also how the list
+ * is pruned. Store `rememberYanks`'s result after every accepted list.
+ */
+export interface YankMemory {
+  readonly keyId: string;
+  readonly serial: number;
+  readonly versions: readonly string[];
+  readonly revokedKeys: readonly string[];
+}
+
+/** The memory after accepting `list` (see `YankMemory`). */
+export function rememberYanks(list: VerifiedYankList): YankMemory {
+  const d = list.document;
+  return {
+    keyId: d.signing.keyId,
+    serial: d.serial,
+    versions: d.versions.map((v) => v.version),
+    revokedKeys: d.revokedKeys.map((k) => k.keyId),
+  };
+}
+
+/** Refuses a list that goes back on `memory` (same yank key: lower serial or a dropped entry). */
+function checkMemory(list: ReleaseYankList, memory: YankMemory | undefined): void {
+  if (!memory || memory.keyId !== list.signing.keyId) return;
+  if (list.serial < memory.serial)
+    refuse(
+      "stale-yank-list",
+      `yanked.json has serial ${list.serial}, below ${memory.serial} seen before: a rolled-back list`,
+    );
+  const versions = new Set(list.versions.map((v) => v.version));
+  const keys = new Set(list.revokedKeys.map((k) => k.keyId));
+  const dropped = [
+    ...memory.versions.filter((v) => !versions.has(v)),
+    ...memory.revokedKeys.filter((k) => !keys.has(k)),
+  ];
+  if (dropped.length)
+    refuse(
+      "stale-yank-list",
+      `yanked.json drops ${dropped.join(", ")}, seen before: a yank or revocation is never undone`,
+    );
 }
 
 /** Verifies `keys.json` (see the file comment); throws a `ReleaseVerifyError`. */
@@ -121,17 +182,17 @@ export async function verifyKeys(input: {
 
 /**
  * Verifies `yanked.json` against a verified key list (see the file comment). A consumer that can
- * keep state passes the highest `serial` it has seen as `lastSerial` and stores the result's
- * serial: a lower one is a rollback to an older, validly signed list and is refused
- * (`stale-yank-list`). A stateless consumer (a Worker) cannot detect such a rollback inside the
- * list's 30 days.
+ * keep state passes its `memory` (`YankMemory`) and stores `rememberYanks(result)`: a lower
+ * serial or a dropped entry is a rollback or an un-yank and is refused (`stale-yank-list`). A
+ * stateless consumer (a Worker) cannot detect either: for it, a stolen yank key can un-yank and
+ * un-revoke until the root rotates the yank key.
  */
 export async function verifyYanked(input: {
   document: Uint8Array;
   signature: Uint8Array;
   keys: VerifiedKeyList;
   now?: Date;
-  lastSerial?: number;
+  memory?: YankMemory;
 }): Promise<VerifiedYankList> {
   const now = (input.now ?? new Date()).getTime();
   const { doc, keyId } = signedDoc(
@@ -156,11 +217,7 @@ export async function verifyYanked(input: {
   if (Date.parse(list.expires) - issued !== 30 * DAY_MS)
     refuse("yank-list-invalid", "yanked.json must expire exactly 30 days after issuedAt");
   if (issued > now + SKEW_MS) refuse("yank-list-invalid", "yanked.json is issued in the future");
-  if (input.lastSerial !== undefined && list.serial < input.lastSerial)
-    refuse(
-      "stale-yank-list",
-      `yanked.json has serial ${list.serial}, below ${input.lastSerial} seen before: a rolled-back list`,
-    );
+  checkMemory(list, input.memory);
   if (now >= Date.parse(list.expires))
     refuse(
       "stale-yank-list",
