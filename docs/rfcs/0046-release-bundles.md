@@ -141,7 +141,7 @@ A `bundle-sign` job runs in the protected environment `release-signing` (a requi
 4. signs. The private key (PKCS#8 PEM) is exposed only to this one step's environment. The step reads it once into a `KeyObject` and removes it from the environment. It then checks that the derived public key equals the pinned public key. The active key id and its raw public key are written inline in the `bundle-sign` job, because the job checks out nothing and cannot read a document. A repository test keeps them equal to `docs/security/release-signing-keys.md`. The step then signs, verifies its own signature, and writes `release-statement.sig`. Errors are fixed strings; the key is never echoed and the shell never traces;
 5. uploads the five files as the signed artifact.
 
-Phase 1 custody is that environment secret (`RELEASE_SIGNING_KEY`), readable only by this job. Phase 2 moves the key into a KMS reached through GitHub OIDC; the statement already fits its message limit (§2, invariant 6), so nothing a consumer reads changes.
+Phase 1 custody is that environment secret (`RELEASE_SIGNING_KEY`), readable only by this job. Phase 3 (deferred, §9) moves the key into a KMS reached through GitHub OIDC; the statement already fits its message limit (§2, invariant 6), so nothing a consumer reads changes.
 
 ### 6. Publication on immutable releases
 
@@ -185,16 +185,65 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
 6. Bundles are never installed automatically by the project's tools; `securityRelease` is a highlight, not an auto-update.
 7. Every version ships to everyone at the same moment: there is no early-access channel and no audience-restricted asset.
 
-### 9. Keys and trust (hooks designed here, built later)
+### 9. Keys and trust
 
 - **Two factors for a consumer that verifies both.** Factor 1 is the Ed25519 statement. Factor 2 is the `bundle-build.yml` attestation, verified by the consumer's own tooling.
   - For a consumer that verifies both, the two factors together defeat theft of the release key alone.
   - A consumer that verifies only the Ed25519 statement relies on the release key alone. A deployer running inside a Worker, without `gh` or a Sigstore verifier, is one example. A stolen key is enough against such a consumer until the key is revoked; §2 asks every consumer whose tooling can verify the attestation to do so.
   - Neither factor defeats a malicious commit on `main` or a compromised build dependency, because both factors then cover bad bytes. Required reviewers on `main`, the frozen lockfile, and the consumer's own soak, backup and rollback guards cover those cases.
-- **Rollback and freeze.** Binding the statement to the request (§2, invariant 7) refuses an older signed release served under a newer name. It cannot tell a consumer that a newer version exists, or that the version it holds is withdrawn. The expiring yank list below covers that case once it is built. Until then, a consumer learns about versions from the release feed, which it uses for discovery only and never as a trust factor.
-- **Key list** `keys.json` (designed, not built): entries `{ keyId, publicKey, role: "release" | "yank", notBefore, notAfter, status: "active" | "retiring" | "revoked" }`, signed by an offline root key held by two people (a hardware key plus a sealed backup), about one year of validity, published at a stable URL and as a release asset. Two release keys overlap at every rotation. The sign job will refuse when the active key's `notAfter` is under 90 days away. A consumer may use `keys.json` only to reduce trust (act on `revoked` or an expired `notAfter`); adding a key to a consumer stays a reviewed change on the consumer's side.
-- **Yank list** `yanked.json` (designed, not built): signed by the dedicated `yank` key from `keys.json`, not the release key, so a stolen release key cannot un-yank; it carries `expires`, and a stale list alerts and never blocks verification of other versions. Installed copies keep running.
-- Until `keys.json` exists, the pinned keys are the ones in `docs/security/release-signing-keys.md`, and a rotation is announced there before its first use.
+- **Rollback and freeze.** Binding the statement to the request (§2, invariant 7) refuses an older signed release served under a newer name. It cannot tell a consumer that a newer version exists, or that the version it holds is withdrawn. The expiring yank list below covers that case. A consumer learns about new versions from the release feed, which it uses for discovery only and never as a trust factor.
+- **Key list, yank list and expiry (decided 2026-11-14, #226).** The decisions below replace the earlier sketch of `keys.json` and `yanked.json`. They are built by #226.
+  - **Documents.** Each is a canonical JSON document with a detached signature, in the same form as the statement: a raw 64-byte Ed25519 signature over the exact bytes. A consumer verifies the downloaded bytes and never re-serialises them.
+    - `keys.json` is `cloudhal.release-keys@1`, signed in `keys.json.sig`.
+    - `yanked.json` is `cloudhal.release-yank-list@1`, signed in `yanked.json.sig`.
+    - Both are contract roots in core-contracts, `release-keys` and `release-yank-list`.
+  - **Where they live.** The canonical URLs are `https://cloudhal.dev/.well-known/cloudhal/keys.json` and `https://cloudhal.dev/.well-known/cloudhal/yanked.json`, each with its `.sig`.
+    - Every GitHub release also attaches the copies current when it was made. A release is immutable, so that copy is a snapshot, and a consumer prefers the canonical URL.
+    - The sources are committed under `security/` in this repository. `apps/docs` (cloudhal.dev) publishes them.
+    - The signatures make the location trust-free; the location only matters for availability.
+  - **The root.** An Ed25519 root key signs only `keys.json`, at the yearly rotation or in an emergency.
+    - The owner generates it offline with `node scripts/release-keys.ts root-init`. The script writes the private key encrypted with a passphrase, never prints it, and writes the public key next to it.
+    - It has one holder for now, with two sealed copies kept in separate places. A YubiKey (firmware 5.7 or later, for Ed25519) is optional.
+    - A second holder is added when there is a second maintainer.
+    - `@cloudhal/release-verify` pins the root's public key, and a repository test keeps it equal to the key doc.
+  - **`keys.json`.**
+    - **Entries:** `{ keyId, publicKey, role: "release" | "yank", notBefore, notAfter, status: "active" | "retiring" | "revoked" }`.
+    - **Freshness:** it carries signed `issuedAt` and `expires`, with `expires` at most 13 months after `issuedAt`. The root re-signs it at every rotation.
+    - **Rotation overlap:** two release keys overlap at every rotation. The successor is listed at least 120 days before the active key's `notAfter`. For `cloudhal-release-2026a` (`notAfter` 2027-11-12), `cloudhal-release-2027a` is listed by 2027-07-15.
+    - **The sign job:** `bundle-sign` refuses to sign when fewer than 90 days remain before the active key's `notAfter`, and when the statement's `createdAt` is outside the key's `[notBefore, notAfter]`.
+  - **The yank key.** `cloudhal-yank-2026a` has `role: "yank"` in `keys.json` and its own GitHub environment, `release-yank`, whose branch policy allows `main` only.
+    - It signs only `yanked.json`.
+    - `yanked.json` lists yanked versions and revoked release key ids, so an emergency revocation does not need the offline root.
+    - It can only reduce trust: nothing in `yanked.json` adds or re-enables a key. The committed source list, `security/yank-list.json`, is append-only: a yanked version or revoked key id is never removed. `sign-yanked` refuses to sign a list that drops an entry of the currently published `yanked.json`, and a reviewed pull request is the only way to change the source.
+    - **A stolen yank key.** It can yank good versions and revoke good keys (denial of service). Its effect on undoing yanks depends on the consumer:
+      - **Stateless consumers** (a Worker deployer): it can also *undo* yanks and revocations by signing a fresh list without them. This lasts until the root rotates the yank key.
+      - **Consumers that keep state** (the CLI): these refuse it. They remember (`YankMemory`):
+        - the yank key, the highest `serial`, and every yanked version and revoked key id they have seen, and refuse any list from that key that goes back in serial or drops one (`stale-yank-list`);
+        - the `issuedAt` of the newest `keys.json` they have seen, and refuse an older one (`key-list-invalid`), so a replayed `keys.json` from before a revocation cannot bring a revoked yank key back;
+        - every yank key a root list has revoked, or that a newer yank key replaced, and refuse it forever (`yank-list-invalid`).
+      - **The cure** is the root: a new `keys.json` revokes the stolen yank key and lists a new one. A list from another yank key starts a new memory only when a `keys.json` newer than the remembered one lists that key and no longer lists the old one as active.
+    - **One active yank key.** `keys.json` lists at most one yank key as `active`; `verifyKeys` and `sign-keys` refuse two. A yank key is rotated by replacing it, never by overlapping, so a thief of one key cannot switch to another to start a fresh memory.
+    - **Revocation becomes permanent through the root.** An emergency revocation goes out at once through `yanked.json`, and the root then records it in `keys.json` within days. Only then does it survive a compromised yank key for stateless consumers.
+    - **Size.** `sign-yanked` refuses a list above 256 KiB, which is the consumer's limit. Pruning happens only through a yank-key rotation: at about 200 KiB the root lists a new yank key, and its first list keeps only what still matters (versions signed by keys that can still verify). Consumers with memory start a new memory with the new key.
+  - **`yanked.json` freshness.** It carries signed `issuedAt` and `expires`, with `expires` exactly 30 days after `issuedAt`, and a signed `serial` that increases by one at every signing.
+    - A consumer that can keep state (the CLI, under the project's `.cloudhal/` or the user's cache directory) refuses a `serial` lower than the last one it saw (`stale-yank-list`). Such a lower serial is a rollback to an older, validly signed list that lacks a recent yank.
+    - A stateless consumer (a Worker deployer) cannot detect such a rollback inside the list's 30 days. That is the remaining risk.
+    - The `yank-list` branch that serves the list is append-only. A ruleset blocks force-pushes and deletion and lets only GitHub Actions push to it, so a rollback needs a new commit that the branch history shows.
+    - A scheduled weekly workflow in `release-yank` re-signs it from the committed source list. That workflow has no required reviewer, because the key can only reduce trust.
+    - A stale `yanked.json` blocks only `deploy --release` (§11b). Installed sites keep running.
+  - **Expired keys.** A statement is valid only when its `createdAt` lies within its key's `[notBefore, notAfter]`. The producer (`bundle-sign`) and every consumer enforce this.
+    - After `notAfter`, the key still verifies statements created before `notAfter`, but only while a fresh, root-signed `keys.json` lists it as `retiring` (not `revoked`).
+    - With pinned keys only, and no `keys.json`, a key past its `notAfter` is refused (`key-expired`).
+    - A stolen key could backdate `createdAt`. The answer to that is revocation, through `yanked.json` or `keys.json`.
+  - **Reduce-only merging.** A consumer starts from its pinned keys. A verified `keys.json` can only revoke a pinned key, mark it `retiring`, or narrow its `[notBefore, notAfter]`. A verified `yanked.json` can only revoke a pinned key or yank a version. Keys that `keys.json` lists but the consumer does not pin are not added: adding a key stays a reviewed change on the consumer's side.
+  - **Online and offline.**
+    - Online consumers fetch both documents on every run, and refuse when a fetch or a verification fails (§11b).
+    - `--from <dir>` requires an unexpired `keys.json` and an unexpired `yanked.json` in that directory.
+  - **KMS custody is deferred** to a separate follow-up, phase 3: "Release signing: KMS-backed signer (RFC-0046 §9 phase 3)".
+    - Signing stays in the `release-signing` environment with a required reviewer.
+    - The reason: there is one maintainer, and a cloud account plus its IAM would add more risk than they remove today. The real gaps, revocation and expiry, are closed by the decisions above.
+    - The follow-up is triggered by a second maintainer, or by any exposure of the release-key secret.
+- Until the first signed `keys.json` is published, the pinned keys are the ones in `docs/security/release-signing-keys.md`, and a rotation is announced there before its first use.
 
 ### 10. Later phases (in scope, not in this change)
 
@@ -302,9 +351,10 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 - **Which version.** `--release` deploys the CLI's own version and takes no other. The CLI's starter, its config generator and its downgrade guard then match the bundle exactly. To install another version, run that version of the CLI (`npx @cloudhal/cli@<v> deploy --release`). `next` prereleases work the same way.
 - **No bundle, no deploy.** The CLI refuses with `release-unavailable` when `v<version>` has no published release, when the release is still a draft (publish-ci's window between attaching assets and publishing), or when it has no bundle assets (`RELEASE_BUNDLES` off, or `v0.8.0` and older). The message says to run `cloudhal deploy` without `--release`. It never falls back to building.
 - **Revocation.** `PINNED_KEYS` is frozen into each published CLI. A stolen key would therefore stay trusted by every CLI already published, and `--release` sends older versions through exactly those CLIs. So **`deploy --release` ships only after #226's signed `keys.json` exists.**
-  - On every `--release`, the CLI fetches `keys.json` from its stable URL, falling back to the release asset. It verifies it with the root key the CLI pins, checks its `expires`, and applies it reduce-only.
-  - A `keys.json` that cannot be fetched, does not verify, or has expired is a refusal. There is no override.
-  - `--from <dir>` needs `keys.json` in that directory too. The same rules apply, plus a freshness limit (§11c, point 7).
+  - On every `--release`, the CLI fetches both `keys.json` and `yanked.json` (each with its `.sig`) from their canonical URLs (§9). It verifies them with the root key the CLI pins and the yank key `keys.json` lists, checks both expiries and its stored `YankMemory`, applies them reduce-only, and stores the new memory.
+  - It never falls back to a release-asset snapshot or a cached copy. A snapshot can be older than a revocation, so an attacker who blocks cloudhal.dev would otherwise roll trust back.
+  - Either list failing to fetch or verify, either one expired, or a yank list going back on the memory is a refusal. There is no override.
+  - `--from <dir>` needs `keys.json` and `yanked.json` (with their `.sig`) in that directory too. The same rules apply, the memory included. Both lists must be unexpired, so an offline copy is at most 30 days old where revocations are concerned (§9).
   - The verifier package itself can ship before #226. Its callers pass the keys they trust.
 - **Order.**
   1. Steps 1 to 5 of §2, with the keys reduced by `keys.json`.
@@ -405,7 +455,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   - A wrangler older than `manifest.toolchain.wrangler` is refused.
 - **Migrations.** These need nothing new. The admin Worker applies D1 migrations itself, as it does after every deploy, and `manifest.levels.schedules` feeds the existing downgrade guard.
 - **Offline and dry runs.**
-  - `--from <dir>` takes the five assets and `keys.json` from a directory, for offline machines. The same verification runs on them.
+  - `--from <dir>` takes the five assets, `keys.json` and `yanked.json` (with their `.sig`) from a directory, for offline machines. The same verification runs on them.
   - `--release --dry-run` downloads, verifies, extracts and writes the configs, then stops before wrangler. It needs no Cloudflare account.
 
 #### 11c. Open points for this addendum
@@ -414,9 +464,9 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 2. Should `--release` accept another version than the CLI's own? **[default: no, until §10's runtime configuration lands]**
 3. When `gh` is unavailable, does the CLI refuse? **[default: yes. `--allow-single-factor` continues on the release key alone, with a line saying so. A failed attestation is always a refusal]**
 4. Where does the full-tarball test run? **[default: opt-in through `CLOUDHAL_RELEASE_ASSETS`, in its own CI job that downloads `v0.9.0`. The 7.2 MB tarball is never committed]**
-5. What does a key's `notAfter` mean for releases it has already signed? This is #226's decision 6. Until it is settled, the verifier has no `key-expired` code, and `PINNED_KEYS` carries no dates. **[default: #226's answer]**
+5. ~~What does a key's `notAfter` mean for releases it has already signed?~~ **Resolved (#226, §9):** a statement is valid when its `createdAt` lies in the key's window. After `notAfter`, the key verifies only while a fresh `keys.json` lists it as `retiring`; with pinned keys alone it gives `key-expired`.
 6. Should a later release record real `theme` and `skills` values in the manifest, so a host can compare a project without the CLI's starter? **[default: not part of this change. Consumers ignore the placeholders]**
-7. With `--from`, an old `keys.json` replays a key list from before a revocation. **[default: `--from` refuses a `keys.json` whose signed `issuedAt` is more than 30 days old, and the remaining window is documented. This needs #226's format to carry `issuedAt`. Online runs always fetch the current list]**
+7. ~~With `--from`, an old `keys.json` replays a key list from before a revocation.~~ **Resolved (#226, §9):** `--from` requires an unexpired `yanked.json`, at most 30 days old, where emergency revocations land first. It also requires an unexpired `keys.json`.
 
 ## Alternatives considered
 
@@ -456,7 +506,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
 ## Open questions
 
 1. Is the Astro and wrangler output byte-stable across two CI runs of one tag? The independent rebuild check waits for the answer.
-2. Where does `keys.json` live: a `cloudhal.dev/.well-known/` URL, release assets only, or both? **[default: both]**
+2. ~~Where does `keys.json` live?~~ **Resolved (#226, §9):** canonically at `https://cloudhal.dev/.well-known/cloudhal/keys.json`, plus a verified snapshot on every release. Online consumers never fall back to the snapshot.
 3. What is the source of truth for `compatibleWithPrevious` (a changeset field, a migration annotation)? **[default: `true` unless a release sets it]**
 4. Should every `next` prerelease ship a bundle? **[default: yes]**
 5. Is the inline `_headers` text in the manifest acceptable, or should it be a signed part? **[default: inline]**

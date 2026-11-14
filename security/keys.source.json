@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "keyId": "cloudhal-release-2026a",
+      "publicKey": "7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=",
+      "role": "release",
+      "notBefore": "2026-11-12T00:00:00Z",
+      "notAfter": "2027-11-12T00:00:00Z",
+      "status": "active"
+    }
+  ]
+}

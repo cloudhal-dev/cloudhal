@@ -116,6 +116,57 @@ describe("bundle-sign's inline scripts, run as written", () => {
     expect(exec(ws, "Check.cjs", env).out).toContain("is not the file the statement pins");
   });
 
+  it("refuses to sign within 90 days of the pinned key's not-after date, dry runs too (#226)", async () => {
+    const ws = await workspace("dryrun-42");
+    const env = {
+      VERSION: "0.8.0",
+      KEY_ID: "dryrun-42",
+      GITHUB_SHA: COMMIT,
+      DRY_RUN: "true",
+      GITHUB_RUN_ID: "42",
+      SECURITY_RELEASE: "false",
+    };
+    const sign = readFileSync(path.join(ws, "Sign.cjs"), "utf8");
+    const pin = /const PINNED_NOT_AFTER = "[^"]+";/;
+    expect(sign).toMatch(pin);
+    const withNotAfter = (days: number) => {
+      const at = new Date(Date.now() + days * 86_400_000).toISOString();
+      const script = sign.replace(pin, `const PINNED_NOT_AFTER = "${at}";`);
+      writeFileSync(path.join(ws, "Sign.cjs"), script);
+      return exec(ws, "Sign.cjs", env);
+    };
+    const near = withNotAfter(89);
+    expect(near).toMatchObject({ ok: false });
+    expect(near.out).toMatch(
+      /^bundle-sign: cloudhal-release-2026a expires on \d{4}-\d\d-\d\d, under 90 days away/,
+    );
+    // The tests above run the script with the real date: from 90 days before it they fail with
+    // this message too, which is the reminder to rotate the key.
+    expect(withNotAfter(-1)).toMatchObject({ ok: false });
+    expect(withNotAfter(91)).toMatchObject({ ok: true });
+  });
+
+  it("refuses a statement created outside the pinned key's window (RFC-0046 §9)", async () => {
+    const ws = await workspace("dryrun-42");
+    const env = {
+      VERSION: "0.8.0",
+      KEY_ID: "dryrun-42",
+      GITHUB_SHA: COMMIT,
+      DRY_RUN: "true",
+      GITHUB_RUN_ID: "42",
+      SECURITY_RELEASE: "false",
+    };
+    const sign = readFileSync(path.join(ws, "Sign.cjs"), "utf8");
+    const pin = /const PINNED_NOT_BEFORE = "[^"]+";/;
+    expect(sign).toMatch(pin);
+    // The fixture statement was created 2026-11-12T08:00:00Z.
+    const script = sign.replace(pin, 'const PINNED_NOT_BEFORE = "2026-11-12T09:00:00Z";');
+    writeFileSync(path.join(ws, "Sign.cjs"), script);
+    const early = exec(ws, "Sign.cjs", env);
+    expect(early).toMatchObject({ ok: false });
+    expect(early.out).toContain("createdAt is outside cloudhal-release-2026a's window");
+  });
+
   it("outside a dry run, refuses any key but the pinned one and never prints the key", async () => {
     const ws = await workspace("cloudhal-release-2026a");
     const pem = generateKeyPairSync("ed25519")

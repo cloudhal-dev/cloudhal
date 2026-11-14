@@ -7,8 +7,10 @@
 export { type IncrementalSha256, incrementalSha256, sha256Hex, verifyEd25519 } from "./crypto.ts";
 export type { ListedPart, Worker } from "./documents.ts";
 export { ERROR_CODES, ReleaseVerifyError, type ReleaseVerifyErrorCode } from "./errors.ts";
+export type { ListedKey, ReleaseKeys as KeyListDocument } from "./generated/release-keys.ts";
 export type { ReleaseManifest } from "./generated/release-manifest.ts";
 export type { ReleaseStatement } from "./generated/release-statement.ts";
+export type { ReleaseYankList } from "./generated/release-yank-list.ts";
 export { type KeyStatus, PINNED_KEYS, type ReleaseKey, type ReleaseKeys } from "./keys.ts";
 export {
   channelOf,
@@ -22,6 +24,20 @@ export {
 export { foldPath, type PathKind, unsafePathReason } from "./paths.ts";
 export { IMPLIED_SCOPES, missingScopes } from "./scopes.ts";
 export type { ByteSource } from "./tar.ts";
+export {
+  addMonths,
+  KEYS_FILE,
+  mergeTrust,
+  PINNED_ROOTS,
+  type RootKeys,
+  TRUST_BASE_URL,
+  type VerifiedKeyList,
+  type VerifiedYankList,
+  verifyKeys,
+  verifyYanked,
+  YANKED_FILE,
+  yankOf,
+} from "./trust.ts";
 export { RELEASE_REPOSITORY, releaseAssetNames, releaseAssetUrls } from "./urls.ts";
 export {
   type VerifiedEntry,
@@ -29,3 +45,4 @@ export {
   type VerifyReleaseInput,
   verifyRelease,
 } from "./verify.ts";
+export { rememberYanks, type YankMemory } from "./yank-memory.ts";

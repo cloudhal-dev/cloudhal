@@ -11,7 +11,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { assertValid, type ReleaseManifest } from "../../packages/core-contracts/src/index.ts";
 import { checkManifestDoc, listedParts } from "../../packages/release-verify/src/documents.ts";
-import { verifyRelease } from "../../packages/release-verify/src/index.ts";
+import { PINNED_KEYS, verifyRelease } from "../../packages/release-verify/src/index.ts";
 import { verifiedEntries } from "../../packages/release-verify/src/verify.ts";
 import { canonicalJson, LIMITS, manifestParts, sha256 } from "./manifest.ts";
 import { verifySignature } from "./signature.ts";
@@ -150,11 +150,15 @@ async function verifyAsConsumer(
     manifest: ReleaseManifest;
   },
 ): Promise<void> {
+  // The pinned record (with its window) when the key is the pinned one, as a consumer has it.
   const keys = Object.fromEntries(
-    Object.entries(o.publicKeys ?? {}).map(([id, publicKey]) => [
-      id,
-      { publicKey, status: "active" as const },
-    ]),
+    Object.entries(o.publicKeys ?? {}).map(([id, publicKey]) => {
+      const pinned = Object.hasOwn(PINNED_KEYS, id) ? PINNED_KEYS[id] : undefined;
+      return [
+        id,
+        pinned?.publicKey === publicKey ? pinned : { publicKey, status: "active" as const },
+      ];
+    }),
   );
   const release = await verifyRelease({
     request: {

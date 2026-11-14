@@ -165,3 +165,13 @@ fn release_manifest() {
 fn release_statement() {
     check::<cloudhal_schema::ReleaseStatement>("release-statement");
 }
+
+#[test]
+fn release_keys() {
+    check::<cloudhal_schema::ReleaseKeys>("release-keys");
+}
+
+#[test]
+fn release_yank_list() {
+    check::<cloudhal_schema::ReleaseYankList>("release-yank-list");
+}

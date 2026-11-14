@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "format": "cloudhal.release-keys@1",
+  "issuedAt": "2027-07-01T00:00:00Z",
+  "expires": "2028-07-01T00:00:00Z",
+  "signing": {
+    "keyId": "cloudhal-root-2026a",
+    "algorithm": "Ed25519",
+    "signature": "keys.json.sig"
+  },
+  "keys": [
+    {
+      "keyId": "cloudhal-release-2026a",
+      "publicKey": "7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=",
+      "role": "release",
+      "notBefore": "2026-11-12T00:00:00Z",
+      "notAfter": "2027-11-12T00:00:00Z",
+      "status": "retiring"
+    },
+    {
+      "keyId": "cloudhal-release-2027a",
+      "publicKey": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "role": "release",
+      "notBefore": "2027-07-15T00:00:00Z",
+      "notAfter": "2028-11-12T00:00:00Z",
+      "status": "active"
+    },
+    {
+      "keyId": "cloudhal-yank-2026a",
+      "publicKey": "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=",
+      "role": "yank",
+      "notBefore": "2026-11-20T00:00:00Z",
+      "notAfter": "2027-11-20T00:00:00Z",
+      "status": "active"
+    },
+    {
+      "keyId": "cloudhal-yank-2025a",
+      "publicKey": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "role": "yank",
+      "notBefore": "2025-11-20T00:00:00Z",
+      "notAfter": "2026-11-20T00:00:00Z",
+      "status": "revoked"
+    }
+  ]
+}

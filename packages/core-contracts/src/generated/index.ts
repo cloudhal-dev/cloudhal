@@ -26,3 +26,5 @@ export type { ScheduleRunId, ScheduleRunSubject, ScheduleRunState, ScheduleRun, 
 export type { Glossary, GlossaryEntry } from "./glossary.ts";
 export type { ReleaseManifest, WorkerArtifact, BindingTemplate } from "./release-manifest.ts";
 export type { ReleaseStatement, StatementAsset } from "./release-statement.ts";
+export type { ReleaseKeys, ListedKey } from "./release-keys.ts";
+export type { ReleaseYankList } from "./release-yank-list.ts";

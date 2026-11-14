@@ -14,8 +14,10 @@ import type {
   Project,
   Redirect,
   Release,
+  ReleaseKeys,
   ReleaseManifest,
   ReleaseStatement,
+  ReleaseYankList,
   ScheduleRun,
   Section,
   Site,
@@ -50,6 +52,8 @@ export interface ContractTypes {
   glossary: Glossary;
   "release-manifest": ReleaseManifest;
   "release-statement": ReleaseStatement;
+  "release-keys": ReleaseKeys;
+  "release-yank-list": ReleaseYankList;
 }
 
 const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K]> } = {
@@ -75,6 +79,8 @@ const validators: { [K in RootSchemaName]: v.StandaloneValidator<ContractTypes[K
   glossary: v.validateGlossary,
   "release-manifest": v.validateReleaseManifest,
   "release-statement": v.validateReleaseStatement,
+  "release-keys": v.validateReleaseKeys,
+  "release-yank-list": v.validateReleaseYankList,
 };
 
 export class ContractValidationError extends Error {
