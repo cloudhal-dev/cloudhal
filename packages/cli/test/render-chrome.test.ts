@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { renderPage } from "@cloudhal/mcp-server/render";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CAROUSEL_SCRIPT } from "../../astro-renderer/src/carousel-client.ts";
 import { renderPagePreview } from "../../astro-renderer/src/preview.ts";
 import { chromeRenderer, findChrome, localRender } from "../src/render-chrome.ts";
@@ -30,7 +30,16 @@ const PAGE = `<!doctype html><html lang="en"><head><meta name="viewport" content
 
 describe.skipIf(!chrome)("render_page checks in Chrome", () => {
   let dir: string;
+  // One Chrome for every test here, started before them with the launch's own budget (#207): a
+  // cold start on a busy CI runner can take most of a minute, which must not eat a render's 50 s.
+  // Chrome that cannot start at all still fails every test, with the launch error.
+  let renderer: ReturnType<typeof chromeRenderer>;
+  beforeAll(async () => {
+    renderer = chromeRenderer(chrome as string, { idleMs: 300_000, startMs: 45_000 });
+    await (await renderer.session()).close();
+  }, 200_000);
   afterAll(async () => {
+    renderer?.stop();
     if (dir) await rm(dir, { recursive: true, force: true });
   });
 
@@ -39,7 +48,7 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     const file = path.join(dir, "page.html");
     await writeFile(file, PAGE);
     const r = await renderPage(
-      chromeRenderer(chrome as string, { idleMs: 10 }),
+      renderer,
       pathToFileURL(file).href,
       // Two widths, full page: the 20 s default is tight on a loaded CI runner (#35).
       { widths: [1440, 390], fullPage: true, timeoutMs: 50_000 },
@@ -74,7 +83,6 @@ describe.skipIf(!chrome)("render_page checks in Chrome", () => {
     expect(check("landmarks")?.examples).toEqual(
       expect.arrayContaining(["@1440: the page — 0 page headers (one is right)"]),
     );
-    // The first test starts Chrome: up to two 20 s launch attempts (render-chrome.ts) plus the render.
   }, 120_000);
 
   it("checks the chrome: skip link, landmarks, a transparent header's contrast, focus under it", async () => {
@@ -96,11 +104,11 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     const run = async (name: string, html: string, widths: (1440 | 768 | 390)[] = [1440]) => {
       const file = path.join(dir, name);
       await writeFile(file, html);
-      const r = await renderPage(
-        chromeRenderer(chrome as string, { idleMs: 10 }),
-        pathToFileURL(file).href,
-        { widths, fullPage: false, timeoutMs: 50_000 },
-      );
+      const r = await renderPage(renderer, pathToFileURL(file).href, {
+        widths,
+        fullPage: false,
+        timeoutMs: 50_000,
+      });
       return (id: string) => r.checks.find((c) => c.id === id);
     };
     const b = await run("bad.html", bad);
@@ -281,11 +289,11 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     const render = async (name: string, html: string) => {
       const file = path.join(dir, name);
       await writeFile(file, html);
-      const r = await renderPage(
-        chromeRenderer(chrome as string, { idleMs: 10 }),
-        pathToFileURL(file).href,
-        { widths: [1440], fullPage: false, timeoutMs: 50_000 },
-      );
+      const r = await renderPage(renderer, pathToFileURL(file).href, {
+        widths: [1440],
+        fullPage: false,
+        timeoutMs: 50_000,
+      });
       return (id: string) => r.checks.find((c) => c.id === id);
     };
     await writeFile(path.join(dir, "theme.js"), "document.body.dataset.ran = '1';");
@@ -320,11 +328,11 @@ header{position:sticky;top:0;height:80px;color:#fff;margin-bottom:-80px}header a
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     try {
       const { port } = server.address() as AddressInfo;
-      const r = await renderPage(
-        chromeRenderer(chrome as string, { idleMs: 10 }),
-        `http://127.0.0.1:${port}/`,
-        { widths: [1440], fullPage: false, timeoutMs: 50_000 },
-      );
+      const r = await renderPage(renderer, `http://127.0.0.1:${port}/`, {
+        widths: [1440],
+        fullPage: false,
+        timeoutMs: 50_000,
+      });
       expect(r.checks.find((c) => c.id === "script-blocked")?.examples).toEqual([
         expect.stringMatching(/an inline script .*would be blocked on the site by script-src-elem/),
       ]);
@@ -341,23 +349,83 @@ describe("localRender", () => {
   });
 });
 
+const STARTS_SECOND_TIME = `n=$(wc -l < "$(dirname "$0")/launches" | tr -d ' ')
+[ "$n" -lt 2 ] && exit 1
+echo "DevTools listening on ws://127.0.0.1:9/devtools/browser/x" >&2
+exec sleep 30`;
+
 describe("chromeRenderer", () => {
-  it.skipIf(process.platform === "win32")(
-    "launches a Chrome that fails to start once more, with a new profile",
+  const unix = process.platform !== "win32";
+  // A fake Chrome: a shell script that logs each launch's arguments, then does `body`.
+  const fakeChrome = async (body: string) => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-retry-"));
+    const log = path.join(tmp, "launches");
+    const fake = path.join(tmp, "chrome");
+    await writeFile(fake, `#!/bin/sh\necho "$$ $@" >> "${log}"\n${body}\n`, { mode: 0o755 });
+    const launches = async () => (await readFile(log, "utf8")).trim().split("\n");
+    return { tmp, fake, log, launches };
+  };
+  const profile = (line?: string) => /--user-data-dir=(\S+)/.exec(line ?? "")?.[1];
+  const alive = (pid: number) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  it.skipIf(!unix)(
+    "launches a Chrome that keeps exiting three times, each with a new profile",
     async () => {
-      const tmp = await mkdtemp(path.join(os.tmpdir(), "cloudhal-render-retry-"));
-      const log = path.join(tmp, "launches");
-      const fake = path.join(tmp, "chrome");
-      await writeFile(fake, `#!/bin/sh\necho "$@" >> "${log}"\nexit 1\n`, { mode: 0o755 });
+      const f = await fakeChrome("exit 1");
       try {
-        await expect(chromeRenderer(fake).session()).rejects.toThrow("Chrome exited");
-        const launches = (await readFile(log, "utf8")).trim().split("\n");
-        expect(launches).toHaveLength(2);
-        const profile = (line?: string) => /--user-data-dir=(\S+)/.exec(line ?? "")?.[1];
-        expect(profile(launches[0])).not.toBe(profile(launches[1]));
+        await expect(chromeRenderer(f.fake, { backoffMs: 10 }).session()).rejects.toThrow(
+          "Chrome exited (3 launches)",
+        );
+        const launches = await f.launches();
+        expect(launches).toHaveLength(3);
+        expect(new Set(launches.map(profile)).size).toBe(3);
       } finally {
-        await rm(tmp, { recursive: true, force: true });
+        await rm(f.tmp, { recursive: true, force: true });
       }
     },
   );
+
+  it.skipIf(!unix)(
+    "kills a launch that hangs past startMs and says how long it waited",
+    async () => {
+      const f = await fakeChrome("exec sleep 30");
+      try {
+        // 1 s: a fake's shell can take a few hundred ms to start while vitest is busy, and it must
+        // have logged its pid before the renderer gives up on it.
+        const renderer = chromeRenderer(f.fake, { startMs: 1000, launches: 2, backoffMs: 10 });
+        await expect(renderer.session()).rejects.toThrow(
+          "Chrome did not start within 1 s (2 launches)",
+        );
+        const pids = (await f.launches()).map((line) => Number(line.split(" ")[0]));
+        expect(pids).toHaveLength(2);
+        for (let i = 0; i < 50 && pids.some(alive); i++) {
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        expect(pids.filter(alive)).toEqual([]);
+      } finally {
+        await rm(f.tmp, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it.skipIf(!unix)("recovers when a later launch starts", async () => {
+    // The second launch prints an endpoint (on a closed port), so the renderer gets past the
+    // launch and fails only at connecting: the retry reached a started Chrome.
+    const f = await fakeChrome(STARTS_SECOND_TIME);
+    const renderer = chromeRenderer(f.fake, { backoffMs: 10 });
+    try {
+      await expect(renderer.session()).rejects.toThrow("could not reach Chrome");
+      expect(await f.launches()).toHaveLength(2);
+    } finally {
+      renderer.stop();
+      await rm(f.tmp, { recursive: true, force: true });
+    }
+  });
 });
