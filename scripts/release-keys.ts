@@ -1,7 +1,7 @@
 /**
  * The release trust ceremony (RFC-0046 §9, #226; runbook: docs/security/release-signing-keys.md).
- * Node built-ins only, so `sign-yanked` runs in the `release-yank` job without a package install.
- * No command ever prints a private key.
+ * Node built-ins, plus `@cloudhal/release-verify` (loaded when signing) to check every signed
+ * document the way consumers do before it is written. No command ever prints a private key.
  *
  *   node scripts/release-keys.ts root-init --key-id cloudhal-root-2026a --out <dir> [--passphrase-file <f>]
  *       An Ed25519 root: <dir>/<id>.key.enc (PKCS#8, AES-256 with the passphrase) + <id>.pub.json.
@@ -301,6 +301,8 @@ export async function signYanked(o: {
         serial: o.published.serial,
         versions: o.published.versions.map((v) => v.version),
         revokedKeys: o.published.revokedKeys.map((k) => k.keyId),
+        keysIssuedAt: keys.document.issuedAt,
+        retiredYankKeys: [],
       }
     : undefined;
   await selfCheck("yank list", () =>

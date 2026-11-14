@@ -17,6 +17,7 @@ import type { ReleaseKeys as KeyListDocument, ListedKey } from "./generated/rele
 import type { ReleaseYankList } from "./generated/release-yank-list.ts";
 import { validateReleaseKeys, validateReleaseYankList } from "./generated/validators.js";
 import { fromBase64, type ReleaseKey, type ReleaseKeys } from "./keys.ts";
+import { checkKeysMemory, checkYankMemory, type YankMemory } from "./yank-memory.ts";
 
 /** Root keys: they sign only `keys.json`. Pinned at the root ceremony; empty until then. */
 export type RootKeys = Readonly<Record<string, { readonly publicKey: string }>>;
@@ -73,7 +74,6 @@ function signedDoc(
   return { doc, keyId: keyId as string };
 }
 
-/** `iso` plus `months` calendar months (UTC). */
 /** `iso` plus `months` calendar months (UTC), clamped to the target month's last day (01-31 + 1 → 02-28/29). */
 export function addMonths(iso: string, months: number): number {
   const d = new Date(iso);
@@ -94,59 +94,14 @@ export function addMonths(iso: string, months: number): number {
   return target.getTime();
 }
 
-/**
- * What a consumer that keeps state remembers of the yank lists it has accepted (RFC-0046 §9): the
- * yank key that signed them, the highest serial, and every yanked version and revoked key id. A
- * later list from the same yank key must keep every remembered entry and must not go back in
- * serial, so a stolen yank key cannot un-yank or un-revoke for such a consumer. A list from another
- * yank key (one the root listed after rotating) starts a new memory: that is also how the list
- * is pruned. Store `rememberYanks`'s result after every accepted list.
- */
-export interface YankMemory {
-  readonly keyId: string;
-  readonly serial: number;
-  readonly versions: readonly string[];
-  readonly revokedKeys: readonly string[];
-}
-
-/** The memory after accepting `list` (see `YankMemory`). */
-export function rememberYanks(list: VerifiedYankList): YankMemory {
-  const d = list.document;
-  return {
-    keyId: d.signing.keyId,
-    serial: d.serial,
-    versions: d.versions.map((v) => v.version),
-    revokedKeys: d.revokedKeys.map((k) => k.keyId),
-  };
-}
-
-/** Refuses a list that goes back on `memory` (same yank key: lower serial or a dropped entry). */
-function checkMemory(list: ReleaseYankList, memory: YankMemory | undefined): void {
-  if (!memory || memory.keyId !== list.signing.keyId) return;
-  if (list.serial < memory.serial)
-    refuse(
-      "stale-yank-list",
-      `yanked.json has serial ${list.serial}, below ${memory.serial} seen before: a rolled-back list`,
-    );
-  const versions = new Set(list.versions.map((v) => v.version));
-  const keys = new Set(list.revokedKeys.map((k) => k.keyId));
-  const dropped = [
-    ...memory.versions.filter((v) => !versions.has(v)),
-    ...memory.revokedKeys.filter((k) => !keys.has(k)),
-  ];
-  if (dropped.length)
-    refuse(
-      "stale-yank-list",
-      `yanked.json drops ${dropped.join(", ")}, seen before: a yank or revocation is never undone`,
-    );
-}
-
 /** Verifies `keys.json` (see the file comment); throws a `ReleaseVerifyError`. */
 export async function verifyKeys(input: {
   document: Uint8Array;
   signature: Uint8Array;
   roots?: RootKeys;
   now?: Date;
+  /** A consumer's `YankMemory`: a `keys.json` older than the newest one seen is refused. */
+  memory?: YankMemory;
 }): Promise<VerifiedKeyList> {
   const now = (input.now ?? new Date()).getTime();
   const { doc, keyId } = signedDoc(
@@ -171,21 +126,30 @@ export async function verifyKeys(input: {
     if (!(Date.parse(k.notBefore) < Date.parse(k.notAfter)))
       refuse("key-list-invalid", `${k.keyId}: notBefore is not before notAfter`);
   }
+  // One active yank key at a time: rotation replaces it, so a thief of one key cannot switch to
+  // another to start a fresh memory (yank-memory.ts).
+  const activeYank = list.keys.filter((k) => k.role === "yank" && k.status === "active");
+  if (activeYank.length > 1)
+    refuse(
+      "key-list-invalid",
+      `keys.json lists ${activeYank.length} active yank keys (${activeYank.map((k) => k.keyId).join(", ")}); at most one`,
+    );
   const issued = Date.parse(list.issuedAt);
   const expires = Date.parse(list.expires);
   if (!(issued < expires) || expires > addMonths(list.issuedAt, 13))
     refuse("key-list-invalid", "keys.json must expire after issuedAt and within 13 months");
   if (issued > now + SKEW_MS) refuse("key-list-invalid", "keys.json is issued in the future");
   if (now >= expires) refuse("key-list-expired", `keys.json expired on ${list.expires}`);
+  checkKeysMemory(list, input.memory);
   return { document: list, sha256: await sha256Hex(input.document) };
 }
 
 /**
  * Verifies `yanked.json` against a verified key list (see the file comment). A consumer that can
- * keep state passes its `memory` (`YankMemory`) and stores `rememberYanks(result)`: a lower
- * serial or a dropped entry is a rollback or an un-yank and is refused (`stale-yank-list`). A
- * stateless consumer (a Worker) cannot detect either: for it, a stolen yank key can un-yank and
- * un-revoke until the root rotates the yank key.
+ * keep state passes its `memory` and stores `rememberYanks(result, keys, memory)` (yank-memory.ts):
+ * a replayed older `keys.json`, a revoked or replaced yank key, a lower serial or a dropped entry
+ * is refused. A stateless consumer (a Worker) cannot detect a replay or an un-yank: for it, a
+ * stolen yank key can un-yank and un-revoke until the root rotates the yank key.
  */
 export async function verifyYanked(input: {
   document: Uint8Array;
@@ -217,7 +181,7 @@ export async function verifyYanked(input: {
   if (Date.parse(list.expires) - issued !== 30 * DAY_MS)
     refuse("yank-list-invalid", "yanked.json must expire exactly 30 days after issuedAt");
   if (issued > now + SKEW_MS) refuse("yank-list-invalid", "yanked.json is issued in the future");
-  checkMemory(list, input.memory);
+  checkYankMemory(list, input.keys.document, input.memory);
   if (now >= Date.parse(list.expires))
     refuse(
       "stale-yank-list",

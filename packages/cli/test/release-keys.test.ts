@@ -285,6 +285,19 @@ describe("sign-yanked", () => {
         now: NOW,
       }),
     ).rejects.toThrow(/does not verify/);
+    // Two active yank keys: rotation replaces the yank key, it never overlaps.
+    const yank = s.source.keys[1] as Record<string, unknown>;
+    const overlap = { keys: [...s.source.keys, { ...yank, keyId: "cloudhal-yank-2026b" }] };
+    await expect(
+      signKeys({
+        rootKey: rootKeyOf(s.dir),
+        passphrase: PASS,
+        rootPub: s.root,
+        source: overlap,
+        out: tmp(),
+        now: NOW,
+      }),
+    ).rejects.toThrow(/active yank keys.*at most one/);
     const before = readdirSync(out);
     await expect(signYanked({ ...base, out, source: bad })).rejects.toThrow();
     expect(readdirSync(out)).toEqual(before);

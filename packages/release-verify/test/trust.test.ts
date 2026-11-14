@@ -141,6 +141,15 @@ describe("verifyKeys", () => {
     const empty = { ...doc, keys: [{ ...first, notAfter: "2026-11-12T00:00:00Z" }] };
     expect(await codeOf(keysAt(empty))).toBe("key-list-invalid");
   });
+
+  it("allows at most one active yank key (rotation replaces it, never overlaps)", async () => {
+    const doc = keysDoc();
+    const yank = doc.keys[1] as (typeof doc.keys)[number];
+    const second = { ...yank, keyId: "test-yank-2027a", publicKey: keyPair().raw };
+    expect(await codeOf(keysAt({ ...doc, keys: [...doc.keys, second] }))).toBe("key-list-invalid");
+    const retiring = { ...doc, keys: [...doc.keys, { ...second, status: "retiring" }] };
+    expect(await codeOf(keysAt(retiring))).toBe("ok");
+  });
 });
 
 describe("verifyYanked", () => {
@@ -171,12 +180,14 @@ describe("verifyYanked", () => {
       keys,
       now: NOW,
     });
-    const memory = rememberYanks(first);
+    const memory = rememberYanks(first, keys);
     expect(memory).toEqual({
       keyId: "test-yank-2026a",
       serial: 5,
       versions: ["0.9.3"],
       revokedKeys: ["cloudhal-release-2025a"],
+      keysIssuedAt: "2026-11-20T00:00:00Z",
+      retiredYankKeys: [],
     });
     const later = (over: Record<string, unknown>) =>
       verifyYanked({
@@ -193,29 +204,140 @@ describe("verifyYanked", () => {
     expect(await codeOf(later({ serial: 6, revokedKeys: [] }))).toBe("stale-yank-list");
   });
 
-  it("a list from another, root-listed yank key starts a new memory (the root's rotation)", async () => {
-    const next = keyPair();
-    const doc = keysDoc();
-    const rotated = {
-      ...doc,
-      keys: [
-        ...doc.keys,
-        {
-          ...(doc.keys[1] as (typeof doc.keys)[number]),
-          keyId: "test-yank-2027a",
-          publicKey: next.raw,
-        },
-      ],
+  describe("key rotation and replayed key lists (YankMemory)", () => {
+    const NEXT = keyPair();
+    const yank2027 = {
+      keyId: "test-yank-2027a",
+      publicKey: NEXT.raw,
+      role: "yank",
+      notBefore: "2026-11-20T00:00:00Z",
+      notAfter: "2027-11-20T00:00:00Z",
+      status: "active",
     };
-    const keys = await keysAt(rotated);
-    const memory = { keyId: "test-yank-2026a", serial: 40, versions: ["0.9.3"], revokedKeys: [] };
-    const fresh = yankDoc({
-      serial: 1,
-      signing: { keyId: "test-yank-2027a", algorithm: "Ed25519", signature: "yanked.json.sig" },
+    /** The root's rotation: newer, lists the new yank key, the old one revoked (or `old`). */
+    const rotatedDoc = (old: Record<string, unknown> = { status: "revoked" }) => {
+      const doc = keysDoc();
+      const [release, yank] = doc.keys as unknown as [
+        Record<string, unknown>,
+        Record<string, unknown>,
+      ];
+      return {
+        ...doc,
+        issuedAt: "2026-11-28T00:00:00Z",
+        expires: "2027-11-28T00:00:00Z",
+        keys: [release, { ...yank, ...old }, yank2027],
+      };
+    };
+    const by2027 = (over: Record<string, unknown> = {}) =>
+      signed(
+        yankDoc({
+          serial: 1,
+          signing: { keyId: "test-yank-2027a", algorithm: "Ed25519", signature: "yanked.json.sig" },
+          ...over,
+        }),
+        NEXT.privateKey,
+      );
+    const by2026 = (over: Record<string, unknown> = {}) =>
+      signed(yankDoc({ serial: 50, ...over }), YANK.privateKey);
+
+    /** The memory after accepting K1's list (serial 40, 0.9.3 yanked) under the first keys.json. */
+    async function rememberedK1() {
+      const keys = await keysAt(keysDoc());
+      const list = await verifyYanked({
+        ...signed(
+          yankDoc({
+            serial: 40,
+            versions: [{ version: "0.9.3", yankedAt: "2026-11-20T00:00:00Z", reason: "Broken." }],
+          }),
+          YANK.privateKey,
+        ),
+        keys,
+        now: NOW,
+      });
+      return rememberYanks(list, keys);
+    }
+
+    it("starts a new memory when a newer keys.json replaces the yank key", async () => {
+      const memory = await rememberedK1();
+      const keys = await keysAt(rotatedDoc());
+      const fresh = await verifyYanked({ ...by2027(), keys, now: NOW, memory });
+      const next = rememberYanks(fresh, keys, memory);
+      expect(next).toMatchObject({
+        keyId: "test-yank-2027a",
+        serial: 1,
+        versions: [],
+        keysIssuedAt: "2026-11-28T00:00:00Z",
+        retiredYankKeys: ["test-yank-2026a"],
+      });
     });
-    expect(
-      await codeOf(verifyYanked({ ...signed(fresh, next.privateKey), keys, now: NOW, memory })),
-    ).toBe("ok");
+
+    it("refuses a replayed older keys.json, with or without a list from the old yank key", async () => {
+      const memory = await rememberedK1();
+      const rotated = await keysAt(rotatedDoc());
+      const after = rememberYanks(
+        await verifyYanked({ ...by2027(), keys: rotated, now: NOW, memory }),
+        rotated,
+        memory,
+      );
+      // The attacker supplies the previous, unexpired keys.json (K1 active) and an empty K1 list.
+      const replayed = await keysAt(keysDoc());
+      expect(
+        await codeOf(
+          verifyYanked({ ...by2026({ versions: [] }), keys: replayed, now: NOW, memory: after }),
+        ),
+      ).toBe("key-list-invalid");
+      expect(
+        await codeOf(
+          verifyKeys({
+            ...signed(keysDoc(), ROOT.privateKey),
+            roots: ROOTS,
+            now: NOW,
+            memory: after,
+          }),
+        ),
+      ).toBe("key-list-invalid");
+    });
+
+    it("refuses a revoked or replaced yank key forever, even under a newer keys.json", async () => {
+      const memory = await rememberedK1();
+      const rotated = await keysAt(rotatedDoc());
+      const after = rememberYanks(
+        await verifyYanked({ ...by2027(), keys: rotated, now: NOW, memory }),
+        rotated,
+        memory,
+      );
+      // A later root list that lists K1 active again (with K2 retired) cannot bring K1 back.
+      const doc = rotatedDoc({ status: "active" });
+      const relisted = {
+        ...doc,
+        issuedAt: "2026-11-29T00:00:00Z",
+        keys: [doc.keys[0], doc.keys[1], { ...yank2027, status: "revoked" }],
+      };
+      expect(
+        await codeOf(
+          verifyYanked({ ...by2026(), keys: await keysAt(relisted), now: NOW, memory: after }),
+        ),
+      ).toBe("yank-list-invalid");
+      // Revoked by the root list itself: remembered before any list from the new key arrives.
+      const revoking = rememberYanks(
+        await verifyYanked({ ...by2027(), keys: rotated, now: NOW }),
+        rotated,
+      );
+      expect(revoking.retiredYankKeys).toEqual(["test-yank-2026a"]);
+    });
+
+    it("refuses another yank key without a newer keys.json that stops listing the old one as active", async () => {
+      const memory = await rememberedK1();
+      // Same issuedAt as the remembered keys.json: no rotation happened.
+      const same = {
+        ...rotatedDoc(),
+        issuedAt: "2026-11-20T00:00:00Z",
+        expires: "2027-11-20T00:00:00Z",
+      };
+      expect(
+        await codeOf(verifyYanked({ ...by2027(), keys: await keysAt(same), now: NOW, memory })),
+      ).toBe("stale-yank-list");
+    });
   });
 
   it("addMonths clamps to the last day of the target month", () => {

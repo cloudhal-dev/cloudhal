@@ -30,14 +30,12 @@ export {
   mergeTrust,
   PINNED_ROOTS,
   type RootKeys,
-  rememberYanks,
   TRUST_BASE_URL,
   type VerifiedKeyList,
   type VerifiedYankList,
   verifyKeys,
   verifyYanked,
   YANKED_FILE,
-  type YankMemory,
   yankOf,
 } from "./trust.ts";
 export { RELEASE_REPOSITORY, releaseAssetNames, releaseAssetUrls } from "./urls.ts";
@@ -47,3 +45,4 @@ export {
   type VerifyReleaseInput,
   verifyRelease,
 } from "./verify.ts";
+export { rememberYanks, type YankMemory } from "./yank-memory.ts";

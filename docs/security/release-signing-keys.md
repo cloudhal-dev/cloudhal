@@ -56,7 +56,8 @@ None yet. The owner's root ceremony adds the first row (see *First-time setup* b
   - It can only reduce trust: it yanks versions and revokes release key ids, and it can never add or re-enable a key.
   - A stolen yank key can yank good versions and revoke good keys (denial of service).
     - It can also *undo* yanks and revocations for stateless consumers, such as a Worker deployer, by signing a fresh list without them.
-    - Consumers that keep state, such as the CLI, refuse such a list: they remember every entry and the highest serial they have seen.
+    - Consumers that keep state, such as the CLI, refuse such a list: they remember every entry and the highest serial they have seen. They also remember the newest `keys.json` and every revoked or replaced yank key, so an older `keys.json` replayed with a list from the stolen key is refused too.
+  - **One active yank key at a time.** `keys.json` lists at most one yank key as `active`, and `sign-keys` refuses two. Rotate the yank key by replacing it in one `keys.json` (old key `revoked` or removed, new key `active`), never by overlapping.
     - The recovery is a root-signed `keys.json` that revokes the stolen key and lists a new one. That is also why every emergency revocation is recorded in `keys.json` within days (*Revocation*, step 2).
 - **`keys.json`** (`cloudhal.release-keys@1`, signed by the root in `keys.json.sig`).
   - It lists every release and yank key with its window and status.
@@ -115,7 +116,7 @@ This runs once, offline where it says so. Nobody else generates or holds these k
 2. **Make it permanent with the root, within days.** Set the key to `revoked` in `security/keys.source.json`, re-sign `keys.json` with the root, publish it, and mark the key's row `revoked` above. Until then, the revocation rests on the yank key alone, which a stateless consumer would lose if the yank key were also stolen.
 3. **Tell people.** Publish an advisory under [SECURITY.md](../../SECURITY.md).
 4. **Recover.** Rotate to a new release key (*Rotation*, steps 2 to 4) and release a new version signed by it.
-5. **A stolen yank key.** It can deny service, and for stateless consumers it can undo yanks and revocations. Revoke it in `keys.json` with the root, generate a new yank key (`yank-init`), list it, and replace `RELEASE_YANK_KEY`. The new key's first list carries every yank and revocation that still matters. Consumers with memory start a new memory with the new key.
+5. **A stolen yank key.** It can deny service, and for stateless consumers it can undo yanks and revocations. Revoke it in `keys.json` with the root, generate a new yank key (`yank-init`), list it as the only `active` yank key in the same `keys.json`, and replace `RELEASE_YANK_KEY`. The new key's first list carries every yank and revocation that still matters. Consumers with memory start a new memory with the new key.
 
 ## Yanking a version
 
