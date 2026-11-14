@@ -94,6 +94,20 @@ npm install @cloudhal/cli@latest @cloudhal/core-ts@latest @cloudhal/astro-render
 
 Then run `npx cloudhal deploy` to update a deployment. Release notes are in each package's changelog on npm and GitHub.
 
+### Installing the signed release
+
+`npx cloudhal deploy --release` installs the signed release of the CLI's own version instead of building the project (RFC-0046 §11b). It deploys the exact bytes that `release.yml` built and signed, so your machine runs no Astro or Worker build. Your content, config and secrets still come from the project.
+
+- **What it checks.**
+  - The signed key and yank lists from cloudhal.dev, on every run. It never falls back to an older copy, and it remembers what it has seen in `~/.cloudhal/release-trust.json`.
+  - The release's signature, and every file against its digest.
+  - The build-provenance attestation, which needs the [GitHub CLI](https://cli.github.com) 2.68 or newer, signed in. `--allow-single-factor` continues on the release key alone when `gh` is missing.
+- **Theme check.** The theme files (`src/`, `public/`, `astro.config.mjs`, `tsconfig.json`, any PostCSS config) must equal the CLI's own starter. Otherwise, run `cloudhal deploy` without `--release`, or add `--discard-local-theme` to deploy the official theme anyway. Your files stay on disk.
+- **Offline.** `--from <dir>` installs from the five release assets plus `keys.json` and `yanked.json` (each with its `.sig`) in a directory.
+- **Dry run.** `--release --dry-run` verifies, extracts and writes the configs, then stops before wrangler.
+
+`--release` is available once the signed key list is published (the root ceremony in [Release signing keys](/docs/security/release-signing-keys)); until then the command refuses and says so.
+
 ## Next
 
 - [Quickstart](/docs/start/quickstart): run the site, open Studio, connect an agent, publish.

@@ -164,7 +164,7 @@ export interface ProjectConfig {
 export const CONFIG_FILE = "cloudhal.json";
 
 /** The keys `ProjectConfig` owns; others (e.g. `media`, read by the starter) are kept on write. */
-const OWN_KEYS = new Set([
+export const OWN_KEYS: ReadonlySet<string> = new Set([
   "siteId",
   "sites",
   "installation",

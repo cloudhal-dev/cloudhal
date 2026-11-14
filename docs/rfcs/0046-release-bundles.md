@@ -395,7 +395,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
       - Without one, it stops at the project root: Vite falls back to the nearest `package.json`, which is the project's own.
       - This is Vite 8.3.5's own rule (`resolvePostcssConfig` with `stopDir` from `searchForWorkspaceRoot`). `cloudhal init` supports projects inside an existing workspace, so a monorepo's root PostCSS config would otherwise apply to a local deploy and be dropped silently by `--release`.
 
-  The list was checked against the installed Astro 7.4.7 and Vite 8.3.5.
+  The list was checked against the installed Astro 7.4.7 and Vite 8.3.5. It lives in `packages/cli/src/commands/deploy/release/theme-check.ts`, whose file comment and AGENTS.md carry the upgrade step.
   - Astro passes `configFile: false` to Vite (`create-vite.js`), so a `vite.config.*` is never loaded and is not compared.
   - The PostCSS names are the search places of the `postcss-load-config` 6.0.1 that Vite bundles.
   - `.env*` files are not compared. Vite loads them, but only code that reads a variable can bake it in, and the code is the starter's, which reads no `import.meta.env`.

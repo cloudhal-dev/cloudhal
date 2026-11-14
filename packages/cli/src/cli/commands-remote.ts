@@ -24,6 +24,28 @@ function deployFlags(values: CliValues): {
   return { where, ticker, plan };
 }
 
+/** RFC-0046 §11b: this CLI's signed release; its two flags are never implied. */
+function releaseFlags(values: CliValues): {
+  release?: true;
+  from?: string;
+  allowSingleFactor?: true;
+  discardLocalTheme?: true;
+} {
+  const single = values["allow-single-factor"] === true;
+  const discard = values["discard-local-theme"] === true;
+  if (!values.release) {
+    if (values.from || single || discard)
+      throw new Error("--from, --allow-single-factor and --discard-local-theme go with --release");
+    return {};
+  }
+  return {
+    release: true,
+    ...(values.from ? { from: values.from } : {}),
+    ...(single ? { allowSingleFactor: true as const } : {}),
+    ...(discard ? { discardLocalTheme: true as const } : {}),
+  };
+}
+
 const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
   const { where, ticker, plan } = deployFlags(values);
   const tty = process.stdin.isTTY && process.stdout.isTTY;
@@ -36,10 +58,15 @@ const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
     ...(plan ? { plan } : {}),
     ...(values["force-downgrade"] ? { forceDowngrade: true } : {}),
     ...(values["no-build-studio"] ? { buildStudio: false } : {}),
+    ...releaseFlags(values),
     log: (l) => console.log(l),
     // The analytics and data-location questions need a person at a terminal.
     ...(tty ? { prompt: askYesNo, askJurisdiction } : {}),
   });
+  if (r.release)
+    console.log(
+      `\nRelease v${r.release.version} (commit ${r.release.commit.slice(0, 12)}): ${r.release.attestation === "verified" ? "signature and build attestation verified" : "signature verified; attestation not checked (--allow-single-factor)"}`,
+    );
   if (r.dryRun) {
     console.log(`\nDry run OK. Workers: ${r.names.site}, ${r.names.admin}. Nothing was deployed.`);
     return 0;

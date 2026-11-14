@@ -43,6 +43,10 @@
  *      `wrangler.jsonc`, the starter seeded when the checkout has none, secrets kept on the Workers
  *      and no setup link printed (`deploy/workers-builds.ts`, docs/guides/deploy-button.md).
  *
+ *  14. `--release` (RFC-0046 §11b, `deploy/release/`): instead of building, installs the signed
+ *      release of this CLI's version: the signed key and yank lists, the theme and config checks,
+ *      the verified bundle and its attestation, then the same provisioning, secrets, guard and push.
+ *
  * `--dry-run` runs everything up to wrangler's own `--dry-run` (bundles, configs) and skips
  * provisioning, deployment and push — no Cloudflare account needed.
  */
@@ -53,6 +57,7 @@ import type { SchedulerTicker } from "../cloudflare/config.ts";
 import { must } from "../cloudflare/wrangler.ts";
 import { readProjectConfig } from "../config.ts";
 import { deployAttached } from "./deploy/attach.ts";
+import { deploySecrets, finishDeploy } from "./deploy/finish.ts";
 import type { DeployOptions, DeployResult } from "./deploy/options.ts";
 import {
   analyticsAndComments,
@@ -63,12 +68,11 @@ import {
   provision,
   studioDirFor,
 } from "./deploy/prepare.ts";
+import { deployRelease } from "./deploy/release/index.ts";
 import { downgradeGuard } from "./deploy/schedules-guard.ts";
 import { attachedWorkers } from "./deploy/served-sites.ts";
 import { commentsResult } from "./deploy/settings.ts";
-import { afterDeploy, purgeIfSwitched, shipWorkers } from "./deploy/ship.ts";
-import { loadOrCreateSecrets, SITE_SECRET_KEYS, writeDeployState } from "./deploy/state.ts";
-import { buildsSecrets, setupInstructions } from "./deploy/workers-builds.ts";
+import { shipWorkers } from "./deploy/ship.ts";
 import { resolveSkillsDir } from "./mcp.ts";
 
 export type { DeployOptions, DeployResult } from "./deploy/options.ts";
@@ -94,21 +98,14 @@ export {
   SECRET_KEYS,
 } from "./deploy/state.ts";
 
-/** What this deploy sets on each Worker, and the values it knows (all of them, outside Workers Builds). */
-async function deploySecrets(ctx: Awaited<ReturnType<typeof loadDeploy>>) {
-  if (ctx.workersBuilds && !ctx.options.dryRun)
-    return buildsSecrets(ctx.run, { cwd: ctx.options.projectDir, dir: ctx.dir, names: ctx.names });
-  const all = await loadOrCreateSecrets(ctx.dir);
-  const site = Object.fromEntries(SITE_SECRET_KEYS.map((k) => [k, all[k]]));
-  return { site, admin: all, known: all };
-}
-
 export async function deploy(options: DeployOptions): Promise<DeployResult> {
   checkOptions(options);
+  // RFC-0046 §11b: the signed release of this CLI's version instead of a build.
+  if (options.release) return deployRelease(options);
   // RFC-0034 §4: a site Worker that joins another installation deploys only itself.
   if ((await readProjectConfig(options.projectDir)).installation) return deployAttached(options);
   const ctx = await loadDeploy(options);
-  const { cfg, log, previous, base, names } = ctx;
+  const { cfg, log, previous, names } = ctx;
   const { analytics, comments } = await analyticsAndComments(ctx);
   const studioDir = await studioDirFor(ctx);
   const { withIds, databaseCreated } = await provision(ctx);
@@ -116,7 +113,11 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
   // ignores holds and gates over open releases
   const secrets = await deploySecrets(ctx);
   if (!options.dryRun && previous?.adminUrl && !ctx.workersBuilds)
-    await downgradeGuard(options, previous.adminUrl, secrets.known.CLOUDHAL_DEPLOY_TOKEN, log);
+    await downgradeGuard(
+      options,
+      { adminUrl: previous.adminUrl, token: secrets.known.CLOUDHAL_DEPLOY_TOKEN as string },
+      log,
+    );
   const settings = await deploySettings(ctx);
   const { plan, schedules, observability } = settings;
   const site = await buildSite(ctx, { withIds, analytics, comments, observability });
@@ -176,67 +177,22 @@ export async function deploy(options: DeployOptions): Promise<DeployResult> {
     };
   }
 
-  const { siteUrl, adminUrl, scheduler } = await shipWorkers(ctx, {
+  const shipped = await shipWorkers(ctx, {
     siteSecrets: secrets.site,
     adminSecrets: secrets.admin,
     admin,
     prepareAdmin,
     scheduler: settings.scheduler,
   });
-  // where the database lives, when a deploy of this deployment name created it
-  const jurisdiction =
-    databaseCreated ?? (previous?.name === base.name ? previous.jurisdiction : undefined);
-  await writeDeployState(options.projectDir, cfg.dataDir, {
-    name: base.name,
-    ...(adminUrl ? { adminUrl } : {}),
-    ...(siteUrl ? { siteUrl } : {}),
-    deployedAt: new Date().toISOString(),
-    ...(cfg.domains?.site ? { siteDomain: cfg.domains.site } : {}),
-    analytics: analytics ? "on" : "off",
-    comments: comments.available ? "on" : "off",
-    ...(jurisdiction ? { jurisdiction } : {}),
-    scheduler,
+  return finishDeploy(ctx, {
+    shipped,
+    known: secrets.known,
+    analytics,
+    comments,
+    databaseCreated,
     plan,
-  });
-  const pushed = await afterDeploy(ctx, { siteUrl, adminUrl });
-  // Workers Builds knows no previous deploy, nor (after the first) the purge token: no purge
-  const purgeToken = secrets.known.CLOUDHAL_PURGE_TOKEN;
-  const { purged, analyticsChanged, commentsChanged } = purgeToken
-    ? await purgeIfSwitched(ctx, { siteUrl, analytics, comments, purgeToken })
-    : { purged: false, analyticsChanged: false, commentsChanged: false };
-
-  // First deploy: the owner account can only be created through this one-time link.
-  const setupToken = secrets.known.CLOUDHAL_SETUP_TOKEN;
-  const first = pushed && adminUrl;
-  const setupUrl =
-    first && setupToken && !ctx.workersBuilds
-      ? `${adminUrl.replace(/\/$/, "")}/login#setup=${setupToken}`
-      : undefined;
-  const instructions =
-    first && ctx.workersBuilds ? setupInstructions(adminUrl, names.admin) : undefined;
-  return {
-    dryRun: false,
-    names,
+    schedules,
     siteConfig: site.siteConfig,
     adminConfig: admin.configPath,
-    siteUrl,
-    adminUrl,
-    pushed,
-    ...(setupUrl ? { setupUrl } : {}),
-    ...(instructions ? { setupInstructions: instructions } : {}),
-    ...(cfg.domains?.site ? { customSiteUrl: `https://${cfg.domains.site}` } : {}),
-    ...(cfg.domains?.studio ? { customStudioUrl: `https://${cfg.domains.studio}` } : {}),
-    scheduler,
-    schedules,
-    analytics: analytics
-      ? {
-          enabled: true,
-          dataset: analytics.dataset,
-          cron: scheduler === "cron",
-          purged: purged && analyticsChanged,
-        }
-      : { enabled: false, ...(purged && analyticsChanged ? { purged } : {}) },
-    comments: commentsResult(comments, scheduler, purged && commentsChanged),
-    ...(databaseCreated ? { databaseCreated } : {}),
-  };
+  });
 }

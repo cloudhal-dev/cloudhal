@@ -8,9 +8,10 @@ import type {
 } from "../../cloudflare/config.ts";
 import type { WranglerRunner } from "../../cloudflare/wrangler.ts";
 import type { StudioBuilder } from "../../studio-build.ts";
+import type { ReleaseDeployOptions, ReleaseResult } from "./release/options.ts";
 import type { Jurisdiction } from "./state.ts";
 
-export interface DeployOptions {
+export interface DeployOptions extends ReleaseDeployOptions {
   readonly projectDir: string;
   /** Base name for Workers and resources (default: the site slug). */
   readonly name?: string;
@@ -73,6 +74,8 @@ export interface DeployOptions {
 
 export interface DeployResult {
   dryRun: boolean;
+  /** `deploy --release`: the signed release that was installed (RFC-0046 §11b). */
+  release?: ReleaseResult;
   names: ReturnType<typeof workerNames>;
   siteConfig: string;
   adminConfig: string;

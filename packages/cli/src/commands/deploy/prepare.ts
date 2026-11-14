@@ -268,37 +268,43 @@ function logFeatures(
     );
 }
 
+export interface SiteConfigInput {
+  withIds: DeploymentNames;
+  analytics: AnalyticsDeployment | undefined;
+  comments: CommentsDeployment;
+  observability: ObservabilityDeployment;
+}
+
+/** 3a. the site Worker's config (RFC-0034 §4–5: with the other sites it serves), written as today. */
+export async function siteConfigFor(ctx: DeployContext, input: SiteConfigInput) {
+  const { options, cfg, site } = ctx;
+  const served = await servedSites(ctx);
+  const config = siteWorkerConfig({
+    ...input.withIds,
+    siteId: cfg.siteId,
+    ...(served.siteIds ? { siteIds: served.siteIds } : {}),
+    ...(served.hosts.length > 0 ? { domains: served.hosts } : {}),
+    ...(cfg.domains?.site ? { domain: cfg.domains.site, siteHosts: [cfg.domains.site] } : {}),
+    ...(cfg.domains?.redirects ? { redirects: cfg.domains.redirects } : {}),
+    ...(input.analytics ? { analytics: input.analytics } : {}),
+    comments: input.comments,
+    observability: input.observability,
+  });
+  await writeWranglerConfig(
+    siteConfigPath(options.projectDir),
+    config,
+    `Cloudhal site Worker for ${site.name}`,
+  );
+  return config;
+}
+
 /**
  * 3. the site Worker: its config, the theme's block types (RFC-0015 §6), design settings
  * (RFC-0017 §1) and DESIGN.md (RFC-0021 §1) checked before anything is built, then the build.
  */
-export async function buildSite(
-  ctx: DeployContext,
-  input: {
-    withIds: DeploymentNames;
-    analytics: AnalyticsDeployment | undefined;
-    comments: CommentsDeployment;
-    observability: ObservabilityDeployment;
-  },
-) {
-  const { options, cfg, site, log } = ctx;
-  // RFC-0034 §4–5: the other sites this Worker serves, checked and with their routes.
-  const served = await servedSites(ctx);
-  await writeWranglerConfig(
-    siteConfigPath(options.projectDir),
-    siteWorkerConfig({
-      ...input.withIds,
-      siteId: cfg.siteId,
-      ...(served.siteIds ? { siteIds: served.siteIds } : {}),
-      ...(served.hosts.length > 0 ? { domains: served.hosts } : {}),
-      ...(cfg.domains?.site ? { domain: cfg.domains.site, siteHosts: [cfg.domains.site] } : {}),
-      ...(cfg.domains?.redirects ? { redirects: cfg.domains.redirects } : {}),
-      ...(input.analytics ? { analytics: input.analytics } : {}),
-      comments: input.comments,
-      observability: input.observability,
-    }),
-    `Cloudhal site Worker for ${site.name}`,
-  );
+export async function buildSite(ctx: DeployContext, input: SiteConfigInput) {
+  const { options, log } = ctx;
+  await siteConfigFor(ctx, input);
   await loadBlockRegistry(options.projectDir);
   await loadThemeSettings(options.projectDir);
   const blockTypes = await blockTypesFile(options.projectDir);

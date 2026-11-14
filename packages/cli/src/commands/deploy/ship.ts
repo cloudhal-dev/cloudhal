@@ -18,7 +18,7 @@ import { purgeSite, waitForHealth, whileTokenPropagates } from "./resources.ts";
 import { CRON_REFUSED_MESSAGE } from "./schedules-guard.ts";
 import type { DeploySecrets } from "./state.ts";
 
-type PreparedAdmin = Awaited<ReturnType<typeof prepareAdminWorker>>;
+type PreparedAdmin = Pick<Awaited<ReturnType<typeof prepareAdminWorker>>, "dir" | "configPath">;
 
 /**
  * `wrangler deploy` for the site Worker, then the admin Worker. When Cloudflare refuses the cron
@@ -34,6 +34,8 @@ export async function shipWorkers(
     admin: PreparedAdmin;
     prepareAdmin: (ticker: SchedulerTicker) => Promise<PreparedAdmin>;
     scheduler: SchedulerTicker;
+    /** `deploy --release`: the site Worker's own config (default: the project's, as built). */
+    site?: { readonly dir: string; readonly configPath: string };
   },
 ): Promise<{
   siteUrl: string | undefined;
@@ -59,7 +61,9 @@ export async function shipWorkers(
     const siteArgs = await secretsArgs(siteSecretsFile, input.siteSecrets);
     const adminSecrets = await secretsArgs(adminSecretsFile, input.adminSecrets);
     log(`deploying ${names.site}`);
-    siteDeploy = await must(run, ["deploy", ...siteArgs], options.projectDir);
+    siteDeploy = input.site
+      ? await must(run, ["deploy", "-c", input.site.configPath, ...siteArgs], input.site.dir)
+      : await must(run, ["deploy", ...siteArgs], options.projectDir);
     log(`deploying ${names.admin}`);
     const adminArgs = ["deploy", "-c", admin.configPath, ...adminSecrets];
     adminDeploy = await run(adminArgs, { cwd: admin.dir });
