@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   Empty,
   LayerCard,
+  ListToolbar,
   PageLayout,
   ScheduleStatusBadge,
   Switch,
@@ -22,7 +23,6 @@ import { useState } from "react";
 import { ModeBadge } from "../components/AgentModes.tsx";
 import { AutomationDialog } from "../components/AutomationDialog.tsx";
 import { deleteResourceProps } from "../components/deleteLabels.ts";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import {
   NewScheduleButton,

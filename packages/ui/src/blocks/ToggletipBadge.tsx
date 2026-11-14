@@ -1,5 +1,6 @@
 import { Badge, type BadgeVariant, cn, Tooltip } from "@cloudflare/kumo";
-import { type ReactNode, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { useToggletip } from "./toggletip.ts";
 
 export interface ToggletipBadgeProps {
   /** The badge's word, from the screen's catalog. */
@@ -12,9 +13,6 @@ export interface ToggletipBadgeProps {
   icon?: ReactNode;
   className?: string;
 }
-
-/** How Kumo's `Tooltip` (Base UI) says why it wants to open or close. */
-type OpenChange = { reason?: string } | undefined;
 
 /**
  * A badge that explains itself: a Kumo `Badge` inside a button whose `reason` opens in a Kumo
@@ -31,20 +29,10 @@ export function ToggletipBadge({
   icon,
   className,
 }: ToggletipBadgeProps) {
-  const [open, setOpen] = useState(false);
-  /** Opened by a press: hover and focus no longer close it, only a press, Escape or outside. */
-  const pinned = useRef(false);
-  const onOpenChange = (next: boolean, details: OpenChange) => {
-    // The trigger's own press is handled by `onClick` (the tooltip would only ever close on it).
-    if (details?.reason === "trigger-press") return;
-    if (!next && pinned.current && details?.reason === "trigger-hover") return;
-    if (!next) pinned.current = false;
-    setOpen(next);
-  };
+  const { tooltip, onPress } = useToggletip();
   return (
     <Tooltip
-      open={open}
-      onOpenChange={onOpenChange}
+      {...tooltip}
       content={<span className="block max-w-72">{reason}</span>}
       // A render function, so our classes are merged with the tooltip trigger's, not replaced.
       render={(props) => (
@@ -53,8 +41,7 @@ export function ToggletipBadge({
           type="button"
           onClick={(event) => {
             props.onClick?.(event);
-            pinned.current = !(open && pinned.current);
-            setOpen(pinned.current);
+            onPress();
           }}
           className={cn(
             props.className,

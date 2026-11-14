@@ -1,12 +1,15 @@
-import { cn, type TabsItem } from "@cloudflare/kumo";
+import { cn, LinkButton, type TabsItem } from "@cloudflare/kumo";
+import { BookOpen } from "@phosphor-icons/react";
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { PageHeader } from "./kumo/page-header/page-header.tsx";
+import { ResourceHeader, type ResourceMode } from "./ResourceHeader.tsx";
 
 /**
  * The page anatomy every admin screen shares (DESIGN.md §1–2): breadcrumbs in the app's top bar,
  * one content container, Kumo's `PageHeader` (title, description, actions, sub-view tabs), then
- * the body — one column, or main + a sticky side column (the `ResourceListPage` layout).
+ * the body — one column, or main + a sticky side column (the `ResourceListPage` layout). In
+ * resource mode (`resource`, DESIGN.md §2 `resource`) a tab bar takes the header's place.
  *
  * Screens never build their own container, header or columns; they pass content to `PageLayout`
  * (and split a body with `Columns`, which reads this container's width).
@@ -68,8 +71,19 @@ export interface PageLayoutProps {
   /** 24px Phosphor icon before the title (top-level list pages). */
   icon?: ReactNode;
   loading?: boolean;
-  /** Page-level actions, right of the title (the primary "Create …" button lives here). */
+  /** Page-level actions, right of the title (the primary "Create …" button lives here, last). */
   actions?: ReactNode;
+  /** A "View docs" pill after the title (list pages): where it links, with `docsLabel`. */
+  docsHref?: string;
+  /** The pill's word ("View docs"), from the screen's catalog. */
+  docsLabel?: string;
+  /**
+   * Resource mode: one resource's detail page, laid out like the dashboard's Worker page. The
+   * crumbs (and an optional environment `switcher`) stay in the top bar, the resource's tabs sit
+   * under it with `actions` on the right, and there is no large title: `title` becomes the page's
+   * visually hidden `h1`. `tabs` and `description` are not used in this mode.
+   */
+  resource?: ResourceMode;
   /** Sub-views of this page only — never a copy of the sidebar. */
   tabs?: TabsItem[];
   tab?: string;
@@ -94,6 +108,9 @@ export function PageLayout({
   icon,
   loading,
   actions,
+  docsHref,
+  docsLabel,
+  resource,
   tabs,
   tab,
   onTabChange,
@@ -103,8 +120,30 @@ export function PageLayout({
   children,
 }: PageLayoutProps) {
   const frame = useContext(PageFrameContext);
-  const portaled = crumbs && frame?.crumbsSlot ? createPortal(crumbs, frame.crumbsSlot) : null;
+  // In resource mode the environment switcher follows the crumbs in the top bar.
+  const top =
+    resource?.switcher && crumbs ? (
+      <div className="flex min-w-0 items-center gap-2">
+        {crumbs}
+        {resource.switcher}
+      </div>
+    ) : (
+      (crumbs ?? resource?.switcher)
+    );
+  const portaled = top && frame?.crumbsSlot ? createPortal(top, frame.crumbsSlot) : null;
   const hasHeader = title !== undefined || loading || description || actions || tabs;
+  const docs =
+    docsHref && docsLabel ? (
+      <LinkButton
+        href={docsHref}
+        size="xs"
+        variant="outline"
+        icon={<BookOpen size={14} />}
+        className="rounded-full"
+      >
+        {docsLabel}
+      </LinkButton>
+    ) : undefined;
   return (
     <div
       className={cn(
@@ -114,16 +153,21 @@ export function PageLayout({
       )}
     >
       {portaled}
-      {crumbs && !frame && <div className="-mt-2">{crumbs}</div>}
-      {hasHeader && (
-        <PageHeader
-          title={title}
-          description={description}
-          icon={icon}
-          loading={loading}
-          actions={actions}
-          {...(tabs ? { tabs, tab, onValueChange: onTabChange } : {})}
-        />
+      {top && !frame && <div className="-mt-2">{top}</div>}
+      {resource ? (
+        <ResourceHeader title={title} actions={actions} resource={resource} />
+      ) : (
+        hasHeader && (
+          <PageHeader
+            title={title}
+            description={description}
+            icon={icon}
+            loading={loading}
+            actions={actions}
+            docs={docs}
+            {...(tabs ? { tabs, tab, onValueChange: onTabChange } : {})}
+          />
+        )
       )}
       {aside ? (
         <div className="flex flex-col gap-6 @5xl/page:flex-row @5xl/page:items-start @5xl/page:gap-8">

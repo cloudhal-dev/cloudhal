@@ -7,6 +7,7 @@ import {
   Empty,
   InlineCopyText,
   LayerCard,
+  ListToolbar,
   PageLayout,
   Pagination,
   SectionCard,
@@ -21,7 +22,6 @@ import { useCallback, useState } from "react";
 import { CodeHighlighted } from "../components/CodeHighlighted.tsx";
 import { Crumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import { ApprovalTool, SkillDetailDialog, SkillScope } from "../components/SkillDetailDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { usePaging } from "../components/usePaging.ts";

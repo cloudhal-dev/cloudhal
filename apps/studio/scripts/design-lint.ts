@@ -97,6 +97,7 @@ export type Template =
   | "moderation"
   | "queue"
   | "dashboard"
+  | "resource"
   | "settings"
   | "editor"
   | "auth"
@@ -135,6 +136,10 @@ export const TEMPLATE_REQUIRES: Record<Template, string[]> = {
     "Pagination",
   ],
   dashboard: ["PageLayout", "crumbs=", "title=", "Columns", "SectionCard"],
+  // One resource's detail page like the dashboard's Worker page (DESIGN.md §2 `resource`): the
+  // crumbs (and an environment switcher) in the top bar, the resource's tabs under it with the
+  // actions on the right, no large title (`title` is the hidden h1), then SectionCards.
+  resource: ["PageLayout", "crumbs=", "title=", "resource=", "SectionCard"],
   settings: ["PageLayout", "crumbs=", "title=", "SettingsLayout", "SettingsSection"],
   editor: ["PageLayout", "crumbs=", "title=", "EditorLayout", "SectionCard"],
   auth: ["AuthLayout", "Tabs", "Input", "Button"],

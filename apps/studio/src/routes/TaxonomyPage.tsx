@@ -7,6 +7,7 @@ import {
   Empty,
   LayerCard,
   Link,
+  ListToolbar,
   PageLayout,
   Pagination,
   SectionCard,
@@ -43,7 +44,6 @@ import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
 import { ReadOnly, ViewOnlyBanner } from "../components/Gating.tsx";
 import { GovernanceDialog, type GovernanceTarget } from "../components/GovernanceDialog.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import { RelativeTime } from "../components/RelativeTime.tsx";
 import { SettingRow } from "../components/Settings.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";

@@ -4,7 +4,8 @@ import type { ReactNode } from "react";
 // Copied with `kumo add PageHeader` and owned by Cloudhal. Changes from upstream, all marked
 // "Cloudhal": breadcrumbs optional (Studio renders them in the top bar, see `PageLayout`), every row
 // flush with the content edge (upstream indents title and tabs by `pl-3`), 14px description,
-// optional icon, `actions` on the title row, controlled `tab`, loading title.
+// optional icon, `actions` on the title row, controlled `tab`, loading title, a `docs` pill after
+// the title.
 
 export const KUMO_PAGE_HEADER_VARIANTS = {
   spacing: {
@@ -58,6 +59,8 @@ export interface PageHeaderProps extends KumoPageHeaderVariantsProps {
   children?: React.ReactNode;
   /** Cloudhal addition: actions rendered on the title row (right-aligned). */
   actions?: ReactNode;
+  /** Cloudhal addition: the small "View docs" pill right after the title (list pages). */
+  docs?: ReactNode;
 }
 
 export function PageHeader({
@@ -74,6 +77,7 @@ export function PageHeader({
   className,
   children,
   actions,
+  docs,
 }: PageHeaderProps) {
   const showTitle = title !== undefined || loading;
   return (
@@ -95,6 +99,7 @@ export function PageHeader({
                     {title}
                   </h1>
                 )}
+                {docs && <span className="flex shrink-0 items-center">{docs}</span>}
               </div>
             )}
             {description && (

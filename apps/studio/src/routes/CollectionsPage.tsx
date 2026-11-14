@@ -5,6 +5,7 @@ import {
   Empty,
   LayerCard,
   Link,
+  ListToolbar,
   PageLayout,
   Pagination,
   Table,
@@ -17,7 +18,6 @@ import { useParams } from "@tanstack/react-router";
 import { useState } from "react";
 import { SiteCrumbs } from "../components/Crumbs.tsx";
 import { ErrorBanner } from "../components/ErrorBanner.tsx";
-import { ListToolbar } from "../components/ListToolbar.tsx";
 import { NewCollectionDialog } from "../components/NewCollectionDialog.tsx";
 import { TableSkeleton } from "../components/TableSkeleton.tsx";
 import { useCan } from "../components/useMe.ts";
