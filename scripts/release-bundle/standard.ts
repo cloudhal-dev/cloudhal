@@ -91,7 +91,15 @@ export const STANDARD_MANIFEST_FIELDS: Readonly<Record<string, unknown>> = {
       cron: ADMIN_CRON,
     },
   },
-  requiredScopes: ["account-settings.read", "workers-scripts.edit", "d1.write", "workers-r2.write"],
+  // Workers Admin, not Workers Editor (`workers-scripts.edit`): installing creates the site and
+  // admin Workers, and an Editor cannot create Workers (#225). Consumers treat `.admin` as covering
+  // the `.edit` that manifests up to v0.9.0 name (RFC-0046 §2).
+  requiredScopes: [
+    "account-settings.read",
+    "workers-scripts.admin",
+    "d1.write",
+    "workers-r2.write",
+  ],
   optionalScopes: ["account-analytics.read", "workers-routes.write", "dns.write"],
   requiredCapabilities: ["account", "workers", "d1", "r2"],
   optionalCapabilities: ["analytics", "domains"],
