@@ -5,6 +5,7 @@
   "fixed": [
     [
       "@cloudhal/core-contracts",
+      "@cloudhal/release-verify",
       "@cloudhal/storage",
       "@cloudhal/analytics",
       "@cloudhal/core-ts",

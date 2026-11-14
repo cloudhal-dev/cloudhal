@@ -4,10 +4,13 @@
  * the requested version and channel), §7's limits and tar format, every listed part present with
  * its size and SHA-256, no unlisted entry, and, when asked, the Ed25519 signature with a pinned key.
  * The builder runs it over its own unsigned output; `release-bundle.ts verify` runs it on demand.
+ * A signed bundle then also passes `@cloudhal/release-verify`, the one consumer verifier
+ * (RFC-0046 §11a), entry by entry.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { assertValid, type ReleaseManifest } from "../../packages/core-contracts/src/index.ts";
+import { verifyRelease } from "../../packages/release-verify/src/index.ts";
 import { canonicalJson, LIMITS, manifestParts, sha256 } from "./manifest.ts";
 import { verifySignature } from "./signature.ts";
 import {
@@ -110,5 +113,41 @@ export async function verifyBundle(dir: string, o: VerifyOptions): Promise<Verif
   checkGzipHeader(tarball);
   const entries = readTar(await gunzipBytes(tarball), Date.parse(statement.createdAt) / 1000);
   checkParts(entries, manifest);
+  if (o.signed)
+    await verifyAsConsumer(o, { dir, statementBytes, manifestBytes, tarball, manifest });
   return { statement, parts: entries.length, tarballBytes: tarball.length };
+}
+
+/** The shared consumer verifier (§11a) over the same bytes, with the given keys as trusted. */
+async function verifyAsConsumer(
+  o: VerifyOptions,
+  b: {
+    dir: string;
+    statementBytes: Uint8Array;
+    manifestBytes: Uint8Array;
+    tarball: Uint8Array;
+    manifest: ReleaseManifest;
+  },
+): Promise<void> {
+  const keys = Object.fromEntries(
+    Object.entries(o.publicKeys ?? {}).map(([id, publicKey]) => [
+      id,
+      { publicKey, status: "active" as const },
+    ]),
+  );
+  const release = await verifyRelease({
+    request: {
+      version: o.version,
+      ...(o.channel === "stable" || o.channel === "next" ? { channel: o.channel } : {}),
+    },
+    statement: b.statementBytes,
+    signature: read(b.dir, SIGNATURE_FILE, 64),
+    manifest: b.manifestBytes,
+    tarball: () => b.tarball,
+    planVersion: b.manifest.planVersion,
+    keys,
+  });
+  for await (const _ of release.entries()) {
+    // every entry verified
+  }
 }

@@ -16,7 +16,7 @@ const pkg = (name: string, version: string): Pkg => ({ dir: name, name, version 
 describe("release plan", () => {
   it("the repo's publishable packages share one version (changesets fixed group)", () => {
     const pkgs = readPackages(ROOT);
-    expect(pkgs).toHaveLength(13);
+    expect(pkgs).toHaveLength(14);
     expect(sharedVersion(pkgs)).toMatch(/^\d+\.\d+\.\d+$/);
   });
 

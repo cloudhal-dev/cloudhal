@@ -49,6 +49,10 @@ Releases are immutable and can never gain an asset, so a release signed by a rev
 4. Set the old key's status to `retiring` in this file. Keep it pinned by consumers for as long as releases it signed are installed.
 5. A compromised key goes straight to `revoked` here, with an advisory under [SECURITY.md](../../SECURITY.md), and the next release is signed with the new key.
 
+## Verifying a release
+
+[`@cloudhal/release-verify`](../../packages/release-verify/README.md) does all of the steps below in one call, on Node, Workers or a browser. Its `PINNED_KEYS` is kept equal to the table above, and its `./attestation` subpath runs step 3. To check by hand instead, follow these steps.
+
 ## Verifying a release by hand
 
 Download the release's assets into an empty directory, for example with `gh release download v<version> --repo cloudhal-dev/cloudhal --dir <dir>`.

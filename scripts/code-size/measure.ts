@@ -25,6 +25,7 @@ const IGNORED = [
   /^packages\/core-contracts\/src\/generated\//,
   /^crates\/cloudhal-schema\/src\/generated\//,
   /^packages\/core-ts\/src\/generated\//,
+  /^packages\/release-verify\/src\/generated\//,
   // Studio's message parameter types, written by `pnpm gen` from the catalogs (RFC-0032 §3).
   /^apps\/studio\/src\/i18n\/generated\//,
   /^packages\/ui\/src\/blocks\/kumo\//,
