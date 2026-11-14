@@ -57,6 +57,50 @@ describe("publish-ci loadBundle", () => {
     await expect(verifyAsConsumer(dir, "0.8.1", { [KEY_ID]: k.raw })).rejects.toThrow();
   });
 
+  it("applies the key and yank lists as consumers do: a revoked key or a yanked version blocks the publish", async () => {
+    const k = throwawayKey();
+    const dir = await signedDir(k.privateKey);
+    const keys = { [KEY_ID]: k.raw };
+    // Shaped as verifyYanked / verifyKeys return them; mergeTrust reads only these fields.
+    const yankList = (over: Record<string, unknown>) => ({
+      document: { versions: [], revokedKeys: [], ...over },
+    });
+    await expect(
+      verifyAsConsumer(dir, "0.8.0", keys, { yanked: yankList({}) }),
+    ).resolves.toBeUndefined();
+    await expect(
+      verifyAsConsumer(dir, "0.8.0", keys, {
+        yanked: yankList({
+          revokedKeys: [{ keyId: KEY_ID, revokedAt: "2026-11-01T00:00:00Z", reason: "Exposed." }],
+        }),
+      }),
+    ).rejects.toMatchObject({ code: "key-revoked" });
+    await expect(
+      verifyAsConsumer(dir, "0.8.0", keys, {
+        yanked: yankList({
+          versions: [{ version: "0.8.0", yankedAt: "2026-11-01T00:00:00Z", reason: "Broken." }],
+        }),
+      }),
+    ).rejects.toMatchObject({ code: "yanked" });
+    const revokedInKeyList = {
+      document: {
+        keys: [
+          {
+            keyId: KEY_ID,
+            publicKey: k.raw,
+            role: "release",
+            notBefore: "2026-01-01T00:00:00Z",
+            notAfter: "2099-01-01T00:00:00Z",
+            status: "revoked",
+          },
+        ],
+      },
+    };
+    await expect(
+      verifyAsConsumer(dir, "0.8.0", keys, { keys: revokedInKeyList }),
+    ).rejects.toMatchObject({ code: "key-revoked" });
+  });
+
   it("reads the five assets in upload order with their digests, and the statement", async () => {
     const k = throwawayKey();
     const dir = await signedDir(k.privateKey);

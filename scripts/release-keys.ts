@@ -11,12 +11,15 @@
  *       [--source security/keys.source.json] [--out security] [--months 12] [--passphrase-file <f>]
  *       keys.json + keys.json.sig, signed by the root, expiring after --months (at most 13).
  *   node scripts/release-keys.ts sign-yanked --key-id <yank id> [--key-file <pem>] [--list security/yank-list.json]
- *       [--keys security/keys.json] [--out <dir>] [--published <file|url>] [--first-run]
- *       [--yank <version> | --revoke <keyId>] [--reason <text>]
+ *       [--keys security/keys.json] [--out <dir>] [--published <file|url>] [--first-run | --rotate]
+ *       [--accept-expired] [--yank=<v1,v2> | --revoke=<id1,id2>] [--reason=<text>]
  *       yanked.json + yanked.json.sig, expiring in 30 days. The key comes from --key-file or the
  *       RELEASE_YANK_KEY environment variable. It refuses a key that is not the active yank key
- *       of keys.json. The list signed is the source plus every published entry (append-only)
- *       plus an emergency `--yank` or `--revoke`; its serial is one above the published one.
+ *       of keys.json. The published list (`<file>` and `<file>.sig`) must verify as a consumer
+ *       would before anything of it is carried forward. The list signed is every published entry
+ *       (append-only), the source, and the emergency `--yank`/`--revoke` entries (comma-separated);
+ *       its serial is one above the published one. `--rotate`: the first list of a new yank key,
+ *       nothing of the old key's list carried forward, serial 1 (runbook, Rotation).
  */
 import {
   createPrivateKey,
@@ -32,6 +35,24 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { canonicalJson, sha256 } from "./release-bundle/manifest.ts";
+import {
+  checkAppendOnly,
+  mergeYankList,
+  type PublishedPair,
+  readPublished,
+  verifyPublished,
+  type YankExtra,
+  type YankSource,
+} from "./release-keys/yank-list.ts";
+
+export {
+  checkAppendOnly,
+  MAX_EXTRA,
+  mergeYankList,
+  parseExtra,
+  type YankExtra,
+  type YankSource,
+} from "./release-keys/yank-list.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SPKI_ED25519 = Buffer.from("302a300506032b6570032100", "hex");
@@ -220,78 +241,10 @@ export async function signKeys(o: {
   return signed;
 }
 
-interface YankSource {
-  versions: { version: string; yankedAt: string; reason: string }[];
-  revokedKeys: { keyId: string; revokedAt: string; reason: string }[];
-}
-
-/** The published list: its entries, its signer, and the serial the next one must exceed. */
-interface PublishedYankList extends YankSource {
-  serial: number;
-  signing?: { keyId?: string };
-}
-
-/** Refuses a source that drops an entry of the published list (the list is append-only). */
-export function checkAppendOnly(source: YankSource, published: YankSource | undefined): void {
-  if (!published) return;
-  const versions = new Set(source.versions.map((v) => v.version));
-  for (const v of published.versions)
-    if (!versions.has(v.version))
-      throw new Error(`the yank list drops ${v.version}; a yank is never undone`);
-  const keys = new Set(source.revokedKeys.map((k) => k.keyId));
-  for (const k of published.revokedKeys)
-    if (!keys.has(k.keyId))
-      throw new Error(
-        `the yank list drops the revoked key ${k.keyId}; a revocation is never undone`,
-      );
-}
-
-const VERSION =
-  /^(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})\.(0|[1-9][0-9]{0,8})(-[0-9A-Za-z.-]{1,64})?$/;
-
-/** An emergency yank or revocation (the workflow's inputs), stamped `now`. */
-export interface YankExtra {
-  readonly yank?: string;
-  readonly revoke?: string;
-  readonly reason?: string;
-}
-
-/** The emergency entry's reason, once its version or key id and reason are well-formed. */
-function checkExtra(extra: YankExtra): string {
-  const reason = extra.reason?.trim() ?? "";
-  if ((extra.yank || extra.revoke) && !reason)
-    throw new Error("an emergency yank or revocation needs a reason");
-  if (reason.length > 500) throw new Error("the reason is longer than 500 characters");
-  if (extra.yank && !VERSION.test(extra.yank)) throw new Error(`not a version: ${extra.yank}`);
-  if (extra.revoke && !KEY_ID.test(extra.revoke)) throw new Error(`not a key id: ${extra.revoke}`);
-  return reason;
-}
-
 /**
- * The list to sign: the committed source, every entry of the published list (carried forward, so
- * nothing published is ever dropped), and an emergency entry, each once, in that order.
+ * `yanked.json` + `yanked.json.sig`, signed by the yank key that `keys` lists as active. The
+ * published list is verified before anything of it is carried forward (release-keys/yank-list.ts).
  */
-export function mergeYankList(
-  source: YankSource,
-  published: YankSource | undefined,
-  extra: YankExtra,
-  now: number,
-): YankSource {
-  const reason = checkExtra(extra);
-  const versions = new Map<string, YankSource["versions"][number]>();
-  const keys = new Map<string, YankSource["revokedKeys"][number]>();
-  for (const list of [published, source])
-    for (const v of list?.versions ?? []) if (!versions.has(v.version)) versions.set(v.version, v);
-  for (const list of [published, source])
-    for (const k of list?.revokedKeys ?? []) if (!keys.has(k.keyId)) keys.set(k.keyId, k);
-  if (extra.yank && !versions.has(extra.yank))
-    versions.set(extra.yank, { version: extra.yank, yankedAt: iso(now), reason });
-  if (extra.revoke && !keys.has(extra.revoke))
-    keys.set(extra.revoke, { keyId: extra.revoke, revokedAt: iso(now), reason });
-  return { versions: [...versions.values()], revokedKeys: [...keys.values()] };
-}
-
-/** `yanked.json` + `yanked.json.sig`, signed by the yank key that `keys` lists as active. */
 export async function signYanked(o: {
   keyId: string;
   keyPem: string;
@@ -299,13 +252,16 @@ export async function signYanked(o: {
   keyList: { document: Uint8Array; signature: Uint8Array };
   roots?: Readonly<Record<string, { readonly publicKey: string }>>;
   source: YankSource;
-  published: PublishedYankList | undefined;
+  /** The published `yanked.json` and `.sig` (none for the very first list). */
+  published: PublishedPair | undefined;
+  /** The first run after a yank-key rotation: the old key's list is not carried forward. */
+  rotate?: boolean;
+  /** Carry forward a published list that expired during an outage (verified as of its issue). */
+  acceptExpired?: boolean;
   extra?: YankExtra;
   out: string;
   now: number;
 }): Promise<{ document: Uint8Array; signature: Uint8Array }> {
-  if (o.published && !(Number.isSafeInteger(o.published.serial) && o.published.serial >= 1))
-    throw new Error("the published yank list has no serial");
   const rv = await verifier();
   const keys = await rv.verifyKeys({
     ...o.keyList,
@@ -328,14 +284,23 @@ export async function signYanked(o: {
     throw new Error(`the yank key given is not ${o.keyId} of keys.json`);
   if (!Array.isArray(o.source.versions) || !Array.isArray(o.source.revokedKeys))
     throw new Error("the yank list source needs versions and revokedKeys");
-  const list = mergeYankList(o.source, o.published, o.extra ?? {}, o.now);
-  checkAppendOnly(list, o.published);
+  const published = await verifyPublished({
+    rv,
+    keys,
+    keyId: o.keyId,
+    published: o.published,
+    now: o.now,
+    ...(o.rotate ? { rotate: true } : {}),
+    ...(o.acceptExpired ? { acceptExpired: true } : {}),
+  });
+  const list = mergeYankList(o.source, published?.list, o.extra ?? {}, o.now);
+  checkAppendOnly(list, published?.list);
   const issued = Math.floor(o.now / 1000) * 1000;
   const doc = {
     schemaVersion: 1,
     format: "cloudhal.release-yank-list@1",
     // One more than the published list's, so a consumer that keeps state refuses a rollback.
-    serial: (o.published?.serial ?? 0) + 1,
+    serial: (published?.serial ?? 0) + 1,
     issuedAt: iso(issued),
     expires: iso(issued + 30 * DAY_MS),
     signing: { keyId: o.keyId, algorithm: "Ed25519", signature: "yanked.json.sig" },
@@ -343,24 +308,14 @@ export async function signYanked(o: {
     revokedKeys: list.revokedKeys,
   };
   const signed = signDocument(doc, key, publicKeyOf(listed.publicKey));
-  // The published list is the memory this one must keep (serial, every entry), as consumers do.
-  // After a rotation it was signed by the old yank key under an earlier keys.json than this one;
-  // which one is not known here, so the memory names none (the epoch): the current keys.json is
-  // then the newer one, as it is for every consumer that kept that earlier one. Its entries are
-  // still kept, by checkAppendOnly above.
-  const publishedBy = o.published?.signing?.keyId ?? o.keyId;
-  const memory = o.published
-    ? {
-        keyId: publishedBy,
-        serial: o.published.serial,
-        versions: o.published.versions.map((v) => v.version),
-        revokedKeys: o.published.revokedKeys.map((k) => k.keyId),
-        keysIssuedAt: publishedBy === o.keyId ? keys.document.issuedAt : "1970-01-01T00:00:00Z",
-        retiredYankKeys: [],
-      }
-    : undefined;
+  // The verified published list is the memory this one must keep, as consumers do.
   await selfCheck("yank list", () =>
-    rv.verifyYanked({ ...signed, keys, now: new Date(issued), ...(memory ? { memory } : {}) }),
+    rv.verifyYanked({
+      ...signed,
+      keys,
+      now: new Date(issued),
+      ...(published ? { memory: published.memory } : {}),
+    }),
   );
   mkdirSync(o.out, { recursive: true });
   writeFileSync(path.join(o.out, "yanked.json"), signed.document);
@@ -369,25 +324,6 @@ export async function signYanked(o: {
 }
 
 const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, "utf8")) as T;
-
-/** The published yank list at `from` (a file or an https URL), or undefined when there is none yet. */
-async function published(
-  from: string | undefined,
-  firstRun: boolean,
-): Promise<PublishedYankList | undefined> {
-  if (!from) {
-    if (firstRun) return undefined;
-    throw new Error("--published is required (or --first-run for the very first list)");
-  }
-  if (from.startsWith("https://")) {
-    const res = await fetch(from);
-    if (res.status === 404 && firstRun) return undefined;
-    if (!res.ok) throw new Error(`could not read the published yank list (${res.status})`);
-    return (await res.json()) as PublishedYankList;
-  }
-  if (!existsSync(from) && firstRun) return undefined;
-  return readJson<PublishedYankList>(from);
-}
 
 /** A passphrase from a file, or typed twice on the terminal without echo. */
 async function passphrase(file: string | undefined, twice: boolean): Promise<string> {
@@ -411,6 +347,46 @@ async function passphrase(file: string | undefined, twice: boolean): Promise<str
   return first;
 }
 
+/** `sign-yanked` from the parsed flags (see the file comment). */
+async function signYankedCli(
+  v: Readonly<Record<string, string | boolean | undefined>>,
+  keyId: string,
+  log: Log,
+): Promise<void> {
+  const str = (name: string) => (typeof v[name] === "string" ? (v[name] as string) : undefined);
+  const security = path.join(ROOT, "security");
+  const keyPem = str("key-file")
+    ? readFileSync(str("key-file") as string, "utf8")
+    : (process.env.RELEASE_YANK_KEY ?? "");
+  delete process.env.RELEASE_YANK_KEY;
+  const out = str("out") ?? path.join(ROOT, ".build/yank-list");
+  const keysFile = str("keys") ?? path.join(security, "keys.json");
+  await signYanked({
+    keyId,
+    keyPem,
+    keyList: { document: readFileSync(keysFile), signature: readFileSync(`${keysFile}.sig`) },
+    // Default: the pinned root. --root-pub only before the root is pinned (or in tests).
+    ...(str("root-pub")
+      ? (() => {
+          const pub = readJson<PublicKeyFile>(str("root-pub") as string);
+          return { roots: { [pub.keyId]: { publicKey: pub.publicKey } } };
+        })()
+      : {}),
+    source: readJson<YankSource>(str("list") ?? path.join(security, "yank-list.json")),
+    published: await readPublished(str("published"), v["first-run"] === true),
+    ...(v.rotate === true ? { rotate: true } : {}),
+    ...(v["accept-expired"] === true ? { acceptExpired: true } : {}),
+    extra: {
+      ...(str("yank") ? { yank: str("yank") as string } : {}),
+      ...(str("revoke") ? { revoke: str("revoke") as string } : {}),
+      ...(str("reason") ? { reason: str("reason") as string } : {}),
+    },
+    out,
+    now: Date.now(),
+  });
+  log(`signed ${path.join(out, "yanked.json")} and yanked.json.sig`);
+}
+
 export async function main(argv: readonly string[], log: Log = console.log): Promise<void> {
   const [command, ...rest] = argv;
   const { values: v } = parseArgs({
@@ -428,6 +404,8 @@ export async function main(argv: readonly string[], log: Log = console.log): Pro
       keys: { type: "string" },
       published: { type: "string" },
       "first-run": { type: "boolean" },
+      rotate: { type: "boolean" },
+      "accept-expired": { type: "boolean" },
       yank: { type: "string" },
       revoke: { type: "string" },
       reason: { type: "string" },
@@ -458,34 +436,7 @@ export async function main(argv: readonly string[], log: Log = console.log): Pro
     });
     log(`signed ${path.join(out, "keys.json")} and keys.json.sig`);
   } else if (command === "sign-yanked") {
-    const keyPem = v["key-file"]
-      ? readFileSync(v["key-file"], "utf8")
-      : (process.env.RELEASE_YANK_KEY ?? "");
-    delete process.env.RELEASE_YANK_KEY;
-    const out = v.out ?? path.join(ROOT, ".build/yank-list");
-    const keysFile = v.keys ?? path.join(security, "keys.json");
-    await signYanked({
-      keyId: need("key-id"),
-      keyPem,
-      keyList: { document: readFileSync(keysFile), signature: readFileSync(`${keysFile}.sig`) },
-      // Default: the pinned root. --root-pub only before the root is pinned (or in tests).
-      ...(v["root-pub"]
-        ? (() => {
-            const pub = readJson<PublicKeyFile>(v["root-pub"] as string);
-            return { roots: { [pub.keyId]: { publicKey: pub.publicKey } } };
-          })()
-        : {}),
-      source: readJson<YankSource>(v.list ?? path.join(security, "yank-list.json")),
-      published: await published(v.published, v["first-run"] === true),
-      extra: {
-        ...(v.yank ? { yank: v.yank } : {}),
-        ...(v.revoke ? { revoke: v.revoke } : {}),
-        ...(v.reason ? { reason: v.reason } : {}),
-      },
-      out,
-      now: Date.now(),
-    });
-    log(`signed ${path.join(out, "yanked.json")} and yanked.json.sig`);
+    await signYankedCli(v, need("key-id"), log);
   } else {
     throw new Error(
       "usage: node scripts/release-keys.ts root-init|yank-init|sign-keys|sign-yanked …",

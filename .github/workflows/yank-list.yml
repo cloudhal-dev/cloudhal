@@ -5,17 +5,26 @@ name: Yank list
 # /.well-known/cloudhal/yanked.json (apps/docs/src/worker/trust.ts). The list expires 30 days
 # after it is signed, so the weekly run keeps it fresh; a stale list blocks only new installs.
 #
-# - The list signed is security/yank-list.json (main), plus every entry of the published list
-#   (carried forward: a yank or revocation is never dropped), plus an emergency entry from the
-#   inputs below, with a serial one above the published one (scripts/release-keys.ts sign-yanked).
+# - The list signed is every entry of the published list, carried forward only after it verifies
+#   as a consumer would (its signature by the active yank key of the pinned-root keys.json), plus
+#   security/yank-list.json (main), plus the emergency entries from the inputs below, with a serial
+#   one above the published one (scripts/release-keys.ts sign-yanked). A published list that does
+#   not verify fails the run loudly; it is never re-signed.
+# - `check` skips everything, with a notice, until the root ceremony has committed
+#   security/keys.json, and outside cloudhal-dev/cloudhal.
 # - The `release-yank` environment has no required reviewer (the key only reduces trust); its
 #   branch policy allows `main` only. The job installs exactly @cloudhal/release-verify's pinned
 #   dependencies, without lifecycle scripts, so sign-yanked can verify the exact bytes it signs as
 #   a consumer would. The key reaches the Sign step only.
-# - The `yank-list` branch is append-only: a ruleset blocks force-pushes and deletion and lets
-#   only GitHub Actions push (docs/security/release-signing-keys.md, First-time setup).
-# - Emergency: Actions › Yank list › Run workflow with `yank` (a version) or `revoke` (a release
-#   key id) and a `reason`. Then record the entry in security/yank-list.json in a reviewed PR.
+# - The `yank-list` branch is append-only: a ruleset blocks force-pushes and deletion, and its
+#   only bypass for updates is a deploy key held as YANK_LIST_DEPLOY_KEY by `release-yank`, so no
+#   other workflow's token can push to it (docs/security/release-signing-keys.md, First-time
+#   setup). That key reaches the Publish step only; the job's token can only read.
+# - Emergency: Actions › Yank list › Run workflow with `yank` (versions) and/or `revoke` (release
+#   key ids), comma-separated, and a `reason`. Wait for a running dispatch to finish before
+#   starting another: GitHub keeps only one pending run per concurrency group and cancels older
+#   pending ones. Then record the entries in security/yank-list.json in a reviewed PR. A failed or
+#   cancelled run opens (or comments on) an issue titled "Yank list run failed".
 
 on:
   schedule:
@@ -23,11 +32,11 @@ on:
   workflow_dispatch:
     inputs:
       yank:
-        description: Emergency yank of this version (X.Y.Z or X.Y.Z-pre)
+        description: Emergency yank of these versions (X.Y.Z or X.Y.Z-pre, comma-separated)
         type: string
         required: false
       revoke:
-        description: Emergency revocation of this release key id
+        description: Emergency revocation of these release key ids (comma-separated)
         type: string
         required: false
       reason:
@@ -39,21 +48,60 @@ on:
         type: boolean
         required: false
         default: false
+      rotate:
+        description: The first list of a new yank key (after the root replaced the old one; serial 1)
+        type: boolean
+        required: false
+        default: false
+      accept_expired:
+        description: Carry forward a published list that expired during an outage (still verified)
+        type: boolean
+        required: false
+        default: false
 
 permissions: {}
 
+# One run at a time. A pending run is replaced by a newer one (GitHub's rule), so dispatches wait
+# for the previous run; several entries go in one dispatch.
 concurrency:
   group: yank-list
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Ready to sign
+    if: github.repository == 'cloudhal-dev/cloudhal'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      ready: ${{ steps.keys.outputs.ready }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Is there a signed key list yet
+        id: keys
+        run: |
+          set -euo pipefail
+          if [ -f security/keys.json ] && [ -f security/keys.json.sig ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::no security/keys.json yet (before the root ceremony): nothing to sign"
+            echo "Skipped: no security/keys.json yet (before the root ceremony)." >> "$GITHUB_STEP_SUMMARY"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
   sign:
     name: Sign and publish yanked.json
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: release-yank
     permissions:
-      contents: write # pushes the yank-list branch; nothing else
+      contents: read # the push uses the environment's deploy key, the ruleset's only bypass
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -79,9 +127,12 @@ jobs:
             exit 1
           fi
       - name: Sign
+        id: sign
         env:
           RELEASE_YANK_KEY: ${{ secrets.RELEASE_YANK_KEY }}
           FIRST_RUN: ${{ inputs.first_run && 'true' || 'false' }}
+          ROTATE: ${{ inputs.rotate && 'true' || 'false' }}
+          ACCEPT_EXPIRED: ${{ inputs.accept_expired && 'true' || 'false' }}
           YANK: ${{ inputs.yank }}
           REVOKE: ${{ inputs.revoke }}
           REASON: ${{ inputs.reason }}
@@ -89,17 +140,28 @@ jobs:
           set -euo pipefail
           args=(sign-yanked --key-id cloudhal-yank-2026a --published "$RUNNER_TEMP/yank-list/yanked.json" --out "$RUNNER_TEMP/signed")
           if [ "$FIRST_RUN" = "true" ]; then args+=(--first-run); fi
-          if [ -n "$YANK" ]; then args+=(--yank "$YANK"); fi
-          if [ -n "$REVOKE" ]; then args+=(--revoke "$REVOKE"); fi
-          if [ -n "$REASON" ]; then args+=(--reason "$REASON"); fi
+          if [ "$ROTATE" = "true" ]; then args+=(--rotate); fi
+          if [ "$ACCEPT_EXPIRED" = "true" ]; then args+=(--accept-expired); fi
+          # --name=value, so a value that starts with "-" is never read as a flag.
+          if [ -n "$YANK" ]; then args+=("--yank=$YANK"); fi
+          if [ -n "$REVOKE" ]; then args+=("--revoke=$REVOKE"); fi
+          if [ -n "$REASON" ]; then args+=("--reason=$REASON"); fi
           node scripts/release-keys.ts "${args[@]}"
       - name: Publish to the yank-list branch
+        id: publish
         env:
-          GH_TOKEN: ${{ github.token }}
+          YANK_LIST_DEPLOY_KEY: ${{ secrets.YANK_LIST_DEPLOY_KEY }}
+          # github.com's published Ed25519 host key, pinned.
+          GITHUB_HOST_KEY: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
         run: |
           set -euo pipefail
-          gh auth setup-git
+          umask 077
+          printf '%s\n' "$YANK_LIST_DEPLOY_KEY" > "$RUNNER_TEMP/deploy-key"
+          printf '%s\n' "$GITHUB_HOST_KEY" > "$RUNNER_TEMP/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/deploy-key"' EXIT
           cd "$RUNNER_TEMP/yank-list"
+          git remote set-url origin "git@github.com:${GITHUB_REPOSITORY}.git"
           cp "$RUNNER_TEMP/signed/yanked.json" "$RUNNER_TEMP/signed/yanked.json.sig" .
           serial="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync("yanked.json","utf8")).serial))')"
           git config user.name "github-actions[bot]"
@@ -109,3 +171,44 @@ jobs:
           # Never --force: the branch only ever gains commits.
           git push --quiet origin yank-list
           echo "published yanked.json serial ${serial}"
+          echo "Published yanked.json serial ${serial}." >> "$GITHUB_STEP_SUMMARY"
+      - name: Summary
+        if: always()
+        env:
+          SIGN: ${{ steps.sign.outcome }}
+          PUBLISH: ${{ steps.publish.outcome }}
+          YANK: ${{ inputs.yank }}
+          REVOKE: ${{ inputs.revoke }}
+        run: |
+          {
+            echo "| Step | Outcome |"
+            echo "| --- | --- |"
+            echo "| Sign | ${SIGN:-not run} |"
+            echo "| Publish | ${PUBLISH:-not run} |"
+            if [ -n "$YANK$REVOKE" ]; then echo; echo "Emergency entries requested: yank \`${YANK:-none}\`, revoke \`${REVOKE:-none}\`."; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  notify:
+    name: Report a failed or cancelled run
+    needs: [check, sign]
+    if: always() && github.repository == 'cloudhal-dev/cloudhal' && (needs.check.result == 'failure' || needs.sign.result == 'failure' || needs.sign.result == 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write # one issue per streak of failures; nothing else
+    steps:
+      - name: Open or comment on the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          title="Yank list run failed"
+          body="The Yank list workflow failed or was cancelled: ${run_url}. A cancelled dispatch may have carried an emergency yank or revocation: check its inputs and run it again (docs/security/release-signing-keys.md)."
+          existing="$(gh issue list --state open --search "in:title \"${title}\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh issue create --title "$title" --body "$body"
+          fi

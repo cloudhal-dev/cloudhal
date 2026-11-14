@@ -82,7 +82,7 @@ describe("trustAssets", () => {
 
   it("attaches the verified key list and the verified yank list from cloudhal.dev", async () => {
     const r = await repo();
-    const { assets, yanked } = await trustAssets({
+    const { assets, keys, yanked } = await trustAssets({
       root: r.repoRoot,
       release: null,
       roots: r.roots,
@@ -102,6 +102,8 @@ describe("trustAssets", () => {
     );
     // The verified yank list, for the consumer check of the bundle.
     expect((yanked as { document: { serial: number } }).document.serial).toBe(1);
+    // Both verified lists go to publish-ci's consumer check (mergeTrust).
+    expect((keys as { document: { keys: unknown[] } }).document.keys).toHaveLength(1);
   });
 
   it("refuses an unverifiable key list or yank list, and an unreachable one", async () => {

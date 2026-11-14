@@ -161,21 +161,30 @@ export async function verifyAsConsumer(
   dir: string,
   version: string,
   publicKeys: Readonly<Record<string, string>>,
-  yanked?: unknown,
+  /** The verified key and yank lists (`trustAssets`), applied as consumers apply them. */
+  trust: { readonly keys?: unknown; readonly yanked?: unknown } = {},
 ): Promise<void> {
   const rv = await import("../packages/release-verify/src/index.ts");
+  type Lists = NonNullable<Parameters<typeof rv.mergeTrust>[1]>;
   const read = (name: string) => readFileSync(path.join(dir, name));
   // The pinned record (with its window) when the key is the pinned one; a dry run's throwaway key
   // has no window.
-  const keys = Object.fromEntries(
+  const pinned = Object.fromEntries(
     Object.entries(publicKeys).map(([id, publicKey]) => {
-      const pinned = Object.hasOwn(rv.PINNED_KEYS, id) ? rv.PINNED_KEYS[id] : undefined;
+      const record = Object.hasOwn(rv.PINNED_KEYS, id) ? rv.PINNED_KEYS[id] : undefined;
       return [
         id,
-        pinned?.publicKey === publicKey ? pinned : { publicKey, status: "active" as const },
+        record?.publicKey === publicKey ? record : { publicKey, status: "active" as const },
       ];
     }),
   );
+  const lists = {
+    ...(trust.keys ? { keys: trust.keys as Lists["keys"] } : {}),
+    ...(trust.yanked ? { yanked: trust.yanked as Lists["yanked"] } : {}),
+  } as Lists;
+  // Exactly what a consumer does: revocations and statuses of both lists reduce the pinned keys.
+  const keys = rv.mergeTrust(pinned, lists);
+  const yanked = lists.yanked;
   const release = await rv.verifyRelease({
     request: { version },
     statement: read("release-statement.json"),
@@ -184,9 +193,7 @@ export async function verifyAsConsumer(
     tarball: () => read(`cloudhal-release-${version}.tar.gz`),
     planVersion: Number.MAX_SAFE_INTEGER,
     keys,
-    ...(yanked
-      ? { yanked: yanked as NonNullable<Parameters<typeof rv.verifyRelease>[0]["yanked"]> }
-      : {}),
+    ...(yanked ? { yanked } : {}),
   });
   for await (const _ of release.entries()) {
     // every entry verified
@@ -363,7 +370,7 @@ export async function main(argv: readonly string[]): Promise<void> {
   const trust = loaded ? await trustAssets({ root: ROOT, release: releases[0] ?? null }) : null;
   // Before anything is created or uploaded: every consumer's own verifier accepts this bundle,
   // the yank list included once there is one.
-  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys, trust?.yanked);
+  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys, trust ?? {});
   const steps = await runPublish(port, {
     version,
     head: sh("git", ["rev-parse", "HEAD"], true).trim(),

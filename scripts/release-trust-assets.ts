@@ -40,11 +40,13 @@ export interface TrustOptions {
 
 export interface TrustAssets {
   readonly assets: LocalAsset[];
-  /** The verified yank list, for the consumer check of the bundle (none for a published release). */
+  /** The verified key list, for the consumer check of the bundle (none for a published release). */
+  readonly keys?: unknown;
+  /** The verified yank list, likewise. */
   readonly yanked?: unknown;
 }
 
-/** The trust assets to attach (see the file comment), and the yank list they verified. */
+/** The trust assets to attach (see the file comment), and the two lists they verified. */
 export async function trustAssets(o: TrustOptions): Promise<TrustAssets> {
   const log = o.log ?? ((l: string) => console.log(`publish-ci: ${l}`));
   if (o.release && !o.release.draft) {
@@ -94,6 +96,7 @@ export async function trustAssets(o: TrustOptions): Promise<TrustAssets> {
       asset("yanked.json", path.join(dir, "yanked.json")),
       asset("yanked.json.sig", path.join(dir, "yanked.json.sig")),
     ],
+    keys,
     yanked: verified,
   };
 }
