@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "format": "cloudhal.release-yank-list@1",
+  "serial": 7,
   "issuedAt": "2026-11-20T00:00:00Z",
   "expires": "2026-12-20T00:00:00Z",
   "signing": {

@@ -178,6 +178,11 @@ interface YankSource {
   revokedKeys: { keyId: string; revokedAt: string; reason: string }[];
 }
 
+/** The published list: its entries, and the serial the next one must exceed. */
+interface PublishedYankList extends YankSource {
+  serial: number;
+}
+
 /** Refuses a source that drops an entry of the published list (the list is append-only). */
 export function checkAppendOnly(source: YankSource, published: YankSource | undefined): void {
   if (!published) return;
@@ -208,10 +213,12 @@ export function signYanked(o: {
     }[];
   };
   source: YankSource;
-  published: YankSource | undefined;
+  published: PublishedYankList | undefined;
   out: string;
   now: number;
 }): { document: Uint8Array; signature: Uint8Array } {
+  if (o.published && !(Number.isSafeInteger(o.published.serial) && o.published.serial >= 1))
+    throw new Error("the published yank list has no serial");
   checkKeyId(o.keyId, "yank");
   const listed = o.keys.keys.find((k) => k.keyId === o.keyId);
   if (listed?.role !== "yank" || listed.status !== "active")
@@ -233,6 +240,8 @@ export function signYanked(o: {
   const doc = {
     schemaVersion: 1,
     format: "cloudhal.release-yank-list@1",
+    // One more than the published list's, so a consumer that keeps state refuses a rollback.
+    serial: (o.published?.serial ?? 0) + 1,
     issuedAt: iso(issued),
     expires: iso(issued + 30 * DAY_MS),
     signing: { keyId: o.keyId, algorithm: "Ed25519", signature: "yanked.json.sig" },
@@ -252,7 +261,7 @@ const readJson = <T>(file: string): T => JSON.parse(readFileSync(file, "utf8")) 
 async function published(
   from: string | undefined,
   firstRun: boolean,
-): Promise<YankSource | undefined> {
+): Promise<PublishedYankList | undefined> {
   if (!from) {
     if (firstRun) return undefined;
     throw new Error("--published is required (or --first-run for the very first list)");
@@ -261,9 +270,10 @@ async function published(
     const res = await fetch(from);
     if (res.status === 404 && firstRun) return undefined;
     if (!res.ok) throw new Error(`could not read the published yank list (${res.status})`);
-    return (await res.json()) as YankSource;
+    return (await res.json()) as PublishedYankList;
   }
-  return readJson<YankSource>(from);
+  if (!existsSync(from) && firstRun) return undefined;
+  return readJson<PublishedYankList>(from);
 }
 
 /** A passphrase from a file, or typed twice on the terminal without echo. */

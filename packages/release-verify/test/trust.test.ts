@@ -75,6 +75,7 @@ function yankDoc(over: Record<string, unknown> = {}) {
   return {
     schemaVersion: 1,
     format: "cloudhal.release-yank-list@1",
+    serial: 5,
     issuedAt: "2026-11-25T00:00:00Z",
     expires: "2026-12-25T00:00:00Z",
     signing: { keyId: "test-yank-2026a", algorithm: "Ed25519", signature: "yanked.json.sig" },
@@ -153,6 +154,16 @@ describe("verifyYanked", () => {
     expect(
       await codeOf(yankedAt(yankDoc(), YANK.privateKey, new Date("2026-12-25T00:00:00Z"))),
     ).toBe("stale-yank-list");
+  });
+
+  it("refuses a rollback below a serial the consumer has seen (stale-yank-list)", async () => {
+    const keys = await keysAt(keysDoc());
+    const s = signed(yankDoc(), YANK.privateKey);
+    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 6 }))).toBe(
+      "stale-yank-list",
+    );
+    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 5 }))).toBe("ok");
+    expect(await codeOf(verifyYanked({ ...s, keys, now: NOW, lastSerial: 1 }))).toBe("ok");
   });
 
   it("refuses expires other than 30 days, a non-yank signer, a revoked yank key", async () => {

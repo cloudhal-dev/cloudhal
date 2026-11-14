@@ -36,6 +36,10 @@ export type KeyId = string;
 export interface ReleaseYankList {
   schemaVersion: SchemaVersion;
   format: "cloudhal.release-yank-list@1";
+  /**
+   * Increases by one at every signing. A consumer that keeps state refuses a serial lower than the last one it saw (a rollback to an older, validly signed list).
+   */
+  serial: number;
   issuedAt: Timestamp;
   /**
    * RFC 3339 / ISO 8601 instant in UTC.

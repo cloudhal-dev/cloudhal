@@ -129,6 +129,8 @@ pub struct ReleaseYankList {
     pub revoked_keys: ::std::vec::Vec<ReleaseYankListRevokedKeysItem>,
     #[serde(rename = "schemaVersion")]
     pub schema_version: SchemaVersion,
+    #[doc = "Increases by one at every signing. A consumer that keeps state refuses a serial lower than the last one it saw (a rollback to an older, validly signed list)."]
+    pub serial: ::std::num::NonZeroU64,
     pub signing: ReleaseYankListSigning,
     pub versions: ::std::vec::Vec<ReleaseYankListVersionsItem>,
 }

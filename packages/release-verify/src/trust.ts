@@ -6,7 +6,8 @@
  *   now < `expires`, at most 13 months apart).
  * - `verifyYanked`: `yanked.json` + `yanked.json.sig`, signed by a yank-role key that a verified
  *   `keys.json` lists as active and valid now, fresh (`expires` exactly 30 days after `issuedAt`;
- *   past it the list is stale, which blocks new installs only).
+ *   past it the list is stale, which blocks new installs only), and not rolled back below a
+ *   `serial` the consumer has already seen.
  * - `mergeTrust`: pinned keys reduced by both: revoke, mark retiring, narrow the validity window.
  *   A key the lists name but the consumer does not pin is never added.
  */
@@ -118,12 +119,19 @@ export async function verifyKeys(input: {
   return { document: list, sha256: await sha256Hex(input.document) };
 }
 
-/** Verifies `yanked.json` against a verified key list (see the file comment). */
+/**
+ * Verifies `yanked.json` against a verified key list (see the file comment). A consumer that can
+ * keep state passes the highest `serial` it has seen as `lastSerial` and stores the result's
+ * serial: a lower one is a rollback to an older, validly signed list and is refused
+ * (`stale-yank-list`). A stateless consumer (a Worker) cannot detect such a rollback inside the
+ * list's 30 days.
+ */
 export async function verifyYanked(input: {
   document: Uint8Array;
   signature: Uint8Array;
   keys: VerifiedKeyList;
   now?: Date;
+  lastSerial?: number;
 }): Promise<VerifiedYankList> {
   const now = (input.now ?? new Date()).getTime();
   const { doc, keyId } = signedDoc(
@@ -148,6 +156,11 @@ export async function verifyYanked(input: {
   if (Date.parse(list.expires) - issued !== 30 * DAY_MS)
     refuse("yank-list-invalid", "yanked.json must expire exactly 30 days after issuedAt");
   if (issued > now + SKEW_MS) refuse("yank-list-invalid", "yanked.json is issued in the future");
+  if (input.lastSerial !== undefined && list.serial < input.lastSerial)
+    refuse(
+      "stale-yank-list",
+      `yanked.json has serial ${list.serial}, below ${input.lastSerial} seen before: a rolled-back list`,
+    );
   if (now >= Date.parse(list.expires))
     refuse(
       "stale-yank-list",

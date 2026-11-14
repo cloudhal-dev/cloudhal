@@ -220,6 +220,24 @@ describe("sign-yanked", () => {
     expect(() => checkAppendOnly(empty, undefined)).not.toThrow();
   });
 
+  it("numbers each list one above the published one (rollback protection)", async () => {
+    const s = await setup();
+    const base = {
+      keyId: "cloudhal-yank-2026a",
+      keyPem: s.pem,
+      keys: s.keysDoc,
+      source: empty,
+      out: tmp(),
+      now: NOW,
+    };
+    const first = signYanked({ ...base, published: undefined });
+    const firstDoc = JSON.parse(new TextDecoder().decode(first.document));
+    expect(firstDoc.serial).toBe(1);
+    const next = signYanked({ ...base, published: firstDoc });
+    expect(JSON.parse(new TextDecoder().decode(next.document)).serial).toBe(2);
+    expect(() => signYanked({ ...base, published: { ...empty } as never })).toThrow(/no serial/);
+  });
+
   it("the CLI reads the key from RELEASE_YANK_KEY, never prints it, and needs --published or --first-run", async () => {
     const s = await setup();
     const work = tmp();

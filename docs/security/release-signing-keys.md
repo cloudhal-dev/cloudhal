@@ -61,7 +61,8 @@ None yet. The owner's root ceremony adds the first row (see *First-time setup* b
   - Its source is `security/keys.json`, with `security/keys.json.sig`.
 - **`yanked.json`** (`cloudhal.release-yank-list@1`, signed by the yank key in `yanked.json.sig`).
   - It lists yanked versions and revoked release key ids.
-  - It expires exactly 30 days after `issuedAt`. A weekly workflow in `release-yank` re-signs it from `security/yank-list.json`, which is append-only.
+  - It expires exactly 30 days after `issuedAt`, and carries a signed `serial`, one higher at every signing. A weekly workflow in `release-yank` re-signs it from `security/yank-list.json`, which is append-only.
+  - The CLI remembers the highest serial it has seen and refuses a lower one, which would be a rolled-back list. A stateless consumer, such as a Worker, cannot detect a rollback inside the 30 days.
   - A stale `yanked.json` blocks `cloudhal deploy --release` only; installed sites keep running.
 - **Where they live.** `https://cloudhal.dev/.well-known/cloudhal/keys.json` and `.../yanked.json`, each with its `.sig`. Every GitHub release also attaches the copies current when it was made. The signatures make the location trust-free.
 - **How consumers use them.** Online consumers fetch both on every run and refuse when a fetch or a check fails. They use both only to reduce trust in the keys they pin (`mergeTrust`).

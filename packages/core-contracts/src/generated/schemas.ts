@@ -9606,6 +9606,7 @@ export const ReleaseYankListSchema = {
   "required": [
     "schemaVersion",
     "format",
+    "serial",
     "issuedAt",
     "expires",
     "signing",
@@ -9621,6 +9622,12 @@ export const ReleaseYankListSchema = {
       "enum": [
         "cloudhal.release-yank-list@1"
       ]
+    },
+    "serial": {
+      "description": "Increases by one at every signing. A consumer that keeps state refuses a serial lower than the last one it saw (a rollback to an older, validly signed list).",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
     },
     "issuedAt": {
       "$ref": "#/$defs/Timestamp"

@@ -216,7 +216,10 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
     - `yanked.json` lists yanked versions and revoked release key ids, so an emergency revocation does not need the offline root.
     - It can only reduce trust: nothing in `yanked.json` adds or re-enables a key. The committed source list, `security/yank-list.json`, is append-only: a yanked version or revoked key id is never removed. `sign-yanked` refuses to sign a list that drops an entry of the currently published `yanked.json`, and a reviewed pull request is the only way to change the source.
     - A stolen yank key can at worst deny service, by yanking good versions or revoking good keys. The recovery is that the root rotates the yank key (a new `keys.json` revokes the old one).
-  - **`yanked.json` freshness.** It carries signed `issuedAt` and `expires`, with `expires` exactly 30 days after `issuedAt`.
+  - **`yanked.json` freshness.** It carries signed `issuedAt` and `expires`, with `expires` exactly 30 days after `issuedAt`, and a signed `serial` that increases by one at every signing.
+    - A consumer that can keep state (the CLI, under the project's `.cloudhal/` or the user's cache directory) refuses a `serial` lower than the last one it saw (`stale-yank-list`). Such a lower serial is a rollback to an older, validly signed list that lacks a recent yank.
+    - A stateless consumer (a Worker deployer) cannot detect such a rollback inside the list's 30 days. That is the remaining risk.
+    - The `yank-list` branch that serves the list is append-only. A ruleset blocks force-pushes and deletion and lets only GitHub Actions push to it, so a rollback needs a new commit that the branch history shows.
     - A scheduled weekly workflow in `release-yank` re-signs it from the committed source list. That workflow has no required reviewer, because the key can only reduce trust.
     - A stale `yanked.json` blocks only `deploy --release` (§11b). Installed sites keep running.
   - **Expired keys.** A statement is valid only when its `createdAt` lies within its key's `[notBefore, notAfter]`. The producer (`bundle-sign`) and every consumer enforce this.
