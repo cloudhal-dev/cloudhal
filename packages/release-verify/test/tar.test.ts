@@ -33,16 +33,16 @@ describe("readTar and gunzip", () => {
   it("refuses a tarball that decompresses beyond the cap", async () => {
     const tar = tarArchive([{ path: "a", bytes: new Uint8Array(200_000) }], MTIME);
     const gz = await gzipBytes(tar);
-    expect(await codeOf(drain(gunzip(chunksOf(gz), 100_000)))).toBe("limit-exceeded");
-    expect(await drain(gunzip(chunksOf(gz)))).toBeGreaterThan(0);
+    expect(await codeOf(drain(gunzip(gz, 100_000)))).toBe("limit-exceeded");
+    expect(await drain(gunzip(gz))).toBeGreaterThan(0);
   });
 
   it("refuses gzip that is corrupt after a valid header, and a truncated one", async () => {
     const gz = await gzipBytes(tarArchive([{ path: "a", bytes: new Uint8Array(5000) }], MTIME));
     const corrupt = new Uint8Array(gz);
     for (let i = 12; i < corrupt.length - 8; i++) corrupt[i] = 0xff;
-    expect(await codeOf(drain(gunzip(chunksOf(corrupt))))).toBe("tar-format");
-    expect(await codeOf(drain(gunzip(chunksOf(gz.subarray(0, 5)))))).toBe("tar-format");
+    expect(await codeOf(drain(gunzip(corrupt)))).toBe("tar-format");
+    expect(await codeOf(drain(gunzip(gz.subarray(0, 5))))).toBe("tar-format");
   });
 
   it("reads Uint8Array, ReadableStream and async iterable sources alike", async () => {

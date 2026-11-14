@@ -1,6 +1,6 @@
 /**
  * The release keys this package trusts (RFC-0046 §9, §11a): the table of
- * docs/security/release-signing-keys.md, kept equal to it by test/keys.test.ts.
+ * docs/security/release-signing-keys.md, kept equal to it by test/package.test.ts.
  *
  * `PINNED_KEYS` is frozen into each published version and cannot learn about a revocation by
  * itself. A caller may only reduce trust: `revoked` withdraws key ids. A caller that trusts a key

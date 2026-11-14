@@ -1,6 +1,6 @@
 /**
  * RFC-0046 §1 asset names and §7's normative limits. `scripts/release-bundle/manifest.ts` (the
- * producer) holds the same numbers; test/limits.test.ts keeps the two equal.
+ * producer) holds the same numbers; test/package.test.ts keeps the two equal.
  */
 export const LIMITS = {
   manifestBytes: 1_900_000,

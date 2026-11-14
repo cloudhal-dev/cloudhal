@@ -63,10 +63,106 @@ describe("a valid synthetic bundle", () => {
     expect([opened, n]).toEqual([2, b.listed]);
   });
 
-  it("lets a consumer stop early without hanging", async () => {
+  /**
+   * `bytes` in 64-byte chunks from a stream that then never ends (as a slow network might), so
+   * only a cancel by the reader can release it, however far ahead the pipe buffers.
+   */
+  const watched = (bytes: Uint8Array) => {
+    const state = { cancelled: false };
+    let at = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (at >= bytes.length) return new Promise<void>(() => {});
+        c.enqueue(bytes.slice(at, at + 64));
+        at += 64;
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return { stream, state };
+  };
+
+  it("cancels the source when a consumer stops early", async () => {
     const b = await synthetic();
-    const r = await verifyRelease({ ...b.input, tarball: () => chunked(b.tarball, 64) });
+    let second: ReturnType<typeof watched> | undefined;
+    let calls = 0;
+    const r = await verifyRelease({
+      ...b.input,
+      tarball: () => {
+        if (calls++ === 0) return b.tarball;
+        second = watched(b.tarball);
+        return second.stream;
+      },
+    });
     for await (const _ of r.entries()) break;
+    expect(second?.state.cancelled).toBe(true);
+  });
+
+  it("cancels the source when an entry is refused mid-stream", async () => {
+    const changed = (e: { path: string; bytes: Uint8Array }[]) => {
+      const x = e.find((y) => y.path === "admin/modules/worker.js");
+      if (x) x.bytes = flip(x.bytes);
+    };
+    const b = await synthetic({ entries: changed });
+    let second: ReturnType<typeof watched> | undefined;
+    let calls = 0;
+    const r = await verifyRelease({
+      ...b.input,
+      tarball: () => {
+        if (calls++ === 0) return b.tarball;
+        second = watched(b.tarball);
+        return second.stream;
+      },
+    });
+    const err = await (async () => {
+      for await (const _ of r.entries()) {
+        // drain
+      }
+    })().catch((e: { code?: string }) => e.code);
+    expect(err).toBe("entry-mismatch");
+    expect(second?.state.cancelled).toBe(true);
+  });
+
+  it("passes a source I/O error in the second pass through unchanged", async () => {
+    const b = await synthetic();
+    const disk = new Error("disk went away");
+    let calls = 0;
+    const r = await verifyRelease({
+      ...b.input,
+      tarball: () => {
+        if (calls++ === 0) return b.tarball;
+        let sent = false;
+        return new ReadableStream<Uint8Array>({
+          pull(c) {
+            if (sent) return c.error(disk);
+            sent = true;
+            c.enqueue(b.tarball.subarray(0, 40));
+          },
+        });
+      },
+    });
+    const got = await (async () => {
+      for await (const _ of r.entries()) {
+        // drain
+      }
+    })().catch((e: unknown) => e);
+    expect(got).toBe(disk);
+  });
+
+  it("reads long non-ASCII names, cut on a character boundary and in the middle of one", async () => {
+    const names = [
+      `site/assets/${"界".repeat(30)}.txt`, // 3-byte characters: the 100-byte window cuts one
+      `site/assets/x${"é".repeat(50)}`, // 2-byte characters: the window ends on a boundary
+      `site/assets/${"😀".repeat(30)}`, // 4-byte characters (surrogate pairs in UTF-16)
+      `site/assets/${"é".repeat(44)}`, // exactly 100 bytes: not ASCII, so a PAX record anyway
+    ];
+    const b = await synthetic({ parts: Object.fromEntries(names.map((n) => [n, n])) });
+    const r = await verifyRelease(b.input);
+    const got: string[] = [];
+    for await (const e of r.entries()) got.push(e.tarPath);
+    expect(got).toEqual(expect.arrayContaining(names));
+    expect(got).toHaveLength(b.listed);
   });
 });
 
@@ -78,6 +174,46 @@ describe("refusals that need a validly signed bundle", () => {
     expect(await codeOf(make({ manifest: (m) => (m.commit = "f".repeat(40)) }))).toBe(
       "statement-manifest-mismatch",
     );
+  });
+
+  it("one-sided changes to every shared fact, and to the key id (invariants 4 and 5)", async () => {
+    const changes: ((m: Record<string, unknown>) => void)[] = [
+      (m) => (m.channel = "next"),
+      (m) => (m.securityRelease = true),
+      (m) => (m.createdAt = "2026-11-13T16:13:21Z"),
+      (m) => ((m.signing as Record<string, unknown>).keyId = "another-key"),
+    ];
+    for (const change of changes)
+      expect(await codeOf(make({ manifest: change }))).toBe("statement-manifest-mismatch");
+  });
+
+  it("a statement whose tarball is not named for its version (invariant 1)", async () => {
+    const rename = (st: Record<string, unknown>) => {
+      (st.tarball as Record<string, unknown>).name = "cloudhal-release-0.9.1.tar.gz";
+    };
+    expect(await codeOf(make({ statement: rename }))).toBe("statement-invalid");
+  });
+
+  it("a mainModule that is not a listed module, or not a safe path", async () => {
+    const main =
+      (p: string) => (m: { workers: Record<"site" | "admin", Record<string, unknown>> }) => {
+        m.workers.admin.mainModule = p;
+      };
+    expect(await codeOf(make({ manifest: main("other.js") }))).toBe("manifest-invalid");
+    expect(await codeOf(make({ manifest: main("../worker.js") }))).toBe("entry-path");
+  });
+
+  it("a starter part above the part limit", async () => {
+    const starter = (m: Record<string, unknown>) => {
+      m.starter = {
+        kind: "bundle",
+        path: "starter/blog.cloudhal",
+        bytes: 64 * 1024 * 1024 + 1,
+        sha256: "0".repeat(64),
+        siteId: "site_starter",
+      };
+    };
+    expect(await codeOf(make({ manifest: starter }))).toBe("limit-exceeded");
   });
 
   it("a manifest that names the legacy manifest.sig, or is not valid", async () => {

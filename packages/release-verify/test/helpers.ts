@@ -57,6 +57,8 @@ export interface SyntheticOptions {
   readonly compress?: (tar: Uint8Array) => Promise<Uint8Array>;
   /** Raw tar bytes instead of the producer's (after `entries`). */
   readonly tar?: (tar: Uint8Array) => Uint8Array;
+  /** More parts, listed and in the tar, by tar path (`site/assets/x`, `site/modules/y.mjs`). */
+  readonly parts?: Readonly<Record<string, string>>;
 }
 
 export interface Synthetic {
@@ -83,15 +85,15 @@ const file = (p: string, bytes: Uint8Array) => ({
   contentType: "application/octet-stream",
 });
 
-/** A signed synthetic bundle of six parts, `opts` applied. */
+/** A signed synthetic bundle of six parts (plus `opts.parts`), `opts` applied. */
 export async function synthetic(opts: SyntheticOptions = {}): Promise<Synthetic> {
   const m = JSON.parse(new TextDecoder().decode(fixture("manifest.json"))) as Doc;
-  const bytesOf = (p: keyof typeof PARTS) => utf8(PARTS[p]);
+  const parts: Record<string, string> = { ...PARTS, ...opts.parts };
   for (const role of ["site", "admin"] as const) {
-    const modules = Object.keys(PARTS)
+    const modules = Object.keys(parts)
       .filter((p) => p.startsWith(`${role}/modules/`))
       .map((p) => {
-        const b = bytesOf(p as keyof typeof PARTS);
+        const b = utf8(parts[p] as string);
         return {
           path: p.slice(`${role}/modules/`.length),
           type: "esm",
@@ -99,9 +101,9 @@ export async function synthetic(opts: SyntheticOptions = {}): Promise<Synthetic>
           sha256: sha(b),
         };
       });
-    const files = Object.keys(PARTS)
+    const files = Object.keys(parts)
       .filter((p) => p.startsWith(`${role}/assets/`))
-      .map((p) => file(p.slice(`${role}/assets`.length), bytesOf(p as keyof typeof PARTS)));
+      .map((p) => file(p.slice(`${role}/assets`.length), utf8(parts[p] as string)));
     const w = m.workers[role];
     w.mainModule = (modules.find((x) => !x.path.startsWith("chunks/")) ?? modules[0])?.path;
     w.modules = modules;
@@ -115,7 +117,7 @@ export async function synthetic(opts: SyntheticOptions = {}): Promise<Synthetic>
   opts.manifest?.(m);
   const manifestBytes = utf8(canonicalJson(m));
 
-  const entries = Object.entries(PARTS).map(([p, text]) => ({ path: p, bytes: utf8(text) }));
+  const entries = Object.entries(parts).map(([p, text]) => ({ path: p, bytes: utf8(text) }));
   opts.entries?.(entries);
   entries.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const createdAt = "2026-11-13T16:13:20Z";
@@ -153,7 +155,7 @@ export async function synthetic(opts: SyntheticOptions = {}): Promise<Synthetic>
     },
     tarball,
     keys,
-    listed: Object.keys(PARTS).length,
+    listed: Object.keys(parts).length,
   };
 }
 

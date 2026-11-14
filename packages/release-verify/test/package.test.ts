@@ -12,6 +12,7 @@ import { releaseAssetNames as producerAssetNames } from "../../../scripts/releas
 import { generate, OUT_DIR } from "../scripts/gen-validators.ts";
 import {
   ERROR_CODES,
+  foldPath,
   LIMITS,
   missingScopes,
   PINNED_KEYS,
@@ -103,6 +104,12 @@ describe("missingScopes (§3)", () => {
     expect(missingScopes(next, admin)).toEqual([]);
   });
 
+  it("is not fooled by Object.prototype names", () => {
+    expect(missingScopes(next, ["constructor", "__proto__", "toString"])).toEqual(
+      next.requiredScopes,
+    );
+  });
+
   it("compares every other id exactly: Editor never covers Admin", () => {
     const editor = ["account-settings.read", "workers-scripts.edit", "d1.write"];
     expect(missingScopes(next, editor)).toEqual(["workers-scripts.admin"]);
@@ -129,6 +136,14 @@ describe("releaseAssetUrls and paths", () => {
   it("refuses a version that could leave the release's path", () => {
     for (const v of ["../0.9.0", "0.9.0/../x", "0.9", "v0.9.0", "0.9.0-", "01.2.3", ""])
       expect(() => releaseAssetUrls(v), v).toThrow(TypeError);
+  });
+
+  it("foldPath meets the case forms file systems treat as one name", () => {
+    expect(foldPath("ẞ")).toBe(foldPath("ß"));
+    expect(foldPath("ß")).toBe(foldPath("SS"));
+    expect(foldPath("ΐ")).toBe(foldPath("Ϊ́"));
+    expect(foldPath("e\u0301")).toBe(foldPath("É"));
+    expect(foldPath("a")).not.toBe(foldPath("b"));
   });
 
   it("unsafePathReason: each rule, and linear on a 100k-character path", () => {

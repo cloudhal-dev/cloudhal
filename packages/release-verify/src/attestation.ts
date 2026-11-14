@@ -125,10 +125,12 @@ export async function verifyAttestation(o: AttestationOptions): Promise<Attestat
   const timeoutMs = o.timeoutMs ?? 60_000;
   const why = await probe(run, timeoutMs);
   if (why) return { status: "unavailable", reason: why };
-  const bundle = path.join(o.dir, sigstoreName(o.version));
+  // Absolute paths, so no file name can ever be read by gh as a flag.
+  const dir = path.resolve(o.dir);
+  const bundle = path.join(dir, sigstoreName(o.version));
   const withBundle = existsSync(bundle) ? bundle : undefined;
   for (const name of [tarballName(o.version), MANIFEST_FILE, STATEMENT_FILE]) {
-    const file = path.join(o.dir, name);
+    const file = path.join(dir, name);
     const r = await run("gh", attestationArgs(file, o.commit, withBundle), timeoutMs).catch(
       (e: Error): RunResult => ({
         code: null,
@@ -143,7 +145,7 @@ export async function verifyAttestation(o: AttestationOptions): Promise<Attestat
         ? `no answer within ${timeoutMs / 1000} s`
         : r.signal
           ? `stopped by ${r.signal}`
-          : (r.stderr.trim().split("\n").pop() ?? `exit ${r.code}`);
+          : r.stderr.trim().split("\n").pop() || `exit ${r.code}`;
       return { status: "failed", file: name, reason };
     }
   }

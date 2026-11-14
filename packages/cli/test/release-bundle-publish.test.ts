@@ -7,6 +7,7 @@ import {
   loadBundle,
   publicKeysFor,
   RELEASE_KEY,
+  verifyAsConsumer,
   waitForDraft,
 } from "../../../scripts/publish-ci.ts";
 import { buildReleaseBundle, writeReleaseBundle } from "../../../scripts/release-bundle/build.ts";
@@ -45,6 +46,16 @@ describe("publish-ci loadBundle", () => {
     writeFileSync(path.join(dir, "cloudhal-release-0.8.0.sigstore.json"), "{}\n");
     return dir;
   }
+
+  it("runs the consumer's verifier over the signed bundle before publishing (§11a)", async () => {
+    const k = throwawayKey();
+    const dir = await signedDir(k.privateKey);
+    await expect(verifyAsConsumer(dir, "0.8.0", { [KEY_ID]: k.raw })).resolves.toBeUndefined();
+    await expect(
+      verifyAsConsumer(dir, "0.8.0", { [KEY_ID]: throwawayKey().raw }),
+    ).rejects.toMatchObject({ code: "signature-invalid" });
+    await expect(verifyAsConsumer(dir, "0.8.1", { [KEY_ID]: k.raw })).rejects.toThrow();
+  });
 
   it("reads the five assets in upload order with their digests, and the statement", async () => {
     const k = throwawayKey();

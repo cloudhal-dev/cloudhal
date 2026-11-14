@@ -15,7 +15,8 @@ export function missingScopes(
   const held = new Set<string>();
   for (const s of granted) {
     held.add(s);
-    for (const implied of IMPLIED_SCOPES[s] ?? []) held.add(implied);
+    const implied = Object.hasOwn(IMPLIED_SCOPES, s) ? IMPLIED_SCOPES[s] : undefined;
+    for (const i of implied ?? []) held.add(i);
   }
   return manifest.requiredScopes.filter((s) => !held.has(s));
 }

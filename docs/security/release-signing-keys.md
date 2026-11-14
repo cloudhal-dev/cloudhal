@@ -51,7 +51,12 @@ Releases are immutable and can never gain an asset, so a release signed by a rev
 
 ## Verifying a release
 
-[`@cloudhal/release-verify`](../../packages/release-verify/README.md) does all of the steps below in one call, on Node, Workers or a browser. Its `PINNED_KEYS` is kept equal to the table above, and its `./attestation` subpath runs step 3. To check by hand instead, follow these steps.
+[`@cloudhal/release-verify`](../../packages/release-verify/README.md) can do two of the steps below for you:
+
+- **Step 1:** `verifyRelease` checks the statement, its signature and every digest, including each entry of the tarball, on Node, Workers or in a browser. Its `PINNED_KEYS` is kept equal to the table above.
+- **Step 3:** the attestation is a separate call. On Node, `verifyAttestation` (in `@cloudhal/release-verify/attestation`) runs `gh attestation verify` for you.
+
+Step 2, `gh release verify-asset`, stays manual. To check by hand instead, follow these steps.
 
 ## Verifying a release by hand
 

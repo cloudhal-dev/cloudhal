@@ -121,7 +121,11 @@ async function checkTarballDigest(
     refuse("tarball-mismatch", "the tarball is not the file the statement pins");
 }
 
-async function* verifiedEntries(
+/**
+ * The second pass (step 6's entries), exported for the producer's self-check
+ * (scripts/release-bundle/verify.ts); not part of the package's public exports.
+ */
+export async function* verifiedEntries(
   open: VerifyReleaseInput["tarball"],
   listed: ReadonlyMap<string, ListedPart>,
   mtime: number,
@@ -138,7 +142,7 @@ async function* verifiedEntries(
     if (size !== part.bytes)
       refuse("entry-mismatch", `${tarPath} is not the size its listing says`);
   };
-  for await (const e of readTar(gunzip(chunksOf(await open())), mtime, admit)) {
+  for await (const e of readTar(gunzip(await open()), mtime, admit)) {
     const part = left.get(e.path) as ListedPart;
     if ((await sha256Hex(e.bytes)) !== part.sha256)
       refuse("entry-mismatch", `${e.path} does not match the manifest's SHA-256`);

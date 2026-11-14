@@ -39,10 +39,12 @@ export function checkPath(path: string, kind: PathKind, where: string): void {
 }
 
 /**
- * Case folding as case-insensitive file systems apply it, approximately: NFC, then upper and
- * lower case (so "ß" and "SS" meet). Two listed paths that fold equal would collide on disk.
+ * Case folding as case-insensitive file systems apply it, approximately: NFC, lower, upper, lower
+ * again, NFC (so "ß", "ẞ" and "SS" meet, and so do "ΐ" and "Ϊ́"). Two listed paths that fold
+ * equal would collide on disk.
  */
-export const foldPath = (path: string): string => path.normalize("NFC").toUpperCase().toLowerCase();
+export const foldPath = (path: string): string =>
+  path.normalize("NFC").toLowerCase().toUpperCase().toLowerCase().normalize("NFC");
 
 /** Refuses two `paths` that are equal after case folding. */
 export function checkNoFoldedDuplicates(paths: Iterable<string>, where: string): void {

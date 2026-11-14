@@ -6,6 +6,7 @@
  * `path` record for the entry that follows). Links, directories and every other type are refused.
  */
 import { gunzipCapped } from "../../packages/cli/src/archive/gzip.ts";
+import { ustarName } from "../../packages/release-verify/src/tar.ts";
 import { LIMITS } from "./manifest.ts";
 import type { SourceFile } from "./read-build.ts";
 
@@ -96,7 +97,7 @@ export function readTar(tar: Uint8Array, mtime: number): SourceFile[] {
       continue;
     }
     const path = pending ?? name;
-    if (pending !== null && pending.slice(-100) !== name)
+    if (pending !== null && ustarName(pending) !== name)
       throw new Error(`${path}: the ustar name is not the end of the PAX path`);
     pending = null;
     out.push({ path, bytes: data });

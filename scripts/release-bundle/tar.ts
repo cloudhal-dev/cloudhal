@@ -6,6 +6,7 @@
  * (`gzipFixed`: mtime 0, no name, OS 255). The same parts give the same bytes on every run.
  */
 import { gzipFixed } from "../../packages/cli/src/archive/gzip.ts";
+import { needsPax, ustarName } from "../../packages/release-verify/src/tar.ts";
 import type { SourceFile } from "./read-build.ts";
 
 const enc = new TextEncoder();
@@ -48,15 +49,9 @@ export function paxRecord(p: string): Uint8Array {
 
 const pad = (n: number) => new Uint8Array((512 - (n % 512)) % 512);
 
-/** Whether `p` needs a PAX `path` record (longer than the 100-byte name field, or not ASCII). */
-export function needsPax(p: string): boolean {
-  if (enc.encode(p).length > 100) return true;
-  for (let i = 0; i < p.length; i++) {
-    const c = p.charCodeAt(i);
-    if (c < 0x20 || c > 0x7e) return true;
-  }
-  return false;
-}
+// One naming rule with the verifier (RFC-0046 §7): the PAX record when a path needs one, and the
+// ustar name field as the longest suffix of at most 100 UTF-8 bytes on a code-point boundary.
+export { needsPax, ustarName };
 
 /** The ustar archive of `entries` in the order given (callers sort them), two zero end blocks. */
 export function tarArchive(entries: readonly SourceFile[], mtime: number): Uint8Array {
@@ -68,7 +63,7 @@ export function tarArchive(entries: readonly SourceFile[], mtime: number): Uint8
       const rec = paxRecord(e.path);
       out.push(tarHeader("././@PaxHeader", rec.length, "x", mtime), rec, pad(rec.length));
     }
-    out.push(tarHeader(e.path.slice(-100), e.bytes.length, "0", mtime), e.bytes);
+    out.push(tarHeader(ustarName(e.path), e.bytes.length, "0", mtime), e.bytes);
     out.push(pad(e.bytes.length));
   }
   out.push(new Uint8Array(1024));

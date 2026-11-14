@@ -146,6 +146,28 @@ describe("verifyAttestation", () => {
     }
   });
 
+  it("says exit N when gh prints nothing, and passes gh absolute paths only", async () => {
+    const { run, calls } = gh();
+    const quiet: Runner = (cmd, args, t) =>
+      args[0] !== "attestation" || args[2] === "--help"
+        ? run(cmd, args, t)
+        : Promise.resolve({ code: 3, signal: null, timedOut: false, stdout: "", stderr: "  \n" });
+    const rel = path.relative(process.cwd(), dir(false));
+    const r = await verifyAttestation({ dir: rel, version: "0.9.0", commit: COMMIT, run: quiet });
+    expect(r).toEqual({
+      status: "failed",
+      file: "cloudhal-release-0.9.0.tar.gz",
+      reason: "exit 3",
+    });
+    const ok = gh();
+    await verifyAttestation({ dir: rel, version: "0.9.0", commit: COMMIT, run: ok.run });
+    const files = ok.calls
+      .filter((c) => c[0] === "attestation" && c[2] !== "--help")
+      .map((c) => c[2]);
+    expect(files.every((f) => path.isAbsolute(f as string))).toBe(true);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
   it("refuses a malformed version or commit before running anything", async () => {
     const { run, calls } = gh();
     await expect(

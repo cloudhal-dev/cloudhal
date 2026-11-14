@@ -123,36 +123,43 @@ export function listedParts(m: ReleaseManifest): Map<string, ListedPart> {
   return out;
 }
 
+/** One Worker's listings: module and asset paths, `mainModule`, folded names and §7's limits. */
+function checkWorker(m: ReleaseManifest, worker: Worker): number {
+  const w = m.workers[worker];
+  for (const mod of w.modules) {
+    checkPath(mod.path, "module", `${worker} module`);
+    if (mod.bytes > LIMITS.partBytes)
+      refuse("limit-exceeded", `${worker} module ${mod.path} is above ${LIMITS.partBytes} bytes`);
+  }
+  checkNoFoldedDuplicates(
+    w.modules.map((x) => x.path),
+    `${worker} modules`,
+  );
+  checkPath(w.mainModule, "module", `${worker} mainModule`);
+  if (!w.modules.some((x) => x.path === w.mainModule))
+    refuse("manifest-invalid", `${worker} mainModule ${w.mainModule} is not a listed module`);
+  const files = w.assets.files;
+  if (files.length > LIMITS.assetsPerWorker)
+    refuse("limit-exceeded", `${worker}: more than ${LIMITS.assetsPerWorker} assets`);
+  for (const f of files) {
+    checkPath(f.path, "asset", `${worker} asset`);
+    if (f.bytes > LIMITS.assetBytes)
+      refuse("limit-exceeded", `${worker} asset ${f.path} is above ${LIMITS.assetBytes} bytes`);
+  }
+  checkNoFoldedDuplicates(
+    files.map((x) => x.path),
+    `${worker} assets`,
+  );
+  return w.modules.length + files.length;
+}
+
 /** Paths (§11a) and §7's limits over every listing, before the tarball is read. */
 function checkListings(m: ReleaseManifest): void {
-  let parts = 0;
-  for (const worker of ["site", "admin"] as const) {
-    const w = m.workers[worker];
-    for (const mod of w.modules) {
-      checkPath(mod.path, "module", `${worker} module`);
-      if (mod.bytes > LIMITS.partBytes)
-        refuse("limit-exceeded", `${worker} module ${mod.path} is above ${LIMITS.partBytes} bytes`);
-    }
-    checkNoFoldedDuplicates(
-      w.modules.map((x) => x.path),
-      `${worker} modules`,
-    );
-    const files = w.assets.files;
-    if (files.length > LIMITS.assetsPerWorker)
-      refuse("limit-exceeded", `${worker}: more than ${LIMITS.assetsPerWorker} assets`);
-    for (const f of files) {
-      checkPath(f.path, "asset", `${worker} asset`);
-      if (f.bytes > LIMITS.assetBytes)
-        refuse("limit-exceeded", `${worker} asset ${f.path} is above ${LIMITS.assetBytes} bytes`);
-    }
-    checkNoFoldedDuplicates(
-      files.map((x) => x.path),
-      `${worker} assets`,
-    );
-    parts += w.modules.length + files.length;
-  }
+  let parts = checkWorker(m, "site") + checkWorker(m, "admin");
   if (m.starter.kind === "bundle") {
     checkPath(m.starter.path, "entry", "starter");
+    if (m.starter.bytes > LIMITS.partBytes)
+      refuse("limit-exceeded", `the starter is above ${LIMITS.partBytes} bytes`);
     parts++;
   }
   if (parts > LIMITS.tarEntries)

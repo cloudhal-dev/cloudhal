@@ -44,32 +44,87 @@ export function checkGzipHeader(head: Uint8Array): void {
   if (head[9] !== 255) refuse("tar-format", "the tarball's gzip OS byte is not 255");
 }
 
-/** The decompressed bytes of a gzip `source` whose header is the fixed one. */
+/**
+ * `source` as a ReadableStream we own: errors from the source itself are remembered (so they
+ * reach the caller unchanged, never as a tamper code), and `release()` cancels the caller's
+ * stream or ends its iterator, whatever state the pipe is in.
+ */
+function sourceStream(source: ByteSource) {
+  let failure: { error: unknown } | undefined;
+  let release: () => Promise<void>;
+  let pull: () => Promise<IteratorResult<Uint8Array>>;
+  if (typeof (source as ReadableStream<Uint8Array>).getReader === "function") {
+    const reader = (source as ReadableStream<Uint8Array>).getReader();
+    pull = async () => {
+      const r = await reader.read();
+      return r.done ? { done: true, value: undefined } : { done: false, value: r.value };
+    };
+    release = () => reader.cancel().catch(() => {});
+  } else {
+    const it = (
+      source instanceof Uint8Array
+        ? (async function* () {
+            yield source;
+          })()
+        : (source as AsyncIterable<Uint8Array>)
+    )[Symbol.asyncIterator]();
+    pull = () => it.next();
+    release = async () => {
+      await it.return?.()?.catch?.(() => {});
+    };
+  }
+  let released = false;
+  const once = async () => {
+    if (released) return;
+    released = true;
+    await release();
+  };
+  const stream = new ReadableStream<Uint8Array>({
+    async pull(c) {
+      try {
+        const next = await pull();
+        if (next.done) c.close();
+        else c.enqueue(next.value);
+      } catch (error) {
+        failure = { error };
+        throw error;
+      }
+    },
+    cancel: once,
+  });
+  return { stream, release: once, failure: () => failure };
+}
+
+/** Errors the stream unless its first ten bytes are the fixed gzip header (§7). */
+function gzipHeaderCheck(): TransformStream<Uint8Array, Uint8Array> {
+  const head: number[] = [];
+  return new TransformStream({
+    transform(chunk, c) {
+      if (head.length < 10) {
+        for (const b of chunk.subarray(0, 10 - head.length)) head.push(b);
+        if (head.length === 10) checkGzipHeader(Uint8Array.from(head));
+      }
+      c.enqueue(chunk);
+    },
+    flush() {
+      if (head.length < 10) checkGzipHeader(Uint8Array.from(head));
+    },
+  });
+}
+
+/**
+ * The decompressed bytes of a gzip `source` whose header is the fixed one. Every exit (the end, a
+ * refusal, a consumer that stops early) cancels the chain and releases the caller's stream.
+ */
 export async function* gunzip(
-  source: AsyncIterable<Uint8Array>,
+  source: ByteSource,
   max: number = MAX_TAR_BYTES,
 ): AsyncGenerator<Uint8Array> {
-  const ds = new DecompressionStream("gzip");
-  const writer = ds.writable.getWriter();
-  const pump = (async () => {
-    const head: number[] = [];
-    try {
-      for await (const chunk of source) {
-        if (head.length < 10) {
-          for (const b of chunk.subarray(0, 10 - head.length)) head.push(b);
-          if (head.length === 10) checkGzipHeader(Uint8Array.from(head));
-        }
-        await writer.write(chunk);
-      }
-      if (head.length < 10) checkGzipHeader(Uint8Array.from(head));
-      await writer.close();
-    } catch (e) {
-      await writer.abort(e).catch(() => {});
-      throw e;
-    }
-  })();
-  pump.catch(() => {});
-  const reader = ds.readable.getReader();
+  const src = sourceStream(source);
+  const reader = src.stream
+    .pipeThrough(gzipHeaderCheck())
+    .pipeThrough(new DecompressionStream("gzip"))
+    .getReader();
   let total = 0;
   try {
     for (;;) {
@@ -77,21 +132,20 @@ export async function* gunzip(
       try {
         next = await reader.read();
       } catch (e) {
-        await pump; // a header refusal from the pump wins over the decompressor's error
-        throw e;
+        const failed = src.failure();
+        if (failed) throw failed.error; // the source's own error, unchanged
+        if (e instanceof ReleaseVerifyError) throw e;
+        return refuse("tar-format", `the tarball is not valid gzip (${(e as Error).message})`);
       }
-      if (next.done) break;
+      if (next.done) return;
       total += next.value.length;
       if (total > max)
         refuse("limit-exceeded", `the tarball decompresses to more than ${max} bytes`);
       yield next.value;
     }
-    await pump;
-  } catch (e) {
-    if (e instanceof ReleaseVerifyError) throw e;
-    refuse("tar-format", `the tarball is not valid gzip (${(e as Error).message})`);
   } finally {
     await reader.cancel().catch(() => {});
+    await src.release();
   }
 }
 
@@ -150,7 +204,8 @@ function checksumOk(h: Uint8Array): boolean {
 }
 
 interface Header {
-  readonly name: string;
+  /** The ustar name field up to its first NUL, as raw bytes. */
+  readonly name: Uint8Array;
   readonly size: number;
   readonly flag: "0" | "x";
 }
@@ -168,7 +223,9 @@ function checkHeader(h: Uint8Array, mtime: number): Header {
     refuse("tar-format", "a tar entry's mtime is not the release's createdAt");
   if (str(h, 157, 100) || str(h, 265, 32) || str(h, 297, 32) || str(h, 345, 155))
     refuse("tar-format", "a tar entry has a link name, an owner name or a prefix");
-  return { name: str(h, 0, 100), size: num(h, 124, 12, "size"), flag };
+  const field = h.subarray(0, 100);
+  const end = field.indexOf(0);
+  return { name: end >= 0 ? field.subarray(0, end) : field, size: num(h, 124, 12, "size"), flag };
 }
 
 /** The `path` of a PAX header holding exactly one `path` record. */
@@ -201,6 +258,10 @@ class TarReader {
   constructor(source: AsyncIterable<Uint8Array>) {
     this.it = source[Symbol.asyncIterator]();
   }
+  /** Ends the source early (a refusal or a consumer that stopped): its own cleanup runs. */
+  async close(): Promise<void> {
+    await this.it.return?.();
+  }
   /** Buffers at least `n` bytes; false when the stream ends first. */
   async fill(n: number): Promise<boolean> {
     while (this.q.length < n) {
@@ -227,6 +288,59 @@ class TarReader {
   }
 }
 
+const utf8 = new TextEncoder();
+
+/**
+ * Whether `path` needs a PAX `path` record: longer than the 100-byte ustar name field in UTF-8,
+ * or not printable ASCII. The producer (scripts/release-bundle/tar.ts) imports this rule.
+ */
+export function needsPax(path: string): boolean {
+  if (utf8.encode(path).length > 100) return true;
+  for (let i = 0; i < path.length; i++) {
+    const c = path.charCodeAt(i);
+    if (c < 0x20 || c > 0x7e) return true;
+  }
+  return false;
+}
+
+/**
+ * The ustar name field of `path`: its longest suffix whose UTF-8 is at most 100 bytes, cut on a
+ * code-point boundary (so it is valid UTF-8). For a path of at most 100 ASCII bytes that is the
+ * path itself. One byte-based rule for the producer, which imports it, and the verifier.
+ */
+export function ustarName(path: string): string {
+  const points = Array.from(path);
+  let bytes = 0;
+  let i = points.length;
+  while (i > 0) {
+    const n = utf8.encode(points[i - 1] as string).length;
+    if (bytes + n > 100) break;
+    bytes += n;
+    i--;
+  }
+  return points.slice(i).join("");
+}
+
+const sameBytes = (a: Uint8Array, b: Uint8Array) =>
+  a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** The path of a file header: the PAX path when one came first, else its own ASCII name. */
+function entryPath(name: Uint8Array, pax: string | null): string {
+  if (pax !== null) {
+    if (!needsPax(pax)) refuse("tar-format", `${pax}: a PAX record for a name that needs none`);
+    if (!sameBytes(name, utf8.encode(ustarName(pax))))
+      refuse("tar-format", `${pax}: the ustar name is not the end of the PAX path`);
+    return pax;
+  }
+  let path = "";
+  for (const c of name) {
+    if (c < 0x20 || c > 0x7e)
+      refuse("tar-format", "a tar name that is not ASCII has no PAX record");
+    path += String.fromCharCode(c);
+  }
+  return path;
+}
+
 /** The next file header with its PAX path applied, or null at the first zero block. */
 async function nextHeader(
   r: TarReader,
@@ -242,12 +356,10 @@ async function nextHeader(
     const { name, size, flag } = checkHeader(h, mtime);
     if (size > LIMITS.partBytes)
       refuse("limit-exceeded", `a tar entry is above ${LIMITS.partBytes} bytes`);
-    if (flag === "0") {
-      if (pax !== null && pax.slice(-100) !== name)
-        refuse("tar-format", `${pax}: the ustar name is not the end of the PAX path`);
-      return { path: pax ?? name, size };
-    }
+    if (flag === "0") return { path: entryPath(name, pax), size };
     if (pax !== null) refuse("tar-format", "two PAX headers in a row");
+    if (!sameBytes(name, utf8.encode("././@PaxHeader")))
+      refuse("tar-format", "a PAX header is not named ././@PaxHeader");
     if (size > 4096) refuse("tar-format", "a PAX header is too large");
     pax = paxPath((await r.take(padded(size))).subarray(0, size));
   }
@@ -265,14 +377,18 @@ export async function* readTar(
 ): AsyncGenerator<TarEntry> {
   const r = new TarReader(source);
   let count = 0;
-  for (;;) {
-    const header = await nextHeader(r, mtime);
-    if (!header) break;
-    if (++count > LIMITS.tarEntries)
-      refuse("limit-exceeded", `the tarball has more than ${LIMITS.tarEntries} entries`);
-    admit(header.path, header.size);
-    const data = await r.take(padded(header.size));
-    yield { path: header.path, bytes: data.subarray(0, header.size) };
+  try {
+    for (;;) {
+      const header = await nextHeader(r, mtime);
+      if (!header) break;
+      if (++count > LIMITS.tarEntries)
+        refuse("limit-exceeded", `the tarball has more than ${LIMITS.tarEntries} entries`);
+      admit(header.path, header.size);
+      const data = await r.take(padded(header.size));
+      yield { path: header.path, bytes: data.subarray(0, header.size) };
+    }
+    await r.checkEnd(512);
+  } finally {
+    await r.close();
   }
-  await r.checkEnd(512);
 }

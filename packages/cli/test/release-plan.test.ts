@@ -5,10 +5,12 @@ import {
   isSecurityRelease,
   type Pkg,
   readPackages,
+  releaseGroup,
   releaseNotes,
   sharedVersion,
   unpublished,
 } from "../../../scripts/release-plan.ts";
+import { planPublish } from "../../../scripts/release-publish-plan.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const pkg = (name: string, version: string): Pkg => ({ dir: name, name, version });
@@ -102,5 +104,74 @@ describe("release plan", () => {
       "# x\n\n## 0.8.2\n\n- abcdef1: **Security (self-hosting).** Fixed.\n- See **Security release.** notes.\n";
     expect(isSecurityRelease([prose], "0.8.2")).toBe(false);
     expect(isSecurityRelease([], "0.8.1")).toBe(false);
+  });
+});
+
+describe("a package that joined the fixed group before its first version PR (#232)", () => {
+  // main right after @cloudhal/release-verify merged: every package at 0.9.0, all released and
+  // with a "## 0.9.0" changelog entry, except release-verify (no CHANGELOG.md, nothing on npm).
+  const NEW = "@cloudhal/release-verify";
+  const at = (version: string) => readPackages(ROOT).map((p) => ({ ...p, version }));
+  const changelogs =
+    (version: string, newEntry: boolean) =>
+    (p: Pkg): string | undefined =>
+      p.name !== NEW || newEntry ? `# ${p.name}\n\n## ${version}\n\n- a change\n` : undefined;
+  const npm =
+    (forNew: string[], released: string) =>
+    async (name: string): Promise<string[]> =>
+      name === NEW ? forNew : ["0.8.0", released];
+
+  it("is left out of the release: nothing publishes it at the group's current version", async () => {
+    for (const onNpmNew of [[], ["0.0.0-placeholder.0"]]) {
+      const pkgs = at("0.9.0");
+      expect(pkgs.map((p) => p.name)).toContain(NEW);
+      const r = await releaseGroup(
+        pkgs,
+        "0.9.0",
+        changelogs("0.9.0", false),
+        npm(onNpmNew, "0.9.0"),
+      );
+      expect(r.notYetReleased.map((p) => p.name)).toEqual([NEW]);
+      expect(r.group).toHaveLength(pkgs.length - 1);
+      // `--plan` on main: npm has everything else, so publish=false (main stays green).
+      const missing = await unpublished(r.group, async () => true);
+      expect(missing).toEqual([]);
+      // A workflow_dispatch dry run publishes the group with --dry-run: never the new package.
+      const dry = planPublish({
+        version: "0.9.0",
+        head: "a".repeat(40),
+        dryRun: true,
+        runNumber: "7",
+        bundle: null,
+        tagCommit: null,
+        releases: [],
+        packages: r.group.map((p) => p.name),
+        npmMissing: missing.map((p) => p.name),
+        tags: ["v0.9.0"],
+      });
+      const published = dry.flatMap((s) => (s.kind === "npm-publish" ? s.packages : []));
+      expect(published.map((p) => p.name)).not.toContain(NEW);
+      expect(published).toHaveLength(pkgs.length - 1);
+    }
+  });
+
+  it("is released by its first version PR, after only the placeholder", async () => {
+    const pkgs = at("0.9.1");
+    const r = await releaseGroup(
+      pkgs,
+      "0.9.1",
+      changelogs("0.9.1", true),
+      npm(["0.0.0-placeholder.0"], "0.9.0"),
+    );
+    expect(r.notYetReleased).toEqual([]);
+    const missing = await unpublished(r.group, async () => false);
+    expect(missing.map((p) => p.name)).toContain(NEW);
+  });
+
+  it("never leaves out a package npm has released, even without a changelog entry", async () => {
+    const pkgs = at("0.9.1");
+    const r = await releaseGroup(pkgs, "0.9.1", () => undefined, npm(["0.9.0"], "0.9.0"));
+    expect(r.notYetReleased).toEqual([]);
+    expect(r.group).toHaveLength(pkgs.length);
   });
 });
