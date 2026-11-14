@@ -6,9 +6,9 @@ A consumer pins the keys below by key id, and must refuse a release whose `signi
 
 ## Keys
 
-| Key id | Algorithm | Public key (raw 32 bytes, base64) | Status | Since |
-|---|---|---|---|---|
-| `cloudhal-release-2026a` | Ed25519 | `7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=` | active | 2026-11-12 |
+| Key id | Algorithm | Public key (raw 32 bytes, base64) | Status | Since | Not after |
+|---|---|---|---|---|---|
+| `cloudhal-release-2026a` | Ed25519 | `7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=` | active | 2026-11-12 | 2027-11-12 |
 
 Other forms of `cloudhal-release-2026a`, for cross-checking:
 
@@ -21,6 +21,8 @@ Other forms of `cloudhal-release-2026a`, for cross-checking:
   MCowBQYDK2VwAyEA7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=
   -----END PUBLIC KEY-----
   ```
+
+A key signs nothing after its **not after** date, and `bundle-sign` refuses to sign once that date is less than 90 days away (RFC-0046 §9). The 90 days are the rotation window: the next key is announced here at least 30 days before its first use, while the old one can still sign. What the date means for releases the key has already signed is set together with the signed key list (RFC-0046 §9).
 
 Statuses:
 
@@ -43,9 +45,9 @@ Releases are immutable and can never gain an asset, so a release signed by a rev
 
 ## Rotation
 
-1. Generate the new key pair offline. Name it `cloudhal-release-<year><letter>` (for example `cloudhal-release-2027a`).
+1. Start no later than 120 days before the active key's **not after** date. `bundle-sign` refuses once fewer than 90 remain, and the new key needs its 30-day announcement. Generate the new key pair offline. Name it `cloudhal-release-<year><letter>` (for example `cloudhal-release-2027a`).
 2. Add a row for it to the table above with status `active` in a reviewed pull request, at least 30 days before its first use, so consumers can pin it in time. Until the signed `keys.json` of RFC-0046 §9 exists, this file is the announcement.
-3. Replace the `RELEASE_SIGNING_KEY` secret of `release-signing`, update the inline key id and public key in the `bundle-sign` job (the test that keeps them equal to this file fails until both agree), and run the release workflow's dry run (`workflow_dispatch`, `dry_run: true`).
+3. Replace the `RELEASE_SIGNING_KEY` secret of `release-signing`, update the inline key id, public key and not-after date in the `bundle-sign` job (the test that keeps them equal to this file fails until both agree), and run the release workflow's dry run (`workflow_dispatch`, `dry_run: true`).
 4. Set the old key's status to `retiring` in this file. Keep it pinned by consumers for as long as releases it signed are installed.
 5. A compromised key goes straight to `revoked` here, with an advisory under [SECURITY.md](../../SECURITY.md), and the next release is signed with the new key.
 

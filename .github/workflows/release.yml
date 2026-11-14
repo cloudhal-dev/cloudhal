@@ -194,7 +194,12 @@ jobs:
           // The active release key (docs/security/release-signing-keys.md; a test keeps them equal).
           const PINNED_KEY_ID = "cloudhal-release-2026a";
           const PINNED_PUBLIC_KEY = "7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=";
+          const PINNED_NOT_AFTER = "2027-11-12T00:00:00Z";
           const fail = (m) => { console.error(`bundle-sign: ${m}`); process.exit(1); };
+          // RFC-0046 §9: no new signature within 90 days of the key's notAfter, so consumers get the
+          // next key in time. Dry runs check it too, so a dry run warns before a release fails.
+          const daysLeft = (Date.parse(PINNED_NOT_AFTER) - Date.now()) / 86_400_000;
+          if (!(daysLeft >= 90)) fail(`${PINNED_KEY_ID} expires on ${PINNED_NOT_AFTER.slice(0, 10)}, under 90 days away: rotate it first (docs/security/release-signing-keys.md, Rotation)`);
           const dryRun = process.env.DRY_RUN === "true";
           const keyId = dryRun ? `dryrun-${process.env.GITHUB_RUN_ID}` : PINNED_KEY_ID;
           if (process.env.KEY_ID !== keyId) fail("KEY_ID is not the key this run signs with");
