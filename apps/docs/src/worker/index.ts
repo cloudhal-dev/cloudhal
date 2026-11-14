@@ -4,11 +4,20 @@
  * - `/mcp`: the read-only docs MCP (`mcp.ts`), rate limited per IP;
  * - `Accept: text/markdown` on a page answers its Markdown copy, with `Vary: Accept` and an
  *   `x-markdown-tokens` estimate (RFC-0037 §4);
+ * - `/.well-known/cloudhal/yanked.json` and `.sig`: the signed yank list, from the `yank-list`
+ *   branch, served only as a pair that verifies (`trust.ts`, RFC-0046 §9);
  * - everything else goes to the assets binding unchanged.
  */
 import { SEARCH_INDEX_PATH, type SearchIndex } from "../lib/search.ts";
 import { CORS, handleMcp } from "./mcp.ts";
 import { isPagePath, markdownPath, pageId } from "./paths.ts";
+import {
+  cachePairStore,
+  KEY_LIST_PATH,
+  type PairCache,
+  YANK_LIST_PATHS,
+  yankList,
+} from "./trust.ts";
 
 /** The parts of the Workers bindings this script uses. */
 export interface Env {
@@ -33,6 +42,18 @@ function loadIndex(env: Env, origin: string): Promise<SearchIndex> {
 async function markdownAsset(env: Env, origin: string, path: string): Promise<string | undefined> {
   const res = await env.ASSETS.fetch(new Request(new URL(path, origin)));
   return res.status === 200 ? res.text() : undefined;
+}
+
+/** The colo's cache (`caches.default`) on workerd; absent under Node (tests). */
+const colo = (globalThis as { caches?: { default?: PairCache } }).caches?.default;
+
+async function staticBytes(
+  env: Env,
+  origin: string,
+  path: string,
+): Promise<Uint8Array<ArrayBuffer> | undefined> {
+  const res = await env.ASSETS.fetch(new Request(new URL(path, origin)));
+  return res.status === 200 ? new Uint8Array(await res.arrayBuffer()) : undefined;
 }
 
 /** True when the client asks for Markdown (`text/markdown` in `Accept`, not with `q=0`). */
@@ -89,6 +110,11 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/mcp" || url.pathname === "/mcp/") return mcp(request, env, url);
+    if (Object.hasOwn(YANK_LIST_PATHS, url.pathname))
+      return yankList(request, url.pathname, {
+        keyList: () => staticBytes(env, url.origin, KEY_LIST_PATH),
+        ...(colo ? { store: cachePairStore(colo) } : {}),
+      });
     const page =
       (request.method === "GET" || request.method === "HEAD") && isPagePath(url.pathname);
     return page ? negotiate(request, env, url) : env.ASSETS.fetch(request);

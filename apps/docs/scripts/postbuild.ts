@@ -6,8 +6,12 @@
  *   fails when a schema's `$id` is not its URL here;
  * - every page as Markdown at `<path>.md` and `<path>/index.md`, links absolute;
  * - `/llms.txt`, `/llms-full.txt` and one pair per section (llmstxt.org);
- * - the docs MCP's search index (`/_mcp/search-index.json`, read by `src/worker`).
+ * - the docs MCP's search index (`/_mcp/search-index.json`, read by `src/worker`);
+ * - the root-signed key list at `/.well-known/cloudhal/keys.json` and `.sig`, from the repo's
+ *   `security/` once the root ceremony has made them (RFC-0046 §9; `yanked.json` is served live by
+ *   `src/worker/trust.ts`).
  */
+import { existsSync } from "node:fs";
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,7 +118,18 @@ async function writeLlms(pages: readonly Page[], schemas: readonly SchemaEntry[]
   }
 }
 
+/** `security/keys.json` and `.sig`, when both exist, at `/.well-known/cloudhal/`. */
+async function copyKeyList(): Promise<boolean> {
+  const files = ["keys.json", "keys.json.sig"].map((f) => path.join(REPO, "security", f));
+  if (!files.every((f) => existsSync(f))) return false;
+  const out = path.join(DIST, ".well-known/cloudhal");
+  await mkdir(out, { recursive: true });
+  for (const f of files) await cp(f, path.join(out, path.basename(f)));
+  return true;
+}
+
 await cp(path.join(APP, "static"), DIST, { recursive: true });
+const keyList = await copyKeyList();
 await writeFile(path.join(DIST, "_redirects"), `${redirectLines().join("\n")}\n`);
 const schemas = await copySchemas();
 const pages = allPages(REPO, true);
@@ -122,4 +137,6 @@ await writeMarkdown(pages);
 await writeLlms(pages, schemas);
 await mkdir(path.dirname(path.join(DIST, SEARCH_INDEX_PATH)), { recursive: true });
 await writeFile(path.join(DIST, SEARCH_INDEX_PATH), JSON.stringify(buildSearchIndex(pages)));
-console.log(`cloudhal.dev: ${pages.length} pages, ${schemas.length} schemas`);
+console.log(
+  `cloudhal.dev: ${pages.length} pages, ${schemas.length} schemas${keyList ? ", keys.json" : ""}`,
+);

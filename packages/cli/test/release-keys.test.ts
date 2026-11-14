@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   checkAppendOnly,
   main,
+  mergeYankList,
   type PublicKeyFile,
   rootInit,
   signKeys,
@@ -323,6 +324,38 @@ describe("sign-yanked", () => {
     expect(() => checkAppendOnly(empty, undefined)).not.toThrow();
   });
 
+  it("carries every published entry forward and adds an emergency yank or revocation", () => {
+    const published = {
+      versions: [{ version: "0.9.3", yankedAt: "2026-11-19T00:00:00Z", reason: "a" }],
+      revokedKeys: [],
+    };
+    const merged = mergeYankList(empty, published, { yank: "0.9.4", reason: "Data loss." }, NOW);
+    expect(merged.versions.map((v) => v.version)).toEqual(["0.9.3", "0.9.4"]);
+    expect(merged.versions[1]).toEqual({
+      version: "0.9.4",
+      yankedAt: iso(NOW),
+      reason: "Data loss.",
+    });
+    const revoked = mergeYankList(
+      empty,
+      undefined,
+      { revoke: "cloudhal-release-2026a", reason: "Exposed." },
+      NOW,
+    );
+    expect(revoked.revokedKeys.map((k) => k.keyId)).toEqual(["cloudhal-release-2026a"]);
+    // A yank already listed keeps its first date and reason.
+    expect(
+      mergeYankList(empty, published, { yank: "0.9.3", reason: "again" }, NOW).versions,
+    ).toEqual(published.versions);
+    expect(() => mergeYankList(empty, undefined, { yank: "0.9.4" }, NOW)).toThrow(/needs a reason/);
+    expect(() =>
+      mergeYankList(empty, undefined, { yank: "v0.9.4; rm -rf /", reason: "x" }, NOW),
+    ).toThrow(/not a version/);
+    expect(() => mergeYankList(empty, undefined, { revoke: "Bad Key", reason: "x" }, NOW)).toThrow(
+      /not a key id/,
+    );
+  });
+
   it("numbers each list one above the published one (rollback protection)", async () => {
     const s = await setup();
     const base = {
@@ -335,13 +368,131 @@ describe("sign-yanked", () => {
       now: NOW,
     };
     const first = await signYanked({ ...base, published: undefined });
-    const firstDoc = JSON.parse(new TextDecoder().decode(first.document));
-    expect(firstDoc.serial).toBe(1);
-    const next = await signYanked({ ...base, published: firstDoc });
+    expect(JSON.parse(new TextDecoder().decode(first.document)).serial).toBe(1);
+    const next = await signYanked({ ...base, published: first });
     expect(JSON.parse(new TextDecoder().decode(next.document)).serial).toBe(2);
-    await expect(signYanked({ ...base, published: { ...empty } as never })).rejects.toThrow(
-      /no serial/,
-    );
+  });
+
+  describe("the published list is verified before anything of it is carried forward", () => {
+    const yanks = {
+      versions: [{ version: "0.9.3", yankedAt: "2026-11-19T00:00:00Z", reason: "Broken." }],
+      revokedKeys: [],
+    };
+    async function published() {
+      const s = await setup();
+      const base = {
+        keyId: "cloudhal-yank-2026a",
+        keyPem: s.pem,
+        keyList: s.keyList,
+        roots: s.rootsOf,
+        source: empty,
+        out: tmp(),
+        now: NOW,
+      };
+      // Published by an earlier run with an emergency yank that is not in the source yet.
+      const pair = await signYanked({
+        ...base,
+        published: undefined,
+        extra: { yank: "0.9.3", reason: "Broken." },
+      });
+      return { s, base, pair };
+    }
+
+    it("carries a list that verifies forward", async () => {
+      const { base, pair } = await published();
+      const next = await signYanked({ ...base, published: pair });
+      const doc = JSON.parse(new TextDecoder().decode(next.document));
+      expect(doc.versions.map((v: { version: string }) => v.version)).toEqual(["0.9.3"]);
+    });
+
+    it("refuses a crafted list pushed to the branch: wrong signature, edited bytes, another signer", async () => {
+      const { base, pair } = await published();
+      const out = tmp();
+      // Someone with contents: write drops the yank and keeps the old signature.
+      const edited = new TextEncoder().encode(
+        new TextDecoder().decode(pair.document).replace('"0.9.3"', '"0.9.9"'),
+      );
+      await expect(
+        signYanked({ ...base, out, published: { document: edited, signature: pair.signature } }),
+      ).rejects.toThrow(/published yank list does not verify.*nothing signed/);
+      const forged = new Uint8Array(pair.signature);
+      forged[0] = (forged[0] as number) ^ 1;
+      await expect(
+        signYanked({ ...base, out, published: { document: pair.document, signature: forged } }),
+      ).rejects.toThrow(/does not verify/);
+      const crafted = new TextEncoder().encode(
+        JSON.stringify({ ...yanks, serial: 9, signing: { keyId: "cloudhal-yank-2099a" } }),
+      );
+      await expect(
+        signYanked({ ...base, out, published: { document: crafted, signature: forged } }),
+      ).rejects.toThrow(
+        /cloudhal-yank-2099a, which keys.json does not list as a yank key.*--rotate/,
+      );
+      expect(readdirSync(out)).toEqual([]);
+    });
+
+    it("refuses an expired published list unless the operator accepts it (still verified)", async () => {
+      const { base, pair } = await published();
+      const later = { ...base, now: NOW + 31 * DAY };
+      await expect(signYanked({ ...later, published: pair })).rejects.toThrow(/stale-yank-list/);
+      const next = await signYanked({ ...later, published: pair, acceptExpired: true });
+      expect(JSON.parse(new TextDecoder().decode(next.document)).serial).toBe(2);
+      const forged = new Uint8Array(pair.signature);
+      forged[1] = (forged[1] as number) ^ 1;
+      await expect(
+        signYanked({
+          ...later,
+          published: { document: pair.document, signature: forged },
+          acceptExpired: true,
+        }),
+      ).rejects.toThrow(/does not verify/);
+    });
+
+    it("--rotate starts the new key's list at serial 1 from the source alone", async () => {
+      const { base, pair } = await published();
+      // The same key cannot "rotate" (that would prune its own list).
+      await expect(signYanked({ ...base, published: pair, rotate: true })).rejects.toThrow(
+        /already signed by cloudhal-yank-2026a/,
+      );
+      await expect(signYanked({ ...base, published: undefined, rotate: true })).rejects.toThrow(
+        /needs the published list/,
+      );
+      const oldKeyList = new TextEncoder().encode(
+        new TextDecoder()
+          .decode(pair.document)
+          .replaceAll("cloudhal-yank-2026a", "cloudhal-yank-2025a"),
+      );
+      const fresh = await signYanked({
+        ...base,
+        source: yanks,
+        published: { document: oldKeyList, signature: pair.signature },
+        rotate: true,
+      });
+      const doc = JSON.parse(new TextDecoder().decode(fresh.document));
+      expect(doc.serial).toBe(1);
+      expect(doc.versions.map((v: { version: string }) => v.version)).toEqual(["0.9.3"]);
+    });
+
+    it("takes several comma-separated emergency entries, each validated", async () => {
+      const merged = mergeYankList(
+        empty,
+        undefined,
+        { yank: "0.9.4, 0.9.5", revoke: "cloudhal-release-2026a", reason: "Data loss." },
+        NOW,
+      );
+      expect(merged.versions.map((v) => v.version)).toEqual(["0.9.4", "0.9.5"]);
+      expect(merged.revokedKeys.map((k) => k.keyId)).toEqual(["cloudhal-release-2026a"]);
+      expect(() =>
+        mergeYankList(empty, undefined, { yank: "0.9.4,,0.9.5", reason: "x" }, NOW),
+      ).toThrow(/empty item/);
+      expect(() =>
+        mergeYankList(empty, undefined, { yank: "0.9.4,-rf", reason: "x" }, NOW),
+      ).toThrow(/not a version: -rf/);
+      const many = Array.from({ length: 21 }, (_, i) => `0.9.${i}`).join(",");
+      expect(() => mergeYankList(empty, undefined, { yank: many, reason: "x" }, NOW)).toThrow(
+        /at most 20/,
+      );
+    });
   });
 
   it("the CLI reads the key from RELEASE_YANK_KEY, never prints it, and needs --published or --first-run", async () => {
@@ -434,14 +585,18 @@ describe("a yank-key rotation, end to end", () => {
       keyPem: readFileSync(path.join(c.dir, "cloudhal-yank-2026b.pem"), "utf8"),
       keyList: keysT2,
       roots: roots(c.root),
-      published: JSON.parse(new TextDecoder().decode(old.document)),
+      published: old,
       out: tmp(),
       now: NOW,
     };
+    // The old key's list is carried forward even when the source does not list its entries yet
+    // (an emergency yank, say); a crafted one fails the old key's signature.
+    const fresh = await signYanked({ ...base, source: { versions: [], revokedKeys: [] } });
+    const forged = new Uint8Array(old.signature);
+    forged[0] = (forged[0] as number) ^ 1;
     await expect(
-      signYanked({ ...base, source: { versions: [], revokedKeys: [] } }),
-    ).rejects.toThrow(/drops 0.9.3/);
-    const fresh = await signYanked({ ...base, source: yanks });
+      signYanked({ ...base, source: yanks, published: { ...old, signature: forged } }),
+    ).rejects.toThrow(/signed by the replaced key cloudhal-yank-2026a\) does not verify/);
     const doc = JSON.parse(new TextDecoder().decode(fresh.document));
     expect(doc.signing.keyId).toBe("cloudhal-yank-2026b");
     expect(doc.serial).toBe(2);

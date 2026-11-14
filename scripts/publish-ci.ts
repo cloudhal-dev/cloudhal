@@ -57,6 +57,7 @@ import {
   runPublish,
   tagFor,
 } from "./release-publish-plan.ts";
+import { trustAssets } from "./release-trust-assets.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = process.env.GITHUB_REPOSITORY ?? "cloudhal-dev/cloudhal";
@@ -160,21 +161,30 @@ export async function verifyAsConsumer(
   dir: string,
   version: string,
   publicKeys: Readonly<Record<string, string>>,
-  yanked?: unknown,
+  /** The verified key and yank lists (`trustAssets`), applied as consumers apply them. */
+  trust: { readonly keys?: unknown; readonly yanked?: unknown } = {},
 ): Promise<void> {
   const rv = await import("../packages/release-verify/src/index.ts");
+  type Lists = NonNullable<Parameters<typeof rv.mergeTrust>[1]>;
   const read = (name: string) => readFileSync(path.join(dir, name));
   // The pinned record (with its window) when the key is the pinned one; a dry run's throwaway key
   // has no window.
-  const keys = Object.fromEntries(
+  const pinned = Object.fromEntries(
     Object.entries(publicKeys).map(([id, publicKey]) => {
-      const pinned = Object.hasOwn(rv.PINNED_KEYS, id) ? rv.PINNED_KEYS[id] : undefined;
+      const record = Object.hasOwn(rv.PINNED_KEYS, id) ? rv.PINNED_KEYS[id] : undefined;
       return [
         id,
-        pinned?.publicKey === publicKey ? pinned : { publicKey, status: "active" as const },
+        record?.publicKey === publicKey ? record : { publicKey, status: "active" as const },
       ];
     }),
   );
+  const lists = {
+    ...(trust.keys ? { keys: trust.keys as Lists["keys"] } : {}),
+    ...(trust.yanked ? { yanked: trust.yanked as Lists["yanked"] } : {}),
+  } as Lists;
+  // Exactly what a consumer does: revocations and statuses of both lists reduce the pinned keys.
+  const keys = rv.mergeTrust(pinned, lists);
+  const yanked = lists.yanked;
   const release = await rv.verifyRelease({
     request: { version },
     statement: read("release-statement.json"),
@@ -183,9 +193,7 @@ export async function verifyAsConsumer(
     tarball: () => read(`cloudhal-release-${version}.tar.gz`),
     planVersion: Number.MAX_SAFE_INTEGER,
     keys,
-    ...(yanked
-      ? { yanked: yanked as NonNullable<Parameters<typeof rv.verifyRelease>[0]["yanked"]> }
-      : {}),
+    ...(yanked ? { yanked } : {}),
   });
   for await (const _ of release.entries()) {
     // every entry verified
@@ -355,16 +363,22 @@ export async function main(argv: readonly string[]): Promise<void> {
         dryRunPublicKey: process.env.RELEASE_DRYRUN_PUBLIC_KEY,
       })
     : {};
-  // Before anything is created or uploaded: every consumer's own verifier accepts this bundle.
-  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys);
+  const releases = port.releases(tag);
+  const loaded = bundleDir ? loadBundle(bundleDir, version, publicKeys) : null;
+  // RFC-0046 §9: the verified key list and yank list ride along as a snapshot (none before the
+  // root ceremony; a resumed run of a published release reuses what it carries).
+  const trust = loaded ? await trustAssets({ root: ROOT, release: releases[0] ?? null }) : null;
+  // Before anything is created or uploaded: every consumer's own verifier accepts this bundle,
+  // the yank list included once there is one.
+  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys, trust ?? {});
   const steps = await runPublish(port, {
     version,
     head: sh("git", ["rev-parse", "HEAD"], true).trim(),
     dryRun,
     ...(runNumber ? { runNumber } : {}),
-    bundle: bundleDir ? loadBundle(bundleDir, version, publicKeys) : null,
+    bundle: loaded ? { ...loaded, assets: [...loaded.assets, ...(trust?.assets ?? [])] } : null,
     tagCommit: dryRun ? null : remoteTagCommit(tag),
-    releases: port.releases(tag),
+    releases,
     packages: pkgs.map((p) => p.name),
     npmMissing: missing.map((p) => p.name),
     tags: sh("git", ["tag", "--list", "v*"], true).split("\n").filter(Boolean),

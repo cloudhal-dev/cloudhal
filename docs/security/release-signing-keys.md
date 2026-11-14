@@ -66,9 +66,11 @@ None yet. The owner's root ceremony adds the first row (see *First-time setup* b
 - **`yanked.json`** (`cloudhal.release-yank-list@1`, signed by the yank key in `yanked.json.sig`).
   - It lists yanked versions and revoked release key ids.
   - It expires exactly 30 days after `issuedAt`, and carries a signed `serial`, one higher at every signing. A weekly workflow in `release-yank` re-signs it from `security/yank-list.json`, which is append-only.
+  - Before the workflow carries the published list forward, `sign-yanked` verifies it exactly as a consumer would: its signature by the active yank key of the pinned-root `keys.json`, its schema and its freshness. A list that fails fails the run loudly and is never re-signed.
   - The CLI remembers the highest serial it has seen and refuses a lower one, which would be a rolled-back list. A stateless consumer, such as a Worker, cannot detect a rollback inside the 30 days.
   - A stale `yanked.json` blocks `cloudhal deploy --release` only; installed sites keep running.
 - **Where they live.** `https://cloudhal.dev/.well-known/cloudhal/keys.json` and `.../yanked.json`, each with its `.sig`. Every GitHub release also attaches the copies current when it was made. The signatures make the location trust-free.
+  - cloudhal.dev serves `yanked.json` and its `.sig` only as a pair whose signature verifies with the yank key of its static `keys.json`, cached together for at most five minutes. When the `yank-list` branch answers a mismatched pair (GitHub's raw CDN caches each file on its own) or fails, it serves the last good pair, else 502.
 - **How consumers use them.** Online consumers fetch both on every run and refuse when a fetch or a check fails. They use both only to reduce trust in the keys they pin (`mergeTrust`).
 
 ## Custody of the release key
@@ -91,10 +93,14 @@ This runs once, offline where it says so. Nobody else generates or holds these k
 3. **Yank key.** Run `node scripts/release-keys.ts yank-init --key-id cloudhal-yank-2026a --out <dir>`. It writes `<dir>/cloudhal-yank-2026a.pem` (mode 0600, never printed) and `<dir>/cloudhal-yank-2026a.pub.json`.
 4. **Environment.** In the repository settings, create the environment `release-yank`, with deployment branches `main` only and no required reviewer. Set its secret: `gh secret set RELEASE_YANK_KEY --env release-yank < <dir>/cloudhal-yank-2026a.pem`. Then move the `.pem` file to offline storage.
 5. **First `keys.json`.** List `cloudhal-release-2026a` and `cloudhal-yank-2026a` in `security/keys.source.json`, then run `node scripts/release-keys.ts sign-keys --root-key <dir>/cloudhal-root-2026a.key.enc --root-pub <dir>/cloudhal-root-2026a.pub.json`. It writes `security/keys.json` and `security/keys.json.sig`, after verifying the exact signed bytes as a consumer would.
-6. **Publish the key list.** Commit `security/keys.json`, `security/keys.json.sig` and `security/keys.source.json` in a reviewed pull request. The yank list needs it on `main` (the workflow reads `security/keys.json`).
-7. **Protect the `yank-list` branch** (arrives with the second #226 PR). Add a ruleset for the branch `yank-list`: block force pushes, restrict deletions, and restrict updates with GitHub Actions as the only bypass.
-8. **First `yanked.json`** (arrives with the second #226 PR). Run the *Yank list* workflow once by hand with `first_run` checked. After that it runs weekly.
-9. **Deploy cloudhal.dev once** (arrives with the second #226 PR). Run `pnpm --filter @cloudhal/docs run deploy`, so that `/.well-known/cloudhal/` serves both lists.
+6. **Publish the key list.** Commit `security/keys.json`, `security/keys.json.sig` and `security/keys.source.json` in a reviewed pull request. The yank list needs it on `main` (the workflow reads `security/keys.json`). **Merge it only while no release is pending, and do steps 7 to 9 straight after:** from this merge on, every release attaches the trust lists and refuses to publish until cloudhal.dev serves a `yanked.json` that verifies.
+7. **Protect the `yank-list` branch, with a deploy key as its only writer.**
+   - Run `ssh-keygen -t ed25519 -N "" -C yank-list -f <dir>/yank-list-deploy`. Add `<dir>/yank-list-deploy.pub` as a deploy key of the repository with write access, named `yank-list`. Set the private half as a secret of `release-yank`: `gh secret set YANK_LIST_DEPLOY_KEY --env release-yank < <dir>/yank-list-deploy`. Then delete both files.
+   - In the repository settings, add a ruleset for the branch `yank-list`: block force pushes, restrict deletions, and restrict updates, with the `yank-list` deploy key as the **only** bypass actor (not "GitHub Actions", which would let every workflow's token with `contents: write` push).
+   - The branch then only ever gains commits, and only from a job that holds the deploy key, which is a job in `release-yank` on `main`.
+   - **What remains.** Anyone who can run a job in `release-yank` (a reviewed change to a workflow on `main`) or a repository admin (who can edit the ruleset) can push to it. A deploy key with write access can also push to other branches no ruleset protects. Such a push can only deny service: a crafted list fails the next run and the cloudhal.dev pair check. A replayed older, genuinely signed pair would be served to stateless consumers until it expires (at most 30 days); consumers with memory refuse it. A rollback needs a new commit that the branch history shows.
+8. **First `yanked.json`.** Run the *Yank list* workflow once by hand with `first_run` checked (Actions › Yank list › Run workflow). It creates the `yank-list` branch with serial 1. After that it runs weekly, on Mondays. Before `security/keys.json` exists, the weekly run skips with a notice.
+9. **Deploy cloudhal.dev once.** Run `pnpm --filter @cloudhal/docs run deploy`. This ships the Worker route that serves `/.well-known/cloudhal/yanked.json` from the branch, and the static `keys.json`. Nothing deploys cloudhal.dev automatically yet, so redeploy it after every change to `security/keys.json` as well.
 
 ## Rotation (yearly)
 
@@ -112,16 +118,21 @@ This runs once, offline where it says so. Nobody else generates or holds these k
 
 ## Revocation (emergency)
 
-1. **Revoke at once with the yank key.** Add `{ keyId, revokedAt, reason }` to `revokedKeys` in `security/yank-list.json`, in a reviewed pull request, then run the *Yank list* workflow by hand. Within minutes every online consumer refuses the key. This does not need the offline root.
+1. **Revoke at once with the yank key.** Run the *Yank list* workflow by hand with `revoke` set to the key id (several: comma-separated) and a `reason`. Wait for a running *Yank list* run to finish before you start another: GitHub keeps one pending run per workflow and cancels an older pending one. A failed or cancelled run opens (or comments on) the issue "Yank list run failed"; check its inputs and run it again. Within minutes every online consumer refuses the key. This does not need the offline root. Then record the entry in `security/yank-list.json` in a reviewed pull request. Published entries are carried forward anyway, so the record never decides whether the revocation stays.
 2. **Make it permanent with the root, within days.** Set the key to `revoked` in `security/keys.source.json`, re-sign `keys.json` with the root, publish it, and mark the key's row `revoked` above. Until then, the revocation rests on the yank key alone, which a stateless consumer would lose if the yank key were also stolen.
 3. **Tell people.** Publish an advisory under [SECURITY.md](../../SECURITY.md).
 4. **Recover.** Rotate to a new release key (*Rotation*, steps 2 to 4) and release a new version signed by it.
-5. **A stolen yank key.** It can deny service, and for stateless consumers it can undo yanks and revocations. Revoke it in `keys.json` with the root, generate a new yank key (`yank-init`), list it as the only `active` yank key in the same `keys.json`, and replace `RELEASE_YANK_KEY`. The new key's first list carries every yank and revocation that still matters. Consumers with memory start a new memory with the new key.
+5. **A stolen yank key, or the yank key's rotation.** A stolen key can deny service, and for stateless consumers it can undo yanks and revocations.
+   - Generate a new yank key (`yank-init`). In one `keys.json`, set the old key `revoked` (stolen) or `retiring` (rotation), keeping it listed, and list the new key as the only `active` yank key. Re-sign it with the root and publish it as in *First-time setup*, steps 6 and 9.
+   - Replace `RELEASE_YANK_KEY`, and the key id in `.github/workflows/yank-list.yml`'s Sign step.
+   - Let the next run sign (or run the *Yank list* workflow by hand). It verifies the old key's published list with the old key as `keys.json` lists it, carries every entry forward, and continues the serial. Consumers with memory move to the new key, because the newer `keys.json` no longer lists the old one as active; they refuse the old key from then on.
+   - **Pruning, or a stolen key whose list you no longer trust:** record every yank and revocation that still matters in `security/yank-list.json` first, then run the workflow once with `rotate` checked. It carries nothing of the old key's list forward and starts again at serial 1.
 
 ## Yanking a version
 
-1. **List it.** Add `{ version, yankedAt, reason }` to `versions` in `security/yank-list.json`, in a reviewed pull request. The list is append-only: an entry is never removed, and `sign-yanked` refuses a list that drops an entry of the currently published one.
-2. **Re-sign.** Run the *Yank list* workflow by hand. From then on `cloudhal deploy --release` and every other consumer refuse that version. Installed copies keep running.
+1. **Yank it now.** Run the *Yank list* workflow by hand with `yank` set to the version (several: comma-separated) and a `reason`. As with a revocation, wait for a running *Yank list* run to finish first. From then on `cloudhal deploy --release` and every other consumer refuse that version. Installed copies keep running.
+2. **Record it.** Add `{ version, yankedAt, reason }` to `versions` in `security/yank-list.json`, in a reviewed pull request. The list is append-only: the workflow carries every published entry forward, and `sign-yanked` refuses a list that drops one. For a yank that can wait, this pull request alone is enough, and the next weekly run publishes it.
+4. **After an outage.** If the published list expired (no successful run for 30 days), the next run refuses to carry it forward. Run the workflow once with `accept_expired` checked: the old list is still verified (signature, schema, the key's window as of its issue), then re-signed fresh.
 3. **Fix forward.** Release a fixed version. A yank is never undone.
 
 ## Verifying a release
