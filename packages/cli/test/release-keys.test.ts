@@ -19,7 +19,12 @@ import {
   validateReleaseKeys,
   validateReleaseYankList,
 } from "../../release-verify/src/generated/validators.js";
-import { PINNED_KEYS, verifyKeys, verifyYanked } from "../../release-verify/src/index.ts";
+import {
+  PINNED_KEYS,
+  rememberYanks,
+  verifyKeys,
+  verifyYanked,
+} from "../../release-verify/src/index.ts";
 import { job, RELEASE, step } from "./fixtures/release-bundle/workflow-text.ts";
 
 const dirs: string[] = [];
@@ -367,6 +372,110 @@ describe("sign-yanked", () => {
     expect(process.env.RELEASE_YANK_KEY).toBeUndefined();
     expect(lines.join("\n")).not.toContain("PRIVATE KEY");
     expect(readFileSync(path.join(out, "yanked.json.sig")).length).toBe(64);
+  });
+});
+
+describe("a yank-key rotation, end to end", () => {
+  it("signs the new key's first list over the old one's, carrying every entry, and moves a CLI's memory", async () => {
+    const c = ceremony();
+    const T1 = NOW - 2 * 3_600_000;
+    const T2 = NOW - 3_600_000;
+    const sign = (source: { keys: unknown[] }, now: number) =>
+      signKeys({
+        rootKey: rootKeyOf(c.dir),
+        passphrase: PASS,
+        rootPub: c.root,
+        source,
+        out: tmp(),
+        now,
+      });
+    const verified = (list: { document: Uint8Array; signature: Uint8Array }, now: number) =>
+      verifyKeys({ ...list, roots: roots(c.root), now: new Date(now) });
+    const yanks = {
+      versions: [{ version: "0.9.3", yankedAt: iso(T1), reason: "Broken." }],
+      revokedKeys: [{ keyId: "cloudhal-release-2025a", revokedAt: iso(T1), reason: "Old." }],
+    };
+
+    // 1. A list published under cloudhal-yank-2026a, with keys.json T1.
+    const keysT1 = await sign(c.source, T1);
+    const old = await signYanked({
+      keyId: "cloudhal-yank-2026a",
+      keyPem: readFileSync(path.join(c.dir, "cloudhal-yank-2026a.pem"), "utf8"),
+      keyList: keysT1,
+      roots: roots(c.root),
+      source: yanks,
+      published: undefined,
+      out: tmp(),
+      now: T1,
+    });
+    const k1 = await verified(keysT1, T1);
+    const memoryT1 = rememberYanks(await verifyYanked({ ...old, keys: k1, now: new Date(T1) }), k1);
+
+    // 2. The root signs T2: 2026a revoked, 2026b the only active yank key.
+    const next = yankInit({ keyId: "cloudhal-yank-2026b", out: c.dir, log: quiet });
+    const [release, yank] = c.source.keys as unknown as [
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ];
+    const keysT2 = await sign(
+      {
+        keys: [
+          release,
+          { ...yank, status: "revoked" },
+          { ...yank, keyId: "cloudhal-yank-2026b", publicKey: next.publicKey },
+        ],
+      },
+      T2,
+    );
+
+    // 3. sign-yanked with the new key over the published list: every entry carried forward.
+    const base = {
+      keyId: "cloudhal-yank-2026b",
+      keyPem: readFileSync(path.join(c.dir, "cloudhal-yank-2026b.pem"), "utf8"),
+      keyList: keysT2,
+      roots: roots(c.root),
+      published: JSON.parse(new TextDecoder().decode(old.document)),
+      out: tmp(),
+      now: NOW,
+    };
+    await expect(
+      signYanked({ ...base, source: { versions: [], revokedKeys: [] } }),
+    ).rejects.toThrow(/drops 0.9.3/);
+    const fresh = await signYanked({ ...base, source: yanks });
+    const doc = JSON.parse(new TextDecoder().decode(fresh.document));
+    expect(doc.signing.keyId).toBe("cloudhal-yank-2026b");
+    expect(doc.serial).toBe(2);
+    expect(doc.versions).toEqual(yanks.versions);
+    expect(doc.revokedKeys).toEqual(yanks.revokedKeys);
+
+    // 4. A CLI that remembers 2026a at T1 accepts it and moves its memory to 2026b at T2.
+    const k2 = await verifyKeys({
+      ...keysT2,
+      roots: roots(c.root),
+      now: new Date(NOW),
+      memory: memoryT1,
+    });
+    const accepted = await verifyYanked({
+      ...fresh,
+      keys: k2,
+      now: new Date(NOW),
+      memory: memoryT1,
+    });
+    const memoryT2 = rememberYanks(accepted, k2, memoryT1);
+    expect(memoryT2).toMatchObject({
+      keyId: "cloudhal-yank-2026b",
+      serial: 2,
+      keysIssuedAt: iso(T2),
+      retiredYankKeys: ["cloudhal-yank-2026a"],
+    });
+
+    // 5. The old key's list is refused from then on, with either key list.
+    await expect(
+      verifyYanked({ ...old, keys: k1, now: new Date(T1), memory: memoryT2 }),
+    ).rejects.toMatchObject({ code: "key-list-invalid" });
+    await expect(
+      verifyYanked({ ...old, keys: k2, now: new Date(T1), memory: memoryT2 }),
+    ).rejects.toMatchObject({ code: "yank-list-invalid" });
   });
 });
 

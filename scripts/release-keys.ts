@@ -295,13 +295,18 @@ export async function signYanked(o: {
   };
   const signed = signDocument(doc, key, publicKeyOf(listed.publicKey));
   // The published list is the memory this one must keep (serial, every entry), as consumers do.
+  // After a rotation it was signed by the old yank key under an earlier keys.json than this one;
+  // which one is not known here, so the memory names none (the epoch): the current keys.json is
+  // then the newer one, as it is for every consumer that kept that earlier one. Its entries are
+  // still kept, by checkAppendOnly above.
+  const publishedBy = o.published?.signing?.keyId ?? o.keyId;
   const memory = o.published
     ? {
-        keyId: o.published.signing?.keyId ?? o.keyId,
+        keyId: publishedBy,
         serial: o.published.serial,
         versions: o.published.versions.map((v) => v.version),
         revokedKeys: o.published.revokedKeys.map((k) => k.keyId),
-        keysIssuedAt: keys.document.issuedAt,
+        keysIssuedAt: publishedBy === o.keyId ? keys.document.issuedAt : "1970-01-01T00:00:00Z",
         retiredYankKeys: [],
       }
     : undefined;
