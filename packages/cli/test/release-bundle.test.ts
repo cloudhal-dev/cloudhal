@@ -254,4 +254,10 @@ describe("standard manifest facts follow the CLI", () => {
     expect([...standard.ADMIN_SECRETS]).toEqual([...SECRET_KEYS]);
     expect([...standard.SITE_SECRETS].sort()).toEqual([...SITE_SECRET_KEYS].sort());
   });
+
+  it("asks for Workers Admin: an installer creates Workers, which Workers Editor cannot (#225)", () => {
+    const scopes = standard.STANDARD_MANIFEST_FIELDS.requiredScopes as readonly string[];
+    expect(scopes).toContain("workers-scripts.admin");
+    expect(scopes).not.toContain("workers-scripts.edit");
+  });
 });

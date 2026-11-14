@@ -103,6 +103,14 @@ Root `release-manifest.schema.json` (`$id` `https://cloudhal.dev/schemas/v1/rele
 
 It holds `version`, `channel`, `securityRelease`, `commit`, `createdAt`, `contracts`, `levels` (`schedules`, `gates`, …), `migrations` (`first`, `last`, `count`, `names`, `compatibleWithPrevious`), `durableObjects` (`bindings`, `lifecycleChange`), `runtime` (compatibility date and flags), `toolchain`, `theme`, `skills`, `workers.site` and `workers.admin` (`mainModule`, `modules[]` with `path`/`type`/`bytes`/`sha256`, `assets` with `count`/`bytes`/`files[]` with a precomputed `assetHash`, inline `headers`), `bindingTemplates`, `requiredScopes`/`optionalScopes`, `requiredCapabilities`/`optionalCapabilities`, `starter`, `features` (a declared map of booleans: the named flags are required and unknown flags are allowed, so an older deployer ignores a new flag), `planVersion` and `signing`.
 
+Scopes (amended 2026-11-14, #225):
+
+- `requiredScopes` and `optionalScopes` name Cloudflare OAuth scope ids. A deployer asks for every required scope and may ask for optional ones.
+- Installing a release creates the site and admin Workers. Since Cloudflare's granular Worker roles (changelog 2026-09-15), only Workers Admin (`workers-scripts.admin`) can create a Worker. Workers Editor (`workers-scripts.edit`) can only change existing ones. Bundles from the next release on therefore require `workers-scripts.admin`.
+- Manifests up to and including `v0.9.0` name `workers-scripts.edit`. Releases are immutable, so these manifests keep it.
+- A consumer that compares a grant with `requiredScopes` treats `workers-scripts.admin` as covering `workers-scripts.edit`. A consumer that builds a grant from an older manifest asks for `workers-scripts.admin` in its place, because a grant with only `workers-scripts.edit` cannot install a release: the asset upload for a new Worker answers 403.
+- This is the only implied scope. Every other id is compared exactly.
+
 Provenance fields:
 
 - `commit` is the release commit, which is also the commit the tag names.

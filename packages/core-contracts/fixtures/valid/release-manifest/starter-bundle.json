@@ -161,7 +161,7 @@
   },
   "requiredScopes": [
     "account-settings.read",
-    "workers-scripts.edit",
+    "workers-scripts.admin",
     "d1.write",
     "workers-r2.write"
   ],
