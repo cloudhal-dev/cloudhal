@@ -200,74 +200,150 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
 
 - `cloudhal deploy --release <v>`: the CLI installs the standard theme from a verified bundle instead of building it (designed in §11b). Until then the CLI's bytes differ from the bundle's; what is shared is the manifest contract and its guards.
 - Runtime configuration of the standard theme: values baked into its build today (theme settings, block types, installation names, site ids) move to bindings and `CLOUDHAL_CONFIG` vars, so one bundle serves every installation of the standard theme. Custom themes keep building with `cloudhal deploy`. Until then the bundle is the standard `cloudhal init` starter.
-- A WebCrypto reference verifier package (designed in §11a, with one audited dependency), KMS custody, an SBOM, and an independent rebuild check once two builds of one tag are byte-identical.
+- A WebCrypto reference verifier package (designed in §11a), KMS custody, an SBOM, and an independent rebuild check once two builds of one tag are byte-identical.
 
 ### 11. Addendum (2026-11-14, #227): the shared verifier and `cloudhal deploy --release`
 
-§2 says what every consumer checks. This section designs the two consumer tools that §10 left for later: one published verifier that hosts, tools and the CLI share, and the CLI's install from a verified bundle. Signed key lists and yanking stay with §9 and #226. This section only leaves room for them.
+§2 says what every consumer checks. This section designs the two consumer tools that §10 left for later: one published verifier that hosts, tools and the CLI share, and the CLI's install from a verified bundle. The verifier can ship on its own. `deploy --release` depends on #226 (§11b, *Revocation*).
 
 #### 11a. `@cloudhal/release-verify`
 
 A new published package, `packages/release-verify`. It is the reference implementation of §2's six steps and of §7's limits, and there is no second implementation in the repository: `scripts/release-bundle/verify.ts` and the CLI both call it.
 
-- **Runtimes.** The root entry runs on Workers, Node 24 and browsers. It uses WebCrypto Ed25519 (`crypto.subtle.verify`), `DecompressionStream("gzip")` and an incremental SHA-256, because WebCrypto's `digest` cannot stream. The SHA-256 is Workers' native `crypto.DigestStream` where it exists, and otherwise `sha256` from `@noble/hashes`. That package has been independently audited, has no dependencies, and only its SHA-2 module (a few KB) is imported. It is the package's only runtime dependency. A home-grown SHA-256 would be small, but it would be new cryptographic code in the one package whose job is to be trusted. A pinned, audited, zero-dependency hash does that job better. Tests check both paths against the NIST SHA-256 vectors and against `node:crypto` on random inputs.
-- **Validators.** Rule 6 forbids Ajv at runtime. `pnpm gen` writes precompiled standalone validators for exactly `release-manifest` and `release-statement` into `src/generated/`, and the drift check covers them. The package does not depend on `@cloudhal/core-contracts`, so a Worker deployer does not pull in every validator.
-- **Keys.** `PINNED_KEYS` is the table of `docs/security/release-signing-keys.md`, as `{ keyId: { publicKey, status } }`, and a repository test keeps the two equal. A caller may only reduce trust: `revoked: string[]` withdraws key ids. A caller that trusts a key outside the table passes a whole `keys` map, which is a reviewed change on its side. Once #226 lands, a verified `keys.json` feeds the same reduce-only path. A key that is `revoked` is refused. A key past its `notAfter` is refused as well, using the expiry rule that #226 sets for releases a key has already signed (§9).
+- **Runtimes.** The root entry runs on Workers, Node 24 and browsers.
+  - It uses WebCrypto Ed25519 (`crypto.subtle.verify`) and `DecompressionStream("gzip")`.
+  - It needs an incremental SHA-256, because WebCrypto's `digest` cannot stream. It uses Workers' native `crypto.DigestStream` where that exists, and otherwise `sha256` from `@noble/hashes`.
+  - `@noble/hashes` is pinned exactly, and only its SHA-2 module is imported. It is independently audited and has no dependencies.
+  - A home-grown SHA-256 would be small, but it would be new cryptographic code in the one package whose job is to be trusted.
+  - Tests check both paths against the NIST SHA-256 vectors and against `node:crypto` on random inputs.
+- **Validators and runtime dependencies.** Rule 6 forbids compiling schemas at runtime.
+  - `pnpm gen` writes precompiled standalone validators for exactly `release-manifest` and `release-statement` into `src/generated/`, and the drift check covers them.
+  - Ajv's standalone output imports `ajv/dist/runtime/equal`, `ajv/dist/runtime/ucs2length` and the `date-time` format from `ajv-formats`. So the package's runtime dependencies are `@noble/hashes`, `ajv` and `ajv-formats`, pinned through the catalog at core-contracts' versions. Nothing in the package constructs `Ajv`. A test fails when a generated validator imports anything outside those three runtime modules.
+  - The package does not depend on `@cloudhal/core-contracts`, so a Worker deployer does not pull in every validator.
+- **Keys.** `PINNED_KEYS` is the table of `docs/security/release-signing-keys.md` as `{ keyId: { publicKey, status } }`, and a repository test keeps the two equal.
+  - It is frozen into each published version. It cannot learn about a revocation by itself; §11b says how the CLI does.
+  - A caller may only reduce trust. `revoked: string[]` withdraws key ids, and once #226 lands, a verified `keys.json` feeds the same reduce-only path.
+  - A caller that trusts a key outside the table passes a whole `keys` map, which is a reviewed change on its side.
+  - A `revoked` key is refused. `PINNED_KEYS` carries no `notAfter` yet, so the package refuses no key for its age until #226 decides what an expiry date means (§11c).
+- **Entry paths.** Every path in the manifest's module and asset listings, and every tar entry name, is checked before any byte of that entry is used. Paths that break any of these rules are refused with `entry-path`:
+  - no empty segment;
+  - no `.` or `..` segment;
+  - no backslash;
+  - no control character (U+0000 to U+001F, U+007F);
+  - no leading `/`, except the asset form `/<path>` that §3 defines;
+  - at most 512 bytes;
+  - no two paths in one Worker's modules, or in its assets, may be equal after Unicode case folding.
+
+  The check is a single pass over the characters with `split("/")`, not a regular expression, so it is linear in the path's length (AGENTS.md rule 13). The manifest's listings are checked in step 5, before the tarball is read.
 - **API.** Every byte the consumer downloaded goes in. Nothing is re-serialised.
 
   ```ts
   const release = await verifyRelease({
-    request: { version: "0.9.1" },          // channel: derived from the version unless given (invariant 7)
+    request: { version: "0.10.0" },          // channel: derived from the version unless given (invariant 7)
     statement, signature, manifest,           // Uint8Array, exactly as downloaded
     tarball: () => stream,                    // a factory: read twice, see below
     planVersion: 1,                           // the highest planVersion the caller supports
   });
-  for await (const entry of release.entries()) { /* { path, bytes }: verified, see below */ }
+  for await (const entry of release.entries()) { /* { worker, kind, path, type?, bytes }: verified */ }
   ```
 
-  `verifyRelease` runs steps 1 to 5. It then reads the tarball once to check its size and SHA-256 against the statement, so a tarball that does not match is refused before anything is extracted. `entries()` then reads the tarball a second time. It yields an entry only after that entry's size and SHA-256 equal its manifest listing. It throws on an entry the manifest does not list, on anything outside §7's tar format, and, at the end, on a listed entry that never came. A consumer may upload verified entries while it iterates. It must not activate a deployment until the iteration has finished without an error. This keeps a Worker deployer within memory: the tarball is at most 100 MiB and is never held whole.
-- **Errors.** A `ReleaseVerifyError` carries a stable `code`, which is public API: `statement-too-large`, `signature-size`, `key-unknown`, `key-revoked`, `key-expired`, `signature-invalid`, `wrong-version`, `wrong-channel`, `statement-invalid`, `manifest-mismatch`, `manifest-invalid`, `statement-manifest-mismatch` (invariants 4 and 5), `plan-version-unsupported`, `tarball-mismatch`, `tar-format`, `entry-unlisted`, `entry-mismatch`, `entry-missing` and `limit-exceeded`. There is no option that turns a refusal into a warning.
-- **Helpers.** `missingScopes(manifest, granted)` applies §3's scopes rule, so `workers-scripts.admin` covers `workers-scripts.edit`. `releaseAssetUrls(version)` gives the four GitHub download URLs, `https://github.com/cloudhal-dev/cloudhal/releases/download/v<version>/<name>`. Downloading is discovery only, never a trust factor.
-- **The second factor.** The subpath `@cloudhal/release-verify/attestation` is Node-only and runs `gh attestation verify` with §2's exact flags for each of the three files: `--signer-workflow`, `--source-ref refs/heads/main`, `--source-digest <statement.commit>` and `--deny-self-hosted-runners`. It reports `verified`, `failed` or `unavailable` (no `gh`, or not signed in). `failed` is always a refusal.
-- **Tests.** The real `v0.9.0` statement, signature and manifest are committed as fixtures, about 250 KB of signed, immutable data. The tarball, 7.2 MB, is not: it would be by far the largest file in the repository. Tests on those fixtures check:
-  - that they verify with the pinned key;
-  - that a flipped byte in each file is refused;
-  - that a wrong key, and a revoked or expired one, is refused;
-  - that a request for another version or channel is refused;
-  - that a manifest whose `version` differs from the statement's is refused.
+  `verifyRelease` runs steps 1 to 5. It then reads the tarball once to check its size and SHA-256 against the statement, so a tarball that does not match is refused before anything is extracted.
 
-  The real tarball is checked by one opt-in test that runs only when `CLOUDHAL_RELEASE_ASSETS` names a directory holding the downloaded assets. Ordinary test runs skip it and never need the network. A separate CI job fills that directory with `gh release download v0.9.0` and runs only that test. The tarball logic itself is covered on a small synthetic bundle signed with a throwaway key, which tests pass as `keys`. Those tests cover:
-  - a tarball entry that is unlisted, missing or changed;
-  - a tarball that does not match the statement;
-  - `planVersion` above what the caller supports;
-  - every limit in §7.
-- **Versioning and publication.** The package joins the fixed version group (ADR-0013). npm trusted publishing can only be configured on a package that already exists. So the **first publish of `@cloudhal/release-verify` and its trusted-publisher entry are the owner's step** (a manual first publish of the first version, then the entry for `release.yml` and the `npm-publish` environment). The release workflow publishes it from then on.
+  `entries()` reads the tarball a second time. It yields an entry only after its path passes the checks above and its size and SHA-256 equal its manifest listing. A module entry carries its `type` from the manifest. It throws on an entry the manifest does not list, on anything outside §7's tar format, and, at the end, on a listed entry that never came.
 
-#### 11b. `cloudhal deploy --release [<version>]`
+  A consumer may upload verified entries while it iterates. It must not activate a deployment until the iteration has finished without an error. This keeps a Worker deployer within memory: the tarball is at most 100 MiB and is never held whole.
+- **Errors.** A `ReleaseVerifyError` carries a stable `code`, which is public API. There is no option that turns a refusal into a warning. The codes:
+  - `statement-too-large`, `signature-size`, `key-unknown`, `key-revoked`, `signature-invalid`;
+  - `wrong-version`, `wrong-channel`, `statement-invalid`;
+  - `manifest-mismatch`, `manifest-invalid`, `statement-manifest-mismatch` (invariants 4 and 5), `plan-version-unsupported`;
+  - `tarball-mismatch`, `tar-format`, `entry-path`, `entry-unlisted`, `entry-mismatch`, `entry-missing`, `limit-exceeded`.
+- **Helpers.**
+  - `missingScopes(manifest, granted)` compares scope ids exactly, with the one exception §3 defines: `workers-scripts.admin` covers `workers-scripts.edit`.
+  - `releaseAssetUrls(version)` gives the five download URLs of §1, Sigstore bundle included, under `https://github.com/cloudhal-dev/cloudhal/releases/download/v<version>/`. Downloading is discovery only, never a trust factor.
+- **The second factor.** The subpath `@cloudhal/release-verify/attestation` is Node-only. It reports `verified`, `failed` or `unavailable`.
+  - It first checks that `gh --version` and `gh auth status` both exit 0. If either does not, the result is `unavailable`, and nothing is verified.
+  - It then runs, for each of `cloudhal-release-<v>.tar.gz`, `manifest.json` and `release-statement.json`:
 
-Today `cloudhal deploy` builds the site with Astro and the admin Worker with wrangler's bundler. With `--release`, it downloads the release's assets, verifies them with `@cloudhal/release-verify`, extracts the verified entries into `.cloudhal/deploy/release/<version>/` and deploys those bytes. Everything else stays as it is: provisioning, secrets, the downgrade guard, settings, the scheduler fallback, the first push and the cache purge.
+    ```
+    gh attestation verify <file> --repo cloudhal-dev/cloudhal \
+      --signer-workflow cloudhal-dev/cloudhal/.github/workflows/bundle-build.yml \
+      --source-ref refs/heads/main --source-digest <statement.commit> \
+      --deny-self-hosted-runners [--bundle cloudhal-release-<v>.sigstore.json]
+    ```
 
-- **How the bytes are deployed.** The deploy generates the same wrangler configs as today, with `main` set to the extracted module, `no_bundle: true` and module rules for `.mjs`/`.js`, and `assets.directory` set to the extracted assets. `_headers` is written from the manifest's inline text. Wrangler uploads the modules unchanged. A deployer that calls the Workers API directly is not needed for the CLI. Hosts that cannot run wrangler use the verifier and their own uploader.
-- **Which version.** `--release` with no value means the CLI's own version. A different version is refused. The CLI's starter, its config generator and its downgrade guard then match the bundle exactly. To install another version, run that version of the CLI (`npx @cloudhal/cli@<v> deploy --release`). `next` prereleases work the same way.
-- **What the bundle can serve.** §10 still applies: theme settings, theme design, block types and skills are baked into the build. The site id is a var (`CLOUDHAL_SITE_ID`), so it is not baked. Before downloading the tarball, the CLI compares the project with the manifest. It refuses, and says to run `cloudhal deploy` without `--release`, when:
-  - the project's theme is not `manifest.theme.name`/`version`;
-  - its theme settings or design hash differ from `settingsSha256`/`designSha256`;
-  - its block types or skills differ;
-  - its `src/` differs from the starter that this CLI version copies on `cloudhal init`;
-  - it is attached to another installation (RFC-0034 `installation`) or serves several sites;
-  - it runs in Workers Builds.
+    `--bundle` is passed when the release's Sigstore bundle is at hand, which it is for every bundled release.
+  - Any non-zero exit, a signal, or no exit within 60 seconds is `failed`. It is never `unavailable`.
+- **Tests.**
+  - **Real fixtures.** The real `v0.9.0` statement, signature and manifest are committed, about 250 KB of signed, immutable data. Tests check that they verify with the pinned key, and that a flipped byte in each file is refused. They also cover a wrong key, a revoked key, and a request for another version or channel.
+  - **No real tarball in git.** The tarball (7.2 MB) is not committed: it would be by far the largest file in the repository.
+  - **Opt-in full test.** One test checks the real tarball. It runs only when `CLOUDHAL_RELEASE_ASSETS` names a directory holding the downloaded assets. Ordinary test runs skip it and never need the network. A separate CI job fills the directory with `gh release download v0.9.0` and runs only that test.
+  - **Synthetic bundle.** Everything that needs a tampered but validly signed bundle uses a small synthetic bundle, signed with a throwaway key that tests pass as `keys`. Editing the real manifest would only ever reach `manifest-mismatch`. The synthetic bundle covers:
+    - a manifest whose `version` differs from the statement's (invariant 5);
+    - an unlisted, missing or changed entry;
+    - every `entry-path` rule;
+    - a tarball that does not match the statement;
+    - `planVersion` above what the caller supports;
+    - every limit in §7.
+- **Versioning and publication.**
+  - The package joins the fixed version group: `.changeset/config.json` `fixed` and ADR-0013.
+  - npm trusted publishing can only be configured on a package that already exists, and a version published by hand carries no provenance. `planPublish` would also skip that version from then on. So the **owner's step** is to publish a placeholder: `0.0.0-placeholder.0`, with only a README and `--tag placeholder`, then `npm deprecate` it. Next, add the trusted-publisher entry (`release.yml`, the `npm-publish` environment).
+  - The first real version then comes from `release.yml` with `--provenance`, like every other package in the group.
 
-  Everything that a binding or a var carries works as today: analytics, comments, mail, AI, Browser Rendering, domains, the scheduler, the jurisdiction, placement and observability.
-- **Verification in the CLI.** The CLI checks the signature and every digest, with no flag to skip them. It verifies the attestation when `gh` is available and refuses when that check fails. When `gh` is unavailable, it prints one line saying that only the release key was checked. `--require-attestation` turns unavailable into a refusal. `--from <dir>` takes the four assets from a directory, for offline machines. The same verification runs on them.
-- **Migrations.** These need nothing new. The admin Worker applies D1 migrations itself, as it does after every deploy. `manifest.levels.schedules` feeds the existing downgrade guard.
-- **Dry run.** `--release --dry-run` downloads, verifies, extracts and writes the configs, then stops before wrangler. It needs no Cloudflare account.
+#### 11b. `cloudhal deploy --release`
+
+Today `cloudhal deploy` builds the site with Astro and the admin Worker with wrangler's bundler. With `--release`, it downloads the release's five assets and verifies them. It then extracts the verified entries and deploys those bytes. Everything else stays as it is: provisioning, secrets, the downgrade guard, settings, the scheduler fallback, the first push and the cache purge.
+
+- **Which version.** `--release` deploys the CLI's own version and takes no other. The CLI's starter, its config generator and its downgrade guard then match the bundle exactly. To install another version, run that version of the CLI (`npx @cloudhal/cli@<v> deploy --release`). `next` prereleases work the same way.
+- **No bundle, no deploy.** The CLI refuses with `release-unavailable` when `v<version>` has no published release, when the release is still a draft (publish-ci's window between attaching assets and publishing), or when it has no bundle assets (`RELEASE_BUNDLES` off, or `v0.8.0` and older). The message says to run `cloudhal deploy` without `--release`. It never falls back to building.
+- **Revocation.** `PINNED_KEYS` is frozen into each published CLI. A stolen key would therefore stay trusted by every CLI already published, and `--release` sends older versions through exactly those CLIs. So **`deploy --release` ships only after #226's signed `keys.json` exists.**
+  - On every `--release`, the CLI fetches `keys.json` from its stable URL, falling back to the release asset. It verifies it with the root key the CLI pins, checks its `expires`, and applies it reduce-only.
+  - A `keys.json` that cannot be fetched, does not verify, or has expired is a refusal. There is no override.
+  - `--from <dir>` needs `keys.json` in that directory too, and the same rules apply.
+  - The verifier package itself can ship before #226. Its callers pass the keys they trust.
+- **Order.**
+  1. Steps 1 to 5 of §2, with the keys reduced by `keys.json`.
+  2. The tarball digest.
+  3. The attestation.
+  4. Extraction.
+  5. Wrangler.
+
+  Nothing is written outside `.cloudhal/deploy/` and nothing is uploaded before step 3 succeeds.
+- **The second factor.** The CLI refuses when the attestation is `failed`. When it is `unavailable`, the CLI also refuses by default and says how to install and sign in to `gh`. `--allow-single-factor` continues on the release key alone, and the CLI prints a line saying so. The flag is never implied, including in CI and non-interactive runs.
+- **Extraction.** Into a fresh directory, `.cloudhal/deploy/release/<version>/`, which is removed first and created empty.
+  - Every target is `path.resolve`d and refused unless it lies inside that directory.
+  - Files are created with exclusive create (`wx`), so a duplicate fails.
+  - Only verified entries are written, so the directory holds exactly the manifest's listings and no stale files.
+  - `_headers` is written from the manifest's inline text.
+- **How the bytes are deployed.**
+  - The deploy generates the same wrangler configs as today, with `main` set to the extracted main module and `no_bundle: true`.
+  - Each module type comes from the manifest. The config lists one `rules` entry per module type, whose globs are that type's exact module paths, so wrangler uploads exactly the listed modules, unchanged.
+  - `assets.directory` is the extracted assets directory.
+  - A deployer that calls the Workers API directly is not needed for the CLI. Hosts that cannot run wrangler use the verifier and their own uploader.
+- **An unmodified starter.** §10 still applies: the bundle bakes in its build inputs. In `v0.9.0` the manifest's `theme.blockTypes`, `settingsSha256`, `designSha256` and `skills` are placeholders: an empty list and the SHA-256 of the empty string. Consumers ignore those fields, and no check reads them. Instead, before downloading the tarball, the CLI checks that the project is the starter that this CLI version's `cloudhal init` writes, which is the starter the bundle was built from (§4 step 3). It refuses, naming the first difference and saying to run `cloudhal deploy` without `--release`, when any of these hold:
+  1. A file the starter template contains is missing or differs, byte for byte. `cloudhal.json` and `package.json`, which `init` fills in, are compared as below instead.
+  2. A file exists under `src/` or `public/` that the template does not contain, or a root `astro.config.*`, `tsconfig*.json` or other `*.config.*` file does.
+  3. `package.json`'s `dependencies` or `devDependencies` differ from the template's. `name` and `version` may differ. Lockfiles are ignored, because no local build runs.
+  4. `cloudhal.json` differs from the template's in a key that is a build input.
+     - The key list lives in one exported table next to `readProjectConfig`. Each key is marked `deploy` (it becomes a binding, a var or a resource) or `build` (the site or admin build reads it).
+     - `deploy`: `siteId`, `dataDir`, `domains`, `analytics`, `mail`, `ai`, `render`, `observability`, `placement`, and `schedules` (plan and automations).
+     - `build`: `comments.available` and the theme settings. `media.transform` is `build` unless the manifest's `features.mediaTransformVar` is true. Every other key is `build`.
+     - A test fails when `buildSite` or `prepareAdminWorker` reads a key that the table marks `deploy`, or one it does not list. The table therefore cannot drift from the build.
+  5. The project is attached to another installation (RFC-0034 `installation`), serves several sites (`sites`), or runs in Workers Builds.
+
+  Paths are compared as normalised relative paths. No pattern runs over file contents.
+- **Migrations.** These need nothing new. The admin Worker applies D1 migrations itself, as it does after every deploy, and `manifest.levels.schedules` feeds the existing downgrade guard.
+- **Offline and dry runs.**
+  - `--from <dir>` takes the five assets and `keys.json` from a directory, for offline machines. The same verification runs on them.
+  - `--release --dry-run` downloads, verifies, extracts and writes the configs, then stops before wrangler. It needs no Cloudflare account.
 
 #### 11c. Open points for this addendum
 
-1. Which incremental SHA-256 should run outside Workers: `@noble/hashes`, or our own of about 120 lines? **[default: `@noble/hashes`, audited and zero-dependency, pinned exactly; Workers use the native `crypto.DigestStream`]**
+1. Which incremental SHA-256 runs outside Workers: `@noble/hashes`, or our own of about 120 lines? **[default: `@noble/hashes`, audited and zero-dependency, pinned exactly. Workers use the native `crypto.DigestStream`]**
 2. Should `--release` accept another version than the CLI's own? **[default: no, until §10's runtime configuration lands]**
-3. When `gh` is unavailable, should the CLI refuse by default instead of falling back to the release key alone? **[default: release key alone, with a line saying so; `--require-attestation` refuses]**
-4. Where does the full-tarball test run? **[default: opt-in through `CLOUDHAL_RELEASE_ASSETS`, in its own CI job that downloads `v0.9.0`; the 7.2 MB tarball is never committed]**
+3. When `gh` is unavailable, does the CLI refuse? **[default: yes. `--allow-single-factor` continues on the release key alone, with a line saying so. A failed attestation is always a refusal]**
+4. Where does the full-tarball test run? **[default: opt-in through `CLOUDHAL_RELEASE_ASSETS`, in its own CI job that downloads `v0.9.0`. The 7.2 MB tarball is never committed]**
+5. What does a key's `notAfter` mean for releases it has already signed? This is #226's decision 6. Until it is settled, the verifier has no `key-expired` code, and `PINNED_KEYS` carries no dates. **[default: #226's answer]**
+6. Should a later release record real `theme` and `skills` values in the manifest, so a host can compare a project without the CLI's starter? **[default: not part of this change. Consumers ignore the placeholders]**
 
 ## Alternatives considered
 
