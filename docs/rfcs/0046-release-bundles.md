@@ -334,7 +334,10 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   - root build inputs the starter does not have, which must not exist:
     - a `skills/` directory. `resolveSkillsDir` prefers it, and the admin build bakes it in.
     - `jsconfig.json`.
-    - any PostCSS config Vite loads: `postcss.config.{js,cjs,mjs,ts,cts,mts}`, `.postcssrc`, `.postcssrc.{json,yaml,yml,js,cjs,mjs,ts,cts,mts}`, and a `postcss` key in `package.json`.
+    - any PostCSS config Vite loads: `postcss.config.{js,cjs,mjs,ts,cts,mts}`, `.postcssrc`, `.postcssrc.{json,yaml,yml,js,cjs,mjs,ts,cts,mts}`, and a `postcss` key in `package.json`. Vite searches for these upward, so the CLI does too.
+      - It checks every directory from the project root up to and including Vite's workspace root. That is the nearest directory with a `pnpm-workspace.yaml` or `lerna.json`, a `package.json` with `workspaces`, or a `deno.json`/`deno.jsonc` with `workspace`.
+      - Without one, it stops at the project root: Vite falls back to the nearest `package.json`, which is the project's own.
+      - This is Vite 8.3.5's own rule (`resolvePostcssConfig` with `stopDir` from `searchForWorkspaceRoot`). `cloudhal init` supports projects inside an existing workspace, so a monorepo's root PostCSS config would otherwise apply to a local deploy and be dropped silently by `--release`.
 
   The list was checked against the installed Astro 7.4.7 and Vite 8.3.5.
   - Astro passes `configFile: false` to Vite (`create-vite.js`), so a `vite.config.*` is never loaded and is not compared.
@@ -390,9 +393,12 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   - Each of these is refused, naming it:
     - an edited `tsconfig.json`;
     - an added `postcss.config.mjs` or `.postcssrc.json`;
+    - a project inside a pnpm workspace whose root has a `postcss.config.cjs`;
+    - a `postcss` key in the `package.json` of a directory between the project and that workspace root;
     - a `postcss` key in `package.json`;
     - an added `jsconfig.json`.
   - A `public/fonts/v1/.DS_Store`, a `Thumbs.db` or a `desktop.ini` under `src/` passes, and so do a `vite.config.ts` and a `.env`.
+  - A `postcss.config.cjs` above the workspace root, or above a standalone project, passes, because Vite never reads it.
   - A project with `search` set, or with `comments.rateLimit` set, passes the config check.
   - Edits to `README.md`, `.gitignore` or `wrangler.jsonc` pass.
   - A starter from the previous version's tag is refused without the flag and passes with it, which covers the upgrade and rollback rule.
