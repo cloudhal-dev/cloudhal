@@ -277,12 +277,25 @@ describe("PageLayout resource mode", () => {
     expect(settings).toHaveAttribute("aria-selected", "true");
   });
 
-  it("draws one rule under the tabs: the row's hairline, not Kumo's list border too", () => {
+  it("draws one rule under the tabs, wide and narrow, and never wraps the row", () => {
     const { container } = render(<ResourcePage />);
     const header = container.querySelector("[data-resource-header]") as HTMLElement;
-    expect(header).toHaveClass("border-b", "border-kumo-hairline");
+    const tabsLine = container.querySelector("[data-resource-tabs]") as HTMLElement;
+    const classes = (el: Element) => el.className.split(" ");
+    // Kumo's own list border is off: the indicator sits on our rule only.
     const list = within(header).getByRole("tablist");
-    expect(list).toHaveClass("border-b-0");
-    expect(list.className.split(" ")).not.toContain("border-b");
+    expect(classes(list)).toContain("border-b-0");
+    expect(classes(list)).not.toContain("border-b");
+    // Narrow: the tab line carries the rule; the header has none of its own.
+    expect(classes(tabsLine)).toEqual(expect.arrayContaining(["border-b", "border-kumo-hairline"]));
+    expect(classes(header)).not.toContain("border-b");
+    // Wide: the rule moves to the header row, under tabs and actions alike.
+    expect(classes(tabsLine)).toContain("@3xl/page:border-b-0");
+    expect(classes(header)).toEqual(
+      expect.arrayContaining(["@3xl/page:flex-row", "@3xl/page:border-b"]),
+    );
+    // No wrapping row in either layout (wrapped, the rule left the tabs).
+    expect(classes(header)).not.toContain("flex-wrap");
+    expect(header.children[1]).toBe(tabsLine);
   });
 });

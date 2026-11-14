@@ -503,7 +503,11 @@ Template `consent`: where a remote MCP client's authorization request lands afte
 One resource's detail page, laid out like the dashboard's Worker page (Overview, Metrics, Deployments, …, Settings). Template `resource`.
 
 - **Top bar.** The crumbs, then an optional environment switcher (`resource.switcher`, a small `Select` or `DropdownMenu` such as Production / Preview), both portaled into the top bar.
-- **Header.** No large title: `title` becomes the page's visually hidden `h1`. In its place is one row over a single hairline, with Kumo's underline `Tabs` (`resource.tabs`, controlled by `resource.tab` from the route, `onTabChange` navigates) on the left and `actions` on the right, the one primary action last. Kumo's own list border is turned off, so the active tab's indicator sits on that one rule across the row. A tab bar wider than the page, as on a phone at 390 px, scrolls sideways. Underline tabs have no scroll buttons, and the arrow keys bring the focused tab into view.
+- **Header.** No large title: `title` becomes the page's visually hidden `h1`. In its place are Kumo's underline `Tabs` (`resource.tabs`, controlled by `resource.tab` from the route, `onTabChange` navigates) and `actions`, the one primary action last, over a single hairline. Kumo's own list border is turned off, so the active tab's indicator always sits on that one rule. The row never wraps.
+  - **Wide** (the page container ≥ 48 rem): tabs and actions share one line over the rule. The tab list is the part that shrinks and scrolls; the actions keep their size.
+  - **Narrow** (a phone at 390 px): the tab line carries the rule across the full width, and the actions follow on their own line below it. Focus and visual order agree: tabs, then actions.
+
+  A tab bar wider than its line scrolls sideways. Underline tabs have no scroll buttons, and the arrow keys bring the focused tab into view.
 - **Tabs.** They are the resource's own sub-views, never a copy of the sidebar. A tab can be a link through its `render`.
 - **Focus order.** It follows the DOM: crumbs and switcher in the top bar, then the tab bar (one tab stop; the arrow keys move between tabs and Enter or Space opens one), then the actions, then the content. `packages/ui/test/dashboard-blocks.test.tsx` holds this order.
 - **Body.** `SectionCard`s, with `Columns` where a usage rail sits beside the content.
