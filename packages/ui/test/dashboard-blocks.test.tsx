@@ -114,7 +114,10 @@ describe("UsageMeterRow", () => {
       "warning",
     );
     expect(screen.getByText("Near the limit")).toBeInTheDocument();
-    const info = screen.getByRole("button", { name: "About requests today" });
+    // The explanation is part of the button's name: the tooltip popup describes nothing.
+    const info = screen.getByRole("button", {
+      name: "About requests today. Resets at 00:00 UTC.",
+    });
     await act(async () => {
       fireEvent.click(info);
     });
@@ -122,11 +125,43 @@ describe("UsageMeterRow", () => {
   });
 
   it("keeps Kumo's own label row first in the meter (the row it hides for sighted users)", () => {
-    render(<UsageMeterRow label="Storage" used={2} limit={10} valueText="2 GB / 10 GB" />);
+    render(
+      <UsageMeterRow
+        label="Storage"
+        used={2}
+        limit={10}
+        valueText="2 GB / 10 GB"
+        warningLabel="Near the limit"
+        dangerLabel="Limit reached"
+      />,
+    );
     const meter = screen.getByRole("meter", { name: "Storage" });
     expect(meter.firstElementChild?.textContent).toContain("Storage");
     expect(meter).toHaveAttribute("aria-valuetext", "2 GB / 10 GB");
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("UsageMeterRow with a fractional limit", () => {
+  it("fills to the real limit: 0.5 of 0.5 is a full, danger bar", () => {
+    const { container } = render(
+      <UsageMeterRow
+        label="Storage"
+        used={0.5}
+        limit={0.5}
+        valueText="0.5 GB / 0.5 GB"
+        warningLabel="Near the limit"
+        dangerLabel="Limit reached"
+      />,
+    );
+    const meter = screen.getByRole("meter", { name: "Storage" });
+    expect(meter).toHaveAttribute("aria-valuemax", "0.5");
+    expect(meter).toHaveAttribute("aria-valuenow", "0.5");
+    expect(container.querySelector("[data-usage-state]")).toHaveAttribute(
+      "data-usage-state",
+      "danger",
+    );
+    expect(meter).toHaveAttribute("aria-valuetext", "0.5 GB / 0.5 GB, Limit reached");
   });
 });
 
@@ -170,7 +205,6 @@ function ResourcePage({ onTab }: { onTab?: (v: string) => void }) {
           setTab(v);
           onTab?.(v);
         },
-        tabLabels: { scrollStart: "Earlier tabs", scrollEnd: "Later tabs" },
         switcher: <Button size="sm">Production</Button>,
       }}
     >
@@ -200,33 +234,55 @@ describe("PageLayout resource mode", () => {
     expect(order).toEqual(["Workers", "Production", "Overview", "Edit code", "Deploy"]);
   });
 
-  it("arrow keys move between tabs; Enter opens one and the tab bar keeps one stop", async () => {
+  const keyOn = (el: Element, k: string, up = false) =>
+    act(async () => {
+      fireEvent.keyDown(el, { key: k, code: k === " " ? "Space" : k });
+      if (up) fireEvent.keyUp(el, { key: k, code: k === " " ? "Space" : k });
+    });
+
+  it("arrow keys move focus without opening; the keyboard opens a tab; one tab stop", async () => {
     const onTab = vi.fn();
     const { container } = render(<ResourcePage onTab={onTab} />);
-    const key = (el: Element, k: string) =>
-      act(async () => {
-        fireEvent.keyDown(el, { key: k, code: k });
-      });
     const overview = screen.getByRole("tab", { name: "Overview" });
     await act(async () => overview.focus());
-    await key(overview, "ArrowRight");
+    await keyOn(overview, "ArrowRight");
     const metrics = screen.getByRole("tab", { name: "Metrics" });
     expect(document.activeElement).toBe(metrics);
-    // Focus alone opens nothing (Kumo's default manual activation): Enter or a click does.
+    // Focus alone opens nothing (Kumo's default manual activation).
     expect(onTab).not.toHaveBeenCalled();
-    await key(metrics, "Enter");
-    await act(async () => {
-      fireEvent.click(metrics);
-    });
+    // The keyboard opens it. A tab is a native button: browsers turn Enter into a click, which
+    // happy-dom does not simulate, so the test presses Space (keydown + keyup), which it does.
+    await keyOn(metrics, " ", true);
+    expect(onTab).toHaveBeenCalledTimes(1);
     expect(onTab).toHaveBeenLastCalledWith("metrics");
     expect(metrics).toHaveAttribute("aria-selected", "true");
     expect(screen.getByText("Tab body: metrics")).toBeInTheDocument();
     // Still one tab stop for the bar, now on the selected tab.
     const stops = tabOrder(container).filter((el) => el.getAttribute("role") === "tab");
     expect(stops.map(nameOf)).toEqual(["Metrics"]);
-    await key(metrics, "End");
+    await keyOn(metrics, "End");
     expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Settings" }));
-    await key(document.activeElement as Element, "Home");
+    await keyOn(document.activeElement as Element, "Home");
     expect(document.activeElement).toBe(overview);
+  });
+
+  it("a click opens a tab", async () => {
+    const onTab = vi.fn();
+    render(<ResourcePage onTab={onTab} />);
+    const settings = screen.getByRole("tab", { name: "Settings" });
+    await act(async () => {
+      fireEvent.click(settings);
+    });
+    expect(onTab).toHaveBeenCalledWith("settings");
+    expect(settings).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("draws one rule under the tabs: the row's hairline, not Kumo's list border too", () => {
+    const { container } = render(<ResourcePage />);
+    const header = container.querySelector("[data-resource-header]") as HTMLElement;
+    expect(header).toHaveClass("border-b", "border-kumo-hairline");
+    const list = within(header).getByRole("tablist");
+    expect(list).toHaveClass("border-b-0");
+    expect(list.className.split(" ")).not.toContain("border-b");
   });
 });

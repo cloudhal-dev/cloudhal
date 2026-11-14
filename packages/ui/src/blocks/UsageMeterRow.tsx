@@ -21,11 +21,11 @@ export interface UsageMeterRowProps {
   limit: number;
   /** `used / limit` as the screen formats it (`formatNumber`), so digits follow the language. */
   valueText: string;
-  /** An explanation next to the label, in a toggletip, and its button's accessible name. */
+  /** An explanation next to the label, in a toggletip; the button's name is `label` then `text`. */
   info?: { text: string; label: string };
-  /** The words for the warning and the limit state; shown as a badge and read with the value. */
-  warningLabel?: string;
-  dangerLabel?: string;
+  /** The words for the warning and the limit state, shown as a badge and read with the value, so a state is never shown by colour alone. */
+  warningLabel: string;
+  dangerLabel: string;
   /** The share of the limit that warns (default 0.8). */
   warnAt?: number;
   className?: string;
@@ -58,7 +58,8 @@ export function UsageMeterRow({
 }: UsageMeterRowProps) {
   const state = usageState(used, limit, warnAt);
   const word = state === "danger" ? dangerLabel : state === "warning" ? warningLabel : undefined;
-  const max = Math.max(1, limit);
+  // A fractional limit (0.5 GB) is a real maximum; only a missing one falls back to 1.
+  const max = limit > 0 ? limit : 1;
   return (
     <div className={cn("grid min-w-0 gap-2", className)} data-usage-state={state}>
       <div className="flex min-w-0 items-center justify-between gap-4">
@@ -93,7 +94,11 @@ export function UsageMeterRow({
   );
 }
 
-/** A 16 px info button whose text opens on hover, focus and press (a toggletip). */
+/**
+ * A 16 px info button whose text opens on hover, focus and press (a toggletip). The text is also
+ * inside the button for screen readers (the tooltip popup is portaled and describes nothing): the
+ * button's name is its contents, `label` then `text`, as `ToggletipBadge` does.
+ */
 function InfoToggletip({ text, label }: { text: string; label: string }) {
   const { tooltip, onPress } = useToggletip();
   return (
@@ -104,7 +109,6 @@ function InfoToggletip({ text, label }: { text: string; label: string }) {
         <button
           {...props}
           type="button"
-          aria-label={label}
           onClick={(event) => {
             props.onClick?.(event);
             onPress();
@@ -117,6 +121,9 @@ function InfoToggletip({ text, label }: { text: string; label: string }) {
       )}
     >
       <Info size={16} aria-hidden="true" />
+      <span className="sr-only">
+        {label}. {text}
+      </span>
     </Tooltip>
   );
 }

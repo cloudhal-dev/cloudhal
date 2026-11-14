@@ -503,7 +503,7 @@ Template `consent`: where a remote MCP client's authorization request lands afte
 One resource's detail page, laid out like the dashboard's Worker page (Overview, Metrics, Deployments, …, Settings). Template `resource`.
 
 - **Top bar.** The crumbs, then an optional environment switcher (`resource.switcher`, a small `Select` or `DropdownMenu` such as Production / Preview), both portaled into the top bar.
-- **Header.** No large title: `title` becomes the page's visually hidden `h1`. In its place is one row over a hairline, with Kumo's underline `Tabs` (`resource.tabs`, controlled by `resource.tab` from the route, `onTabChange` navigates) on the left and `actions` on the right, the one primary action last. Kumo's scroll-button labels come in as `resource.tabLabels`.
+- **Header.** No large title: `title` becomes the page's visually hidden `h1`. In its place is one row over a single hairline, with Kumo's underline `Tabs` (`resource.tabs`, controlled by `resource.tab` from the route, `onTabChange` navigates) on the left and `actions` on the right, the one primary action last. Kumo's own list border is turned off, so the active tab's indicator sits on that one rule across the row. A tab bar wider than the page, as on a phone at 390 px, scrolls sideways. Underline tabs have no scroll buttons, and the arrow keys bring the focused tab into view.
 - **Tabs.** They are the resource's own sub-views, never a copy of the sidebar. A tab can be a link through its `render`.
 - **Focus order.** It follows the DOM: crumbs and switcher in the top bar, then the tab bar (one tab stop; the arrow keys move between tabs and Enter or Space opens one), then the actions, then the content. `packages/ui/test/dashboard-blocks.test.tsx` holds this order.
 - **Body.** `SectionCard`s, with `Columns` where a usage rail sits beside the content.
@@ -511,7 +511,7 @@ One resource's detail page, laid out like the dashboard's Worker page (Overview,
 Dense status and usage on these pages:
 
 - **`StatusIndicator`.** A dot or a thin bar plus the state's word ("Ready", "Failed", "Running"), for deployment and step rows where a `Badge` per row is too heavy. `active` pulses the mark, but not under reduced motion. The word always carries the state.
-- **`UsageMeterRow`.** One row of a usage rail: the label with an optional info toggletip, `used / limit` (formatted by the screen), and a Kumo `Meter`. The meter turns warning at 80 % (`warnAt`) and danger at the limit, with the state's word as a badge. The visible row is the block's own, because Kumo's `Meter.label` is a plain string. The meter keeps its label for screen readers and reads the value text and the state as its value.
+- **`UsageMeterRow`.** One row of a usage rail: the label with an optional info toggletip, `used / limit` (formatted by the screen), and a Kumo `Meter`. The meter turns warning at 80 % (`warnAt`) and danger at the limit, with the state's word as a badge. `warningLabel` and `dangerLabel` are required, so a state is never shown by colour alone. The visible row is the block's own, because Kumo's `Meter.label` is a plain string. The meter keeps its label for screen readers and reads the value text and the state as its value. The info text is repeated inside its button, since the tooltip popup describes nothing to screen readers.
 
 ## 3. Sidebar specification
 ```tsx
