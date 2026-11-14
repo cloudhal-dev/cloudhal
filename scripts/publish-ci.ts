@@ -24,7 +24,14 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,9 +39,11 @@ import { parseArgs } from "node:util";
 import { verifySignature } from "./release-bundle/signature.ts";
 import {
   isSecurityRelease,
+  npmVersions,
   onNpm,
   type Pkg,
   readPackages,
+  releaseGroup,
   releaseNotes,
   sharedVersion,
   unpublished,
@@ -142,6 +151,40 @@ function remoteTagCommit(tag: string): string | null {
   return (peeled ?? lines[0])?.[0] ?? null;
 }
 
+/**
+ * RFC-0046 §11a: `@cloudhal/release-verify`, the verifier every consumer runs, over the signed
+ * bundle in `dir`, every tarball entry included, so a release no consumer would install is never
+ * published. Imported here only: the `plan` job runs this script without a pnpm install.
+ */
+export async function verifyAsConsumer(
+  dir: string,
+  version: string,
+  publicKeys: Readonly<Record<string, string>>,
+): Promise<void> {
+  const { verifyRelease } = await import("../packages/release-verify/src/index.ts");
+  const read = (name: string) => readFileSync(path.join(dir, name));
+  const release = await verifyRelease({
+    request: { version },
+    statement: read("release-statement.json"),
+    signature: read("release-statement.sig"),
+    manifest: read("manifest.json"),
+    tarball: () => read(`cloudhal-release-${version}.tar.gz`),
+    planVersion: Number.MAX_SAFE_INTEGER,
+    keys: Object.fromEntries(
+      Object.entries(publicKeys).map(([id, publicKey]) => [id, { publicKey, status: "active" }]),
+    ),
+  });
+  for await (const _ of release.entries()) {
+    // every entry verified
+  }
+}
+
+/** A package's CHANGELOG.md, or undefined when it has none yet (a package before its first release). */
+function changelogOf(p: Pkg): string | undefined {
+  const file = path.join(ROOT, "packages", p.dir, "CHANGELOG.md");
+  return existsSync(file) ? readFileSync(file, "utf8") : undefined;
+}
+
 async function npmPublish(pkgs: readonly Pkg[], publishes: readonly NpmPublish[], dryRun: boolean) {
   const tarballs = mkdtempSync(path.join(os.tmpdir(), "cloudhal-release-"));
   // Builds, packs and installs every package from scratch with npm; fails the release on error.
@@ -218,9 +261,7 @@ function githubPort(pkgs: readonly Pkg[], version: string, dryRun: boolean): Pub
     },
     releases: releasesOf,
     createDraft(tag, o) {
-      const changelogs = pkgs.map((p) =>
-        readFileSync(path.join(ROOT, "packages", p.dir, "CHANGELOG.md"), "utf8"),
-      );
+      const changelogs = pkgs.map((p) => changelogOf(p) ?? "");
       const notes = path.join(os.tmpdir(), `cloudhal-${tag}-notes.md`);
       writeFileSync(notes, releaseNotes(changelogs, version));
       const title = dryRun
@@ -269,13 +310,21 @@ export async function main(argv: readonly string[]): Promise<void> {
     },
   });
   const dryRun = v["dry-run"] === true || process.env.RELEASE_DRY_RUN === "true";
-  const pkgs = readPackages(ROOT);
-  const version = sharedVersion(pkgs);
+  const all = readPackages(ROOT);
+  const version = sharedVersion(all);
+  const { group: pkgs, notYetReleased } = await releaseGroup(
+    all,
+    version,
+    changelogOf,
+    npmVersions,
+  );
+  for (const p of notYetReleased)
+    console.log(
+      `publish-ci: leaving out ${p.name}: never released and no "## ${version}" in its changelog (its first version PR has not landed)`,
+    );
   const missing = await unpublished(pkgs, onNpm);
   if (v.plan) {
-    const changelogs = pkgs.map((p) =>
-      readFileSync(path.join(ROOT, "packages", p.dir, "CHANGELOG.md"), "utf8"),
-    );
+    const changelogs = pkgs.map((p) => changelogOf(p) ?? "");
     const security = isSecurityRelease(changelogs, version);
     const out = `publish=${dryRun || missing.length > 0}\nversion=${version}\ndry_run=${dryRun}\nsecurity_release=${security}\n`;
     if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, out);
@@ -285,22 +334,22 @@ export async function main(argv: readonly string[]): Promise<void> {
   const runNumber = process.env.GITHUB_RUN_NUMBER;
   const tag = tagFor({ version, dryRun, ...(runNumber ? { runNumber } : {}) });
   const port = githubPort(pkgs, version, dryRun);
+  const bundleDir = v["bundle-dir"];
+  const publicKeys = bundleDir
+    ? publicKeysFor({
+        dryRun,
+        runId: process.env.GITHUB_RUN_ID,
+        dryRunPublicKey: process.env.RELEASE_DRYRUN_PUBLIC_KEY,
+      })
+    : {};
+  // Before anything is created or uploaded: every consumer's own verifier accepts this bundle.
+  if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys);
   const steps = await runPublish(port, {
     version,
     head: sh("git", ["rev-parse", "HEAD"], true).trim(),
     dryRun,
     ...(runNumber ? { runNumber } : {}),
-    bundle: v["bundle-dir"]
-      ? loadBundle(
-          v["bundle-dir"],
-          version,
-          publicKeysFor({
-            dryRun,
-            runId: process.env.GITHUB_RUN_ID,
-            dryRunPublicKey: process.env.RELEASE_DRYRUN_PUBLIC_KEY,
-          }),
-        )
-      : null,
+    bundle: bundleDir ? loadBundle(bundleDir, version, publicKeys) : null,
     tagCommit: dryRun ? null : remoteTagCommit(tag),
     releases: port.releases(tag),
     packages: pkgs.map((p) => p.name),

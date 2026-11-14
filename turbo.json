@@ -4,6 +4,7 @@
   "agentGuidance": true,
   "tasks": {
     "gen:ts": {
+      "dependsOn": ["^gen:ts"],
       "inputs": ["schemas/**", "scripts/**"],
       "outputs": ["src/generated/**", "schemas/.bundled/**"]
     },

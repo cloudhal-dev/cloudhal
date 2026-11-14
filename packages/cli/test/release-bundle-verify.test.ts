@@ -147,6 +147,58 @@ describe("verifyBundle", () => {
   });
 });
 
+describe("the producer's self-check runs the consumer's rules (RFC-0046 §11a, #232)", () => {
+  /** An unsigned bundle of the fixture build with `edit` applied to its build output first. */
+  async function built(edit: (out: ReturnType<typeof readBuildOutput>) => void): Promise<string> {
+    const fx = fixtureProject();
+    roots.push(fx.root);
+    const out = readBuildOutput({ project: fx.project, studio: fx.studio });
+    edit(out);
+    const secrets = readDeploySecrets(path.join(fx.project, ".cloudhal/deploy/secrets.json"));
+    const b = await buildReleaseBundle(out, facts({ version: "0.8.0" }), secrets);
+    const dir = mkdtempSync(path.join(os.tmpdir(), "release-bundle-out-"));
+    roots.push(dir);
+    writeReleaseBundle(b, dir);
+    return dir;
+  }
+  const addAsset = (p: string) => (out: ReturnType<typeof readBuildOutput>) => {
+    (out.site.assets as { path: string; bytes: Uint8Array }[]).push({
+      path: p,
+      bytes: enc.encode("x"),
+    });
+  };
+
+  it("refuses assets that collide after case folding, unsigned", async () => {
+    // Built in memory: a case-insensitive file system could not hold both files.
+    const dir = await built(addAsset("/FAVICON.svg"));
+    await expect(verifyBundle(dir, { version: "0.8.0" })).rejects.toMatchObject({
+      code: "entry-path",
+      message: expect.stringMatching(/collide/),
+    });
+  });
+
+  it("refuses a path over 512 bytes and a .. segment, unsigned", async () => {
+    const long = await built(
+      addAsset(`/${"a".repeat(200)}/${"b".repeat(200)}/${"c".repeat(200)}.svg`),
+    );
+    await expect(verifyBundle(long, { version: "0.8.0" })).rejects.toMatchObject({
+      code: "entry-path",
+    });
+    const dots = await built(addAsset("/x/../y.svg"));
+    await expect(verifyBundle(dots, { version: "0.8.0" })).rejects.toMatchObject({
+      code: "entry-path",
+    });
+  });
+
+  it("writes and reads long non-ASCII names with one byte rule (PAX + ustar name)", async () => {
+    const names = [`/${"界".repeat(30)}.txt`, `/x${"é".repeat(50)}`, `/${"😀".repeat(30)}`];
+    const dir = await built((out) => {
+      for (const n of names) addAsset(n)(out);
+    });
+    await expect(verifyBundle(dir, { version: "0.8.0" })).resolves.toMatchObject({});
+  });
+});
+
 describe("tar and gzip format checks", () => {
   const file = { path: "site/modules/a.mjs", bytes: enc.encode("a") };
 

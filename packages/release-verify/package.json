@@ -1,0 +1,58 @@
+{
+  "name": "@cloudhal/release-verify",
+  "version": "0.9.0",
+  "description": "Verifies a Cloudhal release bundle (RFC-0046 §2, §7, §11a): the Ed25519 release statement against pinned keys, the manifest, and every part of the tarball. Worker-safe; the attestation check is a Node-only subpath.",
+  "license": "Apache-2.0",
+  "homepage": "https://cloudhal.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cloudhal-dev/cloudhal.git",
+    "directory": "packages/release-verify"
+  },
+  "bugs": {
+    "url": "https://github.com/cloudhal-dev/cloudhal/issues"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./attestation": "./src/attestation.ts"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "gen:ts": "node scripts/gen-validators.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test"
+  },
+  "dependencies": {
+    "@noble/hashes": "catalog:",
+    "ajv": "catalog:",
+    "ajv-formats": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
+    "@cloudhal/core-contracts": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/src/index.js"
+      },
+      "./attestation": {
+        "types": "./dist/src/attestation.d.ts",
+        "default": "./dist/src/attestation.js"
+      }
+    }
+  }
+}

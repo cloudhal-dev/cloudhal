@@ -1,0 +1,24 @@
+{
+  "channel": "stable",
+  "commit": "6bfe74a17f3a941e68130bb3e05a866fd9f19df5",
+  "createdAt": "2026-11-13T16:13:20Z",
+  "format": "cloudhal.release-statement@1",
+  "manifest": {
+    "bytes": 252366,
+    "name": "manifest.json",
+    "sha256": "4e77e60d281f112cf2079b3b61d69c12f1b880b93c40b06bfc84253efb577e87"
+  },
+  "schemaVersion": 1,
+  "securityRelease": false,
+  "signing": {
+    "algorithm": "Ed25519",
+    "keyId": "cloudhal-release-2026a",
+    "signature": "release-statement.sig"
+  },
+  "tarball": {
+    "bytes": 7226429,
+    "name": "cloudhal-release-0.9.0.tar.gz",
+    "sha256": "ab17dad5cf75b83d5f1434ae1e64818d8234b4d47210e06f93efb2422c1ca59b"
+  },
+  "version": "0.9.0"
+}

@@ -30,6 +30,7 @@ const require = createRequire(path.join(ROOT, "packages/core-ts/package.json"));
 /** Publishable packages, dependencies first. */
 export const PACKAGES = [
   "core-contracts",
+  "release-verify",
   "storage",
   "analytics",
   "core-ts",
@@ -50,7 +51,10 @@ const TEST_FILE = /\.test\.tsx?$/;
 /** A package's test-support entry; it ships only where its exports name it (./testing). */
 const TESTING_ENTRY = /(^|[\\/])testing\.ts$/;
 /** Development-only generators: they run in the monorepo (on dev dependencies) and never ship. */
-const DEV_ONLY = new Set(["core-ts/scripts/gen-icons.ts"]);
+const DEV_ONLY = new Set([
+  "core-ts/scripts/gen-icons.ts",
+  "release-verify/scripts/gen-validators.ts",
+]);
 
 type Json = Record<string, unknown>;
 

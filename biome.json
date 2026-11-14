@@ -16,7 +16,8 @@
       "!**/.turbo",
       "!**/node_modules",
       "!apps/studio/src/assets/geo",
-      "!packages/cli/test/fixtures/theme-*"
+      "!packages/cli/test/fixtures/theme-*",
+      "!packages/release-verify/test/fixtures/v0.9.0"
     ]
   },
   "formatter": {

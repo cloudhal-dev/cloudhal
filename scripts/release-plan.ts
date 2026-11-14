@@ -51,6 +51,54 @@ export async function unpublished(
   return out;
 }
 
+/** Every version of `name` npm has ever published ([] when npm has never seen the package). */
+export async function npmVersions(name: string): Promise<string[]> {
+  const res = await fetch(`https://registry.npmjs.org/${name.replaceAll("/", "%2F")}`);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`npm registry: ${name}: HTTP ${res.status}`);
+  return Object.keys(((await res.json()) as { versions?: Record<string, unknown> }).versions ?? {});
+}
+
+/**
+ * The deprecated placeholder an owner publishes by hand so that npm trusted publishing can be
+ * set up for a new package (RFC-0046 §11a). It is never a release of the package.
+ */
+export const isPlaceholderVersion = (v: string): boolean => v.startsWith("0.0.0-placeholder.");
+
+/** Whether a changelog has a `## <version>` section. */
+export const hasChangelogEntry = (text: string | undefined, version: string): boolean =>
+  text?.includes(`\n## ${version}\n`) ?? false;
+
+export interface ReleaseGroup {
+  /** The packages this release covers, in publish order. */
+  readonly group: Pkg[];
+  /** Packages left out: never released, and no changelog entry for this version. */
+  readonly notYetReleased: Pkg[];
+}
+
+/**
+ * The fixed group minus the packages that are not part of this release yet. A package joins the
+ * group in one PR and gets its first version in the next version PR. In between, `main` holds it
+ * at the group's current version with no changelog entry for it. That version was never released
+ * for this package and must not be published from `main` (#232). Such a package is one npm holds
+ * no real version of (nothing, or only the placeholder) and whose changelog has no `## <version>`.
+ * Every package already released keeps being published as before.
+ */
+export async function releaseGroup(
+  pkgs: readonly Pkg[],
+  version: string,
+  changelogOf: (p: Pkg) => string | undefined,
+  versionsOf: (name: string) => Promise<string[]>,
+): Promise<ReleaseGroup> {
+  const notYetReleased: Pkg[] = [];
+  for (const p of pkgs) {
+    if (hasChangelogEntry(changelogOf(p), version)) continue;
+    const real = (await versionsOf(p.name)).filter((v) => !isPlaceholderVersion(v));
+    if (real.length === 0) notYetReleased.push(p);
+  }
+  return { group: pkgs.filter((p) => !notYetReleased.includes(p)), notYetReleased };
+}
+
 /** Lines the fixed group writes into every changelog: dependency bumps, not changes. */
 const DEPENDENCY_ONLY = /^- (?:Updated dependencies|(?:@cloudhal\/[a-z-]+|create-cloudhal)@\d)/;
 

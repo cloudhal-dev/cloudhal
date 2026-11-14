@@ -24,6 +24,7 @@
   "include": [
     "packages/core-contracts/src",
     "packages/core-contracts/scripts",
+    "packages/release-verify/src",
     "packages/storage/src",
     "packages/storage/migrations",
     "packages/analytics/src",

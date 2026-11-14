@@ -91,7 +91,31 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @cloudhal/core-contracts gen
+      - run: pnpm --filter @cloudhal/release-verify gen:ts
       - name: Generated code must match the committed code
         run: |
-          git diff --exit-code -- packages/core-contracts/src/generated crates/cloudhal-schema/src/generated \
+          git diff --exit-code -- packages/core-contracts/src/generated packages/release-verify/src/generated crates/cloudhal-schema/src/generated \
             || { echo "::error::Generated types are out of date. Run 'pnpm gen' and commit."; exit 1; }
+
+  release-verify-v0-9-0:
+    # RFC-0046 §11a: @cloudhal/release-verify against the real, immutable v0.9.0 assets, tarball
+    # included. Ordinary test runs skip this test (no network); only this job downloads them.
+    name: Release verifier on the real v0.9.0 bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Download the v0.9.0 release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v0.9.0 --repo cloudhal-dev/cloudhal --dir "$RUNNER_TEMP/v0.9.0"
+      - name: Verify them (statement, manifest, every tarball entry)
+        working-directory: packages/release-verify
+        env:
+          CLOUDHAL_RELEASE_ASSETS: ${{ runner.temp }}/v0.9.0
+        run: pnpm exec vitest run test/real-tarball.test.ts
