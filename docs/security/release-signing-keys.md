@@ -160,7 +160,8 @@ const yanked = await verifyYanked({
   document: await get("yanked.json"), signature: await get("yanked.json.sig"), keys,
 });
 const release = await verifyRelease({
-  request: { version },                        // invariant 7: refuses a signed older release
+  // Invariant 7: refuse a validly signed older release, or another channel, served under this name.
+  request: { version, channel: version.includes("-") ? "next" : "stable" },
   statement: readFileSync("release-statement.json"),
   signature: readFileSync("release-statement.sig"),
   manifest: readFileSync("manifest.json"),
@@ -175,7 +176,7 @@ console.log(`ok: ${version} signed by ${release.statement.signing.keyId}, commit
 ```
 
 This checks:
-- the sizes, the Ed25519 signature over the exact bytes, and that the statement is for the version you asked for;
+- the sizes, the Ed25519 signature over the exact bytes (never parsed and re-serialised first), and that the statement is for the version and channel you asked for;
 - that the key was valid when the release was created (`createdAt` in its window), and is still trusted today;
 - that the version is not yanked and the key not revoked;
 - both schemas, the manifest's binding to the statement, and every entry of the tarball.

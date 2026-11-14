@@ -256,6 +256,16 @@ describe("statement signatures (RFC-0046 §2, with a throwaway key)", () => {
   });
 });
 
+/** The by-hand verification script in the key doc (its first `js` block after the heading). */
+function handScript(doc: string): string {
+  const at = doc.indexOf("## Verifying a release by hand");
+  const start = doc.indexOf("```js\n", at);
+  const end = doc.indexOf("\n```", start + 6);
+  expect(at).toBeGreaterThan(0);
+  expect(start).toBeGreaterThan(at);
+  return doc.slice(start + 6, end);
+}
+
 describe("RFC-0046 and the release key list", async () => {
   const rfc = await readFile(path.join(REPO, "docs/rfcs/0046-release-bundles.md"), "utf8");
   const keys = await readFile(path.join(REPO, "docs/security/release-signing-keys.md"), "utf8");
@@ -301,10 +311,13 @@ describe("RFC-0046 and the release key list", async () => {
     expect(steps[2]).toContain("`channel` equals the requested channel");
     expect(rfc).toMatch(/^7\. \*\*The statement is for the release the consumer asked for\.\*\*/m);
     expect(rfc).toMatch(/^4\. Verification hard-fails.*binding the statement to the request/m);
-    expect(keys).toContain("if (statement.version !== version) throw");
-    expect(keys).toContain(
-      'if (statement.channel !== (version.includes("-") ? "next" : "stable"))',
+    // The by-hand script asks the shared verifier for exactly this version and channel.
+    const script = handScript(keys);
+    expect(script).toContain(
+      'request: { version, channel: version.includes("-") ? "next" : "stable" },',
     );
+    expect(script).toContain("const version = process.argv[2];");
+    expect(keys).toContain("the statement is for the version and channel you asked for");
   });
 
   it("re-checks the draft's assets immediately before publishing it", () => {
@@ -346,8 +359,19 @@ describe("RFC-0046 and the release key list", async () => {
   );
 
   it("documents the three hand checks", () => {
-    expect(keys).toContain("crypto");
-    expect(keys).toContain(ED25519_SPKI_PREFIX.toString("hex"));
+    // 1. The statement, through @cloudhal/release-verify: the signature and every digest, the
+    //    key's window and expiry, and the two signed lists (revocations, yanks), never an old copy.
+    const script = handScript(keys);
+    expect(script).toContain('from "@cloudhal/release-verify"');
+    expect(script).toContain("const keys = await verifyKeys(");
+    expect(script).toContain("const yanked = await verifyYanked(");
+    expect(script).toContain("never fall back to an old copy");
+    expect(script).toContain("keys: mergeTrust(PINNED_KEYS, { keys, yanked }),");
+    expect(script).toMatch(/^\s+yanked,/m);
+    expect(script).toContain("for await (const _ of release.entries())");
+    expect(keys).toContain("that the key was valid when the release was created");
+    expect(keys).toContain("that the version is not yanked and the key not revoked");
+    // 2. GitHub's release record, 3. the build attestation.
     expect(keys).toContain("gh release verify-asset");
     expect(keys).toContain(
       "--signer-workflow cloudhal-dev/cloudhal/.github/workflows/bundle-build.yml",
