@@ -1,0 +1,107 @@
+name: Yank list
+
+# RFC-0046 §9 (#226): re-signs yanked.json with the yank key, weekly and on demand, and publishes
+# it to the append-only `yank-list` branch, which cloudhal.dev serves at
+# /.well-known/cloudhal/yanked.json (apps/docs/src/worker/trust.ts). The list expires 30 days
+# after it is signed, so the weekly run keeps it fresh; a stale list blocks only new installs.
+#
+# - The list signed is security/yank-list.json (main), plus every entry of the published list
+#   (carried forward: a yank or revocation is never dropped), plus an emergency entry from the
+#   inputs below, with a serial one above the published one (scripts/release-keys.ts sign-yanked).
+# - The yank key can only reduce trust, so the `release-yank` environment has no required
+#   reviewer; its branch policy allows `main` only. The job installs nothing and runs only
+#   scripts/release-keys.ts (Node built-ins). The key reaches that one step.
+# - The `yank-list` branch is append-only: a ruleset blocks force-pushes and deletion and lets
+#   only GitHub Actions push (docs/security/release-signing-keys.md, First-time setup).
+# - Emergency: Actions › Yank list › Run workflow with `yank` (a version) or `revoke` (a release
+#   key id) and a `reason`. Then record the entry in security/yank-list.json in a reviewed PR.
+
+on:
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC
+  workflow_dispatch:
+    inputs:
+      yank:
+        description: Emergency yank of this version (X.Y.Z or X.Y.Z-pre)
+        type: string
+        required: false
+      revoke:
+        description: Emergency revocation of this release key id
+        type: string
+        required: false
+      reason:
+        description: Why (required with yank or revoke; public)
+        type: string
+        required: false
+      first_run:
+        description: The very first list (no yank-list branch yet)
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: yank-list
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    name: Sign and publish yanked.json
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release-yank
+    permissions:
+      contents: write # pushes the yank-list branch; nothing else
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - name: Read the published list
+        env:
+          FIRST_RUN: ${{ inputs.first_run && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --heads "https://github.com/${GITHUB_REPOSITORY}.git" yank-list >/dev/null; then
+            git clone --quiet --branch yank-list --single-branch "https://github.com/${GITHUB_REPOSITORY}.git" "$RUNNER_TEMP/yank-list"
+          elif [ "$FIRST_RUN" = "true" ]; then
+            git init --quiet -b yank-list "$RUNNER_TEMP/yank-list"
+            git -C "$RUNNER_TEMP/yank-list" remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          else
+            echo "::error::there is no yank-list branch: run once with first_run (runbook, First-time setup)"
+            exit 1
+          fi
+      - name: Sign
+        env:
+          RELEASE_YANK_KEY: ${{ secrets.RELEASE_YANK_KEY }}
+          FIRST_RUN: ${{ inputs.first_run && 'true' || 'false' }}
+          YANK: ${{ inputs.yank }}
+          REVOKE: ${{ inputs.revoke }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          set -euo pipefail
+          args=(sign-yanked --key-id cloudhal-yank-2026a --published "$RUNNER_TEMP/yank-list/yanked.json" --out "$RUNNER_TEMP/signed")
+          if [ "$FIRST_RUN" = "true" ]; then args+=(--first-run); fi
+          if [ -n "$YANK" ]; then args+=(--yank "$YANK"); fi
+          if [ -n "$REVOKE" ]; then args+=(--revoke "$REVOKE"); fi
+          if [ -n "$REASON" ]; then args+=(--reason "$REASON"); fi
+          node scripts/release-keys.ts "${args[@]}"
+      - name: Publish to the yank-list branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh auth setup-git
+          cd "$RUNNER_TEMP/yank-list"
+          cp "$RUNNER_TEMP/signed/yanked.json" "$RUNNER_TEMP/signed/yanked.json.sig" .
+          serial="$(node -e 'process.stdout.write(String(JSON.parse(require("fs").readFileSync("yanked.json","utf8")).serial))')"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add yanked.json yanked.json.sig
+          git commit --quiet -m "chore(yank-list): serial ${serial}"
+          # Never --force: the branch only ever gains commits.
+          git push --quiet origin yank-list
+          echo "published yanked.json serial ${serial}"

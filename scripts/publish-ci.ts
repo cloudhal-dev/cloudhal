@@ -57,6 +57,7 @@ import {
   runPublish,
   tagFor,
 } from "./release-publish-plan.ts";
+import { trustAssets } from "./release-trust-assets.ts";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const REPO = process.env.GITHUB_REPOSITORY ?? "cloudhal-dev/cloudhal";
@@ -357,14 +358,19 @@ export async function main(argv: readonly string[]): Promise<void> {
     : {};
   // Before anything is created or uploaded: every consumer's own verifier accepts this bundle.
   if (bundleDir) await verifyAsConsumer(bundleDir, version, publicKeys);
+  const releases = port.releases(tag);
+  const loaded = bundleDir ? loadBundle(bundleDir, version, publicKeys) : null;
+  // RFC-0046 §9: the verified key list and yank list ride along as a snapshot (none before the
+  // root ceremony; a resumed run of a published release reuses what it carries).
+  const trust = loaded ? await trustAssets({ root: ROOT, release: releases[0] ?? null }) : [];
   const steps = await runPublish(port, {
     version,
     head: sh("git", ["rev-parse", "HEAD"], true).trim(),
     dryRun,
     ...(runNumber ? { runNumber } : {}),
-    bundle: bundleDir ? loadBundle(bundleDir, version, publicKeys) : null,
+    bundle: loaded ? { ...loaded, assets: [...loaded.assets, ...trust] } : null,
     tagCommit: dryRun ? null : remoteTagCommit(tag),
-    releases: port.releases(tag),
+    releases,
     packages: pkgs.map((p) => p.name),
     npmMissing: missing.map((p) => p.name),
     tags: sh("git", ["tag", "--list", "v*"], true).split("\n").filter(Boolean),

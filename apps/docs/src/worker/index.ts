@@ -4,11 +4,14 @@
  * - `/mcp`: the read-only docs MCP (`mcp.ts`), rate limited per IP;
  * - `Accept: text/markdown` on a page answers its Markdown copy, with `Vary: Accept` and an
  *   `x-markdown-tokens` estimate (RFC-0037 §4);
+ * - `/.well-known/cloudhal/yanked.json` and `.sig`: the signed yank list, from the `yank-list`
+ *   branch (`trust.ts`, RFC-0046 §9);
  * - everything else goes to the assets binding unchanged.
  */
 import { SEARCH_INDEX_PATH, type SearchIndex } from "../lib/search.ts";
 import { CORS, handleMcp } from "./mcp.ts";
 import { isPagePath, markdownPath, pageId } from "./paths.ts";
+import { YANK_LIST_PATHS, yankList } from "./trust.ts";
 
 /** The parts of the Workers bindings this script uses. */
 export interface Env {
@@ -89,6 +92,7 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (url.pathname === "/mcp" || url.pathname === "/mcp/") return mcp(request, env, url);
+    if (Object.hasOwn(YANK_LIST_PATHS, url.pathname)) return yankList(request, url.pathname);
     const page =
       (request.method === "GET" || request.method === "HEAD") && isPagePath(url.pathname);
     return page ? negotiate(request, env, url) : env.ASSETS.fetch(request);

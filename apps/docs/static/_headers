@@ -25,3 +25,11 @@
 # The docs MCP's search index (read by the Worker, not a public API).
 /_mcp/*
   X-Robots-Tag: noindex
+
+# The root-signed release key list (RFC-0046 §9). yanked.json is served by the Worker (trust.ts).
+/.well-known/cloudhal/*
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=300
+
+/.well-known/cloudhal/*.sig
+  Content-Type: application/octet-stream

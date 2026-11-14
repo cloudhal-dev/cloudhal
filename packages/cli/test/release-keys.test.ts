@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   checkAppendOnly,
   main,
+  mergeYankList,
   type PublicKeyFile,
   rootInit,
   signKeys,
@@ -321,6 +322,38 @@ describe("sign-yanked", () => {
     );
     expect(() => checkAppendOnly(published, published)).not.toThrow();
     expect(() => checkAppendOnly(empty, undefined)).not.toThrow();
+  });
+
+  it("carries every published entry forward and adds an emergency yank or revocation", () => {
+    const published = {
+      versions: [{ version: "0.9.3", yankedAt: "2026-11-19T00:00:00Z", reason: "a" }],
+      revokedKeys: [],
+    };
+    const merged = mergeYankList(empty, published, { yank: "0.9.4", reason: "Data loss." }, NOW);
+    expect(merged.versions.map((v) => v.version)).toEqual(["0.9.3", "0.9.4"]);
+    expect(merged.versions[1]).toEqual({
+      version: "0.9.4",
+      yankedAt: iso(NOW),
+      reason: "Data loss.",
+    });
+    const revoked = mergeYankList(
+      empty,
+      undefined,
+      { revoke: "cloudhal-release-2026a", reason: "Exposed." },
+      NOW,
+    );
+    expect(revoked.revokedKeys.map((k) => k.keyId)).toEqual(["cloudhal-release-2026a"]);
+    // A yank already listed keeps its first date and reason.
+    expect(
+      mergeYankList(empty, published, { yank: "0.9.3", reason: "again" }, NOW).versions,
+    ).toEqual(published.versions);
+    expect(() => mergeYankList(empty, undefined, { yank: "0.9.4" }, NOW)).toThrow(/needs a reason/);
+    expect(() =>
+      mergeYankList(empty, undefined, { yank: "v0.9.4; rm -rf /", reason: "x" }, NOW),
+    ).toThrow(/not a version/);
+    expect(() => mergeYankList(empty, undefined, { revoke: "Bad Key", reason: "x" }, NOW)).toThrow(
+      /not a key id/,
+    );
   });
 
   it("numbers each list one above the published one (rollback protection)", async () => {

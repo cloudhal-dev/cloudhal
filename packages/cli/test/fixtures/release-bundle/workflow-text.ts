@@ -10,6 +10,7 @@ export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const read = (f: string) => readFileSync(path.join(ROOT, ".github/workflows", f), "utf8");
 export const RELEASE = read("release.yml");
 export const BUILD = read("bundle-build.yml");
+export const YANK = read("yank-list.yml");
 
 /** A GitHub Actions expression `${{ inner }}` (written so, not as a JS template). */
 export const gha = (inner: string) => ["$", "{{ ", inner, " }}"].join("");

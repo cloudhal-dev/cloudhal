@@ -37,6 +37,7 @@ A release carries exactly these assets, all attached before it is published:
 | `release-statement.json` | `cloudhal.release-statement@1`, canonical JSON, at most 4096 bytes |
 | `release-statement.sig` | the raw 64-byte Ed25519 signature over the exact bytes of `release-statement.json` |
 | `cloudhal-release-<v>.sigstore.json` | the Sigstore bundle of the build-provenance attestation over the first three files |
+| `keys.json`, `keys.json.sig`, `yanked.json`, `yanked.json.sig` | §9's key list and yank list as they were when the release was made, verified by `publish-ci` before it attaches them. This snapshot starts with the first release after the root ceremony; consumers prefer the canonical URLs (added 2026-11-14, #226) |
 
 The manifest's `signing` is `{ "keyId": "<id>", "algorithm": "Ed25519", "signature": "release-statement.sig" }`. The enum also admits `"manifest.sig"`, a detached signature over the manifest bytes: that legacy form exists for development keys a consumer operates itself, and a consumer must never accept it for a project key. Project releases never carry `manifest.sig`.
 
@@ -199,7 +200,10 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
     - Both are contract roots in core-contracts, `release-keys` and `release-yank-list`.
   - **Where they live.** The canonical URLs are `https://cloudhal.dev/.well-known/cloudhal/keys.json` and `https://cloudhal.dev/.well-known/cloudhal/yanked.json`, each with its `.sig`.
     - Every GitHub release also attaches the copies current when it was made. A release is immutable, so that copy is a snapshot, and a consumer prefers the canonical URL.
-    - The sources are committed under `security/` in this repository. `apps/docs` (cloudhal.dev) publishes them.
+    - The sources are committed under `security/` in this repository.
+      - `keys.json` changes yearly. cloudhal.dev (`apps/docs`) serves it as a static asset, copied at build time.
+      - `yanked.json` is re-signed weekly. The *Yank list* workflow commits it to the append-only `yank-list` branch. The cloudhal.dev Worker proxies exactly that branch's raw file (a fixed URL, cached for at most five minutes, bytes unchanged), and answers 502 when the upstream fails, never with an old copy.
+      - No workflow deploys cloudhal.dev yet (RFC-0037's "push to `main` deploys `cloudhal-dev`" is a separate follow-up), so the route ships with one manual docs deploy.
     - The signatures make the location trust-free; the location only matters for availability.
   - **The root.** An Ed25519 root key signs only `keys.json`, at the yearly rotation or in an emergency.
     - The owner generates it offline with `node scripts/release-keys.ts root-init`. The script writes the private key encrypted with a passphrase, never prints it, and writes the public key next to it.
