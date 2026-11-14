@@ -137,16 +137,17 @@ describe("release.yml jobs", () => {
     expect(j.indexOf("Check the statement")).toBeLessThan(j.indexOf("Sign the statement"));
   });
 
-  it("bundle-sign pins the key the security doc lists as active, with its not-after date", () => {
+  it("bundle-sign pins the key the security doc lists as active, with its window", () => {
     const row =
-      /\| `(cloudhal-release-\d{4}[a-z])` \| Ed25519 \| `([A-Za-z0-9+/]{43}=)` \| active \| \d{4}-\d\d-\d\d \| (\d{4}-\d\d-\d\d) \|/.exec(
+      /\| `(cloudhal-release-\d{4}[a-z])` \| Ed25519 \| `([A-Za-z0-9+/]{43}=)` \| active \| (\d{4}-\d\d-\d\d) \| (\d{4}-\d\d-\d\d) \|/.exec(
         KEYS_DOC,
       );
     expect(row).not.toBeNull();
     const sign = step(job(RELEASE, "bundle-sign"), "Sign the statement");
     expect(sign).toContain(`const PINNED_KEY_ID = "${row?.[1]}";`);
     expect(sign).toContain(`const PINNED_PUBLIC_KEY = "${row?.[2]}";`);
-    expect(sign).toContain(`const PINNED_NOT_AFTER = "${row?.[3]}T00:00:00Z";`);
+    expect(sign).toContain(`const PINNED_NOT_BEFORE = "${row?.[3]}T00:00:00Z";`);
+    expect(sign).toContain(`const PINNED_NOT_AFTER = "${row?.[4]}T00:00:00Z";`);
     expect(row?.[1]).toBe("cloudhal-release-2026a");
     expect(row?.[2]).toBe("7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=");
   });

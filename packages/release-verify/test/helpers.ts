@@ -24,6 +24,8 @@ export function realInput(over: Partial<VerifyReleaseInput> = {}): VerifyRelease
     manifest: fixture("manifest.json"),
     tarball: () => new Uint8Array(0),
     planVersion: 1,
+    // Inside cloudhal-release-2026a's window, so the tests do not age with the calendar.
+    now: new Date("2026-12-01T00:00:00Z"),
     ...over,
   };
 }

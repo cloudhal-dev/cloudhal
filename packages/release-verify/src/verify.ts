@@ -2,7 +2,8 @@
  * `verifyRelease` (RFC-0046 §2, §11a): the six steps of §2 in order, with no soft-fail anywhere.
  *
  *   1. sizes: the statement at most 4096 bytes, the signature exactly 64;
- *   2. Ed25519 over the exact statement bytes with a trusted key for `signing.keyId`;
+ *   2. Ed25519 over the exact statement bytes with a trusted key for `signing.keyId`, valid at
+ *      the statement's `createdAt` and still trusted now (§9), and the version not yanked;
  *   3. the statement is for the requested version and channel (invariant 7);
  *   4. the statement's schema and invariants 1, 2, 3 and 6;
  *   5. the manifest: size and SHA-256 equal the statement's, schema, invariants 4 and 5, the
@@ -28,10 +29,11 @@ import {
 import { refuse } from "./errors.ts";
 import type { ReleaseManifest } from "./generated/release-manifest.ts";
 import type { ReleaseStatement } from "./generated/release-statement.ts";
-import { PINNED_KEYS, type ReleaseKeys, trustedKey } from "./keys.ts";
+import { checkKeyWindow, PINNED_KEYS, type ReleaseKeys, trustedKey } from "./keys.ts";
 import { LIMITS } from "./limits.ts";
 import { checkPath } from "./paths.ts";
 import { type ByteSource, chunksOf, gunzip, readTar } from "./tar.ts";
+import { type VerifiedYankList, yankOf } from "./trust.ts";
 
 export interface VerifyReleaseInput {
   /** What the consumer asked for; `channel` defaults to the one the version implies. */
@@ -48,6 +50,10 @@ export interface VerifyReleaseInput {
   readonly keys?: ReleaseKeys;
   /** Key ids to distrust on top of `keys` (reduce-only). */
   readonly revoked?: readonly string[];
+  /** A verified yank list (`verifyYanked`): a yanked version is refused. Pass `keys` through `mergeTrust` to apply its revocations too. */
+  readonly yanked?: VerifiedYankList;
+  /** The time keys are checked against (default: now). */
+  readonly now?: Date;
 }
 
 export interface VerifiedEntry {
@@ -78,12 +84,16 @@ export async function verifyRelease(input: VerifyReleaseInput): Promise<Verified
   const doc = parseJson(input.statement, "statement-invalid");
   const keyId = (doc as { signing?: { keyId?: unknown } } | null)?.signing?.keyId;
   if (typeof keyId !== "string") refuse("statement-invalid", "the statement names no key");
-  const key = trustedKey(input.keys ?? PINNED_KEYS, input.revoked ?? [], keyId);
-  if (!(await verifyEd25519(key, input.statement, input.signature)))
+  const { raw, key } = trustedKey(input.keys ?? PINNED_KEYS, input.revoked ?? [], keyId);
+  if (!(await verifyEd25519(raw, input.statement, input.signature)))
     refuse("signature-invalid", `the signature does not verify with ${keyId}`);
   // 3. and 4.
   checkRequested(doc, input.request.version, input.request.channel);
   const statement = checkStatementDoc(doc, input.statement.length);
+  // §9: the key was valid when the statement was created, and is still trusted now.
+  checkKeyWindow(keyId, key, statement.createdAt, input.now ?? new Date());
+  const yank = yankOf(input.yanked, statement.version);
+  if (yank) refuse("yanked", `${statement.version} is yanked: ${yank.reason}`);
   // 5.
   if (
     input.manifest.length !== statement.manifest.bytes ||

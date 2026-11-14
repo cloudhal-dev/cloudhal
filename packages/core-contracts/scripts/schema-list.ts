@@ -25,6 +25,8 @@ export const ROOT_SCHEMAS = [
   "glossary",
   "release-manifest",
   "release-statement",
+  "release-keys",
+  "release-yank-list",
 ] as const;
 
 export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];
@@ -39,6 +41,8 @@ export type RootSchemaName = (typeof ROOT_SCHEMAS)[number];
 export const INDEX_EXPORTS: Partial<Record<RootSchemaName, readonly string[]>> = {
   "release-manifest": ["ReleaseManifest", "WorkerArtifact", "BindingTemplate"],
   "release-statement": ["ReleaseStatement", "StatementAsset"],
+  "release-keys": ["ReleaseKeys", "ListedKey"],
+  "release-yank-list": ["ReleaseYankList"],
 };
 
 export const COMMON_SCHEMA = "common";

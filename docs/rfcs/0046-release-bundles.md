@@ -141,7 +141,7 @@ A `bundle-sign` job runs in the protected environment `release-signing` (a requi
 4. signs. The private key (PKCS#8 PEM) is exposed only to this one step's environment. The step reads it once into a `KeyObject` and removes it from the environment. It then checks that the derived public key equals the pinned public key. The active key id and its raw public key are written inline in the `bundle-sign` job, because the job checks out nothing and cannot read a document. A repository test keeps them equal to `docs/security/release-signing-keys.md`. The step then signs, verifies its own signature, and writes `release-statement.sig`. Errors are fixed strings; the key is never echoed and the shell never traces;
 5. uploads the five files as the signed artifact.
 
-Phase 1 custody is that environment secret (`RELEASE_SIGNING_KEY`), readable only by this job. Phase 2 moves the key into a KMS reached through GitHub OIDC; the statement already fits its message limit (§2, invariant 6), so nothing a consumer reads changes.
+Phase 1 custody is that environment secret (`RELEASE_SIGNING_KEY`), readable only by this job. Phase 3 (deferred, §9) moves the key into a KMS reached through GitHub OIDC; the statement already fits its message limit (§2, invariant 6), so nothing a consumer reads changes.
 
 ### 6. Publication on immutable releases
 
@@ -185,16 +185,53 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
 6. Bundles are never installed automatically by the project's tools; `securityRelease` is a highlight, not an auto-update.
 7. Every version ships to everyone at the same moment: there is no early-access channel and no audience-restricted asset.
 
-### 9. Keys and trust (hooks designed here, built later)
+### 9. Keys and trust
 
 - **Two factors for a consumer that verifies both.** Factor 1 is the Ed25519 statement. Factor 2 is the `bundle-build.yml` attestation, verified by the consumer's own tooling.
   - For a consumer that verifies both, the two factors together defeat theft of the release key alone.
   - A consumer that verifies only the Ed25519 statement relies on the release key alone. A deployer running inside a Worker, without `gh` or a Sigstore verifier, is one example. A stolen key is enough against such a consumer until the key is revoked; §2 asks every consumer whose tooling can verify the attestation to do so.
   - Neither factor defeats a malicious commit on `main` or a compromised build dependency, because both factors then cover bad bytes. Required reviewers on `main`, the frozen lockfile, and the consumer's own soak, backup and rollback guards cover those cases.
-- **Rollback and freeze.** Binding the statement to the request (§2, invariant 7) refuses an older signed release served under a newer name. It cannot tell a consumer that a newer version exists, or that the version it holds is withdrawn. The expiring yank list below covers that case once it is built. Until then, a consumer learns about versions from the release feed, which it uses for discovery only and never as a trust factor.
-- **Key list** `keys.json` (designed, not built): entries `{ keyId, publicKey, role: "release" | "yank", notBefore, notAfter, status: "active" | "retiring" | "revoked" }`, signed by an offline root key held by two people (a hardware key plus a sealed backup), about one year of validity, published at a stable URL and as a release asset. Two release keys overlap at every rotation. The sign job will refuse when the active key's `notAfter` is under 90 days away. A consumer may use `keys.json` only to reduce trust (act on `revoked` or an expired `notAfter`); adding a key to a consumer stays a reviewed change on the consumer's side.
-- **Yank list** `yanked.json` (designed, not built): signed by the dedicated `yank` key from `keys.json`, not the release key, so a stolen release key cannot un-yank; it carries `expires`, and a stale list alerts and never blocks verification of other versions. Installed copies keep running.
-- Until `keys.json` exists, the pinned keys are the ones in `docs/security/release-signing-keys.md`, and a rotation is announced there before its first use.
+- **Rollback and freeze.** Binding the statement to the request (§2, invariant 7) refuses an older signed release served under a newer name. It cannot tell a consumer that a newer version exists, or that the version it holds is withdrawn. The expiring yank list below covers that case. A consumer learns about new versions from the release feed, which it uses for discovery only and never as a trust factor.
+- **Key list, yank list and expiry (decided 2026-11-14, #226).** The decisions below replace the earlier sketch of `keys.json` and `yanked.json`. They are built by #226.
+  - **Documents.** Each is a canonical JSON document with a detached signature, in the same form as the statement: a raw 64-byte Ed25519 signature over the exact bytes. A consumer verifies the downloaded bytes and never re-serialises them.
+    - `keys.json` is `cloudhal.release-keys@1`, signed in `keys.json.sig`.
+    - `yanked.json` is `cloudhal.release-yank-list@1`, signed in `yanked.json.sig`.
+    - Both are contract roots in core-contracts, `release-keys` and `release-yank-list`.
+  - **Where they live.** The canonical URLs are `https://cloudhal.dev/.well-known/cloudhal/keys.json` and `https://cloudhal.dev/.well-known/cloudhal/yanked.json`, each with its `.sig`.
+    - Every GitHub release also attaches the copies current when it was made. A release is immutable, so that copy is a snapshot, and a consumer prefers the canonical URL.
+    - The sources are committed under `security/` in this repository. `apps/docs` (cloudhal.dev) publishes them.
+    - The signatures make the location trust-free; the location only matters for availability.
+  - **The root.** An Ed25519 root key signs only `keys.json`, at the yearly rotation or in an emergency.
+    - The owner generates it offline with `node scripts/release-keys.ts root-init`. The script writes the private key encrypted with a passphrase, never prints it, and writes the public key next to it.
+    - It has one holder for now, with two sealed copies kept in separate places. A YubiKey (firmware 5.7 or later, for Ed25519) is optional.
+    - A second holder is added when there is a second maintainer.
+    - `@cloudhal/release-verify` pins the root's public key, and a repository test keeps it equal to the key doc.
+  - **`keys.json`.**
+    - **Entries:** `{ keyId, publicKey, role: "release" | "yank", notBefore, notAfter, status: "active" | "retiring" | "revoked" }`.
+    - **Freshness:** it carries signed `issuedAt` and `expires`, with `expires` at most 13 months after `issuedAt`. The root re-signs it at every rotation.
+    - **Rotation overlap:** two release keys overlap at every rotation. The successor is listed at least 120 days before the active key's `notAfter`. For `cloudhal-release-2026a` (`notAfter` 2027-11-12), `cloudhal-release-2027a` is listed by 2027-07-15.
+    - **The sign job:** `bundle-sign` refuses to sign when fewer than 90 days remain before the active key's `notAfter`, and when the statement's `createdAt` is outside the key's `[notBefore, notAfter]`.
+  - **The yank key.** `cloudhal-yank-2026a` has `role: "yank"` in `keys.json` and its own GitHub environment, `release-yank`, whose branch policy allows `main` only.
+    - It signs only `yanked.json`.
+    - `yanked.json` lists yanked versions and revoked release key ids, so an emergency revocation does not need the offline root.
+    - It can only reduce trust: nothing in `yanked.json` adds or re-enables a key. The committed source list, `security/yank-list.json`, is append-only: a yanked version or revoked key id is never removed. `sign-yanked` refuses to sign a list that drops an entry of the currently published `yanked.json`, and a reviewed pull request is the only way to change the source.
+    - A stolen yank key can at worst deny service, by yanking good versions or revoking good keys. The recovery is that the root rotates the yank key (a new `keys.json` revokes the old one).
+  - **`yanked.json` freshness.** It carries signed `issuedAt` and `expires`, with `expires` exactly 30 days after `issuedAt`.
+    - A scheduled weekly workflow in `release-yank` re-signs it from the committed source list. That workflow has no required reviewer, because the key can only reduce trust.
+    - A stale `yanked.json` blocks only `deploy --release` (§11b). Installed sites keep running.
+  - **Expired keys.** A statement is valid only when its `createdAt` lies within its key's `[notBefore, notAfter]`. The producer (`bundle-sign`) and every consumer enforce this.
+    - After `notAfter`, the key still verifies statements created before `notAfter`, but only while a fresh, root-signed `keys.json` lists it as `retiring` (not `revoked`).
+    - With pinned keys only, and no `keys.json`, a key past its `notAfter` is refused (`key-expired`).
+    - A stolen key could backdate `createdAt`. The answer to that is revocation, through `yanked.json` or `keys.json`.
+  - **Reduce-only merging.** A consumer starts from its pinned keys. A verified `keys.json` can only revoke a pinned key, mark it `retiring`, or narrow its `[notBefore, notAfter]`. A verified `yanked.json` can only revoke a pinned key or yank a version. Keys that `keys.json` lists but the consumer does not pin are not added: adding a key stays a reviewed change on the consumer's side.
+  - **Online and offline.**
+    - Online consumers fetch both documents on every run, and refuse when a fetch or a verification fails (§11b).
+    - `--from <dir>` requires an unexpired `keys.json` and an unexpired `yanked.json` in that directory.
+  - **KMS custody is deferred** to a separate follow-up, phase 3: "Release signing: KMS-backed signer (RFC-0046 §9 phase 3)".
+    - Signing stays in the `release-signing` environment with a required reviewer.
+    - The reason: there is one maintainer, and a cloud account plus its IAM would add more risk than they remove today. The real gaps, revocation and expiry, are closed by the decisions above.
+    - The follow-up is triggered by a second maintainer, or by any exposure of the release-key secret.
+- Until the first signed `keys.json` is published, the pinned keys are the ones in `docs/security/release-signing-keys.md`, and a rotation is announced there before its first use.
 
 ### 10. Later phases (in scope, not in this change)
 

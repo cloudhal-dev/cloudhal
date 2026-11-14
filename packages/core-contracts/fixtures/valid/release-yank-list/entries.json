@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "format": "cloudhal.release-yank-list@1",
+  "issuedAt": "2026-11-20T00:00:00Z",
+  "expires": "2026-12-20T00:00:00Z",
+  "signing": {
+    "keyId": "cloudhal-yank-2026a",
+    "algorithm": "Ed25519",
+    "signature": "yanked.json.sig"
+  },
+  "versions": [
+    {
+      "version": "0.9.3",
+      "yankedAt": "2026-11-18T09:00:00Z",
+      "reason": "The admin Worker dropped scheduled releases (GHSA-xxxx)."
+    },
+    {
+      "version": "1.0.0-next.2",
+      "yankedAt": "2026-11-19T09:00:00Z",
+      "reason": "Broken migration."
+    }
+  ],
+  "revokedKeys": [
+    {
+      "keyId": "cloudhal-release-2026a",
+      "revokedAt": "2026-11-19T10:00:00Z",
+      "reason": "Key material exposed in a CI log."
+    }
+  ]
+}

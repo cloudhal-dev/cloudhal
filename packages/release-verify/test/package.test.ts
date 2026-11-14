@@ -16,6 +16,7 @@ import {
   LIMITS,
   missingScopes,
   PINNED_KEYS,
+  PINNED_ROOTS,
   releaseAssetNames,
   releaseAssetUrls,
   unsafePathReason,
@@ -27,20 +28,42 @@ const ROOT = path.resolve(here, "../../..");
 const SRC = path.resolve(here, "../src");
 
 describe("the package and its sources of truth", () => {
-  it("PINNED_KEYS is the key doc's table, row for row", () => {
-    const doc = readFileSync(path.join(ROOT, "docs/security/release-signing-keys.md"), "utf8");
-    const rows = doc
+  const keyDoc = () =>
+    readFileSync(path.join(ROOT, "docs/security/release-signing-keys.md"), "utf8")
       .split("\n")
       .filter((l) => l.startsWith("| `"))
       .map((l) => l.split("|").map((c) => c.trim()));
+  const day = (d: string) => `${d}T00:00:00Z`;
+
+  it("PINNED_KEYS is the key doc's release keys, row for row, with their windows", () => {
+    // | `id` | Ed25519 | `public key` | status | since | not after |
+    const rows = keyDoc().filter((r) => (r[1] as string).startsWith("`cloudhal-release-"));
     const fromDoc = Object.fromEntries(
       rows.map((r) => [
         (r[1] as string).slice(1, -1),
-        { publicKey: (r[3] as string).slice(1, -1), status: r[4] },
+        {
+          publicKey: (r[3] as string).slice(1, -1),
+          status: r[4],
+          notBefore: day(r[5] as string),
+          notAfter: day(r[6] as string),
+        },
       ]),
     );
     expect(fromDoc).toEqual(PINNED_KEYS);
     expect(Object.isFrozen(PINNED_KEYS)).toBe(true);
+  });
+
+  it("PINNED_ROOTS is the key doc's root keys (none until the root ceremony)", () => {
+    // | `cloudhal-root-…` | Ed25519 | `public key` | since |
+    const rows = keyDoc().filter((r) => (r[1] as string).startsWith("`cloudhal-root-"));
+    const fromDoc = Object.fromEntries(
+      rows.map((r) => [
+        (r[1] as string).slice(1, -1),
+        { publicKey: (r[3] as string).slice(1, -1) },
+      ]),
+    );
+    expect(fromDoc).toEqual(PINNED_ROOTS);
+    expect(Object.isFrozen(PINNED_ROOTS)).toBe(true);
   });
 
   it("LIMITS and the asset names equal the producer's", () => {

@@ -45,6 +45,22 @@ There is no soft-fail mode. Every refusal is a `ReleaseVerifyError` with a stabl
 
 You can only reduce trust: pass `revoked: ["<keyId>"]` to withdraw a key. Passing your own `keys` map replaces the table, so treat that as a reviewed change.
 
+## Key list and yank list (RFC-0046 §9)
+
+`keys.json` (signed by an offline root) and `yanked.json` (signed by a yank key) live at `https://cloudhal.dev/.well-known/cloudhal/`, each with its `.sig`. Fetch all four on every run, verify them, and merge them into the keys you pin. They can only take trust away:
+
+```ts
+import { mergeTrust, PINNED_KEYS, verifyKeys, verifyRelease, verifyYanked } from "@cloudhal/release-verify";
+
+const keys = await verifyKeys({ document: keysJson, signature: keysSig });            // pinned root, fresh
+const yanked = await verifyYanked({ document: yankedJson, signature: yankedSig, keys }); // stale → stale-yank-list
+await verifyRelease({ ...input, keys: mergeTrust(PINNED_KEYS, { keys, yanked }), yanked });
+```
+
+- **Expiry.** A statement's `createdAt` must lie within its key's `[notBefore, notAfter]`. After `notAfter`, the key verifies only while a fresh `keys.json` lists it as `retiring`. With pinned keys alone, the release is refused with `key-expired`.
+- **Yanking.** A yanked version is refused (`yanked`), and a key that `yanked.json` revokes is refused (`key-revoked`).
+- **Not yet published.** `PINNED_ROOTS` is empty until the root is generated. Until then `verifyKeys` refuses every list, unless you pass `roots`.
+
 ## The second factor
 
 The Node-only subpath `@cloudhal/release-verify/attestation` checks the GitHub build-provenance attestation of the tarball, the manifest and the statement. It needs `gh` 2.68.0 or newer, signed in. It returns `verified` or `failed`, or `unavailable` when `gh` is missing, too old, or signed out.

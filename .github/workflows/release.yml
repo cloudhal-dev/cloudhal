@@ -194,6 +194,7 @@ jobs:
           // The active release key (docs/security/release-signing-keys.md; a test keeps them equal).
           const PINNED_KEY_ID = "cloudhal-release-2026a";
           const PINNED_PUBLIC_KEY = "7az3pPc4oT0AOfRcdfOZZQkM6XAGHo2jXEdDZ1qEVR8=";
+          const PINNED_NOT_BEFORE = "2026-11-12T00:00:00Z";
           const PINNED_NOT_AFTER = "2027-11-12T00:00:00Z";
           const fail = (m) => { console.error(`bundle-sign: ${m}`); process.exit(1); };
           // RFC-0046 §9: no new signature within 90 days of the key's notAfter, so consumers get the
@@ -216,6 +217,9 @@ jobs:
           const raw = pub.export({ format: "der", type: "spki" }).subarray(12).toString("base64");
           if (!dryRun && raw !== PINNED_PUBLIC_KEY) fail(`the signing key is not ${PINNED_KEY_ID}`);
           const statement = readFileSync("bundle/release-statement.json");
+          // RFC-0046 §9: a statement is valid only when its createdAt lies in the key's window.
+          const createdAt = Date.parse(JSON.parse(statement.toString("utf8")).createdAt);
+          if (!(createdAt >= Date.parse(PINNED_NOT_BEFORE) && createdAt <= Date.parse(PINNED_NOT_AFTER))) fail(`the statement's createdAt is outside ${PINNED_KEY_ID}'s window [${PINNED_NOT_BEFORE}, ${PINNED_NOT_AFTER}]`);
           const sig = sign(null, statement, key);
           if (sig.length !== 64 || !verify(null, statement, pub, sig)) fail("the signature does not verify");
           writeFileSync("bundle/release-statement.sig", sig);

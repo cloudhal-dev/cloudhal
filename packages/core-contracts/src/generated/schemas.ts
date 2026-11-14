@@ -9466,6 +9466,273 @@ export const ReleaseStatementSchema = {
   }
 } as const;
 
+export const ReleaseKeysSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release-keys.schema.json",
+  "title": "ReleaseKeys",
+  "description": "cloudhal.release-keys@1 (RFC-0046 §9): the root-signed list of Cloudhal's release and yank keys, published as keys.json at https://cloudhal.dev/.well-known/cloudhal/keys.json next to keys.json.sig (a raw 64-byte Ed25519 signature by the offline root over the exact bytes). A consumer uses it only to reduce trust in the keys it pins: revoke, mark retiring, narrow a validity window; it never adds a key. Canonical bytes as for the release statement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "issuedAt",
+    "expires",
+    "signing",
+    "keys"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "cloudhal.release-keys@1"
+      ]
+    },
+    "issuedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "expires": {
+      "description": "At most 13 months after issuedAt; a consumer refuses an expired list.",
+      "$ref": "#/$defs/Timestamp"
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "algorithm",
+        "signature"
+      ],
+      "properties": {
+        "keyId": {
+          "description": "The root key that signed this list.",
+          "$ref": "#/$defs/KeyId"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "Ed25519"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "enum": [
+            "keys.json.sig"
+          ]
+        }
+      }
+    },
+    "keys": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "$ref": "#/$defs/ListedKey"
+      }
+    }
+  },
+  "$defs": {
+    "KeyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "ListedKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "publicKey",
+        "role",
+        "notBefore",
+        "notAfter",
+        "status"
+      ],
+      "properties": {
+        "keyId": {
+          "$ref": "#/$defs/KeyId"
+        },
+        "publicKey": {
+          "description": "The raw 32-byte Ed25519 public key, base64.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]{43}=$"
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "release",
+            "yank"
+          ]
+        },
+        "notBefore": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "notAfter": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "retiring",
+            "revoked"
+          ]
+        }
+      }
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
+export const ReleaseYankListSchema = {
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudhal.dev/schemas/v1/release-yank-list.schema.json",
+  "title": "ReleaseYankList",
+  "description": "cloudhal.release-yank-list@1 (RFC-0046 §9): the yank list, published as yanked.json at https://cloudhal.dev/.well-known/cloudhal/yanked.json next to yanked.json.sig (a raw 64-byte Ed25519 signature by a yank-role key from keys.json over the exact bytes). It only reduces trust: versions no consumer may install, and release key ids every consumer must refuse. Re-signed weekly; it expires 30 days after issuedAt, and a stale list blocks new installs only.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "format",
+    "issuedAt",
+    "expires",
+    "signing",
+    "versions",
+    "revokedKeys"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "#/$defs/SchemaVersion"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "cloudhal.release-yank-list@1"
+      ]
+    },
+    "issuedAt": {
+      "$ref": "#/$defs/Timestamp"
+    },
+    "expires": {
+      "description": "Exactly 30 days after issuedAt.",
+      "$ref": "#/$defs/Timestamp"
+    },
+    "signing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "keyId",
+        "algorithm",
+        "signature"
+      ],
+      "properties": {
+        "keyId": {
+          "description": "The yank-role key that signed this list.",
+          "$ref": "#/$defs/KeyId"
+        },
+        "algorithm": {
+          "type": "string",
+          "enum": [
+            "Ed25519"
+          ]
+        },
+        "signature": {
+          "type": "string",
+          "enum": [
+            "yanked.json.sig"
+          ]
+        }
+      }
+    },
+    "versions": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "yankedAt",
+          "reason"
+        ],
+        "properties": {
+          "version": {
+            "$ref": "#/$defs/CloudhalVersion"
+          },
+          "yankedAt": {
+            "$ref": "#/$defs/Timestamp"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      }
+    },
+    "revokedKeys": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keyId",
+          "revokedAt",
+          "reason"
+        ],
+        "properties": {
+          "keyId": {
+            "$ref": "#/$defs/KeyId"
+          },
+          "revokedAt": {
+            "$ref": "#/$defs/Timestamp"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "CloudhalVersion": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?$"
+    },
+    "KeyId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"
+    },
+    "SchemaVersion": {
+      "type": "integer",
+      "description": "Version of this contract. Readers reject unknown versions; migrations move documents forward one version at a time.",
+      "enum": [
+        1
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "description": "RFC 3339 / ISO 8601 instant in UTC.",
+      "format": "date-time"
+    }
+  }
+} as const;
+
 export const schemas = {
   "project": ProjectSchema,
   "site": SiteSchema,
@@ -9489,4 +9756,6 @@ export const schemas = {
   "glossary": GlossarySchema,
   "release-manifest": ReleaseManifestSchema,
   "release-statement": ReleaseStatementSchema,
+  "release-keys": ReleaseKeysSchema,
+  "release-yank-list": ReleaseYankListSchema,
 } as const;

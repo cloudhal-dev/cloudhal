@@ -1,9 +1,9 @@
 /**
  * Writes this package's generated files (RFC-0046 §11a) from the core-contracts sources:
  *
- *   src/generated/validators.js      ajv standalone validators for exactly the two release roots
+ *   src/generated/validators.js      ajv standalone validators for exactly the four release roots
  *   src/generated/validators.d.ts
- *   src/generated/release-manifest.ts, release-statement.ts   the generated contract types
+ *   src/generated/release-*.ts       the generated contract types of those roots
  *
  * The package never depends on `@cloudhal/core-contracts` at runtime, so a Worker deployer does
  * not pull in every validator; the validators import only ajv's runtime helpers and the
@@ -32,7 +32,7 @@ const BANNER = `/* eslint-disable */
 /* biome-ignore-all lint: generated */
 /**
  * GENERATED FILE — DO NOT EDIT.
- * Source: packages/core-contracts/schemas/release-{manifest,statement}.schema.json
+ * Source: packages/core-contracts/schemas/release-{manifest,statement,keys,yank-list}.schema.json
  * (run \`pnpm gen\`; packages/release-verify/scripts/gen-validators.ts)
  */
 `;
@@ -40,6 +40,8 @@ const BANNER = `/* eslint-disable */
 const ROOTS = {
   validateReleaseManifest: "release-manifest",
   validateReleaseStatement: "release-statement",
+  validateReleaseKeys: "release-keys",
+  validateReleaseYankList: "release-yank-list",
 } as const;
 
 /**
@@ -81,8 +83,10 @@ export function generate(): Map<string, string> {
     "validators.d.ts",
     [
       BANNER,
+      'import type { ReleaseKeys } from "./release-keys.ts";',
       'import type { ReleaseManifest } from "./release-manifest.ts";',
       'import type { ReleaseStatement } from "./release-statement.ts";',
+      'import type { ReleaseYankList } from "./release-yank-list.ts";',
       "",
       "export interface StandaloneValidator<T> {",
       "  (data: unknown): data is T;",
@@ -91,6 +95,8 @@ export function generate(): Map<string, string> {
       "",
       "export declare const validateReleaseManifest: StandaloneValidator<ReleaseManifest>;",
       "export declare const validateReleaseStatement: StandaloneValidator<ReleaseStatement>;",
+      "export declare const validateReleaseKeys: StandaloneValidator<ReleaseKeys>;",
+      "export declare const validateReleaseYankList: StandaloneValidator<ReleaseYankList>;",
       "",
     ].join("\n"),
   );

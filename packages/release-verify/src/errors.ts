@@ -22,6 +22,13 @@ export const ERROR_CODES = [
   "entry-mismatch",
   "entry-missing",
   "limit-exceeded",
+  // RFC-0046 §9 (#226): expiry, the key list and the yank list.
+  "key-expired",
+  "yanked",
+  "key-list-invalid",
+  "key-list-expired",
+  "yank-list-invalid",
+  "stale-yank-list",
 ] as const;
 
 export type ReleaseVerifyErrorCode = (typeof ERROR_CODES)[number];

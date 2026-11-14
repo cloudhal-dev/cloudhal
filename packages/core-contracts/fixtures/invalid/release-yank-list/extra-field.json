@@ -1,0 +1,17 @@
+{
+  "reason": "objects are closed (additionalProperties: false)",
+  "data": {
+    "schemaVersion": 1,
+    "format": "cloudhal.release-yank-list@1",
+    "issuedAt": "2026-11-20T00:00:00Z",
+    "expires": "2026-12-20T00:00:00Z",
+    "signing": {
+      "keyId": "cloudhal-yank-2026a",
+      "algorithm": "Ed25519",
+      "signature": "yanked.json.sig"
+    },
+    "versions": [],
+    "revokedKeys": [],
+    "extra": 1
+  }
+}

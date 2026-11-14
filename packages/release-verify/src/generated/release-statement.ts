@@ -2,7 +2,7 @@
 /* biome-ignore-all lint: generated */
 /**
  * GENERATED FILE — DO NOT EDIT.
- * Source: packages/core-contracts/schemas/release-{manifest,statement}.schema.json
+ * Source: packages/core-contracts/schemas/release-{manifest,statement,keys,yank-list}.schema.json
  * (run `pnpm gen`; packages/release-verify/scripts/gen-validators.ts)
  */
 /* biome-ignore-all lint: generated */
