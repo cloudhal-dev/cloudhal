@@ -325,66 +325,50 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
   - Each module type comes from the manifest. The config lists one `rules` entry per module type, whose globs are that type's exact module paths, so wrangler uploads exactly the listed modules, unchanged.
   - `assets.directory` is the extracted assets directory.
   - A deployer that calls the Workers API directly is not needed for the CLI. Hosts that cannot run wrangler use the verifier and their own uploader.
-- **An unmodified starter.** §10 still applies: the bundle bakes in its build inputs. In `v0.9.0` the manifest's `theme.blockTypes`, `settingsSha256`, `designSha256` and `skills` are placeholders: an empty list and the SHA-256 of the empty string. Consumers ignore those fields, and no check reads them.
+- **What `--release` means.** `--release` installs the official standard theme of this CLI's version into the project's Cloudflare account. It does not build the project. The site and admin code come entirely from the bundle, and the project contributes only its content (the first push), its config and its secrets.
 
-  Instead, the CLI checks two things before it downloads the tarball:
-  - **Files:** the project has no local changes relative to the starter that *created* it.
-  - **Config:** the project's build-input config equals the starter of the *target*, which is the running CLI's own version, and which the bundle was built from (§4 step 3).
+  §10 still applies: the bundle bakes in its build inputs. In `v0.9.0` the manifest's `theme.blockTypes`, `settingsSha256`, `designSha256` and `skills` are placeholders: an empty list and the SHA-256 of the empty string. Consumers ignore those fields, and no check reads them.
+- **The theme check.** Before downloading the tarball, the CLI compares the project with **this CLI version's own starter**, the template it ships and `cloudhal init` copies, which is the starter the bundle was built from (§4 step 3). The comparison covers:
+  - every file under `src/` and `public/`;
+  - `astro.config.mjs`;
+  - a root `skills/` directory, which the starter does not have. `resolveSkillsDir` prefers it, and the admin build bakes it in.
 
-  The deployed code comes entirely from the bundle, so upgrades and rollbacks only need these two facts, not matching versions.
-  - **The starter lock.** From the version that ships `--release` on, `cloudhal init` writes `cloudhal.starter.json` at the project root, and the project commits it. It records:
-    - `starter` (`blog`);
-    - the `version` that ran `init`;
-    - the SHA-256 of every file `init` wrote, except `cloudhal.json` and `package.json`;
-    - the sorted dependency names of `package.json` (`dependencies` and `devDependencies`).
+  Files are compared byte for byte after CRLF is normalised to LF, so a Windows checkout of an unmodified starter passes. A file the starter has that the project lacks is a difference, and so is a file the project has that the starter lacks. Paths are compared as normalised relative paths, with no pattern over paths or contents. Nothing outside these paths is compared, so `README`, `.gitignore`, lockfiles and `wrangler.jsonc` never matter.
 
-    It is a new public file format: a `starter-lock` root schema in core-contracts (`schemaVersion: 1`), through the contract-change skill. Its format is fixed now, so a CLI older than the one that wrote a lock can read it. A user who edits the lock to get past the check opts out of the check. The lock is a guard against silently dropping customisations, not a security boundary.
-  - **Projects created before the lock.** The CLI carries a frozen table, `starter-history.json`, with the same per-file hashes for every published version before the lock. It is generated once from the `v*` tags by `node scripts/starter-history.ts` (the starter at each tag, with `init`'s writes applied) and reviewed in the code PR.
-    - The base version is the exact `@cloudhal/cli` version in the project's `package.json`, which `init` pins.
-    - A project whose base version is missing, not exact, or not in the table is refused with "cannot tell which starter created this project".
-  - **The refusals.** The CLI refuses, names the first difference, and says to run `cloudhal deploy` without `--release`, when any of these hold:
-    1. A file recorded for the base version is missing or differs from its hash.
-    2. A file exists anywhere in the project that the base version did not record and that is not on the ignore list. Ignored are:
-       - the configured `dataDir` (default `.cloudhal/`);
-       - `node_modules/`, `.git/`, `dist/`, `.astro/` and `.wrangler/`;
-       - lockfiles (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock*`);
-       - `.env*` and `.dev.vars*`;
-       - `.DS_Store`, `README*`, `LICENSE*`, `.gitignore`, `.github/`, `.vscode/` and `.idea/`;
-       - `cloudhal.starter.json` itself.
-
-       This catches a root `skills/` directory, which `resolveSkillsDir` prefers and the admin build bakes in, and every other added source.
-    3. The dependency names in `package.json` differ from the base version's. Versions are ignored, because `init` pins exact versions per release and nothing from `node_modules` is deployed: the bundle is self-contained.
-    4. `cloudhal.json` differs from the target's starter in a key the table marks `build`, or holds a key the target's table does not know.
-    5. The project is attached to another installation (RFC-0034 `installation`), serves several sites (`sites`), or runs in Workers Builds.
-  - **Upgrades and rollbacks.** Both pass the same check:
-    - the files are compared with the base version, whatever the target is;
-    - the config is compared with the target, which is the running CLI.
-
-    After an upgrade, the local starter files stay at the base version: `cloudhal dev` serves them, while the deployment runs the target's bundle. Moving local files forward is a separate, later command (`cloudhal starter sync`, not designed here), and it would rewrite the lock.
-  - **The config table.** The key list lives in one exported table next to `readProjectConfig`. Each key is marked with one of three classes:
+  On any difference, the CLI refuses. It lists the differing files (the first 20, then a count) and names the two ways forward: `cloudhal deploy` without `--release`, which builds the project as it is, or `--discard-local-theme`.
+- **`--discard-local-theme`.** The flag deploys the official theme anyway. The CLI then lists every file that is not deployed (changed, added or missing relative to the starter) before it uploads. The flag is never implied, including in CI and non-interactive runs. It discards nothing on disk: the project's files stay as they are.
+- **Older projects.** A project whose starter files come from an older version differs from this CLI's starter wherever the starter changed between the two versions, even if nobody edited it. Such a project needs `--discard-local-theme` to upgrade or roll back with `--release`. A future `cloudhal starter sync` would bring the local starter files to the CLI's version; it is named here and is out of scope.
+- **Config build keys.** Separately from the theme check, the CLI refuses when `cloudhal.json` sets a key the table below marks `build` to a value other than this version's starter's. `--discard-local-theme` does not cover this. The config is the project's own, so the user changes the key or deploys without `--release`. A `cloudhal.json` key this CLI does not know is refused the same way.
+  - **The table.** It lives in one exported table next to `readProjectConfig`, and each key has one of three classes:
     - `deploy`: it becomes a binding, a var or a resource, and no build reads it. These are `domains`, `mail`, `ai`, `render`, `observability`, `placement` and `schedules`.
     - `runtime`: a build reads it, but the deployed Worker overrides it.
       - `siteId`: the Site Worker's `CLOUDHAL_SITE_ID`/`CLOUDHAL_SITE_IDS` vars override the baked id.
       - `dataDir`: the `cloudflare` target never reads it. The baked value is the CI build's absolute path.
       - `analytics`: the Site Worker reads its vars instead.
     - `build`: a build reads it and nothing overrides it.
-      - `comments` is always `build`.
-      - `media` is `build` unless the manifest's `features.mediaTransformVar` is true.
+      - `comments.available` is always `build`.
+      - `media.transform` is `build` unless the manifest's `features.mediaTransformVar` is true.
       - Every other key is `build`.
-  - **Drift guards.** These are tests of the builds themselves, not of config generation:
-    - **Site.** The template's `astro.config.mjs` is a lock-covered file, so a project can only carry the template's copy. A repository test scans `starters/blog/astro.config.mjs` for every `project.<key>` it reads, and fails unless that set equals the table's site keys (`siteId`, `dataDir`, `media`, `analytics`, `comments`) with their classes. Two further tests hold the `runtime` overrides:
+  - **Drift guards.** These test the builds themselves, not config generation.
+    - **Site.** A repository test scans `starters/blog/astro.config.mjs` for every `project.<key>` it reads. It fails unless that set equals the table's site keys (`siteId`, `dataDir`, `media`, `analytics`, `comments`) with their classes. The theme check guarantees that a project deployed with `--release` carries this exact file. Two further tests hold the `runtime` overrides:
       - a Site Worker test serves a site whose id differs from the baked one, through `CLOUDHAL_SITE_ID`;
-      - an astro-renderer test shows the `cloudflare` target ignores `dataDir`. If it does not, the integration stops emitting `dataDir` for that target.
-    - **Admin.** A test runs `prepareAdminWorker` twice, with different `mail`, `ai`, `browser`, `observability`, `placement`, `domains.studio` and `siteId`. The generated entry, the skills module and the theme-design module must be byte-identical; only the wrangler config may differ. The code the admin build bakes in reads only files (block types, theme settings, `src/DESIGN.md`, skills), and the lock covers those files.
-  - **Tests for the check.**
-    - **Real 0.9.0 project.** A committed copy of what `cloudhal init` 0.9.0 wrote, generated from the tag, passes against this version's template: the real 0.9.0 → 0.10.0 case. The same project is refused, with the file or key named, after any one of these:
-      - one `src/` file edited;
-      - a `skills/x/SKILL.md` added;
-      - a dependency name added;
-      - `comments.available: false` set.
-    - **Rollback.** A project created by this version passes against an older target template. With a `cloudhal.json` key the older target does not know, it is refused.
-    - **Ignore list.** `.env`, `node_modules/` and the `dataDir` never count.
-    - **Linear checks.** Paths are compared as normalised relative paths, with no pattern over file contents or paths.
+      - an astro-renderer test shows that the `cloudflare` target ignores `dataDir`. If it does not, the integration stops emitting `dataDir` for that target.
+    - **Admin.** A test runs `prepareAdminWorker` twice, with different `mail`, `ai`, `browser`, `observability`, `placement`, `domains.studio` and `siteId`. The generated entry, the skills module and the theme-design module must be byte-identical; only the wrangler config may differ. The code the admin build bakes in reads only files (block types, theme settings, `src/DESIGN.md`, skills), and the theme check covers those files.
+- **Other refusals.** The CLI also refuses when the project is attached to another installation (RFC-0034 `installation`), serves several sites (`sites`), or runs in Workers Builds.
+- **Wrangler.** `--release` needs a wrangler at least as new as the one the bundle was built with (`manifest.toolchain.wrangler`), because the generated configs use its asset and module settings. The CLI reads the version of the wrangler it will run, resolved the way `deploy` resolves it today, from that wrangler's own `package.json`. An older wrangler is refused, and the refusal names the required version. The starter only declares a range (`wrangler ^4.158.0`), so the check trusts the installed version, never the range.
+- **Tests for the check.**
+  - An unmodified starter passes, also with CRLF line endings.
+  - Each of these is refused, naming the file:
+    - an edited `src/` file;
+    - an added `public/` file;
+    - a starter file deleted;
+    - an edited `astro.config.mjs`;
+    - an added `skills/x/SKILL.md`.
+  - `--discard-local-theme` turns each of those refusals into a deploy that lists the files not deployed.
+  - `comments.available: false` is refused with and without the flag. So is `media.transform` while `features.mediaTransformVar` is false.
+  - Edits to `README.md`, `.gitignore` or `wrangler.jsonc` pass.
+  - A starter from the previous version's tag is refused without the flag and passes with it, which covers the upgrade and rollback rule.
+  - A wrangler older than `manifest.toolchain.wrangler` is refused.
 - **Migrations.** These need nothing new. The admin Worker applies D1 migrations itself, as it does after every deploy, and `manifest.levels.schedules` feeds the existing downgrade guard.
 - **Offline and dry runs.**
   - `--from <dir>` takes the five assets and `keys.json` from a directory, for offline machines. The same verification runs on them.
