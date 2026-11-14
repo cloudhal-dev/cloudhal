@@ -93,7 +93,7 @@ export const STANDARD_MANIFEST_FIELDS: Readonly<Record<string, unknown>> = {
   },
   // Workers Admin, not Workers Editor (`workers-scripts.edit`): installing creates the site and
   // admin Workers, and an Editor cannot create Workers (#225). Consumers treat `.admin` as covering
-  // the `.edit` that manifests up to v0.9.0 name (RFC-0046 §2).
+  // the `.edit` that manifests up to v0.9.0 name (RFC-0046 §3).
   requiredScopes: [
     "account-settings.read",
     "workers-scripts.admin",
