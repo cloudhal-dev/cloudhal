@@ -11,6 +11,7 @@ const read = (f: string) => readFileSync(path.join(ROOT, ".github/workflows", f)
 export const RELEASE = read("release.yml");
 export const BUILD = read("bundle-build.yml");
 export const YANK = read("yank-list.yml");
+export const DOCS = read("docs-deploy.yml");
 
 /** A GitHub Actions expression `${{ inner }}` (written so, not as a JS template). */
 export const gha = (inner: string) => ["$", "{{ ", inner, " }}"].join("");

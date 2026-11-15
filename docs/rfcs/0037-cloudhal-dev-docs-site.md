@@ -87,7 +87,7 @@ Who links where:
 ### 6. Build and deploy
 - CI builds `apps/docs` on every PR that touches `docs/**`, `apps/docs/**`, the schemas, `help.ts` or the MCP tool list, and runs the link checks (§3.5).
 - Every PR gets a preview: `wrangler versions upload` with a preview alias, posted as a PR comment.
-- A push to `main` deploys `cloudhal-dev`. This needs a Cloudflare API token, limited to Workers Scripts edit on this one Worker, stored as a GitHub Actions secret.
+- A push to `main` deploys `cloudhal-dev`. This needs a Cloudflare API token, limited to Workers Scripts edit on this one Worker, stored as a GitHub Actions secret. Since #236 this is `.github/workflows/docs-deploy.yml`, with the token in the `docs-deploy` environment.
 - `cloudhal.dev` sends no mail. DNS gets `v=spf1 -all`, DMARC `p=reject` and a null MX (ADR-0037).
 
 ### 7. Phases
