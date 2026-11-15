@@ -1,5 +1,53 @@
 # @cloudhal/cli
 
+## 0.10.0
+
+### Minor Changes
+
+- f41802b: `cloudhal deploy --release` installs the signed release of the CLI's own version instead of building the project (RFC-0046 §11b, #227).
+  
+  - **Trust lists.** On every run it fetches the signed key list and yank list from cloudhal.dev and verifies them against the pinned root. It never falls back to an older copy. It keeps a yank memory in `~/.cloudhal/release-trust.json`, so a rolled-back list, a replayed key list or a revoked yank key is refused.
+  - **Before the root ceremony** no root is pinned, so the command refuses and names the ceremony.
+  - **The release.** The release must be published (not a draft) and carry a bundle; `v0.8.0` and older have none. The CLI verifies it with `@cloudhal/release-verify`: the keys reduced by both lists, yanked versions refused, and every file checked against its digest.
+  - **The attestation.** It checks the build-provenance attestation with `gh`. `--allow-single-factor` continues on the release key alone when `gh` is unavailable; a failed attestation is always refused.
+  - **The project.** Its theme files must equal the CLI's own starter, unless `--discard-local-theme` is given. Its `cloudhal.json` build keys must match the starter's, a key the CLI does not know is refused, and the installed wrangler must be at least the bundle's.
+  - **Refused projects.** Projects attached to another installation, multi-site projects and Workers Builds are refused.
+  - **Deploying.** The verified files are extracted into a fresh `.cloudhal/deploy/release/<version>/`. Both Workers are then deployed with `no_bundle` wrangler configs that upload exactly those bytes.
+  - **Offline and dry runs.** `--from <dir>` installs offline from the assets and both lists, and `--release --dry-run` stops before wrangler.
+  
+  The CLI now depends on `@cloudhal/release-verify`.
+  
+  `@cloudhal/release-verify` now typechecks under every consumer's lib settings: WebCrypto inputs are `ArrayBuffer`-backed views, and the gzip pipe is typed through explicitly. `@cloudhal/astro-renderer` names the Site Worker's single-site choice `singleSiteId`, so a test holds that `CLOUDHAL_SITE_ID` overrides the built id.
+
+### Patch Changes
+
+- 49720db: `render_page` on Node gives a slow Chrome more chances to start. A launch that hangs past its start budget or exits is killed, and the renderer tries again up to three times. Each try uses a new profile, and the pause doubles from 1 s. The error says how long a launch may take and how many tries were made. A Chrome that crashes after it started is launched again by the next render, and its profile is removed (#207).
+- 74d7098: RFC-0045 rollout step 7b: **reference and repeater fields are now enabled.** Sites can define `reference` fields (entries of one to five collections of the same site, one or several, with optional conditions) and `repeater` fields (ordered lists of items with up to ten flat sub-fields) wherever the renderer serving them reads the two types. See [docs/guides/fields.md](https://github.com/cloudhal-dev/cloudhal/blob/main/docs/guides/fields.md).
+  
+  - **Where.** On Cloudflare, once the site Worker serving the site answers `GET /__cloudhal/features` with `fields: 2` (0.9.0 and later): the admin Worker asks the Worker each site is routed to (`SITE`, or an attached `SITE_n`), as it asks for time gates, and remembers a yes for that Worker only. Time gates are now confirmed per site Worker too, so a site on an older attached Worker no longer inherits the installation Worker's answer. Deploy the site Worker first; until it reports `fields: 2`, the types stay refused with `fields_unsupported` on every path. On Node (`cloudhal dev`, `studio`, self-host, Docker) and in the playground, always, since the renderer runs in the same process (`openLocalStore` passes `FIELDS_SUPPORTED`).
+  - **Every write path follows the capability:** Studio, MCP, the API, field operations and their dry runs, and every bundle: `cloudhal push` (the admin route passes the store's capability), `pull`, `cloudhal import` (dry runs included), `--replace` and `--revert`. A bundle that defines either type is still refused whole where the capability does not hold, and a site's new snapshot cannot point at another site's held site body to bring the types in.
+  - **MCP and Studio.** `update_collection` and `change_field_type` list both types, and `/api/instance` answers `features.referenceFields: true`, on servers that have the capability. The store still decides per site.
+  - **A one-time `entry_refs` check per site** (`rebuildEntryRefs`, new core-ts export): the admin Worker's new `refs.rebuild` system job (every five minutes, offset from `lists.backfill`, until every site is done; then two reads a run), and `openLocalStore` at start-up. Rows are written per entry, anchored on the hash each entry was read with, so a concurrent edit keeps its own rows; each chunk is anchored on the site node's hash, so no statement grows with the site's settings; it leaves a site alone while a text ↔ reference type change runs there; progress is in the new `entry_refs_state` table (storage migration `0034_entry_refs_state`), so a run stopped anywhere resumes. It is a safety net and should find nothing to change.
+- 9501d81: Studio's list toolbars come from one shared `@cloudhal/ui` block. The search now fills the free width of the row, and the filters, other actions, sort and refresh follow in a fixed order. `@cloudhal/ui` also gains `StatusIndicator`, `UsageMeterRow`, a "View docs" pill on `PageLayout`, and a resource mode for one resource's detail page: its tabs under the top bar, actions on the right, and no large title (#228).
+- Updated dependencies [4cb3ac6]
+- Updated dependencies [f41802b]
+- Updated dependencies [5baacb4]
+- Updated dependencies [61825b8]
+- Updated dependencies [3ffdf29]
+- Updated dependencies [74d7098]
+  - @cloudhal/astro-renderer@0.10.0
+  - @cloudhal/release-verify@0.10.0
+  - @cloudhal/core-contracts@0.10.0
+  - @cloudhal/core-ts@0.10.0
+  - @cloudhal/storage@0.10.0
+  - @cloudhal/cloudflare@0.10.0
+  - @cloudhal/api@0.10.0
+  - @cloudhal/mcp-server@0.10.0
+  - @cloudhal/agent-runtime@0.10.0
+  - @cloudhal/analytics@0.10.0
+  - @cloudhal/comments@0.10.0
+  - @cloudhal/schedules@0.10.0
+
 ## 0.9.0
 
 ### Patch Changes
