@@ -140,6 +140,7 @@ async function verifiedRelease(
     from: options.from,
     ...(options.fetch ? { fetch: options.fetch } : {}),
     dir: path.join(dir, "release-download", version),
+    log,
   };
   const files = await fetchRelease(source);
   const facts = unverifiedFacts(files.manifest);

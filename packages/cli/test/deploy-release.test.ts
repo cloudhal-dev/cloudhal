@@ -459,3 +459,50 @@ describe("deploy --release: review round 1", () => {
     });
   });
 });
+
+describe("deploy --release: a stale GitHub token", () => {
+  const withToken = async (run: () => Promise<unknown>) => {
+    const saved = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = "expired-token-not-a-secret";
+    try {
+      return await run();
+    } finally {
+      if (saved === undefined) delete process.env.GH_TOKEN;
+      else process.env.GH_TOKEN = saved;
+    }
+  };
+  const lookups = (urls: string[]) =>
+    urls.filter((u) => new URL(u).hostname === "api.github.com").length;
+
+  it("retries once without a token GitHub rejects (401), warns, and goes on", async () => {
+    const s = await setup();
+    s.world.rejectToken = true;
+    const lines: string[] = [];
+    const r = (await withToken(() => deploy({ ...s.options, log: (l) => lines.push(l) }))) as {
+      release?: { version: string };
+    };
+    expect(r.release?.version).toBe(VERSION);
+    expect(lookups(s.net.urls)).toBe(2);
+    expect(
+      s.net.headers
+        .filter((h) => new URL(h.url).hostname === "api.github.com")
+        .map((h) => h.authorization),
+    ).toEqual(["Bearer expired-token-not-a-secret", null]);
+    expect(lines.filter((l) => l.includes("rejected GH_TOKEN"))).toHaveLength(1);
+  });
+
+  it("reports the retry's own status when it fails too", async () => {
+    const s = await setup();
+    s.world.rejectToken = true;
+    s.world.anonymousStatus = 404;
+    await expect(withToken(() => deploy(s.options))).rejects.toMatchObject({
+      code: "release-unavailable",
+      message: expect.stringContaining("no published release"),
+    });
+    expect(lookups(s.net.urls)).toBe(2);
+    const t = await setup();
+    t.world.rejectToken = true;
+    t.world.anonymousStatus = 429;
+    expect(await codeOf(withToken(() => deploy(t.options)))).toBe("github-rate-limited");
+  });
+});

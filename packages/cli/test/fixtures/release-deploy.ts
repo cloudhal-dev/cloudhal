@@ -100,6 +100,10 @@ export interface Served {
 export interface World {
   trust: { keys: TrustWorld["keys"]; yanked: TrustWorld["yanked"] } | "down";
   release: "published" | "draft" | "missing" | "no-bundle" | "rate-limited";
+  /** The API answers 401 to any request carrying an `authorization` header (a stale token). */
+  rejectToken?: boolean;
+  /** The API answers this status to the retry without a token too. */
+  anonymousStatus?: number;
   bundle: Synthetic;
 }
 
@@ -125,6 +129,10 @@ export function serve(world: World): Served {
     if (url === `https://api.github.com/repos/cloudhal-dev/cloudhal/releases/tags/v${VERSION}`) {
       if (world.release === "missing") return new Response("{}", { status: 404 });
       if (world.release === "rate-limited") return new Response("{}", { status: 403 });
+      const authorized = new Headers(init?.headers).has("authorization");
+      if (world.rejectToken && authorized) return new Response("{}", { status: 401 });
+      if (world.anonymousStatus && !authorized)
+        return new Response("{}", { status: world.anonymousStatus });
       const names =
         world.release === "no-bundle"
           ? ["cloudhal-cli.tgz"]

@@ -44,6 +44,7 @@ export interface ReleaseSource {
   readonly fetch?: typeof fetch;
   /** A GitHub token for the API lookup only (default: `GH_TOKEN`, else `GITHUB_TOKEN`). */
   readonly githubToken?: string | undefined;
+  readonly log?: (line: string) => void;
   /** `.cloudhal/deploy/release-download/<version>/`. */
   readonly dir: string;
 }
@@ -74,17 +75,27 @@ export function checkBundledVersion(version: string): void {
 /** The published release `v<version>` and that it lists every bundle asset (GitHub's API). */
 async function checkPublished(s: ReleaseSource): Promise<void> {
   const url = `https://api.github.com/repos/${RELEASE_REPOSITORY}/releases/tags/v${s.version}`;
-  let res: Response;
-  try {
-    // The token goes to api.github.com only (a higher rate limit), never to a download URL.
-    const token = s.githubToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
-    res = await (s.fetch ?? fetch)(url, {
+  // The token goes to api.github.com only (a higher rate limit), never to a download URL.
+  const token = s.githubToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
+  const lookup = (withToken: boolean) =>
+    (s.fetch ?? fetch)(url, {
       headers: {
         accept: "application/vnd.github+json",
         "user-agent": "cloudhal-cli",
-        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(withToken && token ? { authorization: `Bearer ${token}` } : {}),
       },
     });
+  let res: Response;
+  try {
+    res = await lookup(true);
+    // An expired or revoked token gets 401 even on public endpoints: ask once more without it.
+    if (res.status === 401 && token) {
+      res = await lookup(false);
+      if (res.ok)
+        (s.log ?? (() => {}))(
+          "GitHub rejected GH_TOKEN/GITHUB_TOKEN (401); the release lookup went on without it",
+        );
+    }
   } catch (e) {
     return unavailable(s.version, `GitHub could not be reached (${(e as Error).message})`);
   }
