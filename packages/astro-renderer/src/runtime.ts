@@ -3,7 +3,7 @@ import type { Site } from "@cloudhal/core-contracts";
 import type { SiteGraphStore } from "@cloudhal/core-ts";
 import { type LocalStore, openLocalStore } from "@cloudhal/core-ts/local";
 import type { SqlDriver } from "@cloudhal/storage";
-import type { CloudhalRendererConfig } from "./integration.ts";
+import type { CloudhalRendererConfig, VirtualCloudhalConfig } from "./integration.ts";
 import type { PeerEdition } from "./locales.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { SiteResolver } from "./resolver.ts";
@@ -16,13 +16,22 @@ let cached: { key: string; source: Promise<GraphSource> } | undefined;
  * selector. `CLOUDHAL_SOURCE=live | snapshot:<id>` overrides the integration config (used by
  * `cloudhal build`); a later build in the same process with another selector gets a new source.
  */
+/** On Node targets the integration always passes `dataDir`; only the `cloudflare` target omits it. */
+export function nodeDataDir(config: Pick<VirtualCloudhalConfig, "dataDir">): string {
+  if (!config.dataDir)
+    throw new Error(
+      "the renderer config has no dataDir: Node targets read the local store from it",
+    );
+  return config.dataDir;
+}
+
 export function getSource(
-  config: CloudhalRendererConfig,
+  config: VirtualCloudhalConfig,
   /** Ignored on Node (one source per process); the `workerd` build resolves per request. */
   _astro?: { request: Request; response: { headers: Headers } },
 ): Promise<GraphSource> {
   const selector = process.env.CLOUDHAL_SOURCE ?? config.source ?? "live";
-  const key = `${config.dataDir}\n${config.siteId}\n${selector}`;
+  const key = `${nodeDataDir(config)}\n${config.siteId}\n${selector}`;
   if (cached?.key !== key) cached = { key, source: open(config, selector) };
   return cached.source;
 }
@@ -35,9 +44,9 @@ function localStore(dataDir: string): Promise<LocalStore> {
   return local.store;
 }
 
-function open(config: CloudhalRendererConfig, selector: string): Promise<GraphSource> {
+function open(config: VirtualCloudhalConfig, selector: string): Promise<GraphSource> {
   return (async () => {
-    const { store } = await localStore(config.dataDir);
+    const { store } = await localStore(nodeDataDir(config));
     if (selector === "live") return new LiveSource(store, config.siteId);
     if (selector.startsWith("snapshot:"))
       return SnapshotSource.open(store, selector.slice("snapshot:".length));

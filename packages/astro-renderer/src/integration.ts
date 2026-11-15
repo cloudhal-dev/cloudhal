@@ -72,6 +72,29 @@ const THEME_HOOKS_ID = "virtual:cloudhal/theme-hooks";
 const RESOLVED_THEME_HOOKS_ID = `\0${THEME_HOOKS_ID}`;
 const THEME_MODULE = "src/theme.ts";
 
+/**
+ * The type of `virtual:cloudhal/config`: the integration's config, with `dataDir` absent on the
+ * `cloudflare` target (`virtualConfig`). Theme code that reads `dataDir` must handle that.
+ */
+export type VirtualCloudhalConfig = Omit<CloudhalRendererConfig, "dataDir"> & {
+  readonly dataDir?: string;
+};
+
+/**
+ * What pages see as `virtual:cloudhal/config`. On the `cloudflare` target there is no `dataDir`:
+ * the Site Worker reads D1 and R2 through its bindings (`runtime-workerd.ts` ignores the field),
+ * and the resolved value is the build machine's absolute path, which a release bundle built in CI
+ * would otherwise carry to every deployment (RFC-0046 §11b, #239).
+ */
+export function virtualConfig(
+  resolved: CloudhalRendererConfig,
+  cloudflare: boolean,
+): VirtualCloudhalConfig {
+  if (!cloudflare) return resolved;
+  const { dataDir: _buildMachinePath, ...rest } = resolved;
+  return rest;
+}
+
 /** The virtual modules: the project config, and in dev the built analytics and comments clients. */
 function configPlugin(modules: { config: unknown; client: unknown; comments: unknown }) {
   const ids: Record<string, string> = {
@@ -182,7 +205,7 @@ export function cloudhal(config: CloudhalRendererConfig): AstroIntegration {
           vite: {
             plugins: [
               configPlugin({
-                config: resolved,
+                config: virtualConfig(resolved, cloudflare),
                 client: cloudflare ? null : (client ?? null),
                 comments: cloudflare ? null : (comments ?? null),
               }),

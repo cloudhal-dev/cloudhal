@@ -12,7 +12,11 @@ export * from "./collection-feeds.ts";
 export * from "./entry-query.ts";
 export * from "./fields.ts";
 export * from "./gates.ts";
-export { type CloudhalRendererConfig, cloudhal } from "./integration.ts";
+export {
+  type CloudhalRendererConfig,
+  cloudhal,
+  type VirtualCloudhalConfig,
+} from "./integration.ts";
 export { renderBody, renderEntryArticle, renderMarkdown, safeHref } from "./markdown.ts";
 export * from "./navigation.ts";
 export * from "./preview.ts";
