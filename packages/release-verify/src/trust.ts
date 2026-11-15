@@ -24,10 +24,14 @@ export type RootKeys = Readonly<Record<string, { readonly publicKey: string }>>;
 
 /**
  * The offline root's public key (docs/security/release-signing-keys.md, kept equal by
- * test/package.test.ts). Empty until the owner's root ceremony: until then `verifyKeys` refuses
- * every list unless a caller passes `roots`.
+ * test/package.test.ts), pinned at the owner's root ceremony on 2026-11-15. It signs only
+ * `keys.json`; a rotation of the root is a new pinned entry in a reviewed release.
  */
-export const PINNED_ROOTS: RootKeys = Object.freeze({});
+export const PINNED_ROOTS: RootKeys = Object.freeze({
+  "cloudhal-root-2026a": Object.freeze({
+    publicKey: "/rtDvlSlCYV402NiA/7OOFk+ryBv4DIWmkqwRyrVzqw=",
+  }),
+});
 
 export const KEYS_FILE = "keys.json";
 export const YANKED_FILE = "yanked.json";

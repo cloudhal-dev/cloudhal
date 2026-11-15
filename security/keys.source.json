@@ -7,6 +7,14 @@
       "notBefore": "2026-11-12T00:00:00Z",
       "notAfter": "2027-11-12T00:00:00Z",
       "status": "active"
+    },
+    {
+      "keyId": "cloudhal-yank-2026a",
+      "publicKey": "kCnR6ndVCEVQ+EoNDFsP9tKuScP6xB95emcQCzZsNG4=",
+      "role": "yank",
+      "notBefore": "2026-11-15T00:00:00Z",
+      "notAfter": "2027-11-12T00:00:00Z",
+      "status": "active"
     }
   ]
 }
