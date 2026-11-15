@@ -60,10 +60,15 @@ export async function npmVersions(name: string): Promise<string[]> {
 }
 
 /**
- * The deprecated placeholder an owner publishes by hand so that npm trusted publishing can be
- * set up for a new package (RFC-0046 §11a). It is never a release of the package.
+ * A `0.0.0-*` prerelease, which is never a release of a package. Two kinds exist on npm today:
+ * - the deprecated placeholder an owner publishes by hand so that npm trusted publishing can be
+ *   set up for a new package (`0.0.0-placeholder.0`, RFC-0046 §11a);
+ * - versions npm creates by itself around that first publish, such as `0.0.0-stage` from staged
+ *   publishing (seen on `@cloudhal/release-verify` on 2026-11-15).
+ * No Cloudhal release is ever `0.0.0-*`: the fixed group started at 0.1.0. A plain `0.0.0` is not
+ * matched.
  */
-export const isPlaceholderVersion = (v: string): boolean => v.startsWith("0.0.0-placeholder.");
+export const isNotRealVersion = (v: string): boolean => v.startsWith("0.0.0-");
 
 /** Whether a changelog has a `## <version>` section. */
 export const hasChangelogEntry = (text: string | undefined, version: string): boolean =>
@@ -81,7 +86,8 @@ export interface ReleaseGroup {
  * group in one PR and gets its first version in the next version PR. In between, `main` holds it
  * at the group's current version with no changelog entry for it. That version was never released
  * for this package and must not be published from `main` (#232). Such a package is one npm holds
- * no real version of (nothing, or only the placeholder) and whose changelog has no `## <version>`.
+ * no real version of (nothing, or only `0.0.0-*` prereleases such as the placeholder and npm's
+ * `0.0.0-stage`) and whose changelog has no `## <version>`.
  * Every package already released keeps being published as before.
  */
 export async function releaseGroup(
@@ -93,7 +99,7 @@ export async function releaseGroup(
   const notYetReleased: Pkg[] = [];
   for (const p of pkgs) {
     if (hasChangelogEntry(changelogOf(p), version)) continue;
-    const real = (await versionsOf(p.name)).filter((v) => !isPlaceholderVersion(v));
+    const real = (await versionsOf(p.name)).filter((v) => !isNotRealVersion(v));
     if (real.length === 0) notYetReleased.push(p);
   }
   return { group: pkgs.filter((p) => !notYetReleased.includes(p)), notYetReleased };

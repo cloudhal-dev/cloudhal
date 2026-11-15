@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  isNotRealVersion,
   isSecurityRelease,
   type Pkg,
   readPackages,
@@ -122,7 +123,8 @@ describe("a package that joined the fixed group before its first version PR (#23
       name === NEW ? forNew : ["0.8.0", released];
 
   it("is left out of the release: nothing publishes it at the group's current version", async () => {
-    for (const onNpmNew of [[], ["0.0.0-placeholder.0"]]) {
+    // Nothing; the owner's placeholder; and npm's own `0.0.0-stage` next to it (2026-11-15).
+    for (const onNpmNew of [[], ["0.0.0-placeholder.0"], ["0.0.0-placeholder.0", "0.0.0-stage"]]) {
       const pkgs = at("0.9.0");
       expect(pkgs.map((p) => p.name)).toContain(NEW);
       const r = await releaseGroup(
@@ -166,6 +168,25 @@ describe("a package that joined the fixed group before its first version PR (#23
     expect(r.notYetReleased).toEqual([]);
     const missing = await unpublished(r.group, async () => false);
     expect(missing.map((p) => p.name)).toContain(NEW);
+  });
+
+  it("counts no 0.0.0-* prerelease as a release, and every other version as one", () => {
+    for (const v of ["0.0.0-placeholder.0", "0.0.0-stage", "0.0.0-anything.1"])
+      expect(isNotRealVersion(v)).toBe(true);
+    for (const v of ["0.0.0", "0.9.0", "0.10.0-next.1", "1.0.0-0.0.0-x"])
+      expect(isNotRealVersion(v)).toBe(false);
+  });
+
+  it("is released by its first version PR after npm's 0.0.0-stage too", async () => {
+    const pkgs = at("0.10.0");
+    const r = await releaseGroup(
+      pkgs,
+      "0.10.0",
+      changelogs("0.10.0", true),
+      npm(["0.0.0-placeholder.0", "0.0.0-stage"], "0.9.0"),
+    );
+    expect(r.notYetReleased).toEqual([]);
+    expect((await unpublished(r.group, async () => false)).map((p) => p.name)).toContain(NEW);
   });
 
   it("never leaves out a package npm has released, even without a changelog entry", async () => {
