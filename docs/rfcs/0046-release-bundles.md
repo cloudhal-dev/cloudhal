@@ -206,8 +206,8 @@ Tar format: ustar with PAX `path` records for long names; regular files only (no
       - The route first shipped with one manual docs deploy. Since #236 the *Docs deploy* workflow deploys cloudhal.dev on every push to `main` that changes what it is built from, `security/**` included (RFC-0037).
     - The signatures make the location trust-free; the location only matters for availability.
   - **The root.** An Ed25519 root key signs only `keys.json`, at the yearly rotation or in an emergency.
-    - The owner generates it offline with `node scripts/release-keys.ts root-init`. The script writes the private key encrypted with a passphrase, never prints it, and writes the public key next to it.
-    - It has one holder for now, with two sealed copies kept in separate places. A YubiKey (firmware 5.7 or later, for Ed25519) is optional.
+    - The owner generates it offline with `node scripts/release-keys.ts root-init`. The script writes the private key encrypted with a passphrase (PKCS#8 PBES2, PBKDF2-HMAC-SHA256 at 600,000 iterations, AES-256-CBC), never prints it, and writes the public key next to it.
+    - It has one holder for now. The *encrypted* file has two sealed copies: one in the private repository `cloudhal-dev/key-custody` (owner only; no Actions, apps or deploy keys; no passphrase and no plaintext key in it), and one kept offline. The passphrase is kept apart, in a password manager and on sealed paper. That repository copy is the one documented exception to keeping keys out of repositories and cloud services; the release key, the yank key and every passphrase stay out of them, apart from the release and yank keys' environment secrets. A YubiKey (firmware 5.7 or later, for Ed25519) is optional.
     - A second holder is added when there is a second maintainer.
     - `@cloudhal/release-verify` pins the root's public key, and a repository test keeps it equal to the key doc.
   - **`keys.json`.**

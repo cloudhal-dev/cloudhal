@@ -4,7 +4,8 @@
  * document the way consumers do before it is written. No command ever prints a private key.
  *
  *   node scripts/release-keys.ts root-init --key-id cloudhal-root-2026a --out <dir> [--passphrase-file <f>]
- *       An Ed25519 root: <dir>/<id>.key.enc (PKCS#8, AES-256 with the passphrase) + <id>.pub.json.
+ *       An Ed25519 root: <dir>/<id>.key.enc (PKCS#8, AES-256-CBC under PBKDF2-HMAC-SHA256 with
+ *       600,000 iterations of the passphrase) + <id>.pub.json. sign-keys also reads older roots.
  *   node scripts/release-keys.ts yank-init --key-id cloudhal-yank-2026a --out <dir>
  *       The yank key: <dir>/<id>.pem (mode 0600, for the RELEASE_YANK_KEY secret) + <id>.pub.json.
  *   node scripts/release-keys.ts sign-keys --root-key <id>.key.enc --root-pub <id>.pub.json
@@ -35,6 +36,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { canonicalJson, sha256 } from "./release-bundle/manifest.ts";
+import { encryptPkcs8 } from "./release-keys/pkcs8.ts";
 import {
   checkAppendOnly,
   mergeYankList,
@@ -45,6 +47,7 @@ import {
   type YankSource,
 } from "./release-keys/yank-list.ts";
 
+export { type Pbes2Params, ROOT_KDF_ITERATIONS, readPbes2 } from "./release-keys/pkcs8.ts";
 export {
   checkAppendOnly,
   MAX_EXTRA,
@@ -115,12 +118,8 @@ export function rootInit(o: {
   if (o.passphrase.length < 12) throw new Error("the passphrase must be at least 12 characters");
   mkdirSync(o.out, { recursive: true });
   const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-  const enc = privateKey.export({
-    format: "pem",
-    type: "pkcs8",
-    cipher: "aes-256-cbc",
-    passphrase: o.passphrase,
-  });
+  // Not `privateKey.export({ cipher })`: that is 2,048 PBKDF2 iterations, with no way to ask for more.
+  const enc = encryptPkcs8(privateKey, o.passphrase);
   writeNew(path.join(o.out, `${o.keyId}.key.enc`), enc, 0o600);
   o.log(`wrote ${o.keyId}.key.enc (encrypted; seal two copies with the passphrase, apart)`);
   return writePublic(o.out, o.keyId, publicKey, o.log);
