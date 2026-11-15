@@ -12,6 +12,16 @@ const toHex = (bytes: Uint8Array): string => {
   return s;
 };
 
+/**
+ * `bytes` as WebCrypto's `BufferSource` under every consumer's lib settings: the same view when it
+ * is backed by an `ArrayBuffer`, else a copy (a `SharedArrayBuffer` is never handed to WebCrypto).
+ */
+function buffer(bytes: Uint8Array): Uint8Array<ArrayBuffer> {
+  return bytes.buffer instanceof ArrayBuffer
+    ? (bytes as Uint8Array<ArrayBuffer>)
+    : new Uint8Array(bytes);
+}
+
 /** Pure Ed25519 over the exact `message` bytes. */
 export async function verifyEd25519(
   publicKey: Uint8Array,
@@ -19,10 +29,14 @@ export async function verifyEd25519(
   signature: Uint8Array,
 ): Promise<boolean> {
   try {
-    const key = await crypto.subtle.importKey("raw", publicKey, { name: "Ed25519" }, false, [
-      "verify",
-    ]);
-    return await crypto.subtle.verify({ name: "Ed25519" }, key, signature, message);
+    const key = await crypto.subtle.importKey(
+      "raw",
+      buffer(publicKey),
+      { name: "Ed25519" },
+      false,
+      ["verify"],
+    );
+    return await crypto.subtle.verify({ name: "Ed25519" }, key, buffer(signature), buffer(message));
   } catch {
     // A key that is not a valid Ed25519 point verifies nothing.
     return false;
@@ -31,7 +45,7 @@ export async function verifyEd25519(
 
 /** SHA-256 of `bytes`, lowercase hex. */
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
+  return toHex(new Uint8Array(await crypto.subtle.digest("SHA-256", buffer(bytes))));
 }
 
 export interface IncrementalSha256 {

@@ -8,9 +8,21 @@ cloudhal dev                                 live preview (drafts visible)
 cloudhal studio                              API + Studio UI (+ /mcp) for this project
 cloudhal mcp [--mode plan|manual|edits|auto] MCP server over stdio for this project
 cloudhal deploy                              site + admin Workers on Cloudflare
+cloudhal deploy --release                    install this CLI version's signed release (no build)
 cloudhal push / cloudhal pull                local site ↔ deployment
 cloudhal export / cloudhal import            one site ↔ a .cloudhal file
 ```
+
+**`deploy --release`** (RFC-0046 §11b) installs the signed release of the CLI's own version instead of building. It verifies the signed key and yank lists from cloudhal.dev (keeping a yank memory in `~/.cloudhal/release-trust.json`), the release's signature and digests, and the build attestation (`gh` 2.68+, or `--allow-single-factor`).
+
+It refuses when:
+- the project joins another installation, serves several sites, or runs in Workers Builds;
+- the version has no published bundle (`v0.8.0` and older, drafts);
+- the theme files (`src/`, `public/`, `astro.config.mjs`, `tsconfig.json`, any `skills/`, `jsconfig.json` or PostCSS config) differ from the CLI's starter, unless `--discard-local-theme` is given, which then lists every file not deployed;
+- a `cloudhal.json` build key differs from the starter's, or a key is unknown (the flag does not cover these);
+- the installed wrangler is older than the release's.
+
+`--from <dir>` installs offline, and `--release --dry-run` stops before wrangler. Full list: [Installation › Installing the signed release](https://cloudhal.dev/docs/start/installation).
 
 **Studio build.** The published CLI ships Studio prebuilt. Run from the monorepo, `cloudhal deploy` uploads `apps/studio/dist` and first checks that it is current: when it is missing, or its `index.html` is older than the newest file in `apps/studio/src`, `apps/studio/index.html` or `packages/ui/src`, it runs `pnpm --filter @cloudhal/studio build`. With `--no-build-studio` it never builds and fails on a missing or stale build instead.
 

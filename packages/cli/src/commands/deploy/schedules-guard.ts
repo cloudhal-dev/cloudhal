@@ -53,10 +53,15 @@ export interface SchedulesStatus {
  */
 export async function downgradeGuard(
   options: DeployOptions,
-  adminUrl: string,
-  token: string,
+  target: {
+    readonly adminUrl: string;
+    readonly token: string;
+    /** The schedules level of the code deployed (`deploy --release`: the manifest's). */
+    readonly localLevel?: number;
+  },
   log: (line: string) => void,
 ): Promise<void> {
+  const { adminUrl, token } = target;
   let status: SchedulesStatus;
   try {
     const res = await (options.fetch ?? fetch)(new URL("/api/admin/schedules/status", adminUrl), {
@@ -77,7 +82,7 @@ export async function downgradeGuard(
     return;
   }
   const remote = status.engine?.schedulesLevel ?? 0;
-  const local = await projectSchedulesLevel(options.projectDir);
+  const local = target.localLevel ?? (await projectSchedulesLevel(options.projectDir));
   if (remote <= local) return;
   const open = (status.sites ?? []).reduce((n, s) => n + (s.openReleases?.length ?? 0), 0);
   const gated = (status.sites ?? []).reduce((n, s) => n + (s.gatedNodes ?? 0), 0);

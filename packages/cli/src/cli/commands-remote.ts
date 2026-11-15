@@ -24,7 +24,37 @@ function deployFlags(values: CliValues): {
   return { where, ticker, plan };
 }
 
-const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
+/** RFC-0046 §11b: this CLI's signed release; its two flags are never implied. */
+export function releaseFlags(
+  values: CliValues,
+  rest: readonly string[],
+): {
+  release?: true;
+  from?: string;
+  allowSingleFactor?: true;
+  discardLocalTheme?: true;
+} {
+  const single = values["allow-single-factor"] === true;
+  const discard = values["discard-local-theme"] === true;
+  if (!values.release) {
+    if (values.from || single || discard)
+      throw new Error("--from, --allow-single-factor and --discard-local-theme go with --release");
+    return {};
+  }
+  // `deploy --release 0.9.0` would install this CLI's version, not 0.9.0: refuse the argument.
+  if (rest.length > 0)
+    throw new Error(
+      `--release installs this CLI's own version and takes no argument (got "${rest.join(" ")}"). To install another version, run that version of the CLI: npx @cloudhal/cli@<version> deploy --release`,
+    );
+  return {
+    release: true,
+    ...(values.from ? { from: values.from } : {}),
+    ...(single ? { allowSingleFactor: true as const } : {}),
+    ...(discard ? { discardLocalTheme: true as const } : {}),
+  };
+}
+
+const deployCommand: CliCommand = async (rest, values, { projectDir }) => {
   const { where, ticker, plan } = deployFlags(values);
   const tty = process.stdin.isTTY && process.stdout.isTTY;
   const r = await deploy({
@@ -36,10 +66,15 @@ const deployCommand: CliCommand = async (_rest, values, { projectDir }) => {
     ...(plan ? { plan } : {}),
     ...(values["force-downgrade"] ? { forceDowngrade: true } : {}),
     ...(values["no-build-studio"] ? { buildStudio: false } : {}),
+    ...releaseFlags(values, rest),
     log: (l) => console.log(l),
     // The analytics and data-location questions need a person at a terminal.
     ...(tty ? { prompt: askYesNo, askJurisdiction } : {}),
   });
+  if (r.release)
+    console.log(
+      `\nRelease v${r.release.version} (commit ${r.release.commit.slice(0, 12)}): ${r.release.attestation === "verified" ? "signature and build attestation verified" : "signature verified; attestation not checked (--allow-single-factor)"}`,
+    );
   if (r.dryRun) {
     console.log(`\nDry run OK. Workers: ${r.names.site}, ${r.names.admin}. Nothing was deployed.`);
     return 0;

@@ -42,6 +42,7 @@ const PROJECT = `  cloudhal init <dir> [--name <name>] [--starter blog]   create
 /** deploy, domain, push, pull: the Cloudflare deployment. */
 const CLOUDFLARE = `  cloudhal deploy [--name <base>] [--dry-run] [--jurisdiction eu] [--scheduler cron|alarm] [--plan free|paid]
                   [--force-downgrade] [--no-build-studio]
+                  [--release [--from <dir>] [--allow-single-factor] [--discard-local-theme]]
                                                           site + admin Workers on Cloudflare (uses wrangler login);
                                                           --jurisdiction eu keeps a newly created D1 database
                                                           in the EU (cannot be changed later); --scheduler picks
@@ -51,7 +52,15 @@ const CLOUDFLARE = `  cloudhal deploy [--name <base>] [--dry-run] [--jurisdictio
                                                           --force-downgrade deploys older schedules code over
                                                           open releases and time gates; from the monorepo a
                                                           stale apps/studio/dist is rebuilt first
-                                                          (--no-build-studio: fail instead)
+                                                          (--no-build-studio: fail instead);
+                                                          --release installs this CLI version's signed
+                                                          release instead of building (RFC-0046 §11b):
+                                                          verified against the signed key and yank lists
+                                                          and the build attestation (gh 2.68+, or
+                                                          --allow-single-factor); --from <dir> installs
+                                                          offline from the assets and both lists;
+                                                          --discard-local-theme deploys the official
+                                                          theme over changed theme files
   cloudhal domain [set <hostname>] [--studio <hostname>] [--redirect <hostname>]… | remove [site|studio|redirects|all]
                                                           custom domains for the next deploy
   cloudhal push [--replace] [--cancel-schedules] [--admin-url <url>]

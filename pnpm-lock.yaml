@@ -766,6 +766,9 @@ importers:
       '@cloudhal/mcp-server':
         specifier: workspace:*
         version: link:../mcp-server
+      '@cloudhal/release-verify':
+        specifier: workspace:*
+        version: link:../release-verify
       '@cloudhal/schedules':
         specifier: workspace:*
         version: link:../schedules

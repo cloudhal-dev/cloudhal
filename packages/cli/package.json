@@ -1,7 +1,7 @@
 {
   "name": "@cloudhal/cli",
   "version": "0.9.0",
-  "description": "cloudhal — create, run and build Cloudhal sites locally",
+  "description": "cloudhal \u2014 create, run and build Cloudhal sites locally",
   "license": "Apache-2.0",
   "homepage": "https://cloudhal.dev",
   "repository": {
@@ -38,6 +38,7 @@
     "@cloudhal/core-contracts": "workspace:*",
     "@cloudhal/core-ts": "workspace:*",
     "@cloudhal/mcp-server": "workspace:*",
+    "@cloudhal/release-verify": "workspace:*",
     "@cloudhal/schedules": "workspace:*",
     "@cloudhal/storage": "workspace:*",
     "@hono/node-server": "catalog:",

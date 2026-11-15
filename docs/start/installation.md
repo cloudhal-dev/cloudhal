@@ -94,6 +94,38 @@ npm install @cloudhal/cli@latest @cloudhal/core-ts@latest @cloudhal/astro-render
 
 Then run `npx cloudhal deploy` to update a deployment. Release notes are in each package's changelog on npm and GitHub.
 
+### Installing the signed release
+
+`npx cloudhal deploy --release` installs the signed release of the CLI's own version instead of building the project (RFC-0046 §11b). It deploys the exact bytes that `release.yml` built and signed, so your machine runs no Astro or Worker build. Your content, config and secrets still come from the project. It takes no version argument: to install another version, run that version of the CLI (`npx @cloudhal/cli@<version> deploy --release`).
+
+**What it checks, in this order.** Nothing is uploaded, and nothing is written outside `.cloudhal/deploy/`, until all of these pass.
+
+1. **The project.**
+   - It must not join another installation (`installation`) or serve several sites (`sites`).
+   - It must not run in Cloudflare Workers Builds.
+   - The version must have a bundle: `v0.9.0` or newer.
+2. **The signed key and yank lists** from cloudhal.dev, on every run. It never falls back to an older copy. It remembers what it has seen in `~/.cloudhal/release-trust.json` and refuses a rolled-back list, a replayed key list or a revoked yank key.
+3. **The release** must be published (not a draft) with its bundle files. Set `GH_TOKEN` if GitHub's API rate limit gets in the way.
+4. **The theme files** must equal the CLI's own starter:
+   - everything under `src/` and `public/`;
+   - `astro.config.mjs` and `tsconfig.json`;
+   - no `skills/` directory (even an empty one) and no `jsconfig.json`;
+   - no PostCSS config (`postcss.config.*`, `.postcssrc*`, or a `postcss` key in `package.json`) from the project up to its workspace root.
+
+   Line endings and `.DS_Store`, `Thumbs.db` and `desktop.ini` are ignored, and so are `README.md`, `.gitignore`, `vite.config.*`, `.env` and `wrangler.jsonc`.
+
+   On a difference, either run `cloudhal deploy` without `--release`, or add `--discard-local-theme` to deploy the official theme anyway. The flag lists every file it does not deploy, and changes nothing on disk.
+5. **`cloudhal.json` build keys.** `comments.available` must not be `false`. `media.transform` must be unset or `"none"`, unless the release reads it at runtime. Any key the CLI does not know is refused. `--discard-local-theme` does not cover these.
+6. **Wrangler** must be at least the version the release was built with.
+7. **The release's signature and every file's digest**, with revoked keys and yanked versions refused.
+8. **The build-provenance attestation.** It needs the [GitHub CLI](https://cli.github.com) 2.68 or newer, signed in. `--allow-single-factor` continues on the release key alone when `gh` is missing; a failed attestation is always refused.
+
+**Offline.** `--from <dir>` installs from the five release assets plus `keys.json` and `yanked.json` (each with its `.sig`) in a directory, under the same rules.
+
+**Dry run.** `--release --dry-run` verifies, extracts and writes the configs, then stops before wrangler.
+
+`--release` is available once the signed key list is published (the root ceremony in [Release signing keys](/docs/security/release-signing-keys)). Until then the command refuses and says so.
+
 ## Next
 
 - [Quickstart](/docs/start/quickstart): run the site, open Studio, connect an agent, publish.
