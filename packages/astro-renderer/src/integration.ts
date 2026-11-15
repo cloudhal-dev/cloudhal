@@ -73,6 +73,14 @@ const RESOLVED_THEME_HOOKS_ID = `\0${THEME_HOOKS_ID}`;
 const THEME_MODULE = "src/theme.ts";
 
 /**
+ * The type of `virtual:cloudhal/config`: the integration's config, with `dataDir` absent on the
+ * `cloudflare` target (`virtualConfig`). Theme code that reads `dataDir` must handle that.
+ */
+export type VirtualCloudhalConfig = Omit<CloudhalRendererConfig, "dataDir"> & {
+  readonly dataDir?: string;
+};
+
+/**
  * What pages see as `virtual:cloudhal/config`. On the `cloudflare` target there is no `dataDir`:
  * the Site Worker reads D1 and R2 through its bindings (`runtime-workerd.ts` ignores the field),
  * and the resolved value is the build machine's absolute path, which a release bundle built in CI
@@ -81,7 +89,7 @@ const THEME_MODULE = "src/theme.ts";
 export function virtualConfig(
   resolved: CloudhalRendererConfig,
   cloudflare: boolean,
-): Omit<CloudhalRendererConfig, "dataDir"> & { dataDir?: string } {
+): VirtualCloudhalConfig {
   if (!cloudflare) return resolved;
   const { dataDir: _buildMachinePath, ...rest } = resolved;
   return rest;

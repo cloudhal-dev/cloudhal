@@ -10,7 +10,8 @@ declare module "virtual:cloudhal/analytics-client" {
 }
 
 declare module "virtual:cloudhal/config" {
-  const config: import("./integration.ts").CloudhalRendererConfig;
+  /** No `dataDir` on the `cloudflare` target (`virtualConfig`). */
+  const config: import("./integration.ts").VirtualCloudhalConfig;
   export default config;
 }
 

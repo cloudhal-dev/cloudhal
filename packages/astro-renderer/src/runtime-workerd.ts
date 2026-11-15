@@ -20,7 +20,7 @@ import { D1Driver } from "@cloudhal/storage/d1";
 import { R2BlobStore } from "@cloudhal/storage/r2";
 import { siteCacheTag } from "./cache-tags.ts";
 import { usableCommentsKey } from "./comments.ts";
-import type { CloudhalRendererConfig } from "./integration.ts";
+import type { CloudhalRendererConfig, VirtualCloudhalConfig } from "./integration.ts";
 import type { PeerEdition } from "./locales.ts";
 import { matchMediaRoute, serveMediaRequest } from "./media-route.ts";
 import { PREVIEW_PARAM, type Resolution, SiteResolver } from "./resolver.ts";
@@ -263,7 +263,7 @@ export { CACHE_TAG_PREFIX } from "./cache-tags.ts";
  * left out (there is no address to point to).
  */
 export async function peerEditions(
-  config: CloudhalRendererConfig,
+  config: VirtualCloudhalConfig,
   node: { id: string; translation?: { group: string } | undefined; path?: string },
 ): Promise<PeerEdition[]> {
   const siteId = siteOf(config.siteId);
@@ -314,7 +314,7 @@ export async function commentsBackend(
  * Returns `undefined` when the site has never been published (the page should answer 503).
  */
 export async function getSource(
-  config: CloudhalRendererConfig,
+  config: VirtualCloudhalConfig,
   astro?: AstroLike,
 ): Promise<GraphSource | undefined> {
   if (!astro) throw new Error("on Cloudflare, pass the Astro global: getSource(config, Astro)");

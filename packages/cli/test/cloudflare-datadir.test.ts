@@ -64,6 +64,7 @@ describe("the Site Worker ignores dataDir (#239)", () => {
   let siteId: string;
   let first: Record<string, string>;
   let second: Record<string, string>;
+  let firstCarries: string | undefined;
   let harness: ReturnType<typeof createTestHarness>;
 
   const setDataDir = async (dataDir: string) => {
@@ -91,6 +92,11 @@ describe("the Site Worker ignores dataDir (#239)", () => {
     );
     await buildSiteWorker(projectDir);
     first = await digests(path.join(projectDir, "dist"));
+    // Scanned now, before the second build replaces dist: the first build and its own data path.
+    firstCarries = await anyFileContains(
+      path.join(projectDir, "dist"),
+      path.join(projectDir, ".cloudhal"),
+    );
     await setDataDir(ELSEWHERE);
     const config = await buildSiteWorker(projectDir);
     second = await digests(path.join(projectDir, "dist"));
@@ -120,6 +126,9 @@ describe("the Site Worker ignores dataDir (#239)", () => {
   });
 
   it("no built file carries either data directory", async () => {
+    // The first build (dataDir .cloudhal), scanned before it was replaced.
+    expect(firstCarries).toBeUndefined();
+    // The second build (the absolute ELSEWHERE), and neither path in it.
     const dist = path.join(projectDir, "dist");
     expect(await anyFileContains(dist, ELSEWHERE)).toBeUndefined();
     expect(await anyFileContains(dist, path.join(projectDir, ".cloudhal"))).toBeUndefined();

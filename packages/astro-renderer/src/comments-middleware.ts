@@ -19,7 +19,11 @@ const handler = createNodeComments({
   // the same local store, site row and published snapshots analytics read
   backend: analyticsBackend(config.siteId, config) as NodeCommentsBackend,
   client: config.comments?.available === false ? null : client,
-  secret: () => localCommentsKey(config.dataDir),
+  // `cloudhal dev` only (a Node target), where the integration always passes dataDir.
+  secret: () => {
+    if (!config.dataDir) throw new Error("the comments middleware needs the renderer's dataDir");
+    return localCommentsKey(config.dataDir);
+  },
   onError: (m, e) => console.warn(`cloudhal: ${m}`, e),
 });
 
