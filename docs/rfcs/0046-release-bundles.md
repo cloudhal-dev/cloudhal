@@ -419,7 +419,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
       - `analytics.queryBudget`, `analytics.rawRetentionDays` and `analytics.rateLimit`.
     - `runtime`: a build reads the key, but the deployed Worker overrides it.
       - `siteId`: the Site Worker's `CLOUDHAL_SITE_ID`/`CLOUDHAL_SITE_IDS` vars override the baked id.
-      - `dataDir`: the `cloudflare` target never reads it. The baked value is the CI build's absolute path.
+      - `dataDir`: the `cloudflare` target never reads it, and since #239 does not bake it in either (`virtual:cloudhal/config` has no `dataDir` on that target), so no CI path reaches a bundle.
       - `analytics.enabled`, `analytics.uniqueVisitors` and `analytics.vitalsOneIn`: the Site Worker reads its vars instead.
       - `analytics.dev`: only `cloudhal dev` reads it.
     - `build`: a build reads the key and nothing overrides it.
@@ -432,7 +432,7 @@ Today `cloudhal deploy` builds the site with Astro and the admin Worker with wra
       - that every sub-key the `cloudhal()` integration's option types declare for `media`, `analytics` and `comments` is classed.
     - **Site.** A repository test scans `starters/blog/astro.config.mjs` for every `project.<key>` it reads. It fails unless every such key is in the table. For `media`, `analytics` and `comments`, which the file passes to the integration whole, the sub-key check above applies. The theme check guarantees that a project deployed with `--release` carries this exact file. Two further tests hold the `runtime` overrides:
       - a Site Worker test serves a site whose id differs from the baked one, through `CLOUDHAL_SITE_ID`;
-      - an astro-renderer test shows that the `cloudflare` target ignores `dataDir`. If it does not, the integration stops emitting `dataDir` for that target.
+      - the `cloudflare` target ignores `dataDir` (#239). The integration emits no `dataDir` for it. `astro-renderer/test/virtual-config.test.ts` checks the module. `cli/test/cloudflare-datadir.test.ts` builds the starter twice with different `dataDir`s and checks that the two outputs are the same bytes and that neither path appears in them. It then serves the site on workerd with no data directory on disk.
     - **Admin.** A test runs `prepareAdminWorker` twice, with different `mail`, `ai`, `browser`, `observability`, `placement`, `domains.studio` and `siteId`. The generated entry, the skills module and the theme-design module must be byte-identical; only the wrangler config may differ. The code the admin build bakes in reads only files (block types, theme settings, `src/DESIGN.md`, skills), and the theme check covers those files.
 - **Other refusals.** The CLI also refuses when the project is attached to another installation (RFC-0034 `installation`), serves several sites (`sites`), or runs in Workers Builds.
 - **Wrangler.** `--release` needs a wrangler at least as new as the one the bundle was built with (`manifest.toolchain.wrangler`), because the generated configs use its asset and module settings. The CLI reads the version of the wrangler it will run, resolved the way `deploy` resolves it today, from that wrangler's own `package.json`. An older wrangler is refused, and the refusal names the required version. The starter only declares a range (`wrangler ^4.158.0`), so the check trusts the installed version, never the range.
