@@ -1,5 +1,7 @@
 ---
 "@cloudhal/cli": minor
+"@cloudhal/release-verify": patch
+"@cloudhal/astro-renderer": patch
 ---
 
 `cloudhal deploy --release` installs the signed release of the CLI's own version instead of building the project (RFC-0046 §11b, #227).
@@ -14,3 +16,5 @@
 - **Offline and dry runs.** `--from <dir>` installs offline from the assets and both lists, and `--release --dry-run` stops before wrangler.
 
 The CLI now depends on `@cloudhal/release-verify`.
+
+`@cloudhal/release-verify` now typechecks under every consumer's lib settings: WebCrypto inputs are `ArrayBuffer`-backed views, and the gzip pipe is typed through explicitly. `@cloudhal/astro-renderer` names the Site Worker's single-site choice `singleSiteId`, so a test holds that `CLOUDHAL_SITE_ID` overrides the built id.

@@ -20,7 +20,7 @@
  * `.DS_Store`, `Thumbs.db` and `desktop.ini` are skipped wherever they appear (exact basenames).
  */
 import { existsSync } from "node:fs";
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { assetDir } from "../../../assets.ts";
 import { starterFilter } from "../../../starter-files.ts";
@@ -47,6 +47,7 @@ type Keep = (abs: string) => boolean;
 async function filesUnder(root: string, rel: string, keep: Keep): Promise<string[]> {
   const dir = path.join(root, rel);
   if (!existsSync(dir)) return [];
+  if (!(await stat(dir)).isDirectory()) return [rel]; // e.g. a file named `skills`
   const out: string[] = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const r = `${rel}/${entry.name}`;
@@ -149,6 +150,10 @@ export async function themeDifferences(
     )
       out.push({ path: f, change: "changed" });
   }
+  // `resolveSkillsDir` takes `skills/` whenever it exists, even empty: that alone is a difference.
+  const skills = (root: string) => existsSync(path.join(root, "skills"));
+  if (skills(projectDir) && !skills(starter.dir) && !out.some((d) => d.path.startsWith("skills")))
+    out.push({ path: "skills/", change: "added" });
   // `postcss` in the project's package.json, compared with the starter's.
   const [own, starters] = [await postcssKey(projectDir), await postcssKey(starter.dir)];
   if (own !== starters)
@@ -167,9 +172,10 @@ export async function themeDifferences(
   return out;
 }
 
-/** The differences as lines: the first 20, then a count. */
-export function listDifferences(diffs: readonly ThemeDifference[]): string {
-  const lines = diffs.slice(0, 20).map((d) => `  ${d.change}: ${d.path}`);
-  if (diffs.length > 20) lines.push(`  … and ${diffs.length - 20} more`);
+/** The differences as lines: the first 20 and a count, or with `all` every one. */
+export function listDifferences(diffs: readonly ThemeDifference[], all = false): string {
+  const shown = all ? diffs : diffs.slice(0, 20);
+  const lines = shown.map((d) => `  ${d.change}: ${d.path}`);
+  if (diffs.length > shown.length) lines.push(`  … and ${diffs.length - shown.length} more`);
   return lines.join("\n");
 }

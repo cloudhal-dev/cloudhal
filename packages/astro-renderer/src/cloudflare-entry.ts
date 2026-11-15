@@ -76,7 +76,13 @@ import { EMBED_HEADER, withEmbedFrames } from "./embed-client.ts";
 import { hostRedirect, type RedirectEnv } from "./host-redirect.ts";
 import { PREVIEW_PARAM } from "./resolver.ts";
 import { SearchLimiter, searchCost } from "./search-limit.ts";
-import { type SiteChoice, SiteDispatch, unknownHost, withNoindex } from "./site-dispatch.ts";
+import {
+  type SiteChoice,
+  SiteDispatch,
+  singleSiteId,
+  unknownHost,
+  withNoindex,
+} from "./site-dispatch.ts";
 import {
   errorPage,
   HEALTH_PATH,
@@ -174,7 +180,7 @@ const statusHook = themeStatusHook(loadTheme, (m, e) => console.error(m, e));
 /** One per isolate: which site a request is for (RFC-0034 §4). */
 function siteDispatch(env: Env, siteIdFromBuild: string | undefined): SiteDispatch {
   dispatch ??= new SiteDispatch({
-    siteId: env.CLOUDHAL_SITE_ID ?? (env.CLOUDHAL_SITE_IDS ? undefined : siteIdFromBuild),
+    siteId: singleSiteId(env, siteIdFromBuild),
     siteIds: env.CLOUDHAL_SITE_IDS,
     sql: () => new D1Driver(env.DB as D1Database),
   });

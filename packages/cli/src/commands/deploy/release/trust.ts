@@ -113,11 +113,46 @@ async function readMemory(file: string): Promise<YankMemory | undefined> {
   }
 }
 
+const union = (a: readonly string[], b: readonly string[]) => [...new Set([...a, ...b])].sort();
+const later = (a: string, b: string) => (Date.parse(a) >= Date.parse(b) ? a : b);
+
+/**
+ * Two memories combined so neither loses what it saw: for the same yank key the higher serial,
+ * the newer key list and the union of every entry; across a rotation the memory of the newer key
+ * list, still carrying every retired yank key of both.
+ */
+export function mergeMemory(disk: YankMemory | undefined, next: YankMemory): YankMemory {
+  if (!disk) return next;
+  const retiredYankKeys = union(disk.retiredYankKeys, next.retiredYankKeys);
+  if (disk.keyId !== next.keyId) {
+    const newer = Date.parse(disk.keysIssuedAt) > Date.parse(next.keysIssuedAt) ? disk : next;
+    return { ...newer, retiredYankKeys: retiredYankKeys.filter((k) => k !== newer.keyId) };
+  }
+  return {
+    keyId: next.keyId,
+    serial: Math.max(disk.serial, next.serial),
+    versions: union(disk.versions, next.versions),
+    revokedKeys: union(disk.revokedKeys, next.revokedKeys),
+    keysIssuedAt: later(disk.keysIssuedAt, next.keysIssuedAt),
+    retiredYankKeys,
+  };
+}
+
+/** Stores `memory`, merged with whatever another run stored meanwhile (re-read just before). */
 async function writeMemory(file: string, memory: YankMemory): Promise<void> {
-  await mkdir(path.dirname(file), { recursive: true });
-  const tmp = `${file}.${process.pid}.tmp`;
-  await writeFile(tmp, `${JSON.stringify({ yankMemory: memory }, null, 2)}\n`, { mode: 0o600 });
-  await rename(tmp, file);
+  try {
+    await mkdir(path.dirname(file), { recursive: true });
+    const merged = mergeMemory(await readMemory(file), memory);
+    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(tmp, `${JSON.stringify({ yankMemory: merged }, null, 2)}\n`, { mode: 0o600 });
+    await rename(tmp, file);
+  } catch (e) {
+    if ((e as { code?: string }).code === "trust-unavailable") throw e;
+    refuseDeploy(
+      "trust-state",
+      `the lists verified, but the yank memory could not be saved to ${file} (${(e as Error).message}); nothing was deployed`,
+    );
+  }
 }
 
 /** Both lists, verified and checked against the memory, which is then updated (see the file comment). */
@@ -151,7 +186,7 @@ export async function loadTrust(input: TrustInput): Promise<Trust> {
     return { keys, yanked };
   } catch (e) {
     const code = (e as { code?: string }).code;
-    if (!code) throw e;
+    if (!code || code === "trust-state") throw e;
     return refuseDeploy(
       "trust-unavailable",
       `the signed key and yank lists do not verify (${code}: ${(e as Error).message}); there is no override`,

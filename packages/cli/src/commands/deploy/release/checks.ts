@@ -50,7 +50,7 @@ export async function checkTheme(
       `--release installs this CLI's official theme, and these build inputs differ from it:\n${listDifferences(diffs)}\nRun \`cloudhal deploy\` without --release to build the project as it is, or add --discard-local-theme to deploy the official theme anyway (your files stay on disk; they are not deployed).`,
     );
   log(
-    `--discard-local-theme: the official theme is deployed; these files of the project are not:\n${listDifferences(diffs)}`,
+    `--discard-local-theme: the official theme is deployed; these ${diffs.length} files of the project are not:\n${listDifferences(diffs, true)}`,
   );
   return diffs;
 }

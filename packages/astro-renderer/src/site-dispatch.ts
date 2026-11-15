@@ -9,6 +9,19 @@
 import type { SqlDriver } from "@cloudhal/storage";
 import { parseSiteIds, SiteHostMap } from "./site-hosts.ts";
 
+/**
+ * The single site a Site Worker serves: its `CLOUDHAL_SITE_ID` var first, so a deployment can
+ * serve a site other than the one its bundle was built for (RFC-0046 §11b: `deploy --release`
+ * installs a bundle built with another site id); else, unless `CLOUDHAL_SITE_IDS` makes it
+ * multi-site, the build's.
+ */
+export function singleSiteId(
+  env: { readonly CLOUDHAL_SITE_ID?: string; readonly CLOUDHAL_SITE_IDS?: string },
+  siteIdFromBuild: string | undefined,
+): string | undefined {
+  return env.CLOUDHAL_SITE_ID ?? (env.CLOUDHAL_SITE_IDS ? undefined : siteIdFromBuild);
+}
+
 export type SiteChoice =
   | { readonly kind: "site"; readonly siteId: string | undefined; readonly noindex?: boolean }
   | { readonly kind: "unknown" };

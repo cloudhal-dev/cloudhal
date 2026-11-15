@@ -92,20 +92,24 @@ export async function trustWorld(): Promise<TrustWorld> {
 export interface Served {
   readonly fetch: typeof fetch;
   readonly urls: string[];
+  /** The `authorization` header each request carried. */
+  readonly headers: { url: string; authorization: string | null }[];
 }
 
 /** What the fake network serves; any other URL answers 404 (and is recorded). */
 export interface World {
   trust: { keys: TrustWorld["keys"]; yanked: TrustWorld["yanked"] } | "down";
-  release: "published" | "draft" | "missing" | "no-bundle";
+  release: "published" | "draft" | "missing" | "no-bundle" | "rate-limited";
   bundle: Synthetic;
 }
 
 export function serve(world: World): Served {
   const urls: string[] = [];
-  const f = async (input: string | URL | Request) => {
+  const headers: { url: string; authorization: string | null }[] = [];
+  const f = async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input instanceof Request ? input.url : input);
     urls.push(url);
+    headers.push({ url, authorization: new Headers(init?.headers).get("authorization") });
     if (url.startsWith(TRUST_BASE_URL)) {
       if (world.trust === "down") return new Response("bad gateway", { status: 502 });
       const name = url.slice(TRUST_BASE_URL.length);
@@ -120,6 +124,7 @@ export function serve(world: World): Served {
     }
     if (url === `https://api.github.com/repos/cloudhal-dev/cloudhal/releases/tags/v${VERSION}`) {
       if (world.release === "missing") return new Response("{}", { status: 404 });
+      if (world.release === "rate-limited") return new Response("{}", { status: 403 });
       const names =
         world.release === "no-bundle"
           ? ["cloudhal-cli.tgz"]
@@ -133,7 +138,7 @@ export function serve(world: World): Served {
     if (asset) return new Response(assetBytes(world.bundle, asset.name));
     return new Response("not found", { status: 404 });
   };
-  return { fetch: f as typeof fetch, urls };
+  return { fetch: f as typeof fetch, urls, headers };
 }
 
 /** The bytes of one release asset of the synthetic bundle. */

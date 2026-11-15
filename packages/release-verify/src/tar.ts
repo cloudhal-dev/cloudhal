@@ -123,12 +123,16 @@ export async function* gunzip(
   const src = sourceStream(source);
   const reader = src.stream
     .pipeThrough(gzipHeaderCheck())
-    .pipeThrough(new DecompressionStream("gzip"))
+    // Typed through explicitly: lib.dom and @types/node disagree on DecompressionStream's chunk types.
+    .pipeThrough(
+      new DecompressionStream("gzip") as unknown as TransformStream<Uint8Array, Uint8Array>,
+    )
     .getReader();
   let total = 0;
   try {
     for (;;) {
-      let next: ReadableStreamReadResult<Uint8Array>;
+      // The reader's own result type: not every lib names `ReadableStreamReadResult`.
+      let next: Awaited<ReturnType<typeof reader.read>>;
       try {
         next = await reader.read();
       } catch (e) {

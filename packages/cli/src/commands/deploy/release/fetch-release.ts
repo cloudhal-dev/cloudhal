@@ -42,6 +42,8 @@ export interface ReleaseSource {
   readonly version: string;
   readonly from?: string | undefined;
   readonly fetch?: typeof fetch;
+  /** A GitHub token for the API lookup only (default: `GH_TOKEN`, else `GITHUB_TOKEN`). */
+  readonly githubToken?: string | undefined;
   /** `.cloudhal/deploy/release-download/<version>/`. */
   readonly dir: string;
 }
@@ -74,8 +76,14 @@ async function checkPublished(s: ReleaseSource): Promise<void> {
   const url = `https://api.github.com/repos/${RELEASE_REPOSITORY}/releases/tags/v${s.version}`;
   let res: Response;
   try {
+    // The token goes to api.github.com only (a higher rate limit), never to a download URL.
+    const token = s.githubToken ?? process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
     res = await (s.fetch ?? fetch)(url, {
-      headers: { accept: "application/vnd.github+json", "user-agent": "cloudhal-cli" },
+      headers: {
+        accept: "application/vnd.github+json",
+        "user-agent": "cloudhal-cli",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
     });
   } catch (e) {
     return unavailable(s.version, `GitHub could not be reached (${(e as Error).message})`);
@@ -84,6 +92,11 @@ async function checkPublished(s: ReleaseSource): Promise<void> {
     unavailable(
       s.version,
       "there is no published release with that tag (a draft is not published yet)",
+    );
+  if (res.status === 403 || res.status === 429)
+    refuseDeploy(
+      "github-rate-limited",
+      `GitHub's API refused the release lookup (${res.status}, most likely its rate limit for unauthenticated requests). Try again later, or set GH_TOKEN (any token, no scopes needed) and run again.`,
     );
   if (!res.ok) unavailable(s.version, `GitHub answered ${res.status} for the release`);
   const release = (await res.json()) as { draft?: unknown; assets?: { name?: unknown }[] };

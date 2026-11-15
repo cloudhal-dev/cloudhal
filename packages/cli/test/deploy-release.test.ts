@@ -8,7 +8,10 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { releaseFlags } from "../src/cli/commands-remote.ts";
 import type { DeployOptions } from "../src/commands/deploy/options.ts";
+import { attestationFailure } from "../src/commands/deploy/release/index.ts";
+import { mergeMemory } from "../src/commands/deploy/release/trust.ts";
 import { deploy } from "../src/index.ts";
 import {
   bundle,
@@ -98,7 +101,7 @@ describe("deploy --release: trust", () => {
       code: "trust-unavailable",
       message: expect.stringContaining("never falls back"),
     });
-    expect(s.net.urls.some((u) => u.includes("api.github.com"))).toBe(false);
+    expect(s.net.urls.some((u) => new URL(u).hostname === "api.github.com")).toBe(false);
   });
 
   it("stores the yank memory and refuses a rolled-back yank list on the next run", async () => {
@@ -151,7 +154,12 @@ describe("deploy --release: which release", () => {
         code: "release-unavailable",
         message: expect.stringContaining("without --release"),
       });
-      expect(s.net.urls.some((u) => u.includes("/releases/download/"))).toBe(false);
+      expect(
+        s.net.urls.some((u) => {
+          const url = new URL(u);
+          return url.hostname === "github.com" && url.pathname.includes("/releases/download/");
+        }),
+      ).toBe(false);
     }
   });
 
@@ -288,11 +296,11 @@ describe("deploy --release: the project", () => {
         /added: public\/extra\.txt\n {2}changed: src\/DESIGN\.md[\s\S]*--discard-local-theme/,
       ),
     });
-    expect(s.net.urls.some((u) => u.endsWith(".tar.gz"))).toBe(false);
+    expect(s.net.urls.some((u) => new URL(u).pathname.endsWith(".tar.gz"))).toBe(false);
     const lines: string[] = [];
     const r = await deploy({ ...s.options, discardLocalTheme: true, log: (l) => lines.push(l) });
     expect(r.release?.notDeployed).toEqual(["public/extra.txt", "src/DESIGN.md"]);
-    expect(lines.join("\n")).toContain("these files of the project are not");
+    expect(lines.join("\n")).toMatch(/these 2 files of the project are not/);
     // Nothing on disk was discarded.
     expect(await readFile(path.join(s.projectDir, "src/DESIGN.md"), "utf8")).toBe("# Mine\n");
   });
@@ -317,6 +325,137 @@ describe("deploy --release: the project", () => {
     await expect(deploy({ ...s.options, wranglerVersion: "4.150.0" })).rejects.toMatchObject({
       code: "wrangler-too-old",
       message: expect.stringContaining("4.158.0"),
+    });
+  });
+});
+
+describe("deploy --release: review round 1", () => {
+  it("refuses a version argument: --release installs this CLI's own version", () => {
+    expect(() => releaseFlags({ release: true }, ["0.9.0"])).toThrow(
+      /takes no argument[\s\S]*npx @cloudhal\/cli@<version> deploy --release/,
+    );
+    expect(releaseFlags({ release: true }, [])).toEqual({ release: true });
+    expect(() => releaseFlags({ "discard-local-theme": true }, [])).toThrow(/go with --release/);
+  });
+
+  it("asks nothing and writes nothing outside .cloudhal/deploy before the release verifies", async () => {
+    const s = await setup();
+    const file = path.join(s.projectDir, "cloudhal.json");
+    const cfg = JSON.parse(await readFile(file, "utf8")) as Record<string, unknown>;
+    const { analytics: _a, ...withoutAnalytics } = cfg;
+    const before = JSON.stringify(withoutAnalytics);
+    await writeFile(file, before);
+    s.world.trust = "down";
+    let asked = 0;
+    const prompt = async () => {
+      asked++;
+      return true;
+    };
+    expect(await codeOf(deploy({ ...s.options, prompt }))).toBe("trust-unavailable");
+    expect(asked).toBe(0);
+    expect(await readFile(file, "utf8")).toBe(before);
+    expect(existsSync(path.join(s.projectDir, "wrangler.jsonc"))).toBe(false);
+  });
+
+  it("lists every file not deployed under --discard-local-theme, not just 20", async () => {
+    const s = await setup();
+    for (let i = 0; i < 25; i++)
+      await writeFile(
+        path.join(s.projectDir, `public/extra-${String(i).padStart(2, "0")}.txt`),
+        "x\n",
+      );
+    const lines: string[] = [];
+    const r = await deploy({ ...s.options, discardLocalTheme: true, log: (l) => lines.push(l) });
+    expect(r.release?.notDeployed).toHaveLength(25);
+    const text = lines.join("\n");
+    expect(text).toContain("these 25 files of the project are not");
+    expect(text).toContain("public/extra-24.txt");
+    expect(text).not.toContain("more");
+  });
+
+  it("keeps the yank memory monotonic when two runs save it", () => {
+    const base = {
+      keyId: "k1",
+      serial: 5,
+      versions: ["0.9.3"],
+      revokedKeys: [],
+      keysIssuedAt: "2026-11-20T00:00:00Z",
+      retiredYankKeys: ["k0"],
+    };
+    expect(mergeMemory({ ...base, serial: 7, versions: ["0.9.4"] }, base)).toEqual({
+      ...base,
+      serial: 7,
+      versions: ["0.9.3", "0.9.4"],
+    });
+    // Across a rotation the newer key list's memory wins, keeping every retired key.
+    const rotated = {
+      ...base,
+      keyId: "k2",
+      serial: 1,
+      versions: [],
+      keysIssuedAt: "2026-12-01T00:00:00Z",
+      retiredYankKeys: ["k1"],
+    };
+    expect(mergeMemory(rotated, base)).toEqual({ ...rotated, retiredYankKeys: ["k0", "k1"] });
+    expect(mergeMemory(undefined, base)).toEqual(base);
+  });
+
+  it("reports a yank memory that cannot be saved as such, not as lists that do not verify", async () => {
+    const s = await setup();
+    const blocker = path.join(tmp(), "a-file");
+    await writeFile(blocker, "x");
+    await expect(
+      deploy({ ...s.options, trustStateFile: path.join(blocker, "release-trust.json") }),
+    ).rejects.toMatchObject({
+      code: "trust-state",
+      message: expect.stringContaining("could not be saved"),
+    });
+  });
+
+  it("words an attestation that could not finish as such; it is still a refusal", async () => {
+    expect(attestationFailure("manifest.json", "no answer within 60 s")).toMatch(
+      /could not be checked[\s\S]*still a refusal/,
+    );
+    expect(attestationFailure("manifest.json", "HTTP 429: API rate limit exceeded")).toMatch(
+      /could not be checked/,
+    );
+    expect(
+      attestationFailure("manifest.json", "verification failed: no matching attestations"),
+    ).toMatch(/were not built by this repository's bundle-build\.yml/);
+    const s = await setup();
+    const timedOut = {
+      ...s.options,
+      attest: async () => ({
+        status: "failed" as const,
+        file: "manifest.json",
+        reason: "no answer within 60 s",
+      }),
+    };
+    await expect(deploy(timedOut)).rejects.toMatchObject({
+      code: "attestation-failed",
+      message: expect.stringContaining("could not be checked"),
+    });
+  });
+
+  it("sends GH_TOKEN to api.github.com only, and reports a rate limit as such", async () => {
+    const s = await setup();
+    const saved = process.env.GH_TOKEN;
+    process.env.GH_TOKEN = "test-token-not-a-secret";
+    try {
+      await deploy(s.options);
+    } finally {
+      if (saved === undefined) delete process.env.GH_TOKEN;
+      else process.env.GH_TOKEN = saved;
+    }
+    const sent = s.net.headers.filter((h) => h.authorization !== null);
+    expect(sent.map((h) => new URL(h.url).hostname)).toEqual(["api.github.com"]);
+    expect(sent[0]?.authorization).toBe("Bearer test-token-not-a-secret");
+    s.world.release = "rate-limited";
+    await expect(
+      deploy({ ...s.options, trustStateFile: path.join(tmp(), "d.json") }),
+    ).rejects.toMatchObject({
+      code: "github-rate-limited",
+      message: expect.stringContaining("GH_TOKEN"),
     });
   });
 });

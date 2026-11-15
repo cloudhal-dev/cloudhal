@@ -16,6 +16,7 @@
  * Nothing is written outside `.cloudhal/deploy/`, and nothing is uploaded, before step 5 passes.
  * `--dry-run` stops after step 6.
  */
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import {
   mergeTrust,
@@ -31,7 +32,6 @@ import {
   type SchedulerTicker,
 } from "../../../cloudflare/config.ts";
 import { readProjectConfig } from "../../../config.ts";
-import type { DeployContext } from "../context.ts";
 import { deploySecrets, finishDeploy } from "../finish.ts";
 import type { DeployOptions, DeployResult } from "../options.ts";
 import {
@@ -45,6 +45,7 @@ import { downgradeGuard } from "../schedules-guard.ts";
 import { attachedWorkers } from "../served-sites.ts";
 import { commentsResult } from "../settings.ts";
 import { shipWorkers } from "../ship.ts";
+import { deployDir } from "../state.ts";
 import { checkBuildKeys, checkProjectShape, checkTheme, checkWrangler } from "./checks.ts";
 import { writeReleaseConfigs } from "./configs.ts";
 import { type ReleaseDeployCode, refuseDeploy } from "./errors.ts";
@@ -79,6 +80,19 @@ function unverifiedFacts(bytes: Uint8Array): {
   }
 }
 
+/**
+ * Why the attestation of `file` failed, in words: a check that could not finish (a timeout, a
+ * signal, GitHub's rate limit, the network) is not evidence about the files, but still a refusal.
+ * Only literal alternatives are matched, so the scan is linear in `reason`.
+ */
+export function attestationFailure(file: string, reason: string): string {
+  const incomplete =
+    /no answer within|stopped by|rate limit|HTTP 403|HTTP 429|ECONN|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|getaddrinfo|dial tcp|TLS handshake|connection reset|network/i;
+  if (reason.length <= 2000 && incomplete.test(reason))
+    return `the build-provenance attestation of ${file} could not be checked (${reason}). This is still a refusal: nothing was deployed. Try again later.`;
+  return `the build-provenance attestation of ${file} failed (${reason}): these files were not built by this repository's bundle-build.yml. Nothing was deployed.`;
+}
+
 async function attestation(
   options: DeployOptions,
   input: { dir: string; version: string; commit: string },
@@ -93,7 +107,7 @@ async function attestation(
   if (r.status === "failed")
     return refuseDeploy(
       "attestation-failed" satisfies ReleaseDeployCode,
-      `the build-provenance attestation of ${r.file} failed (${r.reason}): these files were not built by this repository's bundle-build.yml. Nothing was deployed.`,
+      attestationFailure(r.file, r.reason),
     );
   if (!options.allowSingleFactor)
     return refuseDeploy(
@@ -107,8 +121,11 @@ async function attestation(
 }
 
 /** Steps 1–6 (see the file comment): the verified, extracted release. */
-async function verifiedRelease(ctx: DeployContext, version: string) {
-  const { options, log } = ctx;
+async function verifiedRelease(
+  options: DeployOptions,
+  where: { dir: string; version: string; log: (line: string) => void },
+) {
+  const { dir, version, log } = where;
   const trust = await loadTrust({
     from: options.from,
     ...(options.fetch ? { fetch: options.fetch } : {}),
@@ -122,7 +139,7 @@ async function verifiedRelease(ctx: DeployContext, version: string) {
     version,
     from: options.from,
     ...(options.fetch ? { fetch: options.fetch } : {}),
-    dir: path.join(ctx.dir, "release-download", version),
+    dir: path.join(dir, "release-download", version),
   };
   const files = await fetchRelease(source);
   const facts = unverifiedFacts(files.manifest);
@@ -148,7 +165,7 @@ async function verifiedRelease(ctx: DeployContext, version: string) {
     { dir: files.dir, version, commit: release.statement.commit },
     log,
   );
-  const extracted = await extractRelease(release, path.join(ctx.dir, "release", version));
+  const extracted = await extractRelease(release, path.join(dir, "release", version));
   log(
     `extracted ${extracted.files} verified files into ${path.relative(options.projectDir, extracted.dir)}`,
   );
@@ -160,8 +177,17 @@ export async function deployRelease(options: DeployOptions): Promise<DeployResul
   checkProjectShape(cfg, options.workersBuilds);
   const version = options.cliVersion ?? (await cliVersion());
   checkBundledVersion(version);
+  // Steps 1–6 first: until the attestation passes nothing is written outside .cloudhal/deploy/
+  // (loadDeploy may ask about analytics and rewrite cloudhal.json) and nothing is uploaded.
+  const dir = deployDir(options.projectDir, cfg.dataDir);
+  await mkdir(dir, { recursive: true });
+  const log = options.log ?? (() => {});
+  const { release, extracted, attested, notDeployed } = await verifiedRelease(options, {
+    dir,
+    version,
+    log,
+  });
   const ctx = await loadDeploy(options);
-  const { release, extracted, attested, notDeployed } = await verifiedRelease(ctx, version);
   const manifest = release.manifest;
 
   const { analytics, comments } = await analyticsAndComments(ctx);

@@ -130,3 +130,13 @@ describe("the theme check", () => {
     expect(named(await themeDifferences(dir, starter))).toEqual(["changed: src/blocks.ts"]);
   });
 });
+
+describe("the theme check: skills/", () => {
+  it("refuses a skills/ directory even when it is empty", async () => {
+    const dir = await copy();
+    await mkdir(path.join(dir, "skills"));
+    expect(named(await themeDifferences(dir, starter))).toEqual(["added: skills/"]);
+    await writeFile(path.join(dir, "skills/.DS_Store"), "x");
+    expect(named(await themeDifferences(dir, starter))).toEqual(["added: skills/"]);
+  });
+});

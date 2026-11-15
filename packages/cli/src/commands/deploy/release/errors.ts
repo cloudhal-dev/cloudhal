@@ -6,8 +6,12 @@
 export type ReleaseDeployCode =
   /** No published release with a bundle for this version: deploy without `--release`. */
   | "release-unavailable"
+  /** GitHub's API refused the lookup (403/429): its rate limit, not the release. */
+  | "github-rate-limited"
   /** The signed key and yank lists cannot be checked (no pinned root, a fetch or check failed). */
   | "trust-unavailable"
+  /** The lists verified, but the CLI's yank memory could not be saved. */
+  | "trust-state"
   /** The project's theme files differ from this CLI's starter (`--discard-local-theme`). */
   | "theme-differs"
   /** `cloudhal.json` sets a build key the bundle cannot honour, or a key this CLI does not know. */
