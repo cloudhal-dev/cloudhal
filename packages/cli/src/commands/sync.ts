@@ -69,21 +69,39 @@ async function target(options: SyncOptions) {
   return { cfg, url, token, fetch: f };
 }
 
+/**
+ * `ifAbsent`: whether the deployment already has the site. Only a 200 (it has it) and a 404 (it
+ * does not) are answers. A 401 throws an error `whileTokenPropagates` retries: right after a
+ * Workers Builds deploy the edge can still check the new token against the previous admin
+ * Worker, and pushing then would hit the site the deployment does have. Anything else throws
+ * too, and nothing is pushed.
+ */
+async function deploymentHasSite(f: typeof fetch, url: URL, auth: Record<string, string>) {
+  const probe = await f(url, { headers: auth });
+  if (probe.status === 200) return true;
+  if (probe.status === 404) return false;
+  throw new Error(
+    `checking whether the deployment has the site failed (${probe.status}): ${brief(await probe.text())}; nothing was pushed`,
+  );
+}
+
+/** A bootstrap PUT refused because the deployment already has this site (SyncConflictError). */
+const alreadyHasSite = (status: number, body: string) =>
+  status === 409 && body.includes('"error":"conflict"') && body.includes("already has site");
+
 export async function pushSite(
   options: SyncOptions & { ifAbsent?: boolean },
 ): Promise<{ pushed: boolean; message: string }> {
   const log = options.log ?? (() => {});
   const { cfg, url, token, fetch: f } = await target(options);
   const auth = { authorization: `Bearer ${token}` };
-  if (options.ifAbsent) {
-    const probe = await f(url, { headers: auth });
-    if (probe.status === 200) {
-      log(
-        "the deployment already has this site; leaving it as the source of truth (use `cloudhal pull`)",
-      );
-      return { pushed: false, message: "already deployed" };
-    }
-  }
+  const keepDeployed = () => {
+    log(
+      "the deployment already has this site; leaving it as the source of truth (use `cloudhal pull`)",
+    );
+    return { pushed: false, message: "already deployed" };
+  };
+  if (options.ifAbsent && (await deploymentHasSite(f, url, auth))) return keepDeployed();
   const local = await openLocalStore(path.join(options.projectDir, cfg.dataDir));
   let bundle: SiteBundle;
   try {
@@ -118,6 +136,9 @@ export async function pushSite(
     body: JSON.stringify(bundle),
   });
   const body = await res.text();
+  // The probe said absent, yet the site is there (it arrived between the two): same outcome.
+  if (options.ifAbsent && !options.replace && alreadyHasSite(res.status, body))
+    return keepDeployed();
   if (res.status === 409 && /"error":"schedules_(pending|running)"/.test(body)) {
     const parsed = JSON.parse(body) as {
       error: string;
