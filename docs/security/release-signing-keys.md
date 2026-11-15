@@ -57,10 +57,22 @@ Other forms of `cloudhal-root-2026a`, for cross-checking:
 The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:00:45Z, expiring 2027-11-15T07:00:45Z) and is committed as `security/keys.json` with `security/keys.json.sig`.
 
 **Custody.**
-- The root is generated offline by `node scripts/release-keys.ts root-init`. The private key is only ever written encrypted with a passphrase, and the script never prints it.
-- There is one holder for now, with two sealed copies (the encrypted file plus its passphrase) kept in separate places. A YubiKey with firmware 5.7 or later, which can hold Ed25519, is an option.
+- The root is generated offline by `node scripts/release-keys.ts root-init`. The private key is only ever written encrypted with a passphrase (PKCS#8 PBES2: PBKDF2-HMAC-SHA256 at 600,000 iterations, AES-256-CBC), and the script never prints it.
+- There is one holder for now. The *encrypted* file has two sealed copies:
+  - one in the private repository `cloudhal-dev/key-custody`, which only the owner can read. It has no Actions, no apps and no deploy keys, and it holds neither the passphrase nor a plaintext key;
+  - one kept offline.
+- The passphrase is kept apart from both copies, in an end-to-end encrypted password manager and on sealed paper.
+- That repository copy is the one exception to the rule that no key is ever in a repository or a cloud service (*Custody of the release key*). It is the encrypted root only, never its passphrase.
+- A YubiKey with firmware 5.7 or later, which can hold Ed25519, is an option.
 - A second holder is added when there is a second maintainer.
 - The root is never a GitHub secret.
+- **A root made before 600,000 iterations.** `root-init` used to write the root with Node's default of only 2,048 PBKDF2 iterations. `sign-keys` reads both forms. Re-encrypt such a file once, offline, with the same passphrase or a new one:
+
+  ```bash
+  openssl pkcs8 -topk8 -v2 aes-256-cbc -v2prf hmacWithSHA256 -iter 600000 -in <id>.key.enc -out <id>.key.enc.new
+  ```
+
+  Check it with `openssl asn1parse -in <id>.key.enc.new`: the PBKDF2 `INTEGER` is `0927C0` (600,000) and the prf is `hmacWithSHA256`. Then replace both sealed copies with it and delete the old file. `cloudhal-root-2026a` was re-encrypted this way on 2026-11-15.
 
 ## The yank key and the two lists
 
@@ -73,6 +85,7 @@ The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:0
   Raw public key, hex: `9029d1ea7755084550f84a0d0c5b0ff6d2ae49c3fac41f797a67100b366c346e`; SHA-256 of it: `a4be5c2588264f4d824705d85bf96cd4b214ab553c52e66364e71d18c0e9f390`. A test keeps this row equal to the committed `keys.json`.
 
   - It lives as the secret `RELEASE_YANK_KEY` of the GitHub environment `release-yank`, whose branch policy allows `main` only.
+  - That secret is its only copy: the plaintext key was deleted once the secret was set. If it is lost, the yank key is rotated (one `keys.json`, below), never restored. The same holds for the `yank-list` deploy key (*First-time setup*, step 7).
   - It can only reduce trust: it yanks versions and revokes release key ids, and it can never add or re-enable a key.
   - A stolen yank key can yank good versions and revoke good keys (denial of service).
     - It can also *undo* yanks and revocations for stateless consumers, such as a Worker deployer, by signing a fresh list without them.
@@ -100,7 +113,7 @@ The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:0
 - No other job, workflow or repository receives the key.
 - Outside GitHub, the maintainer holds the key.
   - The copies are the PKCS#8 file the key was generated into, kept readable by its owner only, and the maintainer's backups.
-  - No copy is ever in a repository, a chat, an issue or a cloud service.
+  - Apart from their environment secrets, no copy of the release key or the yank key is ever in a repository, a chat, an issue or a cloud service, and no passphrase is ever in a repository, a chat, an issue, or a cloud service other than an end-to-end encrypted password manager. The one exception is the root's *encrypted* file, without its passphrase, in the private `cloudhal-dev/key-custody` repository (*Root keys*, Custody).
   - Once the environment secret is set, and before the first signed release, the maintainer moves the generated file to offline storage. From then on, the environment secret and the offline backups are the only copies.
 - KMS custody is deferred to phase 3 ("Release signing: KMS-backed signer (RFC-0046 §9 phase 3)"). It is triggered by a second maintainer, or by any exposure of this secret.
 
@@ -108,14 +121,14 @@ The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:0
 
 This runs once, offline where it says so. Nobody else generates or holds these keys.
 
-1. **Root.** On an offline machine, run `node scripts/release-keys.ts root-init --key-id cloudhal-root-2026a --out <dir>`. It asks for a passphrase twice, then writes `<dir>/cloudhal-root-2026a.key.enc` (encrypted PKCS#8) and `<dir>/cloudhal-root-2026a.pub.json`. Seal two copies of the encrypted file and the passphrase, in separate places.
+1. **Root.** On an offline machine, run `node scripts/release-keys.ts root-init --key-id cloudhal-root-2026a --out <dir>`. It asks for a passphrase twice, then writes `<dir>/cloudhal-root-2026a.key.enc` (encrypted PKCS#8, 600,000 PBKDF2 iterations) and `<dir>/cloudhal-root-2026a.pub.json`. Seal two copies of the encrypted file (*Root keys*, Custody) and keep the passphrase apart from them.
 2. **Pin the root.** Add its public key to the *Root keys* table above and to `PINNED_ROOTS` in `packages/release-verify/src/trust.ts`, in one reviewed pull request.
 3. **Yank key.** Run `node scripts/release-keys.ts yank-init --key-id cloudhal-yank-2026a --out <dir>`. It writes `<dir>/cloudhal-yank-2026a.pem` (mode 0600, never printed) and `<dir>/cloudhal-yank-2026a.pub.json`.
-4. **Environment.** In the repository settings, create the environment `release-yank`, with deployment branches `main` only and no required reviewer. Set its secret: `gh secret set RELEASE_YANK_KEY --env release-yank < <dir>/cloudhal-yank-2026a.pem`. Then move the `.pem` file to offline storage.
+4. **Environment.** In the repository settings, create the environment `release-yank`, with deployment branches `main` only and no required reviewer. Set its secret: `gh secret set RELEASE_YANK_KEY --env release-yank < <dir>/cloudhal-yank-2026a.pem`. Then delete the `.pem` file: the secret is its only copy, and a lost yank key is rotated, not restored.
 5. **First `keys.json`.** List `cloudhal-release-2026a` and `cloudhal-yank-2026a` in `security/keys.source.json`, then run `node scripts/release-keys.ts sign-keys --root-key <dir>/cloudhal-root-2026a.key.enc --root-pub <dir>/cloudhal-root-2026a.pub.json`. It writes `security/keys.json` and `security/keys.json.sig`, after verifying the exact signed bytes as a consumer would.
 6. **Publish the key list.** Commit `security/keys.json`, `security/keys.json.sig` and `security/keys.source.json` in a reviewed pull request. The yank list needs it on `main` (the workflow reads `security/keys.json`). **Merge it only while no release is pending, and do steps 7 to 9 straight after:** from this merge on, every release attaches the trust lists and refuses to publish until cloudhal.dev serves a `yanked.json` that verifies.
 7. **Protect the `yank-list` branch, with a deploy key as its only writer.**
-   - Run `ssh-keygen -t ed25519 -N "" -C yank-list -f <dir>/yank-list-deploy`. Add `<dir>/yank-list-deploy.pub` as a deploy key of the repository with write access, named `yank-list`. Set the private half as a secret of `release-yank`: `gh secret set YANK_LIST_DEPLOY_KEY --env release-yank < <dir>/yank-list-deploy`. Then delete both files.
+   - Run `ssh-keygen -t ed25519 -N "" -C yank-list -f <dir>/yank-list-deploy`. Add `<dir>/yank-list-deploy.pub` as a deploy key of the repository with write access, named `yank-list`. Set the private half as a secret of `release-yank`: `gh secret set YANK_LIST_DEPLOY_KEY --env release-yank < <dir>/yank-list-deploy`. Then delete both files. If the secret is lost, make a new deploy key the same way and remove the old one.
    - In the repository settings, add a ruleset for the branch `yank-list`: block force pushes, restrict deletions, and restrict updates, with the `yank-list` deploy key as the **only** bypass actor (not "GitHub Actions", which would let every workflow's token with `contents: write` push).
    - The branch then only ever gains commits, and only from a job that holds the deploy key, which is a job in `release-yank` on `main`.
    - **What remains.** Anyone who can run a job in `release-yank` (a reviewed change to a workflow on `main`) or a repository admin (who can edit the ruleset) can push to it. A deploy key with write access can also push to other branches no ruleset protects. Such a push can only deny service: a crafted list fails the next run and the cloudhal.dev pair check. A replayed older, genuinely signed pair would be served to stateless consumers until it expires (at most 30 days); consumers with memory refuse it. A rollback needs a new commit that the branch history shows.

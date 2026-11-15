@@ -2,6 +2,7 @@
  * scripts/release-keys.ts (RFC-0046 §9, #226): the root and yank keys a ceremony makes, and the
  * lists it signs, checked with the consumer's own verifier. Throwaway keys in temp directories only.
  */
+import { createPrivateKey, createPublicKey, generateKeyPairSync } from "node:crypto";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -11,6 +12,8 @@ import {
   main,
   mergeYankList,
   type PublicKeyFile,
+  ROOT_KDF_ITERATIONS,
+  readPbes2,
   rootInit,
   signKeys,
   signYanked,
@@ -99,6 +102,26 @@ describe("root-init and yank-init", () => {
     expect(said).not.toContain(pem.split("\n")[1] as string);
   });
 
+  it("encrypt the root with PBKDF2-HMAC-SHA256 at 600,000 iterations and AES-256-CBC", () => {
+    const { dir, root } = ceremony();
+    const enc = rootKeyOf(dir);
+    expect(ROOT_KDF_ITERATIONS).toBeGreaterThanOrEqual(600_000);
+    expect(readPbes2(enc)).toEqual({
+      iterations: 600_000,
+      saltBytes: 16,
+      prf: "hmacWithSHA256",
+      cipher: "aes-256-cbc",
+    });
+    // Node (OpenSSL) opens it with the passphrase, and it is the root that was announced.
+    const key = createPrivateKey({ key: enc, passphrase: PASS });
+    const raw = createPublicKey(key).export({ format: "der", type: "spki" }).subarray(12);
+    expect(Buffer.from(raw).toString("base64")).toBe(root.publicKey);
+    expect(() => createPrivateKey({ key: enc, passphrase: "wrong passphrase!" })).toThrow();
+    // Each file has its own salt.
+    expect(readPbes2(rootKeyOf(ceremony().dir))).toEqual(readPbes2(enc));
+    expect(rootKeyOf(ceremony().dir)).not.toBe(enc);
+  });
+
   it("refuse to overwrite a key, a short passphrase and a key id without its role", () => {
     const { dir } = ceremony();
     expect(() => yankInit({ keyId: "cloudhal-yank-2026a", out: dir, log: quiet })).toThrow(
@@ -129,6 +152,32 @@ describe("sign-keys", () => {
     expect(list.document.issuedAt).toBe(iso(NOW));
     expect(list.document.expires).toBe(iso(inMonths(NOW, 12)));
     expect(readFileSync(path.join(out, "keys.json.sig")).length).toBe(64);
+  });
+
+  it("still opens a root written before the fix (2,048 iterations, Node's default export)", async () => {
+    const { source } = ceremony();
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const old = privateKey.export({
+      format: "pem",
+      type: "pkcs8",
+      cipher: "aes-256-cbc",
+      passphrase: PASS,
+    });
+    expect(readPbes2(old).iterations).toBe(2048);
+    const raw = publicKey.export({ format: "der", type: "spki" }).subarray(12);
+    const oldRoot = {
+      keyId: "cloudhal-root-2026a",
+      publicKey: Buffer.from(raw).toString("base64"),
+    };
+    const signed = await signKeys({
+      rootKey: old,
+      passphrase: PASS,
+      rootPub: oldRoot,
+      source,
+      out: tmp(),
+      now: NOW,
+    });
+    await verifyKeys({ ...signed, roots: roots(oldRoot), now: new Date(NOW) });
   });
 
   it("refuses a wrong passphrase, another root's key, and more than 13 months", async () => {
