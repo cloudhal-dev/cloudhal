@@ -61,7 +61,7 @@ The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:0
 - There is one holder for now. The *encrypted* file has two sealed copies:
   - one in the private repository `cloudhal-dev/key-custody`, which only the owner can read. It has no Actions, no apps and no deploy keys, and it holds neither the passphrase nor a plaintext key;
   - one kept offline.
-- The passphrase is kept apart from both copies, in a password manager and on sealed paper.
+- The passphrase is kept apart from both copies, in an end-to-end encrypted password manager and on sealed paper.
 - That repository copy is the one exception to the rule that no key is ever in a repository or a cloud service (*Custody of the release key*). It is the encrypted root only, never its passphrase.
 - A YubiKey with firmware 5.7 or later, which can hold Ed25519, is an option.
 - A second holder is added when there is a second maintainer.
@@ -113,7 +113,7 @@ The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:0
 - No other job, workflow or repository receives the key.
 - Outside GitHub, the maintainer holds the key.
   - The copies are the PKCS#8 file the key was generated into, kept readable by its owner only, and the maintainer's backups.
-  - Apart from their environment secrets, no copy of the release key or the yank key, and no passphrase, is ever in a repository, a chat, an issue or a cloud service. The one exception is the root's *encrypted* file, without its passphrase, in the private `cloudhal-dev/key-custody` repository (*Root keys*, Custody).
+  - Apart from their environment secrets, no copy of the release key or the yank key is ever in a repository, a chat, an issue or a cloud service, and no passphrase is ever in a repository, a chat, an issue, or a cloud service other than an end-to-end encrypted password manager. The one exception is the root's *encrypted* file, without its passphrase, in the private `cloudhal-dev/key-custody` repository (*Root keys*, Custody).
   - Once the environment secret is set, and before the first signed release, the maintainer moves the generated file to offline storage. From then on, the environment secret and the offline backups are the only copies.
 - KMS custody is deferred to phase 3 ("Release signing: KMS-backed signer (RFC-0046 §9 phase 3)"). It is triggered by a second maintainer, or by any exposure of this secret.
 
