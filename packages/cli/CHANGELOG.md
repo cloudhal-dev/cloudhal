@@ -1,5 +1,23 @@
 # @cloudhal/cli
 
+## 0.10.1
+
+### Patch Changes
+
+- 3333de5: Workers Builds deploys no longer fail when the new deployment token is still propagating (#245). After uploading the Workers, `cloudhal deploy` checks whether the deployment already has the site. That check counted any answer other than 200 as "absent", so a 401 from the token not yet having spread led to a push that the deployment refused with "diverged". Now only a 404 means absent: a 401 is retried while the token spreads, any other answer is an error and nothing is pushed, and a push refused because the deployment already has the site counts as already deployed. `cloudhal push` keeps its divergence error.
+- @cloudhal/agent-runtime@0.10.1
+  - @cloudhal/analytics@0.10.1
+  - @cloudhal/api@0.10.1
+  - @cloudhal/astro-renderer@0.10.1
+  - @cloudhal/cloudflare@0.10.1
+  - @cloudhal/comments@0.10.1
+  - @cloudhal/core-contracts@0.10.1
+  - @cloudhal/core-ts@0.10.1
+  - @cloudhal/mcp-server@0.10.1
+  - @cloudhal/release-verify@0.10.1
+  - @cloudhal/schedules@0.10.1
+  - @cloudhal/storage@0.10.1
+
 ## 0.10.0
 
 ### Minor Changes
