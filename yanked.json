@@ -1,0 +1,14 @@
+{
+  "expires": "2026-12-15T07:28:12Z",
+  "format": "cloudhal.release-yank-list@1",
+  "issuedAt": "2026-11-15T07:28:12Z",
+  "revokedKeys": [],
+  "schemaVersion": 1,
+  "serial": 1,
+  "signing": {
+    "algorithm": "Ed25519",
+    "keyId": "cloudhal-yank-2026a",
+    "signature": "yanked.json.sig"
+  },
+  "versions": []
+}
