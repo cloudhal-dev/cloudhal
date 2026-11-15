@@ -101,7 +101,9 @@ describe("verifyKeys", () => {
 
   it("refuses an unpinned root, a wrong signature, tampered bytes and no roots at all", async () => {
     const s = signed(keysDoc(), ROOT.privateKey);
-    expect(await codeOf(verifyKeys({ ...s, now: NOW }))).toBe("key-list-invalid"); // PINNED_ROOTS is empty
+    // No roots at all (a CLI built before the ceremony), and the pinned root, which did not sign it.
+    expect(await codeOf(verifyKeys({ ...s, roots: {}, now: NOW }))).toBe("key-list-invalid");
+    expect(await codeOf(verifyKeys({ ...s, now: NOW }))).toBe("key-list-invalid");
     const other = signed(keysDoc(), keyPair().privateKey);
     expect(await codeOf(verifyKeys({ ...other, roots: ROOTS, now: NOW }))).toBe("key-list-invalid");
     const tampered = new Uint8Array(s.document);

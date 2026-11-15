@@ -20,6 +20,7 @@ import {
   releaseAssetNames,
   releaseAssetUrls,
   unsafePathReason,
+  verifyKeys,
 } from "../src/index.ts";
 import { fixture } from "./helpers.ts";
 
@@ -53,7 +54,7 @@ describe("the package and its sources of truth", () => {
     expect(Object.isFrozen(PINNED_KEYS)).toBe(true);
   });
 
-  it("PINNED_ROOTS is the key doc's root keys (none until the root ceremony)", () => {
+  it("PINNED_ROOTS is the key doc's root keys, row for row", () => {
     // | `cloudhal-root-…` | Ed25519 | `public key` | since |
     const rows = keyDoc().filter((r) => (r[1] as string).startsWith("`cloudhal-root-"));
     const fromDoc = Object.fromEntries(
@@ -63,7 +64,60 @@ describe("the package and its sources of truth", () => {
       ]),
     );
     expect(fromDoc).toEqual(PINNED_ROOTS);
+    expect(Object.keys(PINNED_ROOTS)).toEqual(["cloudhal-root-2026a"]);
     expect(Object.isFrozen(PINNED_ROOTS)).toBe(true);
+    for (const root of Object.values(PINNED_ROOTS)) expect(Object.isFrozen(root)).toBe(true);
+  });
+
+  it("the committed security/keys.json verifies with PINNED_ROOTS, byte for byte as published", async () => {
+    const document = readFileSync(path.join(ROOT, "security/keys.json"));
+    const signature = readFileSync(path.join(ROOT, "security/keys.json.sig"));
+    // Inside its validity; the yearly re-signing (runbook, Rotation step 5) replaces both files.
+    const now = new Date("2026-12-01T00:00:00Z");
+    const list = await verifyKeys({ document, signature, roots: PINNED_ROOTS, now });
+    expect(list.document.signing.keyId).toBe("cloudhal-root-2026a");
+    expect(list.document.issuedAt).toBe("2026-11-15T07:00:45Z");
+    // The same list the source holds (the source is what the next re-signing starts from).
+    const source = JSON.parse(readFileSync(path.join(ROOT, "security/keys.source.json"), "utf8"));
+    expect(list.document.keys).toEqual(source.keys);
+    // A flipped byte, or the signature of another document, is refused.
+    const flipped = new Uint8Array(document);
+    flipped[flipped.indexOf(0x32)] = 0x33; // the first "2" of a date
+    await expect(
+      verifyKeys({ document: flipped, signature, roots: PINNED_ROOTS, now }),
+    ).rejects.toMatchObject({
+      code: "key-list-invalid",
+    });
+  });
+
+  it("the key doc's yank key row is the committed keys.json's yank key", () => {
+    const doc = readFileSync(path.join(ROOT, "docs/security/release-signing-keys.md"), "utf8");
+    // | `cloudhal-yank-…` | Ed25519 | `public key` | status | since | not after | (inside a list item)
+    const rows = doc
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.startsWith("| `cloudhal-yank-"))
+      .map((l) => l.split("|").map((c) => c.trim()));
+    const keys = JSON.parse(readFileSync(path.join(ROOT, "security/keys.json"), "utf8")) as {
+      keys: {
+        keyId: string;
+        publicKey: string;
+        role: string;
+        status: string;
+        notBefore: string;
+        notAfter: string;
+      }[];
+    };
+    const yank = keys.keys.filter((k) => k.role === "yank");
+    expect(
+      rows.map((r) => ({
+        keyId: (r[1] as string).slice(1, -1),
+        publicKey: (r[3] as string).slice(1, -1),
+        status: r[4],
+        notBefore: day(r[5] as string),
+        notAfter: day(r[6] as string),
+      })),
+    ).toEqual(yank.map(({ role: _role, ...k }) => k));
   });
 
   it("LIMITS and the asset names equal the producer's", () => {

@@ -40,8 +40,21 @@ The root signs only `keys.json`, at the yearly rotation or in an emergency (RFC-
 
 | Key id | Algorithm | Public key (raw 32 bytes, base64) | Since |
 |---|---|---|---|
+| `cloudhal-root-2026a` | Ed25519 | `/rtDvlSlCYV402NiA/7OOFk+ryBv4DIWmkqwRyrVzqw=` | 2026-11-15 |
 
-None yet. The owner's root ceremony adds the first row (see *First-time setup* below).
+Other forms of `cloudhal-root-2026a`, for cross-checking:
+
+- Raw public key, hex: `febb43be54a5098578d3636203fece38593eaf206fe032169a4ab0472ad5ceac`
+- SHA-256 of the raw public key, hex: `16d77b0a2ab4643802ca6e37000c39863f0f0611b133141e22784b38bac9d4a2`
+- SPKI PEM:
+
+  ```
+  -----BEGIN PUBLIC KEY-----
+  MCowBQYDK2VwAyEA/rtDvlSlCYV402NiA/7OOFk+ryBv4DIWmkqwRyrVzqw=
+  -----END PUBLIC KEY-----
+  ```
+
+The first `keys.json` was signed by it on 2026-11-15 (`issuedAt` 2026-11-15T07:00:45Z, expiring 2027-11-15T07:00:45Z) and is committed as `security/keys.json` with `security/keys.json.sig`.
 
 **Custody.**
 - The root is generated offline by `node scripts/release-keys.ts root-init`. The private key is only ever written encrypted with a passphrase, and the script never prints it.
@@ -52,6 +65,13 @@ None yet. The owner's root ceremony adds the first row (see *First-time setup* b
 ## The yank key and the two lists
 
 - **The yank key.** `cloudhal-yank-2026a` has role `yank` in `keys.json`. It signs only `yanked.json`.
+
+  | Key id | Algorithm | Public key (raw 32 bytes, base64) | Status | Since | Not after |
+  |---|---|---|---|---|---|
+  | `cloudhal-yank-2026a` | Ed25519 | `kCnR6ndVCEVQ+EoNDFsP9tKuScP6xB95emcQCzZsNG4=` | active | 2026-11-15 | 2027-11-12 |
+
+  Raw public key, hex: `9029d1ea7755084550f84a0d0c5b0ff6d2ae49c3fac41f797a67100b366c346e`; SHA-256 of it: `a4be5c2588264f4d824705d85bf96cd4b214ab553c52e66364e71d18c0e9f390`. A test keeps this row equal to the committed `keys.json`.
+
   - It lives as the secret `RELEASE_YANK_KEY` of the GitHub environment `release-yank`, whose branch policy allows `main` only.
   - It can only reduce trust: it yanks versions and revokes release key ids, and it can never add or re-enable a key.
   - A stolen yank key can yank good versions and revoke good keys (denial of service).

@@ -84,10 +84,9 @@ const codeOf = async (p: Promise<unknown>) => {
 };
 
 describe("deploy --release: trust", () => {
-  it("refuses before the root ceremony, naming it, and fetches nothing", async () => {
+  it("refuses with no root pinned (a CLI built before the ceremony), naming it, and fetches nothing", async () => {
     const s = await setup();
-    const { trustRoots: _roots, ...options } = s.options;
-    await expect(deploy(options)).rejects.toMatchObject({
+    await expect(deploy({ ...s.options, trustRoots: {} })).rejects.toMatchObject({
       code: "trust-unavailable",
       message: expect.stringMatching(/root ceremony.*First-time setup/),
     });
