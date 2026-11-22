@@ -1,22 +1,26 @@
 /**
- * What a self-hoster gets (docs/guides/self-host.md, #143): runs the image with an empty volume,
- * waits for its HEALTHCHECK, then — through the API, as Studio would — checks that the first owner
- * can sign up only with the setup token (#165), that Studio's page is served and that `/mcp`
- * refuses an anonymous call, lists the scaffolded site, waits for the entrypoint's start-up
- * `site-build`, takes a draft snapshot and builds the public site with `site-build` before the
- * first publish (RFC-0043's status page, never the draft, which the compose file's Caddyfile — run
- * in a `caddy` container on the same volume — answers with 503 and `Retry-After`), publishes it
- * and waits for Studio's rebuild on publish (#150: the site, which Caddy now answers with 200, and
- * the overview's `/site-build` report), runs a build that fails and checks the site stayed, and
- * builds once more (it swaps the served tree in place, #166). An image whose CLI has no
- * `cloudhal build --published` or no rebuild on publish (a backfill of 0.7.1 or older) skips
- * those checks: its `site-build` builds the old way, by hand. Run by .github/workflows/docker.yml
- * after every build, and by hand:
+ * What a self-hoster gets (RFC-0047, docs/guides/self-host.md). This test:
  *
- *   node scripts/docker-smoke.ts [--image <ref>] [--platform <os/arch>] [--port <n>]
- *                                [--site-port <n>] [--keep]
+ * 1. Runs the image as the compose file does: the SeaweedFS of compose.yml on a private network,
+ *    the bucket, the `secrets` the image prints, and the container read-only with a tmpfs /tmp.
+ * 2. Checks the instance on its own:
+ *    - `/api/health`, and the site the entrypoint creates under `CLOUDHAL_SITE_ID`;
+ *    - RFC-0043's 503 before the first publish;
+ *    - the first owner, who signs up only with the setup token (#165);
+ *    - Studio's page, and `/mcp` refusing an anonymous call;
+ *    - a publish live on the next request with no build;
+ *    - content surviving a restart.
+ * 3. Checks the guard: a Node-image volume is refused.
+ * 4. Checks the cluster: a second instance with the same settings serves the same site, and keeps
+ *    answering while the first stops (SIGTERM hands its objects over).
+ *
+ * Run by .github/workflows/docker.yml after every build, and by hand:
+ *
+ *   node scripts/docker-smoke.ts [--image <ref>] [--platform <os/arch>] [--port <n>] [--keep]
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,56 +32,154 @@ const image = arg("image") ?? "cloudhal:local";
 const platform = arg("platform");
 const port = Number(arg("port") ?? 18787);
 const keep = process.argv.includes("--keep");
-const sitePort = Number(arg("site-port") ?? port + 1);
-const name = `cloudhal-smoke-${process.pid}`;
-const caddyName = `${name}-caddy`;
-const origin = `http://localhost:${port}`;
-const siteOrigin = `http://127.0.0.1:${sitePort}`;
-/** The compose file's Caddyfile and the Caddy it runs (compose.yml, the `caddy` profile). */
-const CADDYFILE = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../deploy/docker/Caddyfile",
+const id = `cloudhal-smoke-${process.pid}`;
+const net = id;
+const store = `${id}-store`;
+const a = `${id}-a`;
+const b = `${id}-b`;
+const ports = { a: { studio: port, site: port + 1 }, b: { studio: port + 2, site: port + 3 } };
+const studio = (n: "a" | "b") => `http://localhost:${ports[n].studio}`;
+const site = (n: "a" | "b") => `http://127.0.0.1:${ports[n].site}`;
+/** The compose file's SeaweedFS image, pinned by digest there. */
+const COMPOSE = readFileSync(
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../deploy/docker/compose.yml"),
+  "utf8",
 );
-const CADDY_IMAGE = "caddy:2.11";
-// #165: the first account needs the setup token; the container gets one so the test need not read
-// the printed link from its logs.
-const setupToken = `smoke-setup-token-${crypto.randomUUID()}`;
-/** The built home page, as the starter renders the site name. */
+const STORE_IMAGE = /image: (chrislusf\/seaweedfs:\S+)/.exec(COMPOSE)?.[1];
+if (!STORE_IMAGE) throw new Error("compose.yml names no SeaweedFS image");
 const HOME_H1 = /<h1[^>]*>Smoke Site<\/h1>/;
-/** The served path: a symlink to /data/site/current, the newest build (#166). */
-const SITE = "/data/dist";
 
-const docker = (args: string[], input?: string): string =>
-  execFileSync("docker", args, { encoding: "utf8", ...(input ? { input } : {}) }).trim();
+const docker = (args: string[]): string =>
+  execFileSync("docker", args, { encoding: "utf8" }).trim();
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const step = (text: string) => console.log(`✓ ${text}`);
+function expect(ok: boolean, what: string, detail?: unknown): void {
+  if (!ok) throw new Error(`${what}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
+}
+const plat = platform ? ["--platform", platform] : [];
 
-async function waitHealthy(): Promise<void> {
-  for (let i = 0; i < 90; i++) {
-    const status = docker(["inspect", "--format", "{{.State.Health.Status}}", name]);
-    if (status === "healthy") return;
-    if (docker(["inspect", "--format", "{{.State.Running}}", name]) !== "true")
-      throw new Error("the container stopped");
-    await sleep(2000);
-  }
-  throw new Error("the container did not become healthy within 180 s");
+/** The image's own `secrets`, as the guide makes .env. */
+function secrets(): Record<string, string> {
+  const text = docker(["run", "--rm", ...plat, image, "secrets"]);
+  return Object.fromEntries(
+    text
+      .split("\n")
+      .filter((l) => l.includes("=") && !l.startsWith("#"))
+      .map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]),
+  );
 }
 
-async function api(
-  method: string,
-  path: string,
-  options: { body?: unknown; cookie?: string; headers?: Record<string, string> } = {},
-): Promise<{ status: number; body: unknown; res: Response }> {
-  const res = await fetch(`${origin}${path}`, {
-    method,
-    headers: {
-      origin,
-      "content-type": "application/json",
-      ...(options.cookie ? { cookie: options.cookie } : {}),
-      ...options.headers,
-    },
-    ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+function startStore(env: Record<string, string>): void {
+  docker(["network", "create", net]);
+  const config = JSON.stringify({
+    identities: [
+      {
+        name: "cloudhal",
+        credentials: [{ accessKey: env.AWS_ACCESS_KEY_ID, secretKey: env.AWS_SECRET_ACCESS_KEY }],
+        actions: ["Admin", "Read", "Write", "List", "Tagging"],
+      },
+    ],
   });
+  docker([
+    "run",
+    "-d",
+    "--name",
+    store,
+    "--network",
+    net,
+    "--network-alias",
+    "seaweedfs",
+    "--env-file",
+    envFile("store", { S3_CONFIG: config }),
+    "--entrypoint",
+    "/bin/sh",
+    STORE_IMAGE as string,
+    "-c",
+    'printf "%s" "$S3_CONFIG" > /tmp/s3.json && exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=256',
+  ]);
+}
+
+async function createBucket(): Promise<void> {
+  for (let i = 0; i < 60; i++) {
+    const r = spawnSync(
+      "docker",
+      ["exec", "-i", store, "weed", "shell", "-master=localhost:9333"],
+      { input: "s3.bucket.create -name cloudhal\n", encoding: "utf8" },
+    );
+    if (/created bucket|already exist/.test(`${r.stdout}${r.stderr}`)) return;
+    await sleep(2000);
+  }
+  throw new Error("SeaweedFS did not create the bucket within 120 s");
+}
+
+/** Secrets go to `docker run` in a 0600 file, so a failed command never prints them. */
+const envDir = mkdtempSync(path.join(os.tmpdir(), "cloudhal-smoke-"));
+function envFile(name: string, env: Record<string, string>): string {
+  const file = path.join(envDir, `${name}.env`);
+  writeFileSync(
+    file,
+    Object.entries(env)
+      .map(([k, v]) => `${k}=${v}\n`)
+      .join(""),
+    { mode: 0o600 },
+  );
+  return file;
+}
+
+function runInstance(n: "a" | "b", env: Record<string, string>, volume: string): void {
+  const name = n === "a" ? a : b;
+  const envArgs = [
+    "--env-file",
+    envFile(name, {
+      ...env,
+      CLOUDHAL_S3_ENDPOINT: "http://seaweedfs:8333",
+      CLOUDHAL_S3_BUCKET: "cloudhal",
+      CLOUDHAL_CLUSTER_ADVERTISE: `${name}:7000`,
+      CLOUDHAL_SITE_NAME: "Smoke Site",
+      CLOUDHAL_BASE_URL: studio(n),
+    }),
+  ];
+  docker([
+    "run",
+    "-d",
+    "--name",
+    name,
+    "--network",
+    net,
+    ...plat,
+    "--read-only",
+    "--tmpfs",
+    "/tmp",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges:true",
+    "-p",
+    `127.0.0.1:${ports[n].studio}:8787`,
+    "-p",
+    `127.0.0.1:${ports[n].site}:8788`,
+    "-v",
+    `${volume}:/data`,
+    ...envArgs,
+    image,
+  ]);
+}
+
+async function waitHealthy(name: string): Promise<void> {
+  for (let i = 0; i < 90; i++) {
+    if (docker(["inspect", "--format", "{{.State.Health.Status}}", name]) === "healthy") return;
+    if (docker(["inspect", "--format", "{{.State.Running}}", name]) !== "true")
+      throw new Error(`${name} stopped`);
+    await sleep(2000);
+  }
+  throw new Error(`${name} did not become healthy within 180 s`);
+}
+
+async function json(
+  url: string,
+  init: RequestInit = {},
+): Promise<{ status: number; body: unknown; res: Response }> {
+  const res = await fetch(url, init);
   const text = await res.text();
   let body: unknown = text;
   try {
@@ -88,183 +190,62 @@ async function api(
   return { status: res.status, body, res };
 }
 
-function expect(ok: boolean, what: string, detail?: unknown): void {
-  if (!ok) throw new Error(`${what}${detail === undefined ? "" : `: ${JSON.stringify(detail)}`}`);
-}
-
-/**
- * The entrypoint builds the site once Studio answers (a background `site-build`): wait until it
- * has published (`/data/dist` is its symlink) and cleaned up (the staging folder is gone).
- */
-async function waitStartupBuild(): Promise<void> {
-  for (let i = 0; i < 90; i++) {
-    const done = spawnSync("docker", [
-      "exec",
-      name,
-      "sh",
-      "-c",
-      "test -L /data/dist && test ! -e /data/.site-build",
-    ]);
-    if (done.status === 0) return;
-    await sleep(2000);
+async function until<T>(
+  what: string,
+  check: () => Promise<T | undefined>,
+  seconds = 120,
+): Promise<T> {
+  for (let i = 0; i < seconds; i++) {
+    const v = await check().catch(() => undefined);
+    if (v !== undefined) return v;
+    await sleep(1000);
   }
-  throw new Error("the start-up site-build did not finish within 180 s");
+  throw new Error(`${what} within ${seconds} s`);
 }
 
-/** Runs `site-build` in the container; returns the build `current` points at afterwards. */
-function siteBuild(which: string): string {
-  const r = spawnSync("docker", ["exec", name, "site-build"], { stdio: "inherit" });
-  expect(r.status === 0, `site-build (${which}) exited ${r.status}`);
-  const served = docker(["exec", name, "readlink", SITE]);
-  expect(served === "site/current", `${SITE} links to site/current`, served);
-  return docker(["exec", name, "readlink", "/data/site/current"]);
-}
-
-/**
- * Caddy with the compose file's Caddyfile, the installation's volume at /srv/cloudhal (read-only,
- * as compose.yml mounts it) and plain HTTP: `:8080` is the site, `:8081` the unused Studio host.
- */
-async function startCaddy(): Promise<void> {
-  const volume = docker([
-    "inspect",
-    "--format",
-    '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Name}}{{end}}{{end}}',
-    name,
-  ]);
-  expect(volume !== "", "the container has a /data volume");
-  docker([
-    "run",
-    "-d",
-    "--name",
-    caddyName,
-    "-p",
-    `127.0.0.1:${sitePort}:8080`,
-    "-e",
-    "CLOUDHAL_SITE_URL=:8080",
-    "-e",
-    "CLOUDHAL_BASE_URL=:8081",
-    "-v",
-    `${CADDYFILE}:/etc/caddy/Caddyfile:ro`,
-    "-v",
-    `${volume}:/srv/cloudhal:ro`,
-    CADDY_IMAGE,
-    "caddy",
-    "run",
-    "--config",
-    "/etc/caddy/Caddyfile",
-    "--adapter",
-    "caddyfile",
-  ]);
-  for (let i = 0; i < 30; i++) {
-    try {
-      await fetch(`${siteOrigin}/robots.txt`);
-      return;
-    } catch {
-      await sleep(1000);
-    }
-  }
-  throw new Error("Caddy did not answer within 30 s");
-}
-
-/** A page of the public site as Caddy serves it. */
-async function served(
-  pathname: string,
-): Promise<{ status: number; headers: Headers; body: string }> {
-  const res = await fetch(`${siteOrigin}${pathname}`);
-  return { status: res.status, headers: res.headers, body: await res.text() };
-}
-
-/** #150: Studio's report of the rebuild on publish, or undefined where the CLI has none. */
-interface BuildReport {
-  enabled: boolean;
-  state?: string;
-  last?: { at: string; ok: boolean; trigger?: string; snapshotId?: string; state?: string } | null;
-  /** What is served now, from /data/site/current.json (any build's). */
-  served?: { at: string; snapshotId?: string; state?: string; source?: string } | null;
-}
-async function buildReport(siteId: string, cookie: string): Promise<BuildReport | undefined> {
-  const r = await api("GET", `/api/sites/${siteId}/site-build`, { cookie });
-  if (r.status !== 200) return undefined;
-  const body = r.body as BuildReport;
-  return body.enabled ? body : undefined;
-}
-
-/** Waits until Studio's queue is idle and its last build is one `trigger` started. */
-async function waitReportedBuild(siteId: string, cookie: string, trigger: string, since: string) {
-  for (let i = 0; i < 150; i++) {
-    const report = await buildReport(siteId, cookie);
-    const last = report?.last;
-    if (report?.state === "idle" && last && last.trigger === trigger && last.at >= since)
-      return last;
-    await sleep(2000);
-  }
-  throw new Error(`Studio reported no finished ${trigger} build within 300 s`);
-}
-
-/** RFC-0043 §1.10: what Caddy answers while the build is the not-published status page. */
-async function expectStatusPage(): Promise<void> {
-  const unpublished = await served("/");
-  expect(
-    unpublished.status === 503,
-    "Caddy answers / with 503 before the first publish",
-    unpublished.status,
-  );
-  expect(
-    unpublished.headers.get("retry-after") === "3600",
-    "Retry-After: 3600",
-    unpublished.headers.get("retry-after"),
-  );
-  expect(
-    unpublished.headers.get("cache-control") === "no-store",
-    "Cache-Control: no-store",
-    unpublished.headers.get("cache-control"),
-  );
-  expect(unpublished.headers.get("x-robots-tag") === "noindex", "X-Robots-Tag: noindex");
-  expect(unpublished.body.includes('data-state="not-published"'), "the 503 is the status page");
-  const deep = await served("/posts/hello-world");
-  expect(deep.status === 503, "every page is the 503 before the first publish", deep.status);
-  const robots = await served("/robots.txt");
-  expect(
-    robots.status === 200 && robots.body.includes("Disallow: /"),
-    "robots.txt is 200 and disallows all",
-    robots,
-  );
-}
-
-docker([
-  "run",
-  "-d",
-  "--name",
-  name,
-  ...(platform ? ["--platform", platform] : []),
-  "-p",
-  `127.0.0.1:${port}:8787`,
-  "-e",
-  `CLOUDHAL_BASE_URL=${origin}`,
-  "-e",
-  "CLOUDHAL_SITE_NAME=Smoke Site",
-  "-e",
-  `CLOUDHAL_SETUP_TOKEN=${setupToken}`,
-  image,
-]);
+const env = secrets();
+const volumes = { a: `${id}-a`, b: `${id}-b`, node: `${id}-node` };
+startStore(env);
 try {
-  await waitHealthy();
-  step("the container is healthy");
-  const health = await api("GET", "/api/health");
-  expect(health.status === 200, "GET /api/health", health.body);
-  expect((health.body as { ok?: boolean }).ok === true, "health says ok", health.body);
-  step("/api/health answers { ok: true }");
+  await createBucket();
+  step("SeaweedFS is up with the bucket");
+  runInstance("a", env, volumes.a);
+  await waitHealthy(a);
+  const health = await json(`${studio("a")}/api/health`);
+  expect(
+    health.status === 200 && (health.body as { ok?: boolean }).ok === true,
+    "health",
+    health.body,
+  );
+  step("instance a is healthy and /api/health answers { ok: true }");
 
+  const admin = { authorization: `Bearer ${env.CLOUDHAL_DEPLOY_TOKEN}` };
+  await until("the entrypoint did not create the site", async () => {
+    const r = await json(`${studio("a")}/api/admin/sites`, { headers: admin });
+    const sites = (r.body as { sites?: { id: string }[] }).sites ?? [];
+    return sites.some((s) => s.id === env.CLOUDHAL_SITE_ID) ? true : undefined;
+  });
+  const before = await fetch(`${site("a")}/`);
+  expect(before.status === 503, "the site answers 503 before the first publish", before.status);
+  await before.body?.cancel();
+  step("the site exists under CLOUDHAL_SITE_ID and answers 503 until it is published");
+
+  const origin = studio("a");
+  const post = (p: string, body: unknown, headers: Record<string, string> = {}) =>
+    json(`${origin}${p}`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
   const owner = {
     name: "Smoke Owner",
     email: "owner@example.com",
     password: "smoke-test-password",
   };
-  const squatter = await api("POST", "/api/auth/sign-up/email", { body: owner });
+  const squatter = await post("/api/auth/sign-up/email", owner);
   expect(squatter.status === 403, "sign-up without the setup token is refused", squatter.body);
-  const signUp = await api("POST", "/api/auth/sign-up/email", {
-    body: owner,
-    headers: { "x-cloudhal-setup-token": setupToken },
+  const signUp = await post("/api/auth/sign-up/email", owner, {
+    "x-cloudhal-setup-token": env.CLOUDHAL_SETUP_TOKEN as string,
   });
   expect(signUp.status === 200, "sign-up of the first owner with the setup token", signUp.body);
   const cookie = signUp.res.headers
@@ -272,198 +253,119 @@ try {
     .map((c) => c.split(";")[0] as string)
     .find((c) => c.includes("better-auth.session_token="));
   if (cookie === undefined) throw new Error("sign-up set no session cookie");
-  const me = await api("GET", "/api/me", { cookie });
-  expect(
-    (me.body as { role?: string }).role === "owner",
-    "the first account is the Owner",
-    me.body,
-  );
   step("the first owner signed up with the setup token, not without it");
 
-  // Studio's index.html (the SPA fallback), not an API 404 and not an empty page.
   const home = await fetch(`${origin}/`);
-  const homeHtml = await home.text();
-  expect(home.status === 200, "GET /", home.status);
-  expect(
-    (home.headers.get("content-type") ?? "").includes("text/html") &&
-      homeHtml.includes("<title>Cloudhal Studio</title>"),
-    "GET / is Studio's index.html",
-    { type: home.headers.get("content-type"), start: homeHtml.slice(0, 120) },
+  expect((await home.text()).includes("<title>Cloudhal Studio</title>"), "GET / is Studio");
+  const mcp = await post("/mcp", { jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+  expect(mcp.status === 401, "POST /mcp without credentials answers 401", mcp.status);
+  step("Studio is served and /mcp refuses an anonymous call");
+
+  const published = await post(
+    `/api/sites/${env.CLOUDHAL_SITE_ID}/snapshots`,
+    { publish: true, label: "smoke" },
+    { cookie },
   );
-  step("GET / serves Studio");
-
-  // The MCP endpoint is public but never anonymous (ADR-0011).
-  const mcp = await api("POST", "/mcp", {
-    body: { jsonrpc: "2.0", id: 1, method: "initialize", params: {} },
+  expect(published.status === 201, "publish", published.body);
+  const live = await fetch(`${site("a")}/`);
+  const liveHtml = await live.text();
+  expect(live.status === 200 && HOME_H1.test(liveHtml), "the site is live on the next request", {
+    status: live.status,
+    start: liveHtml.slice(0, 200),
   });
-  expect(mcp.status === 401, "POST /mcp without credentials is refused with 401", mcp.status);
-  step("POST /mcp without credentials answers 401");
+  step("a publish is live on the next request, with no build");
 
-  const sites = await api("GET", "/api/sites", { cookie });
-  const site = (sites.body as { id: string; name: string }[])[0];
-  if (site?.name !== "Smoke Site") expect(false, "the scaffolded site is listed", sites.body);
-  if (!site) throw new Error("no site");
-  // RFC-0043 §1.10: `cloudhal build --published`, which site-build uses when the CLI has it.
-  const hasPublished =
-    spawnSync("docker", [
-      "exec",
-      name,
-      "sh",
-      "-c",
-      "cloudhal build --help | grep -q -e --published",
-    ]).status === 0;
-  if (!hasPublished)
-    console.log("! this image's CLI has no `build --published`: skipping the status-page checks");
-  const marker = () =>
-    docker(["exec", name, "sh", "-c", `cat ${SITE}/.cloudhal-status 2>/dev/null || true`]);
-
-  // The entrypoint's start-up build: on a new volume, the status page at once.
-  await waitStartupBuild();
-  if (hasPublished)
-    expect(marker() === "not-published", "the start-up build is the status page", marker());
-  // #150: a CLI with the rebuild on publish runs the start-up build itself and reports it.
-  const rebuilds = (await buildReport(site.id, cookie)) !== undefined;
-  if (rebuilds) {
-    const start = await waitReportedBuild(site.id, cookie, "start", "");
-    expect(start.ok, "Studio's start-up build succeeded", start);
-  } else console.log("! this image's CLI does not rebuild on publish: building by hand");
-  step("the start-up site-build published the site's first build");
-
-  // A snapshot nobody published: `--published` must not build it.
-  const draft = await api("POST", `/api/sites/${site.id}/snapshots`, {
-    cookie,
-    body: { label: "smoke draft" },
+  docker(["restart", a]);
+  await waitHealthy(a);
+  const again = await until("the site did not come back after a restart", async () => {
+    const r = await fetch(`${site("a")}/`);
+    const t = await r.text();
+    return r.status === 200 && HOME_H1.test(t) ? t : undefined;
   });
-  expect(draft.status === 200 || draft.status === 201, "a draft snapshot", draft.body);
+  expect(again.length > 0, "the site after a restart");
+  step("content and the published pointer survive a restart");
 
-  // A volume from 0.6.3 has a real /data/dist folder: the next build moves it aside, keeps it as
-  // site/previous, and puts the symlink in its place (#166).
+  docker(["volume", "create", volumes.node]);
   docker([
-    "exec",
-    name,
+    "run",
+    "--rm",
+    "-v",
+    `${volumes.node}:/data`,
+    "--entrypoint",
     "sh",
+    image,
     "-c",
-    "rm /data/dist && mkdir /data/dist && touch /data/dist/marker",
+    "echo '{}' > /data/cloudhal.json",
   ]);
-  // Before the first publish the build is the status page and its marker, never the drafts, and
-  // Caddy answers it with 503 and Retry-After (robots.txt keeps its 200).
-  const first = siteBuild("before the first publish");
-  const resolved = docker(["exec", name, "readlink", "-f", SITE]);
-  expect(resolved.startsWith("/data/site/"), `${SITE} resolves under /data/site/`, resolved);
-  const legacy = spawnSync("docker", ["exec", name, "test", "-e", "/data/site/previous/marker"]);
-  expect(legacy.status === 0, "site/previous is the moved 0.6.3 folder, marker included");
-  step("site-build moved a 0.6.3 /data/dist aside as site/previous");
-  await startCaddy();
-  if (hasPublished) {
-    await expectStatusPage();
-    step("before the first publish, with a draft snapshot, Caddy serves the 503 status page");
-  }
-
-  const publish = await api("POST", `/api/sites/${site.id}/snapshots`, {
-    cookie,
-    body: { publish: true, label: "smoke" },
-  });
-  expect(publish.status === 200 || publish.status === 201, "publish", publish.body);
-  step(`site ${site.id} published`);
-
-  // #150: Studio rebuilds on the publish by itself; an older CLI needs `site-build` by hand.
-  let second: string;
-  if (rebuilds) {
-    const snapshotId = (publish.body as { snapshot?: { id?: string } }).snapshot?.id;
-    // the first `publish` build of this volume (container and host clocks may differ)
-    const built = await waitReportedBuild(site.id, cookie, "publish", "");
-    expect(
-      built.ok && built.state === "published" && built.snapshotId === snapshotId,
-      "Studio rebuilt the site from the published snapshot",
-      { built, snapshotId },
-    );
-    second = docker(["exec", name, "readlink", "/data/site/current"]);
-    step(`Studio rebuilt the site on the publish (${built.snapshotId})`);
-  } else second = siteBuild("after the publish");
-  expect(second !== first, "the build after the publish is a new tree", { first, second });
-  expect(marker() === "", "the published build has no status marker", marker());
-  expect(
-    HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
-    "the built home page shows the site name",
+  const refused = spawnSync(
+    "docker",
+    [
+      "run",
+      "--rm",
+      ...plat,
+      "-v",
+      `${volumes.node}:/data`,
+      "--env-file",
+      envFile("node", {
+        ...env,
+        CLOUDHAL_S3_ENDPOINT: "http://seaweedfs:8333",
+        CLOUDHAL_S3_BUCKET: "cloudhal",
+      }),
+      image,
+    ],
+    { encoding: "utf8" },
   );
-  const published = await served("/");
-  expect(published.status === 200, "Caddy answers / with 200 after the publish", published.status);
-  expect(HOME_H1.test(published.body), "Caddy serves the built home page");
-  step(`the published site is served with 200: ${SITE} -> site/current -> ${second}`);
+  expect(
+    refused.status !== 0 && /Node self-host image/.test(`${refused.stdout}${refused.stderr}`),
+    "a Node-image volume is refused",
+    { status: refused.status, out: `${refused.stdout}${refused.stderr}`.slice(-400) },
+  );
+  step("a volume of the Node image is refused with the way out");
 
-  // A failed build changes nothing: `--snapshot` with `--published` is refused before anything is
-  // built (an older CLI fails on the unknown snapshot instead).
-  const failed = spawnSync("docker", [
-    "exec",
-    name,
-    "site-build",
-    "--snapshot",
-    "snap_nonexistent0",
-  ]);
-  expect(failed.status !== 0, "a build that fails exits non-zero", failed.status);
-  expect(
-    docker(["exec", name, "readlink", "/data/site/current"]) === second,
-    "a failed build leaves site/current as it was",
-  );
-  expect((await served("/")).status === 200, "Caddy still serves the site after a failed build");
-  step("a failed site-build kept the previous site");
+  runInstance("b", env, volumes.b);
+  await waitHealthy(b);
+  const viaB = await fetch(`${site("b")}/`);
+  expect(viaB.status === 200 && HOME_H1.test(await viaB.text()), "instance b serves the site");
+  step("a second instance with the same settings serves the same site");
 
-  // A third build swaps the served tree in one rename and keeps the one before it, whose pages
-  // may still load their assets (#166).
-  const third = siteBuild("third");
-  expect(third !== second, "the third build is a new tree", { second, third });
-  const kept = docker([
-    "exec",
-    name,
-    "sh",
-    "-c",
-    "ls -1 /data/site | grep -v -x -e current -e previous -e current.json",
-  ]);
+  const codes: number[] = [];
+  let polling = true;
+  const poll = (async () => {
+    while (polling) {
+      const r = await fetch(`${studio("b")}/api/health`).catch(() => undefined);
+      codes.push(r?.status ?? 0);
+      await r?.body?.cancel();
+      await sleep(200);
+    }
+  })();
+  docker(["stop", "-t", "15", a]);
+  await sleep(3000);
+  polling = false;
+  await poll;
+  const bad = codes.filter((c) => c !== 200);
+  expect(bad.length === 0, "instance b answered every request while a stopped", { codes });
+  const after = await fetch(`${site("b")}/`);
   expect(
-    kept === [second, third].sort().join("\n"),
-    "the newest build and the one before it are kept",
-    kept,
+    after.status === 200 && HOME_H1.test(await after.text()),
+    "instance b serves the site after a stopped",
   );
-  const previous = docker(["exec", name, "readlink", "/data/site/previous"]);
-  expect(previous === second, "site/previous links to the build before", previous);
-  expect(
-    HOME_H1.test(docker(["exec", name, "cat", `${SITE}/index.html`])),
-    "the home page is served after the swap",
-  );
-  expect((await served("/")).status === 200, "Caddy still answers / with 200 after the swap");
-  step("a third site-build swapped the served tree and kept the previous one");
-  // #150: the hand-started build is what the overview says is served
-  if (rebuilds) {
-    const record = JSON.parse(docker(["exec", name, "cat", "/data/site/current.json"])) as {
-      build?: string;
-      source?: string;
-      state?: string;
-    };
-    expect(
-      record.build === third && record.source === "manual" && record.state === "published",
-      "site/current.json records the hand-started build",
-      record,
-    );
-    const report = await buildReport(site.id, cookie);
-    expect(
-      report?.served?.source === "manual" && report.served.state === "published",
-      "the overview reports the hand-started build as served",
-      report,
-    );
-    step("site/current.json and the overview name the hand-started build");
-  }
+  step(`instance a stopped (SIGTERM) and b answered all ${codes.length} requests meanwhile`);
   console.log("\nDocker smoke test passed.");
 } catch (e) {
-  console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}\n--- container logs ---`);
-  spawnSync("docker", ["logs", "--tail", "200", name], { stdio: "inherit" });
-  console.error("--- caddy logs ---");
-  spawnSync("docker", ["logs", "--tail", "50", caddyName], { stdio: "inherit" });
+  console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}`);
+  for (const name of [a, b, store]) {
+    console.error(`--- ${name} logs ---`);
+    spawnSync("docker", ["logs", "--tail", "120", name], { stdio: "inherit" });
+  }
   process.exitCode = 1;
 } finally {
-  if (keep) console.log(`kept containers ${name} and ${caddyName}`);
+  if (keep) console.log(`kept ${a}, ${b}, ${store} and the network ${net}`);
   else {
-    // Caddy first: the volume goes with the Cloudhal container, and only once nothing uses it.
-    spawnSync("docker", ["rm", "-f", caddyName], { stdio: "ignore" });
-    spawnSync("docker", ["rm", "-f", "-v", name], { stdio: "ignore" });
+    for (const name of [a, b, store])
+      spawnSync("docker", ["rm", "-f", "-v", name], { stdio: "ignore" });
+    for (const v of Object.values(volumes))
+      spawnSync("docker", ["volume", "rm", v], { stdio: "ignore" });
+    spawnSync("docker", ["network", "rm", net], { stdio: "ignore" });
   }
+  rmSync(envDir, { recursive: true, force: true });
 }

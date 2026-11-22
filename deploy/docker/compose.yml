@@ -1,50 +1,107 @@
-# Cloudhal self-hosted (docs/guides/self-host.md): Studio, the API and the MCP endpoint in one
-# container, every file on the `cloudhal-data` volume. Copy .env.example to .env, then
-#   docker compose up -d                      Studio on http://localhost:8787
+# Cloudhal self-hosted (RFC-0047, docs/guides/self-host.md): the release bundle's site and admin
+# Workers on workerd, with their state in SeaweedFS (S3). Once:
+#   docker run --rm ghcr.io/cloudhal-dev/cloudhal:latest secrets > .env && chmod 600 .env
+# then
+#   docker compose up -d                      Studio on http://localhost:8787, the site on :8788
 #   docker compose --profile caddy up -d      + Caddy with automatic TLS for CLOUDHAL_BASE_URL
-#                                               (Studio) and CLOUDHAL_SITE_URL (the built site)
+#                                               (Studio) and CLOUDHAL_SITE_URL (the site)
+# Every instance of an installation needs the same .env; this file runs one instance (the cluster
+# of one). More instances: deploy/swarm or deploy/helm.
+x-store: &store
+  CLOUDHAL_S3_ENDPOINT: ${CLOUDHAL_S3_ENDPOINT:-http://seaweedfs:8333}
+  CLOUDHAL_S3_BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
+  CLOUDHAL_S3_PREFIX: ${CLOUDHAL_S3_PREFIX:-}
+  CLOUDHAL_S3_REGION: ${CLOUDHAL_S3_REGION:-us-east-1}
+  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?run `secrets` first (see the top of this file)}
+  AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?run `secrets` first (see the top of this file)}
+
 services:
   cloudhal:
     image: ghcr.io/cloudhal-dev/cloudhal:${CLOUDHAL_TAG:-latest}
     restart: unless-stopped
-    # Bound to this machine unless CLOUDHAL_BIND says otherwise; with the caddy profile the proxy
-    # is the way in.
+    # workerd hands its Durable Objects to its peers and exits within 8 s of SIGTERM.
+    stop_grace_period: 15s
+    depends_on:
+      store-init:
+        condition: service_completed_successfully
     ports:
       - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_PORT:-8787}:8787"
+      - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_SITE_PORT:-8788}:8788"
     environment:
-      # The origin browsers open Studio at, which sign-in is tied to (.env.example). No default on
-      # purpose: empty, sign-in accepts the browser's own address and the log warns; behind a proxy
-      # (CLOUDHAL_BEHIND_PROXY=1) it is required, and Studio refuses to start without it.
-      - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL:-}
-      - CLOUDHAL_BEHIND_PROXY=${CLOUDHAL_BEHIND_PROXY:-0}
-      - CLOUDHAL_INIT=${CLOUDHAL_INIT:-blog}
-      - CLOUDHAL_SITE_NAME=${CLOUDHAL_SITE_NAME:-My site}
-      # The public site's origin: `site-build` writes its host into canonical links, the sitemap
-      # and feeds (cloudhal.json `domains.site`); with the caddy profile Caddy serves the site there.
-      - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
-      # Rebuild the public site on every publish, and once at start (#150); `off` when the site is
-      # built elsewhere (CI, another host). `site-build` by hand or from cron works either way.
-      - CLOUDHAL_SITE_BUILD=${CLOUDHAL_SITE_BUILD:-on}
-      - CLOUDHAL_AUTOMATIONS=${CLOUDHAL_AUTOMATIONS:-on}
-      - CLOUDHAL_TRUSTED_ORIGINS=${CLOUDHAL_TRUSTED_ORIGINS:-}
-      # Remote MCP clients (RFC-0044; docs/guides/mcp-oauth.md): `off` turns OAuth, metadata
-      # documents or dynamic registration off; the host list limits where clients come from.
-      - CLOUDHAL_MCP_OAUTH=${CLOUDHAL_MCP_OAUTH:-on}
-      - CLOUDHAL_MCP_CIMD=${CLOUDHAL_MCP_CIMD:-on}
-      - CLOUDHAL_MCP_DCR=${CLOUDHAL_MCP_DCR:-on}
-      - CLOUDHAL_MCP_CLIENT_HOSTS=${CLOUDHAL_MCP_CLIENT_HOSTS:-}
-      - CLOUDHAL_MCP_REDIRECT_SCHEMES=${CLOUDHAL_MCP_REDIRECT_SCHEMES:-}
-      # Secrets. A name without a value is passed through from .env or the shell only when it is
-      # set there, so an unset BETTER_AUTH_SECRET leaves the container with the secret it created
-      # on the volume (/data/.cloudhal/auth-secret). Never set it to an empty value.
-      - BETTER_AUTH_SECRET
-      # The first owner's setup token; empty: one is generated at each start while there is no
-      # account, and the setup link is printed to the logs.
-      - CLOUDHAL_SETUP_TOKEN=${CLOUDHAL_SETUP_TOKEN:-}
-      - CLOUDHAL_AI_TOKEN
-      - CLOUDFLARE_ACCOUNT_ID
+      <<: *store
+      # From `secrets` (.env): the site's id, the cluster key and every secret. Never change them
+      # once the installation exists.
+      CLOUDHAL_SITE_ID: ${CLOUDHAL_SITE_ID:?run `secrets` first (see the top of this file)}
+      CLOUDHAL_CLUSTER_KEY: ${CLOUDHAL_CLUSTER_KEY:?}
+      CLOUDHAL_CLUSTER_ADVERTISE: cloudhal:7000
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?}
+      MCP_STATE_KEY: ${MCP_STATE_KEY:?}
+      CLOUDHAL_PREVIEW_SECRET: ${CLOUDHAL_PREVIEW_SECRET:?}
+      CLOUDHAL_PURGE_TOKEN: ${CLOUDHAL_PURGE_TOKEN:?}
+      CLOUDHAL_DEPLOY_TOKEN: ${CLOUDHAL_DEPLOY_TOKEN:?}
+      CLOUDHAL_SETUP_TOKEN: ${CLOUDHAL_SETUP_TOKEN:?}
+      CLOUDHAL_COMMENTS_KEY: ${CLOUDHAL_COMMENTS_KEY:?}
+      # The origin browsers open Studio at; required behind a proxy (CLOUDHAL_BEHIND_PROXY=1, the
+      # caddy profile), where the proxy must also set CF-Connecting-IP to the client's address.
+      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:-}
+      CLOUDHAL_BEHIND_PROXY: ${CLOUDHAL_BEHIND_PROXY:-0}
+      CLOUDHAL_SITE_NAME: ${CLOUDHAL_SITE_NAME:-My site}
+      CLOUDHAL_AUTOMATIONS: ${CLOUDHAL_AUTOMATIONS:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     volumes:
       - cloudhal-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+  # The S3 store: SeaweedFS (Apache-2.0), whose conditional writes workerd's cluster needs
+  # (RFC-0047 §3). Its credentials are the .env's; its port stays on this network. Set
+  # CLOUDHAL_S3_ENDPOINT to use another store (AWS S3, GCS, R2, RustFS) and stop this service.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    restart: unless-stopped
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        printf '{"identities":[{"name":"cloudhal","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' \
+          "$$AWS_ACCESS_KEY_ID" "$$AWS_SECRET_ACCESS_KEY" > /tmp/s3.json
+        exec weed server -dir=/data -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+    volumes:
+      - seaweedfs-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # Creates the bucket once (a no-op afterwards), before Cloudhal starts.
+  store-init:
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    depends_on:
+      seaweedfs:
+        condition: service_healthy
+    environment:
+      BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        for i in $$(seq 1 30); do
+          if echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 2>/dev/null | grep -q "^  $$BUCKET"; then
+            echo "store-init: bucket $$BUCKET exists"; exit 0
+          fi
+          if echo "s3.bucket.create -name $$BUCKET" | weed shell -master=seaweedfs:9333 2>&1 | grep -q "created bucket"; then
+            echo "store-init: created bucket $$BUCKET"; exit 0
+          fi
+          sleep 2
+        done
+        echo "store-init: could not create the bucket $$BUCKET" >&2; exit 1
 
   caddy:
     profiles: [caddy]
@@ -59,9 +116,6 @@ services:
     environment:
       - CLOUDHAL_BASE_URL=${CLOUDHAL_BASE_URL:-}
       - CLOUDHAL_SITE_URL=${CLOUDHAL_SITE_URL:-}
-    # Both origins are required for this profile. They are checked here, when Caddy starts, rather
-    # than with `:?` interpolation, which would fail `docker compose up` for everyone who never
-    # uses Caddy.
     command:
       - sh
       - -c
@@ -73,19 +127,15 @@ services:
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # the built site at /data/dist (from 0.6.4 a symlink to /data/site/current, the newest
-      # build; /data/site/previous is the one before), read-only here
-      - cloudhal-data:/srv/cloudhal:ro
       - caddy-data:/data
       - caddy-config:/config
 
 volumes:
-  # The installation. Named outright, so that this stack, `docker run -v cloudhal-data:/data …` and
-  # the guide's backup commands share one volume whatever the compose project is called. A stack
-  # created with the compose file of 0.6.3 has `<project>_cloudhal-data` (`docker volume ls`): set
-  # CLOUDHAL_VOLUME to that name in .env to keep it (the guide, "Backup and restore"). A second
-  # stack on the same host must set a CLOUDHAL_VOLUME of its own: one volume, one container.
+  # Each instance's Durable Object files (they replicate through the store) and the v2 marker.
   cloudhal-data:
-    name: ${CLOUDHAL_VOLUME:-cloudhal-data}
+    name: ${CLOUDHAL_VOLUME:-cloudhal-v2-data}
+  # The installation's state: D1, media, the cluster's records. Back this one up.
+  seaweedfs-data:
+    name: ${CLOUDHAL_STORE_VOLUME:-cloudhal-store}
   caddy-data:
   caddy-config:
