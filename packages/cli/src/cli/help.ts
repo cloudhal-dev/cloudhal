@@ -158,7 +158,20 @@ const OPERATIONS = `  cloudhal media import-urls [--dry-run] [--include-markdown
   cloudhal --help
 `;
 
+/** selfhost: the workerd self-host image (RFC-0047). */
+const SELFHOST = `  cloudhal selfhost secrets                               a fresh .env block: the site id, the cluster key and
+                                                          every secret the self-host image requires
+  cloudhal selfhost start [--in <bundle>]                 the image's entrypoint: check the release bundle, write
+                                                          the workerd config from the environment, run workerd
+                                                          as a cluster instance on the S3 store, create the site
+  cloudhal selfhost config [--in <bundle>]                print that workerd config (it holds the cluster key)
+  cloudhal selfhost check [--in <bundle>]                 every file of the extracted bundle against its manifest
+  cloudhal selfhost fetch <version> --out <dir> [--from <dir>]
+                                                          download, verify and extract a release bundle
+                                                          (the image build; --from: a folder of its assets)
+`;
+
 export const HELP = `cloudhal — agent-native sites
 
 Usage:
-${PROJECT}${CLOUDFLARE}${CONTENT}${OPERATIONS}`;
+${PROJECT}${CLOUDFLARE}${CONTENT}${OPERATIONS}${SELFHOST}`;

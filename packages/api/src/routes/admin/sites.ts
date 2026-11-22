@@ -2,8 +2,10 @@
  * RFC-0034 §2–3: the sites of a multi-site installation, for the operator (`cloudhal site …`).
  *
  * - `GET    /sites` → every site with its hostnames and any hostname it claims but does not hold
- * - `POST   /sites` ← {name, slug, locale?, projectId?, theme?} → the new site, seeded like
- *   `cloudhal init`; nothing is published
+ * - `POST   /sites` ← {name, slug, locale?, projectId?, theme?, id?} → the new site, seeded like
+ *   `cloudhal init`; nothing is published. `id` (RFC-0047 decision 1) lets the operator fix the
+ *   site's id first, as the workerd self-host entrypoint does before it writes the site Worker's
+ *   config; a taken id answers 409. Studio's `POST /api/sites` takes no `id`.
  * - `DELETE /sites/:siteId` ← {confirm: <slug>} → removes the site's rows and objects; refused for
  *   the last site of the installation
  */
@@ -25,6 +27,17 @@ import { type AdminDeps, NO_STORE, OPERATOR_ACTOR } from "./shared.ts";
 
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LOCALE = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
+/** A site id the operator chooses: the contract's `Id` pattern with the `site` prefix. */
+const SITE_ID = /^site_[A-Za-z0-9]{6,32}$/;
+
+/** The optional `id` of the operator's `POST /sites` (RFC-0047); 400 on anything off. */
+export function parseSiteId(body: unknown): string | undefined {
+  const id = ((body ?? {}) as Record<string, unknown>).id;
+  if (id === undefined) return undefined;
+  if (typeof id !== "string" || id.length > 37 || !SITE_ID.test(id))
+    throw badRequest("id: site_ followed by 6 to 32 letters or digits");
+  return id;
+}
 
 export interface CreateInput {
   name: string;
@@ -122,7 +135,16 @@ export function sitesAdminRoutes(deps: AdminDeps): Hono<Env> {
     })
     .post("/sites", async (c) => {
       const store = c.get("store");
-      const input = parseCreate(await c.req.json().catch(() => null));
+      const body: unknown = await c.req.json().catch(() => null);
+      const input = parseCreate(body);
+      const siteId = parseSiteId(body);
+      if (siteId && input.from) throw badRequest("id cannot be set for a language edition (from)");
+      if (siteId && (await store.getSite(siteId)))
+        return c.json(
+          { error: "conflict", message: `a site with the id ${siteId} exists` },
+          409,
+          NO_STORE,
+        );
       if (input.projectId && !(await store.getProject(input.projectId)))
         return c.json({ error: "not_found", message: "not found: project" }, 404, NO_STORE);
       if ((await store.listSites()).some((s) => s.slug === input.slug))
@@ -131,7 +153,9 @@ export function sitesAdminRoutes(deps: AdminDeps): Hono<Env> {
           409,
           NO_STORE,
         );
-      const made = await makeSite(store, input);
+      const made: Awaited<ReturnType<typeof makeSite>> = siteId
+        ? { site: await seedStarterSite(store, { ...input, siteId }) }
+        : await makeSite(store, input);
       if (made instanceof Response) return made;
       const site = made.site;
       await c.get("audit")?.record({
@@ -145,6 +169,7 @@ export function sitesAdminRoutes(deps: AdminDeps): Hono<Env> {
           slug: input.slug,
           locale: input.locale,
           from: input.from ?? null,
+          ...(siteId ? { id: siteId } : {}),
           via: "deploy-token",
         },
         reason: `operator created the site ${input.name}`,

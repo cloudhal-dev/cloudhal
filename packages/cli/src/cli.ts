@@ -3,6 +3,7 @@ import { CONTENT_COMMANDS } from "./cli/commands-content.ts";
 import { LOCAL_COMMANDS } from "./cli/commands-local.ts";
 import { OPS_COMMANDS } from "./cli/commands-ops.ts";
 import { REMOTE_COMMANDS } from "./cli/commands-remote.ts";
+import { SELFHOST_COMMANDS } from "./cli/commands-selfhost.ts";
 import { SITE_COMMANDS } from "./cli/commands-site.ts";
 import { HELP } from "./cli/help.ts";
 import type { CliCommand } from "./cli/types.ts";
@@ -141,6 +142,7 @@ export const COMMANDS: Record<string, CliCommand> = {
   ...CONTENT_COMMANDS,
   ...OPS_COMMANDS,
   ...SITE_COMMANDS,
+  ...SELFHOST_COMMANDS,
 };
 
 export async function main(argv: string[]): Promise<number> {

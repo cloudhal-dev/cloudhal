@@ -35,3 +35,4 @@ starters/**/*.cloudhal
 
 # Packed tarballs for the edge Docker image (scripts/pack-packages.ts)
 deploy/docker/tarballs/
+deploy/docker/bundle/

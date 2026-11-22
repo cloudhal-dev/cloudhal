@@ -1,33 +1,30 @@
 name: Docker image
 
-# The official self-host image, ghcr.io/cloudhal-dev/cloudhal (issue #143, docs/guides/self-host.md).
-# Built from the npm release, never from the tree, so the image is exactly what npm users get.
+# The official self-host image, ghcr.io/cloudhal-dev/cloudhal (RFC-0047, docs/guides/self-host.md):
+# the release bundle's site and admin Workers on a pinned workerd (deploy/docker/workerd-version),
+# a cluster instance on an S3 store. A release image is built from the npm release and the GitHub
+# release's signed bundle, never from the tree, so it is exactly what was released.
 # Three jobs, so that no release tag moves before the gates pass (#166):
 # - `build` builds linux/amd64 + linux/arm64 with an SBOM and buildx provenance, pushes it under
 #   the candidate tag `sha-<short>` only, then runs scripts/docker-smoke.ts on the amd64 image
-#   (empty volume, health check, Studio's page, an anonymous `/mcp` call, the first owner through
-#   the API, a publish, `site-build` twice) and Trivy, which fails the job on a CRITICAL
-#   vulnerability with a fix;
-# - `smoke-arm64` runs the same smoke test on the arm64 image, on GitHub's native arm64 runner
-#   (free for public repositories; under QEMU a Node process and an Astro build take far longer
-#   than the ten minutes that would be worth);
+#   (compose.yml's SeaweedFS, the image's own `secrets`, the first site and owner, a publish live
+#   on the next request, a restart, the Node-volume guard, a second instance taking over while the
+#   first stops) and Trivy, which fails the job on a CRITICAL vulnerability with a fix;
+# - `smoke-arm64` runs the same smoke test on the arm64 image, on GitHub's native arm64 runner;
 # - `tag` adds the release tags to the very digest that passed, with `imagetools create`, and then
 #   writes the GitHub build attestation for it.
 # Which tags `tag` adds:
 # - release.yml calls this after a successful npm publish (`workflow_call` with the version), and
 #   Actions › Docker image › Run workflow with a version re-publishes or backfills one. X.Y.Z
 #   always; X.Y when the version is the highest patch of that minor among the repository's v*
-#   tags; `latest` when it is the highest release of all. So a release started by hand still gets
-#   `latest`, and a backfill of an older patch moves nothing backwards.
+#   tags; `latest` when it is the highest release of all.
 # - with no version (a dispatch without one, and nightly) `edge` is built from main's own packed
-#   tarballs (scripts/pack-packages.ts) and tagged edge only, never latest;
+#   tarballs (scripts/pack-packages.ts) and this ref's unsigned bundle
+#   (scripts/selfhost-edge-bundle.ts), and tagged edge only, never latest;
 # - a pull request that touches the image builds it for linux/amd64 without pushing and runs the
 #   amd64 smoke test and the scan.
-# Versions before 0.6.4 cannot pass the gates: the smoke test expects the first owner's setup
-# token (#165), which 0.6.4 brought, and the image needs `--init-if-empty` (0.6.3). A backfill of
-# 0.6.4–0.7.1 passes without the RFC-0043 status page: its CLI has no `cloudhal build --published`,
-# so `site-build` (from this checkout) warns and builds the old way, and the smoke test skips its
-# status-page checks.
+# Only versions whose release has a bundle and whose admin API takes a site id (RFC-0047) can pass
+# the gates: the workerd image starts with the release after 0.10.1.
 
 on:
   workflow_call:
@@ -51,6 +48,8 @@ on:
       - ".github/workflows/docker.yml"
       - "scripts/docker-smoke.ts"
       - "scripts/pack-packages.ts"
+      - "scripts/selfhost-edge-bundle.ts"
+      - "packages/cli/src/selfhost/**"
 
 permissions: {}
 
@@ -89,6 +88,17 @@ jobs:
             -e CLOUDHAL_SITE_URL=https://www.example.com \
             -v "$PWD/deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2.11 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      # The compose file as `docker compose` reads it, with a generated .env (no image needed).
+      - name: Validate compose.yml
+        run: |
+          {
+            echo "CLOUDHAL_SITE_ID=site_COMPOSECHECK00000001"
+            for n in CLOUDHAL_CLUSTER_KEY BETTER_AUTH_SECRET MCP_STATE_KEY CLOUDHAL_PREVIEW_SECRET \
+              CLOUDHAL_PURGE_TOKEN CLOUDHAL_DEPLOY_TOKEN CLOUDHAL_SETUP_TOKEN CLOUDHAL_COMMENTS_KEY \
+              AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do echo "$n=$(openssl rand -hex 32)"; done
+          } > "$RUNNER_TEMP/compose.env"
+          docker compose -f deploy/docker/compose.yml --env-file "$RUNNER_TEMP/compose.env" config --quiet
+          docker compose -f deploy/docker/compose.yml --env-file "$RUNNER_TEMP/compose.env" --profile caddy config --quiet
       - name: Check the version
         if: env.VERSION != ''
         run: |
@@ -126,6 +136,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - if: env.VERSION == ''
         run: node scripts/pack-packages.ts deploy/docker/tarballs
+      - if: env.VERSION == ''
+        run: pnpm --filter @cloudhal/studio build
+      - if: env.VERSION == ''
+        run: node scripts/selfhost-edge-bundle.ts deploy/docker/bundle --no-build
 
       - if: env.PUSH == 'true'
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0

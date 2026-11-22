@@ -76,6 +76,48 @@ describe("admin sites endpoints", () => {
   });
 });
 
+describe("admin site creation with a chosen id (RFC-0047 decision 1)", () => {
+  it("creates the site under the operator's id, and refuses a taken or malformed id", async () => {
+    const { store, first, call } = await setup();
+    const id = "site_SELFHOST0000000001";
+    const res = await call("POST", "/api/admin/sites", { name: "Self-host", slug: "self", id });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { site: { id: string } }).site.id).toBe(id);
+    expect((await store.getSite(id))?.slug).toBe("self");
+    expect((await store.listPages(id)).length).toBe(2);
+
+    const again = await call("POST", "/api/admin/sites", { name: "Again", slug: "again", id });
+    expect(again.status).toBe(409);
+    expect((await store.getSite(id))?.slug).toBe("self");
+    expect(
+      (await call("POST", "/api/admin/sites", { name: "Ok", slug: "ok", id: first.id })).status,
+    ).toBe(409);
+
+    for (const bad of [
+      "page_SELFHOST0000000001",
+      "site_short",
+      "site_has-dash000",
+      42,
+      "",
+      `site_${"A".repeat(33)}`,
+    ])
+      expect(
+        (await call("POST", "/api/admin/sites", { name: "Bad", slug: "bad", id: bad })).status,
+      ).toBe(400);
+    expect(
+      (
+        await call("POST", "/api/admin/sites", {
+          name: "Ed",
+          slug: "ed",
+          id: "site_EDITION000001",
+          from: first.id,
+        })
+      ).status,
+    ).toBe(400);
+    expect(await store.getSite("site_EDITION000001")).toBeUndefined();
+  });
+});
+
 describe("admin site-workers endpoints (RFC-0034 §4)", () => {
   it("registers, lists and removes an attached site Worker", async () => {
     const { first, call } = await setup();
