@@ -1,6 +1,6 @@
 # RFC-0047: Self-host v2: the release bundle on workerd, as a cluster on an S3 store
 
-- Status: Draft
+- Status: Accepted (2026-11-23, by Halil: the open questions are decided as recommended; see "Decisions (2026-11-23)").
 - Author: Halil (Madraka), drafted with Claude · Date: 2026-11-23
 - Related:
   - #263 is the issue; its owner decisions of 2026-11-23 are binding here: v2 replaces the Node image outright, workerd's local bucket store is never used, cluster mode is in the first release, and the Helm chart lives in `deploy/helm`.
@@ -256,7 +256,17 @@ workerd cannot inject the peer address as a header. The admin Worker counts rate
 - **Client addresses** cannot be spoofed without a proxy (§8).
 - **No new scopes and no approval changes.** The policy engine, auth and MCP are the bundle's, unchanged.
 
-## Open questions
+## Decisions (2026-11-23)
+
+The owner took the recommendation on each open question:
+
+1. **First site id.** `POST /api/admin/sites` accepts an optional `id` (the site id format) from the deploy-token holder. The entrypoint picks the id, writes it into the config and then creates the site. A taken id answers 409.
+2. **Several sites.** The first release serves one site per installation. `CLOUDHAL_SITE_IDS` and the host map follow in a later release.
+3. **Cache.** The first release ships with no cache, and `no-store` is fine. The shared Cache API with purge on publish is a later, measured step.
+4. **D1 throughput.** Before the first release, the cluster smoke records a publish made while many agents write.
+5. **Analytics.** Analytics is off on self-host. A SQL rollup table as a stand-in for Analytics Engine is a later RFC.
+
+## Open questions (decided above)
 
 1. **The first site's id before the first start.**
    - (a) `POST /api/admin/sites` accepts an optional `id` from the deploy-token holder, so the entrypoint picks it first. This is recommended: one small API change, covered by the API suite.
