@@ -1,0 +1,40 @@
+{{- $fullname := include "cloudhal.fullname" . }}
+{{- if .Values.networkPolicy.enabled }}
+# The cluster port grants full control of every instance (its traffic is not encrypted): only this
+# release's own instances may reach it. Studio and the site stay open to the cluster's ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "cloudhal.selector" . | nindent 6 }}
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8787
+        - port: 8788
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "cloudhal.selector" . | nindent 14 }}
+      ports:
+        - port: 7000
+{{- end }}
+{{- if and .Values.podDisruptionBudget.enabled (gt (int .Values.replicaCount) 1) }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  selector:
+    matchLabels:
+      {{- include "cloudhal.selector" . | nindent 6 }}
+{{- end }}

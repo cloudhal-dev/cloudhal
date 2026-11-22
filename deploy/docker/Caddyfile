@@ -1,11 +1,10 @@
 # Caddy for the compose file's `caddy` profile (RFC-0047): automatic TLS for both hosts (the DNS of
 # each must point at this machine, ports 80 and 443 open). Studio, the API and /mcp at
 # CLOUDHAL_BASE_URL, the site at CLOUDHAL_SITE_URL, both proxied to the workerd instance; set
-# CLOUDHAL_BEHIND_PROXY=1. CF-Connecting-IP is overwritten with the client's address: the Workers
-# count rate limits by it, and workerd keeps it only behind a proxy (RFC-0047 §8).
+# CLOUDHAL_BEHIND_PROXY=1. Caddy appends the client's address to X-Forwarded-For, whose last hop
+# the image then takes as the client's (RFC-0047 §8).
 {$CLOUDHAL_BASE_URL} {
 	reverse_proxy cloudhal:8787 {
-		header_up CF-Connecting-IP {remote_host}
 		# Build chat streams server-sent events
 		flush_interval -1
 	}
@@ -13,7 +12,5 @@
 
 {$CLOUDHAL_SITE_URL} {
 	encode zstd gzip
-	reverse_proxy cloudhal:8788 {
-		header_up CF-Connecting-IP {remote_host}
-	}
+	reverse_proxy cloudhal:8788
 }

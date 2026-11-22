@@ -155,6 +155,8 @@ The site Worker needs the site's id in its config (`CLOUDHAL_SITE_ID`). Open que
 
 ### 8. Client address
 
+*Amended 2026-11-23, in phase 3:* a small front Worker sits in front of each socket (`packages/cli/src/selfhost/front-worker.ts`). It always removes an incoming `CF-Connecting-IP`. Behind a proxy it sets the header to the last `X-Forwarded-For` hop, which is how `cloudhal studio --behind-proxy` read the address on Node (#165). So no proxy needs to set `CF-Connecting-IP`, and an ingress that passes client headers through cannot be spoofed. The text below describes the first design.
+
 workerd cannot inject the peer address as a header. The admin Worker counts rate limits by `CF-Connecting-IP`, as on Cloudflare.
 
 - **Without a proxy,** the sockets remove any incoming `CF-Connecting-IP` with `injectRequestHeaders`, so a client cannot choose its own address. Rate limits then share one bucket per path, which Better Auth logs. This is the same guarantee #165 gave on Node.

@@ -1,0 +1,18 @@
+Cloudhal {{ .Chart.AppVersion }}: {{ .Values.replicaCount }} instance(s) of one installation{{ if .Values.store.enabled }}, SeaweedFS as its store{{ end }}.
+
+{{- if not .Values.baseUrl }}
+
+Open Studio locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "cloudhal.fullname" . }} 8787:{{ .Values.service.studioPort }} 8788:{{ .Values.service.sitePort }}
+Studio: http://localhost:8787   The site: http://localhost:8788
+{{- else }}
+
+Studio: {{ .Values.baseUrl }}
+{{- end }}
+
+Create the Owner account with the setup link from the logs, the token in place of the placeholder:
+  kubectl -n {{ .Release.Namespace }} logs {{ include "cloudhal.fullname" . }}-0 -c cloudhal | grep setup
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "cloudhal.secretName" . }} -o jsonpath='{.data.CLOUDHAL_SETUP_TOKEN}' | base64 -d
+
+The Secret {{ include "cloudhal.secretName" . }} holds the site id and the cluster key: keep a copy;
+it is not deleted with the release (helm.sh/resource-policy: keep).

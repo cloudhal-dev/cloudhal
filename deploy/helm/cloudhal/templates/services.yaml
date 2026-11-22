@@ -1,0 +1,37 @@
+{{- $fullname := include "cloudhal.fullname" . }}
+# Studio, the API, /mcp and the site, on any ready instance.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "cloudhal.selector" . | nindent 4 }}
+  ports:
+    - name: studio
+      port: {{ .Values.service.studioPort }}
+      targetPort: studio
+    - name: site
+      port: {{ .Values.service.sitePort }}
+      targetPort: site
+---
+# The peers' names (<pod>.<release>-peers), resolvable before a pod is ready: an instance joins the
+# cluster, and becomes ready, only once it can reach the others.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-peers
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "cloudhal.selector" . | nindent 4 }}
+  ports:
+    - name: cluster
+      port: 7000
+      targetPort: cluster

@@ -63,8 +63,9 @@ docker compose --profile caddy up -d
 
 - Proxy the Studio host to port 8787 and the site host to 8788.
 - Set `CLOUDHAL_BEHIND_PROXY=1` and `CLOUDHAL_BASE_URL`.
-- Send `X-Forwarded-Proto`.
-- Overwrite `CF-Connecting-IP` with the client's address. The Workers count rate limits by that header, as they do on Cloudflare. Without `CLOUDHAL_BEHIND_PROXY=1` the image removes any `CF-Connecting-IP` a client sends, so nobody can choose their own address, and rate limits then share one bucket per path. Only set it when the proxy is the only way in.
+- Send `X-Forwarded-Proto`, and append the client's address to `X-Forwarded-For`. Most proxies do both by default.
+
+The Workers count rate limits by `CF-Connecting-IP`, as on Cloudflare. The image always removes the `CF-Connecting-IP` a request brings. With `CLOUDHAL_BEHIND_PROXY=1`, it sets the header to the last `X-Forwarded-For` hop, which is the address your proxy appended. The proxy must therefore append that hop and never pass on only what the client sent. Without the setting, rate limits share one bucket per path. Only set it when the proxy is the only way in.
 
 For nginx:
 
@@ -73,7 +74,7 @@ location / {
     proxy_pass http://127.0.0.1:8787;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header CF-Connecting-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     # Build chat streams server-sent events
     proxy_buffering off;
 }
@@ -117,6 +118,22 @@ Instances with the same `.env` and store form one installation. Each Durable Obj
 - **Readiness:** use `GET /ready` on port 7000 as the readiness probe of a rolling restart.
 
 The cluster runs on workerd's experimental cluster mode, so treat several instances as a preview until workerd documents it.
+
+### Docker Swarm and Kubernetes
+
+- **Docker Swarm:** [`deploy/swarm/`](https://github.com/cloudhal-dev/cloudhal/tree/main/deploy/swarm) has a stack file with these parts:
+  - every secret as a Docker secret (`create-secrets.sh` reads the image's `secrets`);
+  - two or more replicas behind the routing mesh, each advertising its address on the stack's encrypted overlay (`CLOUDHAL_CLUSTER_ADVERTISE=auto:<cidr>`);
+  - a volume per task slot, and `start-first` rolling updates;
+  - SeaweedFS pinned to a labelled node.
+- **Kubernetes:** the Helm chart in [`deploy/helm/cloudhal`](https://github.com/cloudhal-dev/cloudhal/tree/main/deploy/helm/cloudhal) is published with each release as `oci://ghcr.io/cloudhal-dev/charts/cloudhal`. It has these parts:
+  - a StatefulSet whose pods advertise `<pod>.<release>-peers` through a headless Service;
+  - readiness on `/ready`, and a NetworkPolicy that admits the cluster port from the release's own pods only;
+  - a PodDisruptionBudget;
+  - an Ingress or Gateway API routes;
+  - a Secret generated once and kept, and optionally SeaweedFS in the release.
+
+`scripts/swarm-smoke.sh` and `scripts/helm-smoke.sh` (kind) run both recipes in CI with every image. Each smoke test covers a publish that is live on the next request and a rolling update while the site is polled.
 
 ## Upgrades
 

@@ -1,0 +1,172 @@
+{{- $fullname := include "cloudhal.fullname" . }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudhal
+spec:
+  replicas: {{ .Values.replicaCount }}
+  # Stable names, so each instance advertises <pod>.<release>-peers to its peers.
+  serviceName: {{ $fullname }}-peers
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "cloudhal.selector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cloudhal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: cloudhal
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.store.enabled }}
+      initContainers:
+        # The bucket, once (a no-op afterwards); Cloudhal cannot start without it.
+        - name: bucket
+          image: "{{ .Values.store.image.repository }}:{{ .Values.store.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              for i in $(seq 1 90); do
+                if echo "s3.bucket.list" | weed shell -master={{ $fullname }}-store:9333 2>/dev/null | grep -q "^  {{ .Values.bucket }}"; then
+                  echo "bucket {{ .Values.bucket }} exists"; exit 0
+                fi
+                if echo "s3.bucket.create -name {{ .Values.bucket }}" | weed shell -master={{ $fullname }}-store:9333 2>&1 | grep -q "created bucket"; then
+                  echo "created bucket {{ .Values.bucket }}"; exit 0
+                fi
+                sleep 2
+              done
+              exit 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+      {{- end }}
+      containers:
+        - name: cloudhal
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          envFrom:
+            - secretRef:
+                name: {{ include "cloudhal.secretName" . }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: CLOUDHAL_CLUSTER_ADVERTISE
+              value: "$(POD_NAME).{{ $fullname }}-peers.{{ .Release.Namespace }}.svc.cluster.local:7000"
+            - name: CLOUDHAL_S3_ENDPOINT
+              value: {{ include "cloudhal.storeEndpoint" . | quote }}
+            - name: CLOUDHAL_S3_BUCKET
+              value: {{ .Values.bucket | quote }}
+            - name: CLOUDHAL_S3_PREFIX
+              value: {{ .Values.prefix | quote }}
+            - name: CLOUDHAL_S3_REGION
+              value: {{ .Values.external.region | quote }}
+            - name: CLOUDHAL_SITE_NAME
+              value: {{ .Values.site.name | quote }}
+            - name: CLOUDHAL_BASE_URL
+              value: {{ .Values.baseUrl | quote }}
+            - name: CLOUDHAL_BEHIND_PROXY
+              value: {{ include "cloudhal.behindProxy" . | quote }}
+            {{- with .Values.otel.endpoint }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: studio
+              containerPort: 8787
+            - name: site
+              containerPort: 8788
+            - name: cluster
+              containerPort: 7000
+          startupProbe:
+            httpGet: { path: /api/health, port: studio }
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            httpGet: { path: /api/health, port: studio }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            # A peer's lease takes ~20 s to expire after it dies; health fails until then.
+            failureThreshold: 6
+          readinessProbe:
+            # 200 while the instance serves, holds its lease and is not stopping.
+            httpGet: { path: /ready, port: cluster }
+            periodSeconds: 5
+            failureThreshold: 2
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 16Mi
+        {{- if not .Values.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

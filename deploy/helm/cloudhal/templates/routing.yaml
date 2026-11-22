@@ -1,0 +1,63 @@
+{{- $fullname := include "cloudhal.fullname" . }}
+{{- if .Values.ingress.enabled }}
+{{- if not .Values.baseUrl }}{{ fail "ingress.enabled needs baseUrl (https://<ingress.studioHost>)" }}{{ end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  ingressClassName: {{ . }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.studioHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}
+                port: { name: studio }
+    - host: {{ .Values.ingress.siteHost | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $fullname }}
+                port: { name: site }
+{{- end }}
+{{- if .Values.httpRoute.enabled }}
+{{- if not .Values.baseUrl }}{{ fail "httpRoute.enabled needs baseUrl (https://<httpRoute.studioHost>)" }}{{ end }}
+{{- range $which := list "studio" "site" }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullname }}-{{ $which }}
+  labels:
+    {{- include "cloudhal.labels" $ | nindent 4 }}
+spec:
+  parentRefs:
+    {{- toYaml $.Values.httpRoute.parentRefs | nindent 4 }}
+  hostnames:
+    - {{ index $.Values.httpRoute (printf "%sHost" $which) | quote }}
+  rules:
+    # The client's address is the last X-Forwarded-For hop, which the gateway appends.
+    - backendRefs:
+        - name: {{ $fullname }}
+          port: {{ if eq $which "studio" }}{{ $.Values.service.studioPort }}{{ else }}{{ $.Values.service.sitePort }}{{ end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,97 @@
+{{- if .Values.store.enabled }}
+{{- $fullname := include "cloudhal.fullname" . }}
+# SeaweedFS (Apache-2.0), the installation's S3 store: one pod with its volume. Its credentials
+# are the release Secret's AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $fullname }}-store
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+    app.kubernetes.io/component: store
+spec:
+  replicas: 1
+  serviceName: {{ $fullname }}-store
+  selector:
+    matchLabels:
+      {{- include "cloudhal.storeSelector" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "cloudhal.labels" . | nindent 8 }}
+        app.kubernetes.io/component: store
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seaweedfs
+          image: "{{ .Values.store.image.repository }}:{{ .Values.store.image.tag }}"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              umask 077
+              printf '{"identities":[{"name":"cloudhal","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' \
+                "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" > /tmp/s3.json
+              exec weed server -dir=/data -ip=$(POD_IP) -ip.bind=0.0.0.0 -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cloudhal.secretName" . }}
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "cloudhal.secretName" . }}
+                  key: AWS_SECRET_ACCESS_KEY
+          ports:
+            - { name: s3, containerPort: 8333 }
+            - { name: master, containerPort: 9333 }
+            - { name: master-grpc, containerPort: 19333 }
+            - { name: filer, containerPort: 8888 }
+            - { name: filer-grpc, containerPort: 18888 }
+          readinessProbe:
+            httpGet: { path: /cluster/status, port: master }
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.store.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          volumeMounts:
+            - name: store
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata:
+        name: store
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .Values.store.persistence.storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.store.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-store
+  labels:
+    {{- include "cloudhal.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "cloudhal.storeSelector" . | nindent 4 }}
+  ports:
+    - { name: s3, port: 8333, targetPort: s3 }
+    - { name: master, port: 9333, targetPort: master }
+    - { name: master-grpc, port: 19333, targetPort: master-grpc }
+    - { name: filer, port: 8888, targetPort: filer }
+    - { name: filer-grpc, port: 18888, targetPort: filer-grpc }
+{{- end }}

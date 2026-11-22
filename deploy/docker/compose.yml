@@ -42,7 +42,7 @@ services:
       CLOUDHAL_SETUP_TOKEN: ${CLOUDHAL_SETUP_TOKEN:?}
       CLOUDHAL_COMMENTS_KEY: ${CLOUDHAL_COMMENTS_KEY:?}
       # The origin browsers open Studio at; required behind a proxy (CLOUDHAL_BEHIND_PROXY=1, the
-      # caddy profile), where the proxy must also set CF-Connecting-IP to the client's address.
+      # caddy profile), whose X-Forwarded-For last hop is then taken as the client's address.
       CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:-}
       CLOUDHAL_BEHIND_PROXY: ${CLOUDHAL_BEHIND_PROXY:-0}
       CLOUDHAL_SITE_NAME: ${CLOUDHAL_SITE_NAME:-My site}
