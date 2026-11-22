@@ -1,0 +1,172 @@
+# Cloudhal on Docker Swarm (RFC-0047 §10, deploy/swarm/README.md): several instances of the workerd
+# image as one installation, SeaweedFS as its S3 store, every secret a Docker secret.
+#
+#   docker run --rm ghcr.io/cloudhal-dev/cloudhal:latest secrets | deploy/swarm/create-secrets.sh
+#   docker node update --label-add cloudhal.store=true <the node that keeps the store>
+#   docker stack deploy -c deploy/swarm/stack.yml cloudhal
+#
+# Studio on port 8787 and the site on 8788 of every node (the routing mesh sends each request to a
+# running instance); put a TLS proxy or load balancer in front for public hosts and set
+# CLOUDHAL_BASE_URL and CLOUDHAL_BEHIND_PROXY=1 below.
+
+x-secret-files: &secret-files
+  CLOUDHAL_SITE_ID_FILE: /run/secrets/cloudhal_site_id
+  CLOUDHAL_CLUSTER_KEY_FILE: /run/secrets/cloudhal_cluster_key
+  BETTER_AUTH_SECRET_FILE: /run/secrets/cloudhal_better_auth_secret
+  MCP_STATE_KEY_FILE: /run/secrets/cloudhal_mcp_state_key
+  CLOUDHAL_PREVIEW_SECRET_FILE: /run/secrets/cloudhal_preview_secret
+  CLOUDHAL_PURGE_TOKEN_FILE: /run/secrets/cloudhal_purge_token
+  CLOUDHAL_DEPLOY_TOKEN_FILE: /run/secrets/cloudhal_deploy_token
+  CLOUDHAL_SETUP_TOKEN_FILE: /run/secrets/cloudhal_setup_token
+  CLOUDHAL_COMMENTS_KEY_FILE: /run/secrets/cloudhal_comments_key
+  AWS_ACCESS_KEY_ID_FILE: /run/secrets/cloudhal_aws_access_key_id
+  AWS_SECRET_ACCESS_KEY_FILE: /run/secrets/cloudhal_aws_secret_access_key
+
+services:
+  cloudhal:
+    image: ghcr.io/cloudhal-dev/cloudhal:${CLOUDHAL_TAG:-latest}
+    environment:
+      <<: *secret-files
+      CLOUDHAL_S3_ENDPOINT: ${CLOUDHAL_S3_ENDPOINT:-http://seaweedfs:8333}
+      CLOUDHAL_S3_BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
+      CLOUDHAL_S3_REGION: ${CLOUDHAL_S3_REGION:-us-east-1}
+      # Each instance announces its address on the stack's own overlay (below), not the ingress
+      # network's: peers reach it there on port 7000.
+      CLOUDHAL_CLUSTER_ADVERTISE: auto:10.231.0.0/24
+      CLOUDHAL_BASE_URL: ${CLOUDHAL_BASE_URL:-}
+      CLOUDHAL_BEHIND_PROXY: ${CLOUDHAL_BEHIND_PROXY:-0}
+      CLOUDHAL_SITE_NAME: ${CLOUDHAL_SITE_NAME:-My site}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    secrets: &cloudhal-secrets
+      - cloudhal_site_id
+      - cloudhal_cluster_key
+      - cloudhal_better_auth_secret
+      - cloudhal_mcp_state_key
+      - cloudhal_preview_secret
+      - cloudhal_purge_token
+      - cloudhal_deploy_token
+      - cloudhal_setup_token
+      - cloudhal_comments_key
+      - cloudhal_aws_access_key_id
+      - cloudhal_aws_secret_access_key
+    ports:
+      - target: 8787
+        published: ${CLOUDHAL_PORT:-8787}
+      - target: 8788
+        published: ${CLOUDHAL_SITE_PORT:-8788}
+    networks: [cloudhal]
+    read_only: true
+    cap_drop: [ALL]
+    volumes:
+      # Each task's working copy of the Durable Objects it runs (the store holds the real copy).
+      - type: volume
+        source: cloudhal-data
+        target: /data
+      - type: tmpfs
+        target: /tmp
+    # workerd hands its objects to its peers and exits within 8 s of SIGTERM.
+    stop_grace_period: 15s
+    deploy:
+      replicas: ${CLOUDHAL_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        order: start-first
+      restart_policy:
+        condition: any
+        delay: 5s
+      # No max_replicas_per_node: with start-first an update briefly runs one task more than
+      # `replicas`, which a per-node cap at `replicas` would block on a small swarm. Spread tasks
+      # with placement preferences (spread: node.labels.zone) if you need to.
+
+  # The S3 store, kept on the node labelled cloudhal.store=true (its volume lives there). Replace it
+  # with an external store by setting CLOUDHAL_S3_ENDPOINT and removing this service and store-init.
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077
+        printf '{"identities":[{"name":"cloudhal","credentials":[{"accessKey":"%s","secretKey":"%s"}],"actions":["Admin","Read","Write","List","Tagging"]}]}' \
+          "$$(cat /run/secrets/cloudhal_aws_access_key_id)" "$$(cat /run/secrets/cloudhal_aws_secret_access_key)" > /tmp/s3.json
+        exec weed server -dir=/data -ip.bind=0.0.0.0 -s3 -s3.config=/tmp/s3.json -master.volumeSizeLimitMB=1024
+    secrets:
+      - cloudhal_aws_access_key_id
+      - cloudhal_aws_secret_access_key
+    volumes:
+      - cloudhal-store:/data
+    networks: [cloudhal]
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.labels.cloudhal.store == true]
+      restart_policy:
+        condition: any
+
+  # Creates the bucket (a no-op once it exists); the Cloudhal tasks restart until it does.
+  store-init:
+    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 90); do
+          if echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 2>/dev/null | grep -q "^  $${BUCKET}"; then
+            echo "store-init: bucket $${BUCKET} exists"; exit 0
+          fi
+          if echo "s3.bucket.create -name $${BUCKET}" | weed shell -master=seaweedfs:9333 2>&1 | grep -q "created bucket"; then
+            echo "store-init: created bucket $${BUCKET}"; exit 0
+          fi
+          sleep 2
+        done
+        exit 1
+    environment:
+      BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
+    networks: [cloudhal]
+    deploy:
+      mode: replicated-job
+      restart_policy:
+        condition: on-failure
+
+networks:
+  # Peer traffic (port 7000) is authenticated but not encrypted by workerd: the overlay encrypts it.
+  cloudhal:
+    driver: overlay
+    driver_opts:
+      encrypted: "true"
+    ipam:
+      config:
+        - subnet: 10.231.0.0/24
+
+volumes:
+  # One per task slot, on the node the task runs on.
+  cloudhal-data:
+    name: "cloudhal-data-{{.Task.Slot}}"
+  cloudhal-store:
+
+secrets:
+  cloudhal_site_id:
+    external: true
+  cloudhal_cluster_key:
+    external: true
+  cloudhal_better_auth_secret:
+    external: true
+  cloudhal_mcp_state_key:
+    external: true
+  cloudhal_preview_secret:
+    external: true
+  cloudhal_purge_token:
+    external: true
+  cloudhal_deploy_token:
+    external: true
+  cloudhal_setup_token:
+    external: true
+  cloudhal_comments_key:
+    external: true
+  cloudhal_aws_access_key_id:
+    external: true
+  cloudhal_aws_secret_access_key:
+    external: true

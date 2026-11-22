@@ -6,13 +6,15 @@ name: Docker image
 # release's signed bundle, never from the tree, so it is exactly what was released.
 # Three jobs, so that no release tag moves before the gates pass (#166):
 # - `build` builds linux/amd64 + linux/arm64 with an SBOM and buildx provenance, pushes it under
-#   the candidate tag `sha-<short>` only, then runs scripts/docker-smoke.ts on the amd64 image
+#   the candidate tag `sha-<short>` only, then runs scripts/docker-smoke.ts, scripts/swarm-smoke.sh
+#   and scripts/helm-smoke.sh (kind) on the amd64 image
 #   (compose.yml's SeaweedFS, the image's own `secrets`, the first site and owner, a publish live
 #   on the next request, a restart, the Node-volume guard, a second instance taking over while the
 #   first stops) and Trivy, which fails the job on a CRITICAL vulnerability with a fix;
 # - `smoke-arm64` runs the same smoke test on the arm64 image, on GitHub's native arm64 runner;
-# - `tag` adds the release tags to the very digest that passed, with `imagetools create`, and then
-#   writes the GitHub build attestation for it.
+# - `tag` adds the release tags to the very digest that passed, with `imagetools create`, writes
+#   the GitHub build attestation for it, and for a release pushes the Helm chart of that version to
+#   oci://ghcr.io/<owner>/charts/cloudhal.
 # Which tags `tag` adds:
 # - release.yml calls this after a successful npm publish (`workflow_call` with the version), and
 #   Actions › Docker image › Run workflow with a version re-publishes or backfills one. X.Y.Z
@@ -50,6 +52,10 @@ on:
       - "scripts/pack-packages.ts"
       - "scripts/selfhost-edge-bundle.ts"
       - "packages/cli/src/selfhost/**"
+      - "deploy/swarm/**"
+      - "deploy/helm/**"
+      - "scripts/helm-smoke.sh"
+      - "scripts/swarm-smoke.sh"
 
 permissions: {}
 
@@ -99,6 +105,11 @@ jobs:
           } > "$RUNNER_TEMP/compose.env"
           docker compose -f deploy/docker/compose.yml --env-file "$RUNNER_TEMP/compose.env" config --quiet
           docker compose -f deploy/docker/compose.yml --env-file "$RUNNER_TEMP/compose.env" --profile caddy config --quiet
+      - name: Lint the Helm chart
+        run: |
+          helm lint deploy/helm/cloudhal
+          helm lint deploy/helm/cloudhal --set replicaCount=3 --set baseUrl=https://studio.example.com --set ingress.enabled=true
+          helm template t deploy/helm/cloudhal --set httpRoute.enabled=true --set baseUrl=https://studio.example.com --set 'httpRoute.parentRefs[0].name=gw' > /dev/null
       - name: Check the version
         if: env.VERSION != ''
         run: |
@@ -190,6 +201,21 @@ jobs:
         run: node scripts/docker-smoke.ts --image "$SMOKE_IMAGE"
         env:
           SMOKE_IMAGE: ${{ steps.ref.outputs.image }}
+      # The recipes (RFC-0047 §10) on the same image: deploy/swarm/stack.yml on this runner's engine
+      # in swarm mode, and deploy/helm/cloudhal on a kind cluster (kind, helm and kubectl come with
+      # the runner image).
+      - name: Local copy of the image for the recipes
+        run: |
+          if [ "$PUSH" = "true" ]; then docker pull "$SMOKE_IMAGE"; fi
+          docker tag "$SMOKE_IMAGE" cloudhal:ci
+        env:
+          SMOKE_IMAGE: ${{ steps.ref.outputs.image }}
+      - name: Swarm smoke test
+        run: scripts/swarm-smoke.sh cloudhal:ci
+      - name: Helm smoke test (kind)
+        run: |
+          kind version && helm version --short
+          scripts/helm-smoke.sh cloudhal:ci
       - name: Trivy scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -290,3 +316,18 @@ jobs:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
+      # The chart, versioned with the release (one version everywhere): oci://ghcr.io/<owner>/charts.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.VERSION != ''
+        with:
+          persist-credentials: false
+      - name: Publish the Helm chart
+        if: env.VERSION != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          echo "$GH_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm package deploy/helm/cloudhal --version "$VERSION" --app-version "$VERSION" --destination "$RUNNER_TEMP"
+          helm push "$RUNNER_TEMP/cloudhal-$VERSION.tgz" "oci://ghcr.io/$OWNER/charts"

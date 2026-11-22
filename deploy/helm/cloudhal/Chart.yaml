@@ -1,0 +1,15 @@
+apiVersion: v2
+name: cloudhal
+description: Cloudhal self-hosted on Kubernetes — the release's site and admin Workers on workerd, as one cluster on an S3 store (RFC-0047)
+type: application
+# One version everywhere (ADR-0013): the chart, the image and the npm packages move together.
+version: 0.10.1
+appVersion: "0.10.1"
+home: https://cloudhal.dev
+sources:
+  - https://github.com/cloudhal-dev/cloudhal
+icon: https://cloudhal.dev/favicon.svg
+keywords: [cms, workers, workerd, agents, mcp]
+maintainers:
+  - name: Cloudhal
+    url: https://github.com/cloudhal-dev

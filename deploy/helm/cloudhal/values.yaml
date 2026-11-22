@@ -1,0 +1,107 @@
+# Cloudhal on Kubernetes (RFC-0047). Every instance runs the same config; any instance serves both
+# hosts. docs/guides/self-host.md explains the image, the store and the cluster.
+
+image:
+  repository: ghcr.io/cloudhal-dev/cloudhal
+  # Default: the chart's appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Instances of the one installation. 1 is a cluster of one; 3 survives a node going away.
+replicaCount: 1
+
+site:
+  # The name of the site the first start creates.
+  name: My site
+
+# Where browsers open Studio (https://studio.example.com). Required with an ingress or route below
+# (the chart then sets CLOUDHAL_BEHIND_PROXY=1): the client's address is then the last
+# X-Forwarded-For hop, which ingress-nginx, Traefik and Envoy-based gateways append.
+baseUrl: ""
+behindProxy: false
+
+# Secrets: generated once on install and kept on upgrade (a Secret named <release>-cloudhal), or
+# an existing Secret with these keys: CLOUDHAL_SITE_ID, CLOUDHAL_CLUSTER_KEY, BETTER_AUTH_SECRET,
+# MCP_STATE_KEY, CLOUDHAL_PREVIEW_SECRET, CLOUDHAL_PURGE_TOKEN, CLOUDHAL_DEPLOY_TOKEN,
+# CLOUDHAL_SETUP_TOKEN, CLOUDHAL_COMMENTS_KEY, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+# (`cloudhal selfhost secrets` prints them). Never change CLOUDHAL_SITE_ID or CLOUDHAL_CLUSTER_KEY.
+secrets:
+  existingSecret: ""
+
+# The S3 store. `store.enabled` runs SeaweedFS in this release; otherwise name an external store
+# that enforces conditional writes (AWS S3, GCS's XML API, R2, RustFS; not MinIO's community
+# edition, not Garage) with its keys in the Secret above.
+store:
+  enabled: true
+  image:
+    repository: chrislusf/seaweedfs
+    tag: "4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15"
+  persistence:
+    size: 10Gi
+    storageClass: ""
+  resources: {}
+external:
+  endpoint: ""
+  region: us-east-1
+bucket: cloudhal
+prefix: ""
+
+# Each instance's working copy of the Durable Objects it runs (the store holds the real copy).
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+
+# Studio, the API and /mcp on 8787; the site on 8788.
+service:
+  type: ClusterIP
+  studioPort: 8787
+  sitePort: 8788
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  #   cert-manager.io/cluster-issuer: letsencrypt
+  studioHost: studio.example.com
+  siteHost: www.example.com
+  tls: []
+
+# Gateway API instead of an Ingress.
+httpRoute:
+  enabled: false
+  parentRefs: []
+  studioHost: studio.example.com
+  siteHost: www.example.com
+
+# Limits who reaches the cluster port (7000) to this release's own pods.
+networkPolicy:
+  enabled: true
+
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1
+
+otel:
+  # http://otel-collector.observability:4318
+  endpoint: ""
+
+# Extra environment for the Cloudhal container (CLOUDHAL_AUTOMATIONS, …).
+extraEnv: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi
+
+# workerd hands its objects to its peers and exits within 8 s of SIGTERM.
+terminationGracePeriodSeconds: 30
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []

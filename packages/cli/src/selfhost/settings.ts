@@ -6,7 +6,7 @@
  * reads only from there.
  */
 import { readFileSync } from "node:fs";
-import os from "node:os";
+import { resolveAdvertise } from "./advertise.ts";
 
 /** The manifest's secrets (RFC-0046 `bindingTemplates.*.secrets`) the image requires. */
 export const REQUIRED_SECRETS = [
@@ -65,7 +65,12 @@ export function resolveSecretFiles(
   read: (file: string) => string = (f) => readFileSync(f, "utf8"),
 ): Record<string, string | undefined> {
   const out: Record<string, string | undefined> = { ...env };
-  for (const name of [...REQUIRED_SECRETS, ...STORE_SECRETS, "CLOUDHAL_CLUSTER_KEY"]) {
+  for (const name of [
+    ...REQUIRED_SECRETS,
+    ...STORE_SECRETS,
+    "CLOUDHAL_CLUSTER_KEY",
+    "CLOUDHAL_SITE_ID",
+  ]) {
     const file = env[`${name}_FILE`];
     if (file === undefined || file === "") continue;
     if (env[name] !== undefined && env[name] !== "")
@@ -137,7 +142,7 @@ export function readSettings(env: Env): SelfhostSettings {
     cluster: {
       key: env.CLOUDHAL_CLUSTER_KEY as string,
       address: `0.0.0.0:${clusterPort}`,
-      advertise: env.CLOUDHAL_CLUSTER_ADVERTISE || `${os.hostname()}:${clusterPort}`,
+      advertise: resolveAdvertise(env.CLOUDHAL_CLUSTER_ADVERTISE, clusterPort),
     },
     siteId: env.CLOUDHAL_SITE_ID as string,
     siteName: env.CLOUDHAL_SITE_NAME || "My site",

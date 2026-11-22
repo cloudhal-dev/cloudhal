@@ -9,6 +9,7 @@
  */
 import path from "node:path";
 import type { ReleaseManifest } from "@cloudhal/release-verify";
+import { FRONT_WORKER_SOURCE } from "./front-worker.ts";
 import type { SelfhostSettings } from "./settings.ts";
 
 /** The compatibility date of workerd's own bundled Workers (D1, R2, cron). */
@@ -108,14 +109,16 @@ function assets(input: ConfigInput, role: "site" | "admin"): string {
 }
 
 /**
- * The sockets' HTTP options (RFC-0047 §8). workerd cannot pass the peer's address on, and the
- * Workers count rate limits by `CF-Connecting-IP`: behind a proxy that overwrites it, it is kept;
- * otherwise any incoming one is removed, so no client chooses its own address.
+ * The sockets' HTTP options: behind a proxy, the scheme comes from its `X-Forwarded-Proto`. The
+ * client's address is the front Worker's job (front-worker.ts, RFC-0047 §8).
  */
 function http(s: SelfhostSettings): string {
-  return s.behindProxy
-    ? `(forwardedProtoHeader = "X-Forwarded-Proto")`
-    : `(injectRequestHeaders = [(name = "CF-Connecting-IP")])`;
+  return s.behindProxy ? `(forwardedProtoHeader = "X-Forwarded-Proto")` : "()";
+}
+
+/** The Worker in front of `next`, which sets or removes `CF-Connecting-IP`. */
+function front(role: "site" | "admin", s: SelfhostSettings): string {
+  return `(name = ${q(`${role}-front`)}, worker = (compatibilityDate = ${q(BUILTIN_DATE)}, modules = [(name = "front.js", esModule = ${q(FRONT_WORKER_SOURCE)})], bindings = [(name = "NEXT", service = ${q(`${role}-assets`)})${s.behindProxy ? `, (name = "TRUST_PROXY", json = "true")` : ""}]))`;
 }
 
 /** The config's text. `{DATA}` in disk paths stands for `settings.dataDir`. */
@@ -156,6 +159,8 @@ export function workerdConfig(input: ConfigInput): string {
     assets(input, "site"),
     admin,
     assets(input, "admin"),
+    front("site", s),
+    front("admin", s),
     ...(s.otlp ? [`(name = "otlp", external = (address = ${q(s.otlp)}, http = ()))`] : []),
   ].map((x) => x.replaceAll("{DATA}", s.dataDir));
   const bucket = `s3://${s.s3.bucket}/${s.s3.prefix}cluster`;
@@ -174,8 +179,8 @@ const config :Workerd.Config = (
     ${services.join(",\n    ")},
   ],
   sockets = [
-    (name = "studio", address = ${q(`*:${s.ports.studio}`)}, http = ${http(s)}, service = "admin-assets"),
-    (name = "site", address = ${q(`*:${s.ports.site}`)}, http = ${http(s)}, service = "site-assets"),
+    (name = "studio", address = ${q(`*:${s.ports.studio}`)}, http = ${http(s)}, service = "admin-front"),
+    (name = "site", address = ${q(`*:${s.ports.site}`)}, http = ${http(s)}, service = "site-front"),
   ],
 );
 `;

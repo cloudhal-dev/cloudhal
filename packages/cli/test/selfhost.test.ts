@@ -6,7 +6,9 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { inCidr, resolveAdvertise } from "../src/selfhost/advertise.ts";
 import { checkBundle, fetchBundle, readBundleManifest } from "../src/selfhost/bundle.ts";
+import { FRONT_WORKER_SOURCE } from "../src/selfhost/front-worker.ts";
 import { secretsEnv } from "../src/selfhost/secrets.ts";
 import { readSettings, resolveSecretFiles } from "../src/selfhost/settings.ts";
 import { claimDataDir, ensureFirstSite, NODE_VOLUME } from "../src/selfhost/start.ts";
@@ -116,6 +118,67 @@ async function extracted() {
   return { out, manifest, lines };
 }
 
+describe("selfhost cluster address", () => {
+  const interfaces = {
+    lo: [{ address: "127.0.0.1", family: "IPv4", internal: true }],
+    eth0: [{ address: "10.0.0.7", family: "IPv4", internal: false }],
+    eth1: [
+      { address: "fe80::1", family: "IPv6", internal: false },
+      { address: "10.231.0.12", family: "IPv4", internal: false },
+    ],
+  } as unknown as ReturnType<typeof import("node:os").networkInterfaces>;
+  it("takes a name, the hostname, the first address or the first one in a network", () => {
+    expect(resolveAdvertise(undefined, 7000, { hostname: "abc123" })).toBe("abc123:7000");
+    expect(resolveAdvertise("cloudhal-0.peers", 7000)).toBe("cloudhal-0.peers:7000");
+    expect(resolveAdvertise("cloudhal:7100", 7000)).toBe("cloudhal:7100");
+    expect(resolveAdvertise("auto", 7000, { interfaces })).toBe("10.0.0.7:7000");
+    expect(resolveAdvertise("auto:10.231.0.0/24", 7000, { interfaces })).toBe("10.231.0.12:7000");
+    expect(() => resolveAdvertise("auto:192.168.0.0/16", 7000, { interfaces })).toThrow(/no such/);
+    expect(() => resolveAdvertise("auto:10.0.0.0/33", 7000, { interfaces })).toThrow(/not an IPv4/);
+    expect(inCidr("10.0.0.0/8")("10.255.1.2")).toBe(true);
+    expect(inCidr("10.0.0.0/8")("11.0.0.1")).toBe(false);
+    expect(inCidr("10.1.2.3")("10.1.2.3")).toBe(true);
+  });
+});
+
+describe("selfhost front Worker (RFC-0047 §8)", () => {
+  async function through(headers: Record<string, string>, trust: boolean) {
+    const mod = (await import(
+      `data:text/javascript,${encodeURIComponent(FRONT_WORKER_SOURCE)}`
+    )) as {
+      default: { fetch(r: Request, env: unknown): Promise<Response> | Response };
+    };
+    let seen: Request | undefined;
+    const env = {
+      ...(trust ? { TRUST_PROXY: true } : {}),
+      NEXT: {
+        fetch: (r: Request) => {
+          seen = r;
+          return new Response("ok");
+        },
+      },
+    };
+    await mod.default.fetch(new Request("http://studio/api/x", { headers }), env);
+    return seen?.headers.get("cf-connecting-ip") ?? null;
+  }
+  it("removes a client's CF-Connecting-IP, and behind a proxy takes the last X-Forwarded-For hop", async () => {
+    expect(await through({ "cf-connecting-ip": "1.2.3.4" }, false)).toBeNull();
+    expect(await through({ "x-forwarded-for": "9.9.9.9" }, false)).toBeNull();
+    expect(
+      await through(
+        { "cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "6.6.6.6, 203.0.113.7" },
+        true,
+      ),
+    ).toBe("203.0.113.7");
+    expect(await through({ "x-forwarded-for": "2001:db8::1" }, true)).toBe("2001:db8::1");
+    expect(await through({ "x-forwarded-for": "1.1.1.1, not-an-ip" }, true)).toBeNull();
+    expect(await through({ "x-forwarded-for": "" }, true)).toBeNull();
+    const started = performance.now();
+    expect(await through({ "x-forwarded-for": `${"1,".repeat(100_000)}5.5.5.5` }, true)).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
 describe("selfhost bundle", () => {
   it("fetches, verifies and extracts a release, and checks its files at start", async () => {
     const { out, manifest, lines } = await extracted();
@@ -158,8 +221,11 @@ describe("selfhost workerd config", () => {
     // embed paths are relative to the config; the main module comes first
     const rel = path.relative(configDir, path.join(out, "site/modules/entry.mjs"));
     expect(c).toContain(`(name = "entry.mjs", esModule = embed ${JSON.stringify(rel)})`);
-    // no proxy: an incoming CF-Connecting-IP is removed
-    expect(c).toContain('injectRequestHeaders = [(name = "CF-Connecting-IP")]');
+    // each socket serves a front Worker first; without a proxy it trusts no forwarded address
+    expect(c).toContain('service = "admin-front")');
+    expect(c).toContain('service = "site-front")');
+    expect(c).toContain('(name = "NEXT", service = "admin-assets")');
+    expect(c).not.toContain('(name = "TRUST_PROXY"');
     expect(c).not.toContain("tracing");
 
     const proxied = workerdConfig({
@@ -175,7 +241,7 @@ describe("selfhost workerd config", () => {
       }),
     });
     expect(proxied).toContain('forwardedProtoHeader = "X-Forwarded-Proto"');
-    expect(proxied).not.toContain("injectRequestHeaders");
+    expect(proxied).toContain('(name = "TRUST_PROXY", json = "true")');
     expect(proxied).toContain('tracing = (otlp = "otlp")');
     expect(proxied).toContain('external = (address = "otel:4318"');
     expect(proxied).toContain('(name = "CLOUDHAL_AUTOMATIONS", text = "off")');
