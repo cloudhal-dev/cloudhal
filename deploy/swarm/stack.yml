@@ -30,6 +30,7 @@ services:
       CLOUDHAL_S3_ENDPOINT: ${CLOUDHAL_S3_ENDPOINT:-http://seaweedfs:8333}
       CLOUDHAL_S3_BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
       CLOUDHAL_S3_REGION: ${CLOUDHAL_S3_REGION:-us-east-1}
+      CLOUDHAL_S3_LIFECYCLE: ${CLOUDHAL_S3_LIFECYCLE:-on}
       # Each instance announces its address on the stack's own overlay (below), not the ingress
       # network's: peers reach it there on port 7000.
       CLOUDHAL_CLUSTER_ADVERTISE: auto:10.231.0.0/24
@@ -84,7 +85,8 @@ services:
       # with placement preferences (spread: node.labels.zone) if you need to.
 
   # The S3 store, kept on the node labelled cloudhal.store=true (its volume lives there). Replace it
-  # with an external store by setting CLOUDHAL_S3_ENDPOINT and removing this service and store-init.
+  # with an external store by setting CLOUDHAL_S3_ENDPOINT and removing this service. Cloudhal
+  # creates the bucket and its lifecycle rule itself.
   seaweedfs:
     image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
     entrypoint: ["/bin/sh", "-c"]
@@ -106,30 +108,6 @@ services:
         constraints: [node.labels.cloudhal.store == true]
       restart_policy:
         condition: any
-
-  # Creates the bucket (a no-op once it exists); the Cloudhal tasks restart until it does.
-  store-init:
-    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        for i in $$(seq 1 90); do
-          if echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 2>/dev/null | grep -q "^  $${BUCKET}"; then
-            echo "store-init: bucket $${BUCKET} exists"; exit 0
-          fi
-          if echo "s3.bucket.create -name $${BUCKET}" | weed shell -master=seaweedfs:9333 2>&1 | grep -q "created bucket"; then
-            echo "store-init: created bucket $${BUCKET}"; exit 0
-          fi
-          sleep 2
-        done
-        exit 1
-    environment:
-      BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
-    networks: [cloudhal]
-    deploy:
-      mode: replicated-job
-      restart_policy:
-        condition: on-failure
 
 networks:
   # Peer traffic (port 7000) is authenticated but not encrypted by workerd: the overlay encrypts it.

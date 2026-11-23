@@ -9,9 +9,12 @@ import { afterAll, describe, expect, it } from "vitest";
 import { inCidr, resolveAdvertise } from "../src/selfhost/advertise.ts";
 import { checkBundle, fetchBundle, readBundleManifest } from "../src/selfhost/bundle.ts";
 import { FRONT_WORKER_SOURCE } from "../src/selfhost/front-worker.ts";
+import { ensureBucket, ensureLifecycle } from "../src/selfhost/s3.ts";
 import { secretsEnv } from "../src/selfhost/secrets.ts";
 import { readSettings, resolveSecretFiles } from "../src/selfhost/settings.ts";
 import { claimDataDir, ensureFirstSite, NODE_VOLUME } from "../src/selfhost/start.ts";
+import { prepareStore } from "../src/selfhost/store-prep.ts";
+import { chooseWorkerd, OLD_CPU_MESSAGE, VA39_MESSAGE } from "../src/selfhost/workerd-binary.ts";
 import { durableObjectKey, workerdConfig } from "../src/selfhost/workerd-config.ts";
 import {
   bundle,
@@ -176,6 +179,141 @@ describe("selfhost front Worker (RFC-0047 §8)", () => {
     const started = performance.now();
     expect(await through({ "x-forwarded-for": `${"1,".repeat(100_000)}5.5.5.5` }, true)).toBeNull();
     expect(performance.now() - started).toBeLessThan(500);
+  });
+});
+
+describe("selfhost workerd choice", () => {
+  const va39 = { status: 134, output: "MmapAligned() failed - unable to allocate with tag" };
+  const ok = { status: 0, output: "workerd 2026-11-22" };
+  it("takes the official build, falls back on a 39-bit kernel, and says why when it cannot", () => {
+    expect(chooseWorkerd({ official: "w" }, () => ok).binary).toBe("w");
+    const probe = (b: string) => (b === "w" ? va39 : ok);
+    expect(chooseWorkerd({ official: "w", fallback: "/fb" }, probe, () => true)).toEqual({
+      binary: "/fb",
+      note: "39-bit kernel: using the tcmalloc-free community build of workerd",
+    });
+    expect(() => chooseWorkerd({ official: "w", fallback: "/fb" }, probe, () => false)).toThrow(
+      VA39_MESSAGE,
+    );
+    expect(() =>
+      chooseWorkerd({ official: "w" }, () => ({ status: null, signal: "SIGILL", output: "" })),
+    ).toThrow(OLD_CPU_MESSAGE);
+    expect(() => chooseWorkerd({ official: "w" }, () => ({ status: 1, output: "boom" }))).toThrow(
+      /exit 1\): boom/,
+    );
+  });
+
+  it("keeps the image's runtime entry free of the CLI's dependencies", () => {
+    const dir = path.resolve(import.meta.dirname, "../src/selfhost");
+    const seen = new Set<string>();
+    const visit = (file: string) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const source = readFileSync(path.join(dir, file), "utf8");
+      for (const m of source.matchAll(/^import (type )?[^;]*? from "([^"]+)";/gms)) {
+        const [, typeOnly, spec] = m as unknown as [string, string | undefined, string];
+        if (typeOnly) continue;
+        if (spec.startsWith("./")) visit(spec.slice(2));
+        else expect(spec, `${file} imports ${spec}`).toMatch(/^node:/);
+      }
+    };
+    visit("main.ts");
+    expect([...seen].sort()).toContain("workerd-binary.ts");
+  });
+});
+
+describe("selfhost store lifecycle rule", () => {
+  it("sets the abort rule only on a bucket without a lifecycle configuration", async () => {
+    const target = {
+      endpoint: "http://store:8333",
+      bucket: "b",
+      key: "k",
+      secret: "s",
+      region: "us-east-1",
+    };
+    const real = globalThis.fetch;
+    const calls: { method: string; url: string; auth: string }[] = [];
+    const fake = (getStatus: number) =>
+      (async (url: string | URL, init?: RequestInit) => {
+        const method = init?.method ?? "GET";
+        calls.push({
+          method,
+          url: String(url),
+          auth: new Headers(init?.headers).get("authorization") ?? "",
+        });
+        return new Response("", { status: method === "GET" ? getStatus : 200 });
+      }) as typeof fetch;
+    try {
+      globalThis.fetch = fake(404);
+      expect(await ensureLifecycle(target)).toBe("set");
+      expect(calls.map((c) => c.method)).toEqual(["GET", "PUT"]);
+      expect(calls[1]?.url).toBe("http://store:8333/b?lifecycle=");
+      expect(calls[1]?.auth).toMatch(
+        /^AWS4-HMAC-SHA256 Credential=k\/\d{8}\/us-east-1\/s3\/aws4_request, SignedHeaders=content-md5;content-type;host;x-amz-content-sha256;x-amz-date, Signature=[0-9a-f]{64}$/,
+      );
+      calls.length = 0;
+      globalThis.fetch = fake(200);
+      expect(await ensureLifecycle(target)).toBe("kept");
+      expect(calls.map((c) => c.method)).toEqual(["GET"]);
+      globalThis.fetch = fake(501);
+      expect(await ensureLifecycle(target)).toBe("unsupported");
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
+});
+
+describe("selfhost bucket at start", () => {
+  const target = {
+    endpoint: "http://store:8333",
+    bucket: "b",
+    key: "k",
+    secret: "s",
+    region: "us-east-1",
+  };
+  it("creates a missing bucket, leaves an existing one, and waits for the store", async () => {
+    const real = globalThis.fetch;
+    const methods: string[] = [];
+    const answer = (byMethod: Record<string, number>) =>
+      (async (_url: string | URL, init?: RequestInit) => {
+        const m = init?.method ?? "GET";
+        methods.push(m);
+        return new Response("", { status: byMethod[m] ?? 404 });
+      }) as typeof fetch;
+    try {
+      globalThis.fetch = answer({ HEAD: 404, PUT: 200 });
+      expect(await ensureBucket(target)).toBe("created");
+      globalThis.fetch = answer({ HEAD: 200 });
+      expect(await ensureBucket(target)).toBe("exists");
+      globalThis.fetch = answer({ HEAD: 403 });
+      await expect(ensureBucket(target)).rejects.toThrow(/answered 403/);
+
+      let calls = 0;
+      globalThis.fetch = (async (_u: string | URL, init?: RequestInit) => {
+        calls++;
+        if (calls < 3) throw new Error("connect ECONNREFUSED");
+        return new Response("", { status: (init?.method ?? "GET") === "GET" ? 200 : 200 });
+      }) as typeof fetch;
+      const log: string[] = [];
+      const settings = readSettings({ ...ENV });
+      await prepareStore(settings, ENV, (l) => log.push(l), { sleep: async () => {} });
+      expect(calls).toBeGreaterThanOrEqual(4);
+      await expect(
+        prepareStore(settings, ENV, () => {}, {
+          attempts: 2,
+          sleep: async () => {},
+        }).then(() => {
+          globalThis.fetch = (async () => {
+            throw new Error("down");
+          }) as typeof fetch;
+          return prepareStore(settings, ENV, () => {}, { attempts: 2, sleep: async () => {} });
+        }),
+      ).rejects.toThrow(/not ready \(down\)/);
+      await prepareStore(settings, { ...ENV, AWS_ACCESS_KEY_ID: "" }, () => {});
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(methods.length).toBeGreaterThan(0);
   });
 });
 

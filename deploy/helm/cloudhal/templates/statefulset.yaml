@@ -40,29 +40,6 @@ spec:
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
-      {{- if .Values.store.enabled }}
-      initContainers:
-        # The bucket, once (a no-op afterwards); Cloudhal cannot start without it.
-        - name: bucket
-          image: "{{ .Values.store.image.repository }}:{{ .Values.store.image.tag }}"
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              for i in $(seq 1 90); do
-                if echo "s3.bucket.list" | weed shell -master={{ $fullname }}-store:9333 2>/dev/null | grep -q "^  {{ .Values.bucket }}"; then
-                  echo "bucket {{ .Values.bucket }} exists"; exit 0
-                fi
-                if echo "s3.bucket.create -name {{ .Values.bucket }}" | weed shell -master={{ $fullname }}-store:9333 2>&1 | grep -q "created bucket"; then
-                  echo "created bucket {{ .Values.bucket }}"; exit 0
-                fi
-                sleep 2
-              done
-              exit 1
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: [ALL]
-      {{- end }}
       containers:
         - name: cloudhal
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
@@ -76,7 +53,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: CLOUDHAL_CLUSTER_ADVERTISE
-              value: "$(POD_NAME).{{ $fullname }}-peers.{{ .Release.Namespace }}.svc.cluster.local:7000"
+              value: "$(POD_NAME).{{ $fullname }}-peers:7000"
             - name: CLOUDHAL_S3_ENDPOINT
               value: {{ include "cloudhal.storeEndpoint" . | quote }}
             - name: CLOUDHAL_S3_BUCKET

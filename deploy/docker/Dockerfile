@@ -13,11 +13,11 @@
 FROM node:24-bookworm-slim AS build
 ARG CLOUDHAL_VERSION=""
 COPY . /ctx
-RUN node /ctx/install.mjs /ctx /opt/cloudhal \
-  && npm cache clean --force \
-  && rm -rf /root/.npm /tmp/*
+RUN node /ctx/install.mjs /ctx /opt/cloudhal
 
-FROM node:24-bookworm-slim
+# The last stage is Debian with the node binary alone (no npm, corepack or headers): Node runs only
+# the small entrypoint; workerd serves.
+FROM debian:bookworm-slim
 ARG CLOUDHAL_VERSION=""
 LABEL org.opencontainers.image.title="Cloudhal" \
   org.opencontainers.image.description="Agent-native site platform: Studio, API, MCP server and the site, on workerd, self-hosted" \
@@ -27,18 +27,22 @@ LABEL org.opencontainers.image.title="Cloudhal" \
   org.opencontainers.image.vendor="Cloudhal" \
   org.opencontainers.image.licenses="Apache-2.0" \
   org.opencontainers.image.version="${CLOUDHAL_VERSION}"
-# tini reaps and forwards signals as PID 1 (to `cloudhal selfhost start`, which passes one SIGTERM
+# tini reaps and forwards signals as PID 1 (to `cloudhal-selfhost start`, which passes one SIGTERM
 # on to workerd so its cluster handoff runs); certificates for an https store and Workers AI.
 RUN apt-get update \
   && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends tini ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
+  && groupadd --gid 1000 node && useradd --uid 1000 --gid node --no-create-home --shell /usr/sbin/nologin node \
   && mkdir -p /data && chown node:node /data
-COPY --from=build /opt/cloudhal /opt/cloudhal
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
+# Only the runtime: the compiled selfhost entry, workerd and the release bundle (install.mjs).
+COPY --from=build /opt/cloudhal/runtime /opt/cloudhal
 COPY bin/ /opt/cloudhal/bin/
 ENV NODE_ENV=production \
-  PATH="/opt/cloudhal/bin:/opt/cloudhal/node_modules/.bin:${PATH}" \
+  PATH="/opt/cloudhal/bin:${PATH}" \
   CLOUDHAL_BUNDLE=/opt/cloudhal/bundle \
+  CLOUDHAL_WORKERD=/opt/cloudhal/bin/workerd \
   CLOUDHAL_DATA_DIR=/data \
   CLOUDHAL_RUN_DIR=/tmp/cloudhal
 # The image is read-only but for /data (Durable Object files) and /tmp (the generated config).

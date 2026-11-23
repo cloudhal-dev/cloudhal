@@ -26,7 +26,7 @@ From a checkout, use the chart's folder instead: `helm install cloudhal deploy/h
   - To bring your own, set `secrets.existingSecret`. The keys are those of `cloudhal selfhost secrets`.
 - **A NetworkPolicy** that admits port 7000 from the release's own pods only. That port grants full control and its traffic is not encrypted.
 - **A PodDisruptionBudget** (`maxUnavailable: 1`) when there is more than one instance.
-- **SeaweedFS** (`store.enabled`): one pod with a 10 Gi volume. An init container in each Cloudhal pod creates the bucket.
+- **SeaweedFS** (`store.enabled`): one pod with a 10 Gi volume. Each Cloudhal pod creates the bucket at start if it is missing.
 
 ## The first Owner
 

@@ -11,6 +11,21 @@ Cloudflare is still the deployment Cloudhal is built for ([quickstart](../start/
 - A server with Docker Engine 24 or later and the compose plugin (`docker compose`), 2 GB of memory and a few GB of disk.
 - For Studio and the site beyond `localhost`: DNS names pointing at the server, and either the compose file's Caddy (ports 80 and 443 open; it fetches TLS certificates itself) or a reverse proxy of your own.
 
+## Platforms
+
+The image is built for `linux/amd64` and `linux/arm64`; Docker pulls the right one. It runs wherever a Linux container engine runs it: Docker Engine, Docker Desktop on macOS and Windows (whose Linux VM runs the container), Podman, containerd, k3s and other Kubernetes distributions. Each version is about 135 MB to download and 410 MB on disk. A cluster of one with its SeaweedFS uses about 300–400 MB of memory.
+
+| Machine | Status |
+| --- | --- |
+| x86-64 servers, PCs, NAS boxes and VMs | Supported on any CPU with x86-64-v2 (SSE4.2, POPCNT), which covers Intel and AMD since about 2009 and Atom/Celeron since Silvermont (2013). AVX is not needed. A VM's CPU model must expose v2: in Proxmox or QEMU use `host` or `x86-64-v2-AES`, not the old `kvm64`, which starts workerd with an "illegal instruction" (the image says so). |
+| arm64 servers (AWS Graviton, Ampere, Hetzner CAX), Apple Silicon Macs via Docker Desktop | Supported. |
+| Raspberry Pi 5 with a 64-bit OS | Expected to work on its default 16 KiB kernel (`kernel_2712.img`; leave out any `kernel=kernel8.img` line in `config.txt`). Its 47-bit address space works with workerd under emulation, and workerd's arm64 binary is aligned for 16 KiB pages. It has not been tested on Pi 5 hardware yet: please report how it goes. |
+| Raspberry Pi 4, 3, Zero 2 W with Ubuntu Server (64-bit) | Expected to work: Ubuntu's arm64 kernels have a 48-bit address space. Not yet tested on hardware. |
+| Raspberry Pi OS (64-bit) on its 4 KiB kernel (Pi 3/4/Zero 2 W default, `kernel8.img` on a Pi 5) | Not yet. Those kernels have a 39-bit address space, and the official workerd's allocator needs 48 bits ([cloudflare/workerd#5020](https://github.com/cloudflare/workerd/issues/5020)). The image recognises this at start and says so. A community build of workerd without that allocator exists; the image takes it automatically on such kernels once a build of the pinned workerd version is published there and pinned in `deploy/docker/workerd-no-tcmalloc`. |
+| 32-bit ARM (Raspberry Pi OS 32-bit, Pi Zero/1/2), RISC-V, ppc64le, s390x, Windows containers | Not supported: workerd has no build for them. Docker answers "no matching manifest". |
+
+`zcat /proc/config.gz | grep ARM64_VA_BITS` on an arm64 host shows its address space (`ARM64_VA_BITS_39=y` is the unsupported case).
+
 ## Quick start
 
 ```bash
@@ -29,7 +44,7 @@ docker compose up -d
 
 Run it once per installation and keep the file. Every instance needs the same values, and `CLOUDHAL_SITE_ID` and `CLOUDHAL_CLUSTER_KEY` must never change once the installation exists. Treat `.env` as private: never commit it.
 
-`docker compose up -d` starts SeaweedFS, creates its bucket, then starts Cloudhal:
+`docker compose up -d` starts SeaweedFS, then Cloudhal, which creates the bucket:
 
 - Studio answers at http://localhost:8787 and the site at http://localhost:8788.
 - The first start runs the database migrations and creates the installation's site, named after `CLOUDHAL_SITE_NAME`, from the blog starter. Nothing is published yet, so the site answers the "coming soon" page with 503 until the first publish.
@@ -96,17 +111,27 @@ location / {
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Traces of every Worker invocation to an OTLP/HTTP collector. |
 | `CLOUDHAL_BIND`, `CLOUDHAL_PORT`, `CLOUDHAL_SITE_PORT` | Compose only: the host address and ports for Studio (8787) and the site (8788). |
 
-`docker compose exec cloudhal cloudhal selfhost config` prints the workerd config the instance runs. Its output contains the cluster key, so do not share it.
+`docker compose exec cloudhal cloudhal-selfhost config` prints the workerd config the instance runs. Its output contains the cluster key, so do not share it.
 
 ## The store
 
 The R2 binding and the cluster's bucket always go to an S3-compatible store. workerd's local test store is never used. The store must enforce conditional writes (`If-None-Match: *` and `If-Match` on PUT), because instances claim objects with them. workerd refuses a store that ignores them when an instance joins.
 
 - **SeaweedFS** (Apache-2.0), in the compose file, is the default.
-- **Supported external stores:** AWS S3, Google Cloud Storage (its XML API) and Cloudflare R2. Set `CLOUDHAL_S3_ENDPOINT`, the bucket and the credentials, and stop the compose file's `seaweedfs` and `store-init` services.
+- **RustFS** (Apache-2.0) also passes the conformance checks.
+- **Supported external stores:** AWS S3, Google Cloud Storage (its XML API) and Cloudflare R2. Set `CLOUDHAL_S3_ENDPOINT`, the bucket and the credentials, and stop the compose file's `seaweedfs` service. Cloudhal creates the bucket when it is missing (HEAD first, so credentials without CreateBucket work on an existing one; `CLOUDHAL_S3_CREATE_BUCKET=off` skips it).
 - **Not supported:** MinIO's community edition (archived, no security fixes) and Garage (no conditional writes).
 
-Give the bucket a lifecycle rule that aborts incomplete multipart uploads after a day. An upload that is cut off otherwise keeps its parts.
+`node scripts/store-conformance.ts --endpoint <url> --bucket <b> --key <k> --secret <s>` checks a store before you rely on it:
+
+- that `If-None-Match: *` is atomic under concurrency, and `If-Match` works;
+- multipart uploads above 8 MiB;
+- ListObjectsV2 paging;
+- the lifecycle rule.
+
+CI runs it against SeaweedFS and RustFS.
+
+**Incomplete uploads.** At each start the image gives the bucket a lifecycle rule that aborts incomplete multipart uploads after a day. Without that rule, an upload that is cut off keeps its parts forever. The image adds the rule only when the bucket has no lifecycle configuration at all, because writing one replaces the whole configuration. Set the rule yourself on a bucket that already has rules, or set `CLOUDHAL_S3_LIFECYCLE=off` to skip this step.
 
 ## Several instances
 
@@ -132,6 +157,8 @@ The cluster runs on workerd's experimental cluster mode, so treat several instan
   - a PodDisruptionBudget;
   - an Ingress or Gateway API routes;
   - a Secret generated once and kept, and optionally SeaweedFS in the release.
+
+- **Kubernetes without Helm:** [`deploy/kustomize/`](https://github.com/cloudhal-dev/cloudhal/tree/main/deploy/kustomize) has the chart's defaults rendered as a kustomize base, with the Secret from a `secretGenerator`.
 
 `scripts/swarm-smoke.sh` and `scripts/helm-smoke.sh` (kind) run both recipes in CI with every image. Each smoke test covers a publish that is live on the next request and a rolling update while the site is polled.
 

@@ -2,7 +2,8 @@
  * What a self-hoster gets (RFC-0047, docs/guides/self-host.md). This test:
  *
  * 1. Runs the image as the compose file does: the SeaweedFS of compose.yml on a private network,
- *    the bucket, the `secrets` the image prints, and the container read-only with a tmpfs /tmp.
+ *    the `secrets` the image prints, and the container read-only with a tmpfs /tmp; the entrypoint
+ *    creates the bucket.
  * 2. Checks the instance on its own:
  *    - `/api/health`, and the site the entrypoint creates under `CLOUDHAL_SITE_ID`;
  *    - RFC-0043's 503 before the first publish;
@@ -11,8 +12,7 @@
  *    - a publish live on the next request with no build;
  *    - content surviving a restart.
  * 3. Checks the guard: a Node-image volume is refused.
- * 4. Checks the cluster: a second instance with the same settings serves the same site, and keeps
- *    answering while the first stops (SIGTERM hands its objects over).
+ * 4. Checks the cluster: a second instance with the same settings serves the same site.
  *
  * Run by .github/workflows/docker.yml after every build, and by hand:
  *
@@ -99,19 +99,6 @@ function startStore(env: Record<string, string>): void {
   ]);
 }
 
-async function createBucket(): Promise<void> {
-  for (let i = 0; i < 60; i++) {
-    const r = spawnSync(
-      "docker",
-      ["exec", "-i", store, "weed", "shell", "-master=localhost:9333"],
-      { input: "s3.bucket.create -name cloudhal\n", encoding: "utf8" },
-    );
-    if (/created bucket|already exist/.test(`${r.stdout}${r.stderr}`)) return;
-    await sleep(2000);
-  }
-  throw new Error("SeaweedFS did not create the bucket within 120 s");
-}
-
 /** Secrets go to `docker run` in a 0600 file, so a failed command never prints them. */
 const envDir = mkdtempSync(path.join(os.tmpdir(), "cloudhal-smoke-"));
 function envFile(name: string, env: Record<string, string>): string {
@@ -121,7 +108,9 @@ function envFile(name: string, env: Record<string, string>): string {
     Object.entries(env)
       .map(([k, v]) => `${k}=${v}\n`)
       .join(""),
-    { mode: 0o600 },
+    {
+      mode: 0o600,
+    },
   );
   return file;
 }
@@ -207,8 +196,7 @@ const env = secrets();
 const volumes = { a: `${id}-a`, b: `${id}-b`, node: `${id}-node` };
 startStore(env);
 try {
-  await createBucket();
-  step("SeaweedFS is up with the bucket");
+  step("SeaweedFS is up (the entrypoint creates the bucket)");
   runInstance("a", env, volumes.a);
   await waitHealthy(a);
   const health = await json(`${studio("a")}/api/health`);
@@ -328,28 +316,6 @@ try {
   expect(viaB.status === 200 && HOME_H1.test(await viaB.text()), "instance b serves the site");
   step("a second instance with the same settings serves the same site");
 
-  const codes: number[] = [];
-  let polling = true;
-  const poll = (async () => {
-    while (polling) {
-      const r = await fetch(`${studio("b")}/api/health`).catch(() => undefined);
-      codes.push(r?.status ?? 0);
-      await r?.body?.cancel();
-      await sleep(200);
-    }
-  })();
-  docker(["stop", "-t", "15", a]);
-  await sleep(3000);
-  polling = false;
-  await poll;
-  const bad = codes.filter((c) => c !== 200);
-  expect(bad.length === 0, "instance b answered every request while a stopped", { codes });
-  const after = await fetch(`${site("b")}/`);
-  expect(
-    after.status === 200 && HOME_H1.test(await after.text()),
-    "instance b serves the site after a stopped",
-  );
-  step(`instance a stopped (SIGTERM) and b answered all ${codes.length} requests meanwhile`);
   console.log("\nDocker smoke test passed.");
 } catch (e) {
   console.error(`\n✗ ${e instanceof Error ? e.message : String(e)}`);

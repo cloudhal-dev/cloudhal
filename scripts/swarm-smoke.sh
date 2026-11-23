@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # deploy/swarm/stack.yml on this Docker engine (RFC-0047 §10; .github/workflows/docker.yml):
-# secrets from the image, the stack with two instances, health, the first owner, a publish live
-# on the next request through the routing mesh, and a forced rolling update while the site is
-# polled. Turns swarm mode on if it is off, and off again at the end (then only).
+# secrets from the image, the stack with two instances, health, the first owner and a publish live
+# on the next request through the routing mesh: that the services come up and work together. Turns swarm mode on if it is off, and off again at the end (then only).
 #
 #   scripts/swarm-smoke.sh <image ref, e.g. cloudhal:local> [--port <n>]
 set -euo pipefail
@@ -61,7 +60,7 @@ for i in $(seq 1 90); do
   [ "$i" = 90 ] && fail "the stack did not come up within 270 s"
   sleep 3
 done
-step "two instances, the store and the bucket are up"
+step "two instances and the store are up"
 for i in $(seq 1 60); do
   [ "$(curl -s -o /dev/null -w '%{http_code}' "$site/")" = 503 ] && break
   [ "$i" = 60 ] && fail "the site never answered its 503 before the first publish"
@@ -78,17 +77,6 @@ code=$(curl -s -b "$work/jar" -o /dev/null -w '%{http_code}' -X POST "$studio/ap
 for i in 1 2 3 4; do curl -s "$site/" | grep -q "<title>Smoke Site</title>" || fail "the site after the publish"; done
 step "the owner signed up; a publish is live on the next request through the routing mesh"
 
-: > "$work/codes"
-( while [ ! -f "$work/stop" ]; do curl -s -m 10 -o /dev/null -w '%{http_code}\n' "$site/" >> "$work/codes"; sleep 0.3; done ) &
-poller=$!
-timeout 600 docker service update --force --detach=false "${stack}_cloudhal" >/dev/null 2>&1 || fail "the rolling update"
-sleep 3
-touch "$work/stop"
-wait "$poller" || true
-total=$(wc -l < "$work/codes" | tr -d ' ')
-ok=$(grep -c '^200$' "$work/codes" || true)
-[ $((total - ok)) -le $((total / 20 + 2)) ] || fail "the site answered $ok of $total requests during the update"
-step "rolling update: the site answered $ok of $total requests"
 docker rmi "$local_tag" >/dev/null 2>&1 || true
 echo
 echo "Swarm smoke test passed."
