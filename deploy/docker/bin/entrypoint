@@ -1,13 +1,12 @@
 #!/bin/sh
 # The image's entrypoint (RFC-0047 §5). `start` (the default), `secrets`, `config` and `check` are
-# `cloudhal selfhost <command>`; anything else runs as given, so `docker run … cloudhal export` and
-# `docker compose exec cloudhal cloudhal schedules status --remote` work too.
+# `cloudhal-selfhost <command>`; anything else runs as given.
 set -eu
 case "${1:-start}" in
   start | secrets | config | check)
     cmd="${1:-start}"
     [ $# -gt 0 ] && shift
-    exec cloudhal selfhost "$cmd" "$@"
+    exec /opt/cloudhal/bin/cloudhal-selfhost "$cmd" "$@"
     ;;
 esac
 exec "$@"

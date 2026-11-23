@@ -4,7 +4,8 @@
  *   1. read the settings (secrets through `_FILE`) and refuse to start without one;
  *   2. refuse a volume of the Node image (`cloudhal.json` and no v2 marker);
  *   3. check the bundle's files against its manifest;
- *   4. write the workerd config (0600, in the run directory) and start workerd, passing SIGTERM
+ *   4. write the workerd config (0600, in the run directory), create the bucket if it is missing
+ *      and set its lifecycle rule (store-prep.ts), and start workerd, passing SIGTERM
  *      and SIGINT on once, so its cluster handoff runs, and exiting with its code;
  *   5. once `/api/health` answers, create the installation's site under `CLOUDHAL_SITE_ID` unless
  *      it exists (every instance tries; the id makes it idempotent), and print the setup link.
@@ -13,8 +14,10 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { checkBundle } from "./bundle.ts";
+import { checkBundle } from "./bundle-check.ts";
 import { type Env, readSettings, resolveSecretFiles, type SelfhostSettings } from "./settings.ts";
+import { prepareStore } from "./store-prep.ts";
+import { chooseWorkerd } from "./workerd-binary.ts";
 import { workerdConfig } from "./workerd-config.ts";
 
 /** Written into the data directory at the first start of a v2 volume. */
@@ -124,7 +127,13 @@ export async function startSelfhost(o: StartOptions): Promise<number> {
   log(
     `selfhost: Cloudhal ${manifest.version}, site ${settings.siteId}, store ${settings.s3.endpoint}`,
   );
-  const child = spawn(o.workerd ?? "workerd", ["serve", "--experimental", configFile], {
+  const chosen = chooseWorkerd({
+    official: o.workerd ?? env.CLOUDHAL_WORKERD ?? "workerd",
+    fallback: env.CLOUDHAL_WORKERD_FALLBACK ?? "/opt/cloudhal/workerd-no-tcmalloc/workerd",
+  });
+  if (chosen.note) log(`selfhost: ${chosen.note}`);
+  await prepareStore(settings, env, log);
+  const child = spawn(chosen.binary, ["serve", "--experimental", configFile], {
     stdio: "inherit",
     env: env as NodeJS.ProcessEnv,
   });

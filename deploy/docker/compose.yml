@@ -12,6 +12,7 @@ x-store: &store
   CLOUDHAL_S3_BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
   CLOUDHAL_S3_PREFIX: ${CLOUDHAL_S3_PREFIX:-}
   CLOUDHAL_S3_REGION: ${CLOUDHAL_S3_REGION:-us-east-1}
+  CLOUDHAL_S3_LIFECYCLE: ${CLOUDHAL_S3_LIFECYCLE:-on}
   AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:?run `secrets` first (see the top of this file)}
   AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:?run `secrets` first (see the top of this file)}
 
@@ -21,9 +22,10 @@ services:
     restart: unless-stopped
     # workerd hands its Durable Objects to its peers and exits within 8 s of SIGTERM.
     stop_grace_period: 15s
+    # The entrypoint creates the bucket and its lifecycle rule (cloudhal-selfhost start).
     depends_on:
-      store-init:
-        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_healthy
     ports:
       - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_PORT:-8787}:8787"
       - "${CLOUDHAL_BIND:-127.0.0.1}:${CLOUDHAL_SITE_PORT:-8788}:8788"
@@ -79,29 +81,6 @@ services:
       interval: 5s
       timeout: 3s
       retries: 30
-
-  # Creates the bucket once (a no-op afterwards), before Cloudhal starts.
-  store-init:
-    image: chrislusf/seaweedfs:4.54@sha256:4b42c212543a0acd4c0e675215ecdcaf62a186ef98def76c7e12701871222d15
-    depends_on:
-      seaweedfs:
-        condition: service_healthy
-    environment:
-      BUCKET: ${CLOUDHAL_S3_BUCKET:-cloudhal}
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        set -e
-        for i in $$(seq 1 30); do
-          if echo "s3.bucket.list" | weed shell -master=seaweedfs:9333 2>/dev/null | grep -q "^  $$BUCKET"; then
-            echo "store-init: bucket $$BUCKET exists"; exit 0
-          fi
-          if echo "s3.bucket.create -name $$BUCKET" | weed shell -master=seaweedfs:9333 2>&1 | grep -q "created bucket"; then
-            echo "store-init: created bucket $$BUCKET"; exit 0
-          fi
-          sleep 2
-        done
-        echo "store-init: could not create the bucket $$BUCKET" >&2; exit 1
 
   caddy:
     profiles: [caddy]

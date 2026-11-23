@@ -2,11 +2,12 @@
 
 The official self-host image, `ghcr.io/cloudhal-dev/cloudhal`, built from each release ([RFC-0047](../../docs/rfcs/0047-self-host-on-workerd.md)). It runs the release bundle's site and admin Workers on a pinned workerd, as a cluster instance whose state lives in an S3 store. The guide is [docs/guides/self-host.md](../../docs/guides/self-host.md); this folder holds what it refers to:
 
-- **`Dockerfile`:** `node:24-bookworm-slim`, with `@cloudhal/cli` and workerd (`workerd-version`) installed by `install.mjs`.
+- **`Dockerfile`:** two stages. The build stage (`node:24-bookworm-slim`) runs `install.mjs`, which installs `@cloudhal/cli` and workerd (`workerd-version`) and lays out the runtime. The final stage is `debian:bookworm-slim` with that runtime only: the `node` binary, the compiled `selfhost` entry (Node built-ins only), the workerd binary and the bundle. It is about 410 MB on disk and 135 MB to download.
+  - On linux-arm64, `workerd-no-tcmalloc` can pin a community build of workerd without tcmalloc, for 39-bit kernels such as Raspberry Pi OS's 4 KiB ones. The build checks its SHA-256, and the entrypoint takes it only where the official binary cannot start.
   - The release bundle lives under `/opt/cloudhal/bundle`. For a release it is downloaded and verified by `cloudhal selfhost fetch`; for edge it comes from `bundle/` (scripts/selfhost-edge-bundle.ts).
   - Runs as non-root with a read-only root, and `/data` and `/tmp` are the only writable paths.
   - Ports 8787 (Studio, the API, `/mcp`), 8788 (the site) and 7000 (the cluster).
-- **`bin/entrypoint`:** `cloudhal selfhost start` by default; `secrets`, `config` and `check` are `cloudhal selfhost` commands. `start` does these steps:
+- **`bin/entrypoint`:** `cloudhal-selfhost start` by default; `secrets`, `config` and `check` are the other `cloudhal-selfhost` commands (`bin/cloudhal-selfhost`). The CLI itself is not in the image. `start` does these steps:
   1. reads the settings (`_FILE` secrets too);
   2. refuses a volume of the Node image;
   3. checks the bundle;

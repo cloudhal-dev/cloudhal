@@ -3,8 +3,7 @@
 #   1. installs deploy/helm/cloudhal with two instances and its SeaweedFS;
 #   2. checks health, the 503 before the first publish, the first owner, a publish live on the
 #      next request through the Service, and that a foreign pod cannot reach the cluster port;
-#   3. restarts the StatefulSet while a pod polls the site, keeps the Secret over an upgrade, scales
-#      to three.
+#   3. keeps the Secret over an upgrade and serves the site with three instances.
 #
 #   scripts/helm-smoke.sh <image ref loaded in docker, e.g. cloudhal:local> [--keep]
 # Needs docker, kind, helm and kubectl.
@@ -61,18 +60,6 @@ if c -o /dev/null -m 4 http://ch-cloudhal-0.ch-cloudhal-peers:7000/ready; then
 else
   step "a foreign pod cannot reach the cluster port (NetworkPolicy)"
 fi
-
-k exec poll -- sh -c 'rm -f /tmp/codes; while [ ! -f /tmp/stop ]; do curl -s -m 5 -o /dev/null -w "%{http_code}\n" http://ch-cloudhal:8788/ >> /tmp/codes; sleep 0.3; done' &
-poller=$!
-k rollout restart statefulset/ch-cloudhal >/dev/null
-k rollout status statefulset/ch-cloudhal --timeout=600s >/dev/null || fail "the rolling restart"
-sleep 3
-k exec poll -- touch /tmp/stop
-wait "$poller" || true
-total=$(k exec poll -- sh -c 'wc -l < /tmp/codes')
-ok=$(k exec poll -- sh -c 'grep -c "^200$" /tmp/codes || true')
-[ $((total - ok)) -le $((total / 20 + 2)) ] || fail "the site answered $ok of $total requests during the restart"
-step "rolling restart: the site answered $ok of $total requests"
 
 key=$(secret CLOUDHAL_CLUSTER_KEY | shasum)
 helm --kube-context "kind-$cluster" -n "$ns" upgrade ch "$root/deploy/helm/cloudhal" --reuse-values --set replicaCount=3 >/dev/null

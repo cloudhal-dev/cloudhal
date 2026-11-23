@@ -1,0 +1,9 @@
+# The tcmalloc-free linux-arm64 workerd for 39-bit kernels (Raspberry Pi OS's 4 KiB kernels;
+# cloudflare/workerd#5020), from the community builds at github.com/pdragun/workerd-no-tcmalloc
+# (upstream source, `use_tcmalloc=False`). Used only where the official build cannot start, and
+# only when its version equals workerd-version. Fill in all three lines when that release exists:
+# the SHA-256 is checked at image build. Empty: the arm64 image carries no fallback, and a 39-bit
+# kernel gets a message saying what to do.
+version=
+sha256=
+url=

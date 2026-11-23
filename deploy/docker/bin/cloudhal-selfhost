@@ -1,0 +1,4 @@
+#!/bin/sh
+# `cloudhal-selfhost start|check|config|secrets`: the image's runtime entry (RFC-0047 §9), for
+# `docker compose exec cloudhal cloudhal-selfhost config` and the entrypoint.
+exec node /opt/cloudhal/selfhost/main.js "$@"

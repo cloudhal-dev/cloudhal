@@ -1,0 +1,14 @@
+# Cloudhal for kustomize (RFC-0047 §10): the Helm chart's defaults, rendered into cloudhal.yaml by
+# scripts/kustomize-base.sh, plus the Secret from secrets.env (`cloudhal-selfhost secrets` output;
+# see ../README.md). Make an overlay for the image tag, replicas, hosts and an Ingress.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - cloudhal.yaml
+secretGenerator:
+  - name: cloudhal
+    envs:
+      - secrets.env
+    options:
+      # The site id and the cluster key must never change: keep the name stable across edits too.
+      disableNameSuffixHash: true

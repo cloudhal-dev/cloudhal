@@ -56,6 +56,9 @@ on:
       - "deploy/helm/**"
       - "scripts/helm-smoke.sh"
       - "scripts/swarm-smoke.sh"
+      - "scripts/store-conformance.ts"
+      - "scripts/kustomize-base.sh"
+      - "deploy/kustomize/**"
 
 permissions: {}
 
@@ -110,6 +113,14 @@ jobs:
           helm lint deploy/helm/cloudhal
           helm lint deploy/helm/cloudhal --set replicaCount=3 --set baseUrl=https://studio.example.com --set ingress.enabled=true
           helm template t deploy/helm/cloudhal --set httpRoute.enabled=true --set baseUrl=https://studio.example.com --set 'httpRoute.parentRefs[0].name=gw' > /dev/null
+      - name: The kustomize base matches the chart
+        run: scripts/kustomize-base.sh --check
+      # The stores the recipes offer, against what workerd's cluster and R2 binding need
+      # (RFC-0047 §3): conditional writes under concurrency, multipart, paging, lifecycle.
+      - name: Store conformance (SeaweedFS, RustFS)
+        run: |
+          node scripts/store-conformance.ts --docker seaweedfs
+          node scripts/store-conformance.ts --docker rustfs
       - name: Check the version
         if: env.VERSION != ''
         run: |
