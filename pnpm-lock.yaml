@@ -318,8 +318,8 @@ catalogs:
       specifier: 1.4.5
       version: 1.4.5
     better-sqlite3:
-      specifier: 13.0.3
-      version: 13.0.3
+      specifier: 13.2.0
+      version: 13.2.0
     echarts:
       specifier: ^6.1.0
       version: 6.1.0
@@ -435,7 +435,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -552,7 +552,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -583,7 +583,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -671,7 +671,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -723,7 +723,7 @@ importers:
         version: 7.4.7(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       happy-dom:
         specifier: 'catalog:'
         version: 21.0.4
@@ -780,7 +780,7 @@ importers:
         version: 2.1.8(hono@4.13.18)
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
     devDependencies:
       '@cloudflare/workers-types':
         specifier: 'catalog:'
@@ -876,7 +876,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -941,7 +941,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -1006,7 +1006,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       happy-dom:
         specifier: 'catalog:'
         version: 21.0.4
@@ -1080,7 +1080,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -1111,7 +1111,7 @@ importers:
         version: 26.6.5
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       miniflare:
         specifier: 'catalog:'
         version: 4.20260730.0(patch_hash=6d7c8031fbf8682db97d0bab3227b4bb2c8c4bc8e77fc8b69019ca2dafd5bd46)(@types/node@26.6.5)
@@ -1256,7 +1256,7 @@ importers:
         version: 7.4.7(@types/node@26.6.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
       better-sqlite3:
         specifier: 'catalog:'
-        version: 13.0.3
+        version: 13.2.0
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3
@@ -3516,8 +3516,8 @@ packages:
       zod:
         optional: true
 
-  better-sqlite3@13.0.3:
-    resolution: {integrity: sha512-RbOBxmLBG8uvFUc15X9+9SFemKcQ0WBuISBVkpuiaUB2qblC8UWlHEjdWVoZ8AdhSwmoEgsiXKfopX0CQxaACQ==}
+  better-sqlite3@13.2.0:
+    resolution: {integrity: sha512-Z8Q/9x/uNyKxA1v4FNodyItRVRw1TeKBrmj32JhxhR0ceNcBY+wMobt/Bv7M7TzwPAXjnZRtNaEsATnUZSKWZQ==}
     engines: {node: '>=22'}
 
   blake3-wasm@2.1.5:
@@ -7110,7 +7110,7 @@ snapshots:
     optionalDependencies:
       zod: 4.6.7
 
-  better-sqlite3@13.0.3:
+  better-sqlite3@13.2.0:
     dependencies:
       node-addon-api: 8.9.2
 
