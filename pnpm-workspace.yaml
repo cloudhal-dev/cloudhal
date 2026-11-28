@@ -33,16 +33,16 @@ catalog:
   tailwindcss: ^4.3.3
   marked: ^18.1.1
   parse5: 8.1.0
-  "@tiptap/core": 3.33.0
-  "@tiptap/react": 3.33.0
-  "@tiptap/pm": 3.33.0
-  "@tiptap/starter-kit": 3.33.0
-  "@tiptap/markdown": 3.33.0
-  "@tiptap/extension-table": 3.33.0
-  "@tiptap/extension-image": 3.33.0
-  "@tiptap/extension-list": 3.33.0
-  "@tiptap/extensions": 3.33.0
-  "@tiptap/suggestion": 3.33.0
+  "@tiptap/core": 3.35.0
+  "@tiptap/react": 3.35.0
+  "@tiptap/pm": 3.35.0
+  "@tiptap/starter-kit": 3.35.0
+  "@tiptap/markdown": 3.35.0
+  "@tiptap/extension-table": 3.35.0
+  "@tiptap/extension-image": 3.35.0
+  "@tiptap/extension-list": 3.35.0
+  "@tiptap/extensions": 3.35.0
+  "@tiptap/suggestion": 3.35.0
   "@codemirror/view": 6.43.15
   "@codemirror/state": 6.7.6
   "@codemirror/commands": 6.11.1
