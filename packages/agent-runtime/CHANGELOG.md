@@ -1,5 +1,12 @@
 # @cloudhal/agent-runtime
 
+## 0.11.0
+
+### Patch Changes
+
+- @cloudhal/core-contracts@0.11.0
+  - @cloudhal/storage@0.11.0
+
 ## 0.10.1
 
 ### Patch Changes
