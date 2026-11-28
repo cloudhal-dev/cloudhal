@@ -18,6 +18,10 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    groups:
+      # init and analyze must be the same release: CodeQL fails when they differ, so a PR that
+      # bumps one alone can never pass (#270, #272).
+      codeql-action: { patterns: ["github/codeql-action", "github/codeql-action/*"] }
   # The self-host image's base image and the compose file's Caddy (docs/guides/self-host.md).
   - package-ecosystem: docker
     directory: /deploy/docker
