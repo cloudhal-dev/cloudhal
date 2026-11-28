@@ -82,10 +82,10 @@ describe("admin search reindex (RFC-0019 §3)", () => {
     expect(await (await reindex()).json()).toEqual({ published: null, index: null });
     const snap = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
     await b.store.publish(site, snap.id);
-    // a restored backup has no index rows: the reindex brings them back
+    // A restored D1 backup (#253): D1 cannot export the FTS5 tables, so they come back empty,
+    // while search_state and search_links, plain tables, come back as they were.
     await b.sql.run("DELETE FROM search_index");
-    await b.sql.run("DELETE FROM search_links");
-    await b.sql.run("DELETE FROM search_state");
+    await b.sql.run("DELETE FROM search_index_cjk");
     const res = await reindex();
     expect(res.status).toBe(200);
     // the seeded article, its two pages and its two terms (RFC-0029 §2)
@@ -96,6 +96,64 @@ describe("admin search reindex (RFC-0019 §3)", () => {
     expect((await b.store.search(site.id, "hello", { locale: "en", now: Date.now() })).total).toBe(
       1,
     );
+  });
+});
+
+describe("a restored D1 backup's search (#253)", () => {
+  const restore = async (b: Awaited<ReturnType<typeof backend>>) => {
+    await b.sql.run("DELETE FROM search_index");
+    await b.sql.run("DELETE FROM search_index_cjk");
+  };
+  const count = async (b: Awaited<ReturnType<typeof backend>>, table: string) =>
+    (await b.sql.get<{ n: number }>(`SELECT count(*) AS n FROM ${table}`))?.n;
+  const hello = (b: Awaited<ReturnType<typeof backend>>, siteId: string) =>
+    b.store.search(siteId, "hello", { locale: "en", now: Date.now() });
+
+  it("is rebuilt in full by the next publish, though search_state survived the restore", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Restored", slug: "restored" });
+    const first = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
+    await b.store.publish(site, first.id);
+    expect((await hello(b, site.id)).total).toBe(1);
+    const links = await count(b, "search_links");
+    await restore(b);
+    // The state still names the live snapshot, the index is empty: nothing is found.
+    expect(await b.store.searchStatus(site.id)).toEqual({ snapshotId: first.id, entries: 5 });
+    expect((await hello(b, site.id)).total).toBe(0);
+    // An unchanged republish would rewrite no node from that state; it rebuilds the site instead.
+    const live = (await b.store.getSite(site.id)) as Site;
+    const second = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
+    await b.store.publish(live, second.id);
+    expect((await hello(b, site.id)).total).toBe(1);
+    expect(await b.store.searchStatus(site.id)).toEqual({ snapshotId: second.id, entries: 5 });
+    // search_links are rewritten, not doubled.
+    expect(await count(b, "search_links")).toBe(links);
+  });
+
+  it("is rebuilt by a refresh at the live snapshot, and an intact index is left alone", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Restored", slug: "restored" });
+    const snap = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
+    await b.store.publish(site, snap.id);
+    const batch = vi.spyOn(b.sql, "batch");
+    await b.store.refreshSearch(site.id);
+    expect(batch).not.toHaveBeenCalled();
+    await restore(b);
+    await b.store.refreshSearch(site.id);
+    expect(batch).toHaveBeenCalledTimes(1);
+    expect((await hello(b, site.id)).total).toBe(1);
+  });
+
+  it("leaves a site with no indexed rows to its state (nothing to rebuild)", async () => {
+    const b = await backend();
+    const site = await seedStarterSite(b.store, { name: "Restored", slug: "restored" });
+    const snap = await b.store.createSnapshot(site.id, { actor: human, reason: "publish" });
+    await b.store.publish(site, snap.id);
+    await b.sql.run("UPDATE search_state SET entries = 0");
+    await restore(b);
+    const batch = vi.spyOn(b.sql, "batch");
+    await b.store.refreshSearch(site.id);
+    expect(batch).not.toHaveBeenCalled();
   });
 });
 

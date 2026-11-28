@@ -75,6 +75,32 @@ Source: [AI Search limits and pricing](https://developers.cloudflare.com/ai-sear
 ### Turning it off
 Remove the `search` block and deploy again. The bindings go, and FTS5 answers alone. The bucket and the instance stay until you delete them in the dashboard.
 
+## Backing up a Cloudflare deployment
+
+D1 refuses to export a database that has virtual tables, and the search index is two FTS5 tables (`search_index`, `search_index_cjk`). A plain `wrangler d1 export --remote` therefore fails with "cannot export databases with virtual tables (like FTS5)". Export the plain tables by name, and add the index tables' definitions, empty, at the end of the dump. `<database>` is the deployment's D1 database (`<name>-db` unless `cloudhal.json` names another).
+
+1. **List the plain tables.** Leave out SQLite's and Cloudflare's own (`sqlite_*`, `_cf_*`); FTS5 tables are type `virtual` and their storage is type `shadow`, so neither is listed:
+
+   ```bash
+   wrangler d1 execute <database> --remote --json --command "SELECT name FROM pragma_table_list WHERE schema = 'main' AND type = 'table' AND name NOT LIKE 'sqlite\_%' ESCAPE '' AND name NOT LIKE '\_cf\_%' ESCAPE '' ORDER BY name"
+   ```
+
+2. **Export them**, with one `--table` per name from step 1:
+
+   ```bash
+   wrangler d1 export <database> --remote --output backup.sql --table <name> --table <name> …
+   ```
+
+3. **Append the index tables**, so a restore recreates them and searches do not fail with "no such table". Take each definition from this query and add it to the end of `backup.sql` as `CREATE VIRTUAL TABLE IF NOT EXISTS …;`, one statement per table:
+
+   ```bash
+   wrangler d1 execute <database> --remote --json --command "SELECT m.sql FROM pragma_table_list AS l JOIN sqlite_master AS m ON m.name = l.name WHERE l.schema = 'main' AND l.type = 'virtual' ORDER BY l.name"
+   ```
+
+To restore, run the dump into a new, empty database with `wrangler d1 execute <database> --remote --file backup.sql`. The index comes back empty while `search_state` still says which snapshot it reflected. Cloudhal notices the missing rows and rebuilds the site's index in full on its next publish. To have search back at once, run `cloudhal search reindex --remote`. If the database holds several sites ([multi-site guide](multi-site.md)), run it in each site's project.
+
+The Docker self-host backup (a copy of the SQLite volume, [self-host guide](self-host.md#backup-and-restore)) and `cloudhal export` ([site archives](site-archives.md)) are not affected: neither goes through D1's export.
+
 ## For agents and Studio
 - **Studio.** The ⌘K palette also searches the site's own content, drafts included: articles, pages, categories and tags, media, menu items and redirects. Enter opens the editor; ⌘/Ctrl+Enter opens it in a new tab.
 - **Agents.** They use the MCP tool `search_site`. By default it searches what can be edited; with `published: true` it returns what readers find.

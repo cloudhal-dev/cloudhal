@@ -12,6 +12,7 @@ import {
   type SearchResults,
   searchState,
   searchStatements,
+  trustedSearchState,
 } from "../search.ts";
 import { fts5Provider, type SearchProvider, withFallback } from "../search-provider.ts";
 import type { SiteGraphStore } from "../store.ts";
@@ -43,7 +44,7 @@ export class SearchEngine {
 
   /**
    * The plan that brings the index to `snapshotId`, from the snapshot it reflects now (only
-   * changed nodes) or from scratch. Undefined when it cannot be planned (the publish goes ahead;
+   * changed nodes) or from scratch (no state, or a state the index no longer backs). Undefined when it cannot be planned (the publish goes ahead;
    * the index stays where it was and pages say it is updating).
    */
   async plan(
@@ -54,7 +55,8 @@ export class SearchEngine {
     try {
       const target = await this.#graph.getSnapshot(snapshotId);
       if (!target) return undefined;
-      const state = options.full ? undefined : await searchState(this.#sql, siteId);
+      // A state whose rows the index lost (a restored D1 backup, #253) counts as none: full plan.
+      const state = options.full ? undefined : await trustedSearchState(this.#sql, siteId);
       if (state?.snapshotId === snapshotId) return undefined;
       const base = state ? await this.#graph.getSnapshot(state.snapshotId) : undefined;
       return await planSearch({ target, base, read: (ref) => this.#graph.readSnapshotNode(ref) });

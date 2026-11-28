@@ -162,6 +162,27 @@ export async function searchState(
   return row ? { snapshotId: row.snapshot_id, entries: row.entries } : undefined;
 }
 
+/**
+ * `searchState` as the planner may trust it: no state when it counts rows the index no longer has
+ * for the site. D1 refuses to export a database with FTS5 tables, so a backup leaves them out (or
+ * drops and recreates them empty) while `search_state`, a plain table, comes back as it was (#253).
+ * Planning from that state would rewrite only changed nodes into an empty index, and an index at
+ * the live snapshot not at all; with no state the next publish or refresh rebuilds the site.
+ */
+export async function trustedSearchState(
+  sql: SqlDriver,
+  siteId: string,
+): Promise<{ snapshotId: string; entries: number } | undefined> {
+  const state = await searchState(sql, siteId);
+  if (!state || state.entries === 0) return state;
+  const row = await sql.get<{ present: number }>(
+    `SELECT EXISTS (SELECT 1 FROM search_index WHERE site_id = ?)
+OR EXISTS (SELECT 1 FROM ${CJK_TABLE} WHERE site_id = ?) AS present`,
+    [siteId, siteId],
+  );
+  return row?.present ? state : undefined;
+}
+
 type Snap = { id: string; nodes: readonly NodeRef[] };
 /** Node kinds the index is built from. */
 const INDEXED = new Set<NodeRef["kind"]>(["contentEntry", "page", "term"]);
