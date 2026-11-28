@@ -7,8 +7,10 @@ import type { Migration } from "../src/migrate.ts";
  * Time gates are columns, not filters: an embargoed article is indexed and found only once its
  * `from` has passed, an expired one only before its `until`.
  *
- * `wrangler d1 export` skips virtual tables: a restored backup rebuilds the index on the next
- * publish or with `cloudhal search reindex`.
+ * D1 refuses to export a database with virtual tables (FTS5), so a D1 backup leaves the index out
+ * (docs/guides/search.md, "Backing up a Cloudflare deployment"). A restore keeps `search_state`;
+ * the planner then finds the site's rows missing and rebuilds them in full on the next publish or
+ * refresh, and `cloudhal search reindex` does it at once (#253).
  */
 export const migration0021Search: Migration = {
   name: "0021_search",

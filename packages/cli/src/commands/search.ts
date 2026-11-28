@@ -1,8 +1,9 @@
 /**
  * `cloudhal search reindex` (RFC-0019 §3): rebuilds the site's search index from its live snapshot,
  * on the project's SQLite or with `--remote` on the deployment (deployment token). Publishing keeps
- * the index current on its own; this is for restored backups (`wrangler d1 export` skips virtual
- * tables) and for sites published before search existed.
+ * the index current on its own, and rebuilds a site whose rows the index lost (a restored D1 backup:
+ * D1 cannot export FTS5 tables, #253) at its next publish; this rebuilds it at once, and serves
+ * sites published before search existed.
  */
 import path from "node:path";
 import { openLocalStore } from "@cloudhal/core-ts/local";
