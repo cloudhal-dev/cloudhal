@@ -1,5 +1,44 @@
 # @cloudhal/cli
 
+## 0.11.0
+
+### Minor Changes
+
+- 0c9ceb9: Self-host v2 (RFC-0047). The Docker image now runs the release bundle's own site and admin Workers on a pinned workerd: D1 is workerd's built-in D1, R2 lives in an S3-compatible store (SeaweedFS in the compose file), and the Durable Objects and cron are workerd's. Every installation is a workerd cluster, so a publish is live on the next request with no build, and several instances with the same settings serve one installation.
+  
+  - New `cloudhal selfhost fetch|check|config|secrets|start`. These commands are the image's entrypoint, its workerd config generator and its bundle verifier.
+  - `POST /api/admin/sites` accepts an optional `id` from the deploy-token holder. A taken id answers 409. The self-host entrypoint uses it to create the site whose id it wrote into the config.
+  - The Node image is replaced, along with its `site-build`, its static site and `CLOUDHAL_SITE_BUILD`. The new image refuses a volume of the Node image and names the way out: `cloudhal export` with the old image, then `cloudhal import` into the new one.
+- d4f0dcf: The self-host image is smaller and states which platforms it runs on (RFC-0047).
+  
+  - **Smaller image:** the final stage is Debian with the node binary, the compiled `selfhost` entry, workerd and the bundle, with no CLI dependencies. It is 410 MB on disk (was 985 MB) and about 135 MB to download. The commands are now `cloudhal-selfhost start|check|config|secrets`.
+  - **Clear start-up errors:** the image recognises a 39-bit-VA arm64 kernel, such as Raspberry Pi OS's 4 KiB kernels where the official workerd cannot start, and an x86-64 CPU without x86-64-v2, and says what to do in each case. On a 39-bit kernel it takes a pinned tcmalloc-free community workerd build when one is configured.
+  - **Store set-up at start:** the entrypoint creates the bucket when it is missing and gives a bucket without lifecycle rules the rule that aborts incomplete multipart uploads. The compose `store-init` service, the Swarm job and the Helm init container are gone.
+  - **Recipes and checks:** a kustomize base rendered from the Helm chart, and `scripts/store-conformance.ts`, which checks S3 stores (SeaweedFS and RustFS pass).
+- 25e3632: Self-host recipes for Docker Swarm (`deploy/swarm`) and Kubernetes (the Helm chart in `deploy/helm/cloudhal`, published with each release as `oci://ghcr.io/cloudhal-dev/charts/cloudhal`) (RFC-0047 §10).
+  
+  The self-host image changes in three ways:
+  
+  - `CLOUDHAL_CLUSTER_ADVERTISE=auto` or `auto:<cidr>` advertises the container's own address, on that network.
+  - `CLOUDHAL_SITE_ID_FILE` is read like the other secrets.
+  - A front Worker before each socket now sets the client address the Workers rate-limit by. It always removes an incoming `CF-Connecting-IP`. Behind a proxy it takes the last `X-Forwarded-For` hop, so the proxy only needs to append that header, which most proxies do by default.
+
+### Patch Changes
+
+- Updated dependencies [0c9ceb9]
+  - @cloudhal/api@0.11.0
+  - @cloudhal/cloudflare@0.11.0
+  - @cloudhal/agent-runtime@0.11.0
+  - @cloudhal/analytics@0.11.0
+  - @cloudhal/astro-renderer@0.11.0
+  - @cloudhal/comments@0.11.0
+  - @cloudhal/core-contracts@0.11.0
+  - @cloudhal/core-ts@0.11.0
+  - @cloudhal/mcp-server@0.11.0
+  - @cloudhal/release-verify@0.11.0
+  - @cloudhal/schedules@0.11.0
+  - @cloudhal/storage@0.11.0
+
 ## 0.10.1
 
 ### Patch Changes
